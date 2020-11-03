@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<title>Telegram Bot API server build instructions</title>
+<style>
+.hide { display: none; }
+div.main { max-width:1200px; margin: auto; font-size: x-large; }
+select.large { font-size: large; }
+</style>
+</head>
+
+<body onload="onLoad(true)" onpopstate="onLoad(false)">
+
+<div class="main">
+  <div id="osSelectDiv" class="large" style="text-align:center;">
+    <p>Choose an operating system, on which you want to use the Telegram Bot API server:</p>
+    <select id="osSelect" onchange="onOsChanged(false)" autofocus class="large">
+      <option>Choose an operating system:</option>
+      <option>Windows</option>
+      <option>Linux</option>
+      <option>macOS</option>
+      <option>FreeBSD</option>
+      <option>OpenBSD</option>
+      <option>NetBSD</option>
+    </select>
+    <p></p>
+  </div>
+
+  <div id="linuxSelectDiv" class="hide" style="text-align:center;">
+    <p>Choose a Linux distro, on which you want to use the Telegram Bot API server:</p>
+    <select id="linuxSelect" onchange="onOsChanged(false)" class="large">
+      <option>Choose a Linux distro:</option>
+      <option>Alpine</option>
+      <option>Debian 8</option>
+      <option>Debian 9</option>
+      <option>Debian 10</option>
+      <option>Ubuntu 14</option>
+      <option>Ubuntu 16</option>
+      <option>Ubuntu 18</option>
+      <option>Ubuntu 20</option>
+      <option>Other</option>
+    </select>
+    <p></p>
+  </div>
+
+  <div id="buildOptionsDiv" class="hide" style="text-align:center;">
+    <div id="buildDebugDiv" class="hide">
+      <label><input type="checkbox" id="buildDebugCheckbox" onchange="onOptionsChanged()"/>Build the debug binary. Debug binaries are much larger and slower than the release one.</label>
+    </div>
+
+    <div id="buildInstallLocalDiv" class="hide">
+      <label><input type="checkbox" id="buildInstallLocalCheckbox" onchange="onOptionsChanged()"/>Install the built Telegram Bot API server to /usr/local instead of placing the files to telegram-bot-api/bin.</label>
+    </div>
+
+    <p></p>
+
+    <div id="buildCompilerDiv" class="hide">
+      <span>Choose which compiler you want to use to build the Telegram Bot API server:</span><br>
+      <label><input type="radio" id="buildCompilerRadioGcc" name="buildCompilerRadio" onchange="onOptionsChanged()" checked/>g++</label>
+      <label><input type="radio" id="buildCompilerRadioClang" name="buildCompilerRadio" onchange="onOptionsChanged()"/>clang++ (recommended)</label>
+      <p></p>
+    </div>
+
+    <div id="buildShellDiv" class="hide">
+      <span>Choose which shell application you want to use for building:</span><br>
+      <label><input type="radio" id="buildShellRadioPowerShell" name="buildShellRadio" onchange="onOptionsChanged()" checked/>PowerShell</label>
+      <label><input type="radio" id="buildShellRadioBash" name="buildShellRadio" onchange="onOptionsChanged()"/>mintty/Bash</label>
+      <p></p>
+    </div>
+
+    <div id="buildShellBsdDiv" class="hide">
+      <span>Choose which shell application you want to use for building:</span><br>
+      <label><input type="radio" id="buildShellBsdRadioCsh" name="buildShellRadioBsd" onchange="onOptionsChanged()" checked/>tcsh/csh</label>
+      <label><input type="radio" id="buildShellBsdRadioBash" name="buildShellRadioBsd" onchange="onOptionsChanged()"/>Bash</label>
+      <p></p>
+    </div>
+
+    <div id="buildBitnessDiv" class="hide">
+      <span>Choose for which bitness you want to build the Telegram Bot API server:</span><br>
+      <label><input type="radio" id="buildBitnessRadio64" name="buildBitnessRadio" onchange="onOptionsChanged()" checked/>64</label>
+      <label><input type="radio" id="buildBitnessRadio32" name="buildBitnessRadio" onchange="onOptionsChanged()"/>32</label>
+      <p></p>
+    </div>
+
+    <div id="buildRootDiv" class="hide">
+      <label><input type="checkbox" id="buildRootCheckbox" onchange="onOptionsChanged()"/>Build from root user (unrecommended).</label>
+    </div>
+
+    <p></p>
+  </div>
+
+  <div id="buildTextDiv" class="hide" style="text-align:center;">
+    <p id="buildText">Hidden text</p>
+  </div>
+
+  <div id="buildCommandsDiv" class="hide" style="text-align:left;">
+    <p id="buildPre">Hidden text</p>
+    <code id="buildCommands">Empty commands</code>
+  </div>
+</div>
+
+<script>
+function onLoad(initial) {
+  var url = new URL(window.location.href);
+  var os = url.searchParams.get('os');
+
+  if (!os) {
+    os = '';
+  }
+  var os_options = document.getElementById('osSelect').options;
+  for (var i = 0; i < os_options.length; i++) {
+    os_options[i].selected = os_options[i].text.toLowerCase() === os.toLowerCase();
+  }
+
+  onOsChanged(initial || !history.state);
+}
+
+function onOsChanged(initial) {
+  var os = document.getElementById('osSelect').value;
+  if (os.includes('Choose ')) {
+    if (history.state != '') {
+      history.pushState('', '', 'build.html');
+    }
+
+    document.getElementById('linuxSelectDiv').style.display = 'none';
+    document.getElementById('buildTextDiv').style.display = 'none';
+    document.getElementById('buildOptionsDiv').style.display = 'none';
+    document.getElementById('buildCommandsDiv').style.display = 'none';
+    return;
+  }
+
+  if (!initial && history.state !== os) {
+    history.pushState(os, '', 'build.html?os=' + encodeURIComponent(os));
+  }
+
+  var os_linux = os.includes('Linux');
+  if (os_linux) {
+    document.getElementById('linuxSelectDiv').style.display = 'block';
+
+    var linux_distro = document.getElementById('linuxSelect').value;
+    if (linux_distro.includes('Choose ')) {
+      document.getElementById('buildTextDiv').style.display = 'none';
+      document.getElementById('buildOptionsDiv').style.display = 'none';
+      document.getElementById('buildCommandsDiv').style.display = 'none';
+      return;
+    }
+  } else {
+    document.getElementById('linuxSelectDiv').style.display = 'none';
+  }
+
+  document.getElementById('buildTextDiv').style.display = 'block';
+  document.getElementById('buildText').innerHTML = 'Here is complete instruction for building Telegram Bot API Server on ' + os + ':';
+
+  document.getElementById('buildOptionsDiv').style.display = 'block';
+
+  onOptionsChanged();
+}
+
+function onOptionsChanged() {
+  var os = document.getElementById('osSelect').value;
+
+  var os_windows = os.includes('Windows');
+  var os_linux = os.includes('Linux');
+  var os_mac = os.includes('macOS');
+  var os_freebsd = os.includes('FreeBSD');
+  var os_openbsd = os.includes('OpenBSD');
+  var os_netbsd = os.includes('NetBSD');
+
+  var linux_distro = 'none';
+  if (os_linux) {
+    linux_distro = document.getElementById('linuxSelect').value;
+  }
+  document.getElementById('buildCommandsDiv').style.display = 'block';
+
+  var use_clang = os_freebsd || os_openbsd;
+  if (os_linux && linux_distro !== 'Alpine') {
+    document.getElementById('buildCompilerDiv').style.display = 'block';
+    use_clang = document.getElementById('buildCompilerRadioClang').checked;
+  } else {
+    document.getElementById('buildCompilerDiv').style.display = 'none';
+  }
+
+  var use_root = false;
+  if ((os_linux && linux_distro !== 'Other') || os_openbsd || os_netbsd) {
+    use_root = document.getElementById('buildRootCheckbox').checked;
+    document.getElementById('buildRootDiv').style.display = 'block';
+  } else {
+    document.getElementById('buildRootDiv').style.display = 'none';
+  }
+
+  var use_powershell = false;
+  var use_cmd = false;
+  var use_csh = false;
+  if (os_windows) {
+    document.getElementById('buildShellDiv').style.display = 'block';
+    use_powershell = document.getElementById('buildShellRadioPowerShell').checked;
+  } else {
+    document.getElementById('buildShellDiv').style.display = 'none';
+  }
+  if (os_freebsd) {
+    document.getElementById('buildShellBsdDiv').style.display = 'block';
+    use_csh = document.getElementById('buildShellBsdRadioCsh').checked;
+  } else {
+    document.getElementById('buildShellBsdDiv').style.display = 'none';
+  }
+
+  var use_msvc = os_windows;
+  var use_vcpkg = os_windows;
+
+  var is_debug_build = document.getElementById('buildDebugCheckbox').checked;
+  document.getElementById('buildDebugDiv').style.display = 'block';
+
+  var sudo = 'sudo ';
+  if (use_root || linux_distro.includes('Debian') || os_freebsd || os_openbsd || os_netbsd) {
+    sudo = '';
+  }
+
+  var build_32bit = false;
+  var build_64bit = false;
+  if (use_msvc) {
+    document.getElementById('buildBitnessDiv').style.display = 'block';
+    build_32bit = document.getElementById('buildBitnessRadio32').checked;
+    build_64bit = document.getElementById('buildBitnessRadio64').checked;
+  } else {
+    document.getElementById('buildBitnessDiv').style.display = 'none';
+  }
+
+  var local = './';
+  if (use_cmd) {
+    local = '.\\';
+  }
+
+  var install_dir = 'telegram-bot-api/bin';
+  if (!os_windows) {
+    document.getElementById('buildInstallLocalDiv').style.display = 'block';
+    if (document.getElementById('buildInstallLocalCheckbox').checked) {
+      install_dir = '/usr/local';
+    }
+  } else {
+    document.getElementById('buildInstallLocalDiv').style.display = 'none';
+  }
+
+  var pre_text = [];
+  if (os_windows) {
+    pre_text.push('Note that Windows Subsystem for Linux (WSL) and Cygwin are not Windows environments, so you need to use instructions for Linux for them instead.');
+    pre_text.push('Download and install <a href="https://visualstudio.microsoft.com/ru/vs/community/">Microsoft Visual Studio</a>. Enable C++ support while installing.');
+    pre_text.push('Download and install <a href="https://cmake.org/download/">CMake</a>; choose "Add CMake to the system PATH" option while installing.');
+    pre_text.push('Download and install <a href="https://git-scm.com/download/win">Git</a>.');
+    pre_text.push('Download and install <a href="https://sourceforge.net/projects/gnuwin32/files/gperf/3.0.1/">gperf</a>. Add the path to gperf.exe to the PATH environment variable.');
+  }
+  if (os_linux && linux_distro === 'Other') {
+    var compiler = use_clang ? 'clang++ >= 3.4' : 'g++ >= 4.9.2';
+    pre_text.push('Install Git, ' + compiler + ', make, CMake >= 3.0.2, OpenSSL-dev, zlib-dev, gperf using your package manager.');
+  }
+  if (os_freebsd) {
+    pre_text.push('Note that the following instruction is for FreeBSD 11.');
+    pre_text.push('Note that the following calls to <code>pkg</code> needs to be run as <code>root</code>.');
+  }
+  if (os_openbsd) {
+    pre_text.push('Note that the following instruction is for OpenBSD 6.7 and default KSH shell.');
+    pre_text.push('Note that building requires a lot of memory, so you may need to increase allowed per-process memory usage in /etc/login.conf or build from root.');
+  }
+  if (os_netbsd) {
+    pre_text.push('Note that the following instruction is for NetBSD 8.0 and default SH shell.');
+  }
+
+  var terminal_name = (function () {
+    if (os_windows) {
+      return use_powershell ? 'PowerShell' : 'mintty/Bash';
+    }
+    if (os_mac) {
+      return 'Terminal';
+    }
+    if (os_openbsd) {
+      return 'ksh';
+    }
+    if (os_netbsd) {
+      return 'sh';
+    }
+    if (use_csh) {
+      return 'tcsh/csh';
+    }
+    return 'Bash';
+  })();
+  if (os_windows) {
+    pre_text.push('Close and re-open ' + terminal_name + ' if the PATH environment variable was changed.');
+  }
+  pre_text.push('Run these commands in ' + terminal_name + ' to build Bot API server and to install it to ' + install_dir + ':');
+  document.getElementById('buildPre').innerHTML = '<ul><li>' + pre_text.join('</li><li>') + '</li></ul>';
+  document.getElementById('buildPre').style.display = 'block';
+
+  if (install_dir !== '/usr/local') {
+    install_dir = '..';
+  }
+
+  function getClangVersionSuffix() {
+    switch (linux_distro) {
+      case 'Ubuntu 14':
+        return '-3.9';
+      case 'Ubuntu 18':
+        return '-6.0';
+      case 'Ubuntu 20':
+        return '-10';
+      default:
+        return ''; // use default version
+    }
+  }
+
+  var commands = [];
+
+  if (os_mac) {
+    commands.push('xcode-select --install');
+    commands.push('/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"');
+    commands.push('brew install gperf cmake openssl');
+  } else if (os_linux && linux_distro !== 'Other') {
+    switch (linux_distro) {
+      case 'Alpine':
+        commands.push(sudo + 'apk update');
+        commands.push(sudo + 'apk upgrade');
+        var packages = 'alpine-sdk linux-headers git zlib-dev openssl-dev gperf cmake';
+        commands.push(sudo + 'apk add --update ' + packages);
+        break;
+      case 'Debian 8':
+      case 'Debian 9':
+      case 'Debian 10':
+      case 'Ubuntu 14':
+      case 'Ubuntu 16':
+      case 'Ubuntu 18':
+      case 'Ubuntu 20':
+        if (linux_distro.includes('Debian') && !use_root) {
+          commands.push('su -');
+        }
+        if (linux_distro === 'Ubuntu 14' && !use_clang) {
+          commands.push(sudo + 'add-apt-repository ppa:ubuntu-toolchain-r/test');
+        }
+        commands.push(sudo + 'apt-get update');
+        commands.push(sudo + 'apt-get upgrade');
+        var packages = 'make git zlib1g-dev libssl-dev gperf';
+        if (linux_distro === 'Ubuntu 14') {
+          packages += ' cmake3';
+        } else {
+          packages += ' cmake';
+        }
+        if (use_clang) {
+          packages += ' clang' + getClangVersionSuffix() + ' libc++-dev';
+          if (linux_distro === 'Debian 10' || linux_distro === 'Ubuntu 18' || linux_distro === 'Ubuntu 20') {
+            packages += ' libc++abi-dev';
+          }
+        } else {
+          packages += ' g++';
+          if (linux_distro === 'Ubuntu 14') {
+            packages += '-4.9';
+          }
+        }
+        commands.push(sudo + 'apt-get install ' + packages);
+        if (linux_distro.includes('Debian') && !use_root) {
+          commands.push('exit');
+        }
+        break;
+    }
+  } else if (os_freebsd) {
+    commands.push(sudo + 'pkg upgrade');
+    var packages = 'git gperf cmake';
+    commands.push(sudo + 'pkg install ' + packages);
+  } else if (os_openbsd) {
+    if (!use_root) {
+      commands.push('su -');
+    }
+    var packages = 'git gperf cmake';
+    commands.push('pkg_add -z ' + packages);
+    if (!use_root) {
+      commands.push('exit');
+    }
+  } else if (os_netbsd) {
+    if (!use_root) {
+      commands.push('su -');
+    }
+    commands.push('export PKG_PATH=ftp://ftp.netbsd.org/pub/pkgsrc/packages/NetBSD/i386/8.0_2019Q2/All');
+    var packages = 'git gperf cmake openssl gcc5-libs';
+    commands.push('pkg_add ' + packages);
+    if (!use_root) {
+      commands.push('exit');
+    }
+  }
+  commands.push('git clone --recursive https://github.com/tdlib/telegram-bot-api.git');
+
+  commands.push('cd telegram-bot-api');
+
+  if (use_vcpkg) {
+    commands.push('git clone https://github.com/Microsoft/vcpkg.git');
+    commands.push('cd vcpkg');
+    commands.push(local + 'bootstrap-vcpkg.bat');
+    if (build_64bit) {
+      commands.push(local + 'vcpkg.exe install openssl:x64-windows zlib:x64-windows');
+    } else {
+      commands.push(local + 'vcpkg.exe install openssl:x86-windows zlib:x86-windows');
+    }
+    commands.push('cd ..');
+  }
+
+  function getBacicCmakeInitOptions() {
+    var options = [];
+    if (!use_msvc) {
+      options.push('-DCMAKE_BUILD_TYPE=' + (is_debug_build ? 'Debug' : 'Release'));
+    }
+    if (use_msvc) {
+      if (build_64bit) {
+        options.push('-A x64');
+      } else {
+        options.push('-A Win32');
+      }
+    }
+    return options;
+  }
+
+  commands.push(use_powershell ? 'Remove-Item build -Force -Recurse -ErrorAction SilentlyContinue' : 'rm -rf build');
+  commands.push('mkdir build');
+  commands.push('cd build');
+
+  if (!use_msvc) {
+    var c_flags = [];
+    var cxx_flags = [];
+
+    if (build_32bit) {
+      c_flags.push('-m32');
+      cxx_flags.push('-m32');
+    } else if (build_64bit) {
+      c_flags.push('-m64');
+      cxx_flags.push('-m64');
+    }
+
+    if (os_linux) {
+      if (use_clang) {
+        cxx_flags.push('-stdlib=libc++');
+      } else {
+        cxx_flags.push('');
+      }
+    }
+
+    if (c_flags.length) {
+      commands.push('export CFLAGS="' + c_flags.join(' ') + '"');
+    }
+    if (cxx_flags.length) {
+      commands.push('export CXXFLAGS="' + cxx_flags.join(' ') + '"');
+    }
+  }
+
+  cmake_init_options = getBacicCmakeInitOptions();
+  if (os_mac) {
+    cmake_init_options.push('-DOPENSSL_ROOT_DIR=/usr/local/opt/openssl/');
+  }
+  cmake_init_options.push('-DCMAKE_INSTALL_PREFIX:PATH=' + install_dir);
+  if (use_vcpkg) {
+    cmake_init_options.push('-DCMAKE_TOOLCHAIN_FILE:FILEPATH=../vcpkg/scripts/buildsystems/vcpkg.cmake');
+  }
+
+  function getCmakeInitCommand(options) {
+    var prefix = '';
+    if (os_linux) {
+      if (use_clang) {
+        var clang_version_suffix = getClangVersionSuffix();
+        prefix = 'CC=/usr/bin/clang' + clang_version_suffix + ' CXX=/usr/bin/clang++' + clang_version_suffix + ' ';
+      } else if (linux_distro === 'Ubuntu 14') {
+        prefix = 'CC=/usr/bin/gcc-4.9 CXX=/usr/bin/g++-4.9 ';
+      }
+    }
+    return prefix + 'cmake ' + options.join(' ') + ' ..';
+  }
+  commands.push(getCmakeInitCommand(cmake_init_options));
+
+  let build_command = 'cmake --build . --target install';
+  if (use_msvc) {
+    if (!is_debug_build) {
+      commands.push(build_command + ' --config Release');
+    }
+    if (is_debug_build) {
+      commands.push(build_command + ' --config Debug');
+    }
+  } else {
+    commands.push(build_command);
+  }
+  commands.push('cd ../..');
+  if (install_dir !== '/usr/local') {
+    install_dir = 'telegram-bot-api';
+  }
+  commands.push((use_powershell ? 'dir ' : 'ls -l ') + install_dir + '/bin/telegram-bot-api*');
+  document.getElementById('buildCommands').innerHTML = '<ul><li>' + commands.join('</li><li>') + '</li></ul>';
+}
+
+</script>
+
+</body>
+</html>

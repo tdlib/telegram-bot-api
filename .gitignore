@@ -1,0 +1,5 @@
+**/*build*/
+**/.*.swp
+**/.DS_Store
+bin/
+vcpkg/

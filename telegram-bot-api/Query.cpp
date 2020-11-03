@@ -1,0 +1,119 @@
+//
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
+//
+// Distributed under the Boost Software License, Version 1.0. (See accompanying
+// file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+//
+#include "telegram-bot-api/Query.h"
+
+#include "telegram-bot-api/Stats.h"
+
+#include "td/actor/actor.h"
+
+#include "td/utils/format.h"
+#include "td/utils/logging.h"
+#include "td/utils/misc.h"
+#include "td/utils/port/IPAddress.h"
+#include "td/utils/Time.h"
+
+#include <numeric>
+
+namespace telegram_bot_api {
+
+std::unordered_map<td::string, std::unique_ptr<td::VirtuallyJsonable>> empty_parameters;
+
+Query::Query(td::vector<td::BufferSlice> &&container, td::Slice token, bool is_test_dc, td::MutableSlice method,
+             td::vector<std::pair<td::MutableSlice, td::MutableSlice>> &&args,
+             td::vector<std::pair<td::MutableSlice, td::MutableSlice>> &&headers, td::vector<td::HttpFile> &&files,
+             std::shared_ptr<SharedData> shared_data, const td::IPAddress &peer_address)
+    : state_(State::Query)
+    , shared_data_(shared_data)
+    , peer_address_(peer_address)
+    , container_(std::move(container))
+    , token_(token)
+    , is_test_dc_(is_test_dc)
+    , method_(method)
+    , args_(std::move(args))
+    , headers_(std::move(headers))
+    , files_(std::move(files)) {
+  if (method_.empty()) {
+    method_ = arg("method");
+  }
+  td::to_lower_inplace(method_);
+  start_timestamp_ = td::Time::now();
+  LOG(INFO) << "QUERY: create " << td::tag("ptr", this) << *this;
+  if (shared_data_) {
+    shared_data_->query_count_++;
+    if (method_ != "getupdates") {
+      shared_data_->query_list_.put(this);
+    }
+  }
+}
+
+td::int64 Query::query_size() const {
+  return std::accumulate(
+      container_.begin(), container_.end(), td::int64{0},
+      [](td::int64 acc, const td::BufferSlice &slice) { return static_cast<td::int64>(acc + slice.size()); });
+}
+
+td::int64 Query::files_size() const {
+  return std::accumulate(files_.begin(), files_.end(), td::int64{0},
+                         [](td::int64 acc, const td::HttpFile &file) { return acc + file.size; });
+}
+
+td::int64 Query::files_max_size() const {
+  return std::accumulate(files_.begin(), files_.end(), td::int64{0},
+                         [](td::int64 acc, const td::HttpFile &file) { return td::max(acc, file.size); });
+}
+
+void Query::set_ok(td::BufferSlice result) {
+  CHECK(state_ == State::Query);
+  LOG(INFO) << "QUERY: got ok " << td::tag("ptr", this) << td::tag("text", result.as_slice());
+  answer_ = std::move(result);
+  state_ = State::OK;
+  http_status_code_ = 200;
+  send_response_stat();
+}
+
+void Query::set_error(int http_status_code, td::BufferSlice result) {
+  LOG(INFO) << "QUERY: got error " << td::tag("ptr", this) << td::tag("code", http_status_code)
+            << td::tag("text", result.as_slice());
+  CHECK(state_ == State::Query);
+  answer_ = std::move(result);
+  state_ = State::Error;
+  http_status_code_ = http_status_code;
+  send_response_stat();
+}
+
+void Query::set_retry_after_error(int retry_after) {
+  retry_after_ = retry_after;
+
+  std::unordered_map<td::string, std::unique_ptr<td::VirtuallyJsonable>> parameters;
+  parameters.emplace("retry_after", std::make_unique<td::VirtuallyJsonableLong>(retry_after));
+  set_error(429, td::json_encode<td::BufferSlice>(
+                     JsonQueryError(429, PSLICE() << "Too Many Requests: retry after " << retry_after, parameters)));
+}
+
+td::StringBuilder &operator<<(td::StringBuilder &sb, const Query &query) {
+  auto padded_time =
+      td::lpad(PSTRING() << td::format::as_time(td::Time::now_cached() - query.start_timestamp()), 10, ' ');
+  sb << "[bot" << td::rpad(query.token().str(), 46, ' ') << "][time:" << padded_time << ']'
+     << td::tag("method", td::lpad(query.method().str(), 20, ' '));
+  if (!query.args().empty()) {
+    sb << td::oneline(PSLICE() << query.args());
+  }
+  if (!query.files().empty()) {
+    sb << query.files();
+  }
+  return sb;
+}
+
+void Query::send_response_stat() {
+  if (stat_actor_.empty()) {
+    return;
+  }
+  send_closure(stat_actor_, &BotStatActor::add_event<ServerBotStat::Response>,
+               ServerBotStat::Response{is_ok(), answer().size()}, td::Time::now());
+}
+
+}  // namespace telegram_bot_api
