@@ -5,7 +5,7 @@ TDLight Telegram Bot API is 100% compatible with the official version.
 
 ## Added features
 
-### TDLight instead of tdlib
+### TDLib replaced with TDLight
 [TDLight](https://github.com/tdlight-team/tdlight) provides constant memory usage, unlike tdlib that must be restarted to reduce the heap size.
 
 
