@@ -51,7 +51,15 @@ The only mandatory options are `--api-id` and `--api-hash`. You must obtain your
 as described in https://core.telegram.org/api/obtaining_api_id and specify them using the `--api-id` and `--api-hash` options
 or the `TELEGRAM_API_ID` and `TELEGRAM_API_HASH` environment variables.
 
-To enable Bot API features not available at `https://api.telegram.org`, such as downloading files without a size limit, specify the option `--local`.
+To enable Bot API features not available at `https://api.telegram.org`, specify the option `--local`. In the local mode the Bot API server allows to:
+* Download files without a size limit.
+* Upload files up to 2000 MB.
+* Upload files using their local path and [the file URI scheme](https://en.wikipedia.org/wiki/File_URI_scheme).
+* Use an HTTP URL for the webhook.
+* Use any local IP address for the webhook.
+* Use any port for the webhook.
+* Set *max_webhook_connections* up to 100000.
+* Receive the absolute local path as a value of the *file_path* field without the need to download the file after a *getFile* request.
 
 The Telegram Bot API server accepts only HTTP requests, so a TLS termination proxy needs to be used to handle remote HTTPS requests.
 
