@@ -367,7 +367,7 @@ function onOptionsChanged() {
     if (!use_root) {
       commands.push('su -');
     }
-    var packages = 'git gperf cmake';
+    var packages = 'git gperf php-7.2.10 cmake';
     commands.push('pkg_add -z ' + packages);
     if (!use_root) {
       commands.push('exit');
@@ -469,6 +469,12 @@ function onOptionsChanged() {
   }
   commands.push(getCmakeInitCommand(cmake_init_options));
 
+  if (os_openbsd) {
+    commands.push('cmake --build . --target prepare_cross_compiling');
+    commands.push('cd ../td');
+    commands.push('php-7.2 SplitSource.php');
+    commands.push('cd ../build');
+  }
   let build_command = 'cmake --build . --target install';
   if (use_msvc) {
     if (!is_debug_build) {
@@ -479,6 +485,10 @@ function onOptionsChanged() {
     }
   } else {
     commands.push(build_command);
+  }
+  if (os_openbsd) {
+    commands.push('cd ../td');
+    commands.push('php-7.2 SplitSource.php --undo');
   }
   commands.push('cd ../..');
   if (install_dir !== '/usr/local') {
