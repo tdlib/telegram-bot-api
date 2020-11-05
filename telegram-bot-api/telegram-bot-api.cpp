@@ -163,7 +163,7 @@ int main(int argc, char *argv[]) {
     return std::string();
   }(std::getenv("TELEGRAM_API_HASH"));
 
-  options.set_usage(td::Slice(argv[0]), "--api_id=<arg> --api-hash=<arg> [--local] [OPTION]...");
+  options.set_usage(td::Slice(argv[0]), "--api-id=<arg> --api-hash=<arg> [--local] [OPTION]...");
   options.set_description("Telegram Bot API server");
   options.add_option('h', "help", "display this help text and exit", [&] { need_print_usage = true; });
   options.add_option('\0', "local", "allow the Bot API server to serve local requests",
