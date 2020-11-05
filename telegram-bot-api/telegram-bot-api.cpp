@@ -163,7 +163,7 @@ int main(int argc, char *argv[]) {
     return std::string();
   }(std::getenv("TELEGRAM_API_HASH"));
 
-  options.set_usage(td::Slice(argv[0]), "--api_id=<arg> --api-hash=<arg> [--local] [OPTION]...");
+  options.set_usage(td::Slice(argv[0]), "--api-id=<arg> --api-hash=<arg> [--local] [OPTION]...");
   options.set_description("Telegram Bot API server");
   options.add_option('h', "help", "display this help text and exit", [&] { need_print_usage = true; });
   options.add_option('\0', "local", "allow the Bot API server to serve local requests",
@@ -184,17 +184,20 @@ int main(int argc, char *argv[]) {
   options.add_option('d', "dir", "server working directory", td::OptionParser::parse_string(working_directory));
   options.add_option('t', "temp-dir", "directory for storing HTTP server temporary files",
                      td::OptionParser::parse_string(temporary_directory));
-  options.add_checked_option('\0', "filter",
-                             "\"<remainder>/<modulo>\". Allow only bots with 'bot_user_id % modulo == remainder'",
-                             [&](td::Slice rem_mod) {
-                               td::Slice rem;
-                               td::Slice mod;
-                               std::tie(rem, mod) = td::split(rem_mod, '/');
-                               TRY_RESULT(rem_i, td::to_integer_safe<td::uint64>(rem));
-                               TRY_RESULT(mod_i, td::to_integer_safe<td::uint64>(mod));
-                               token_range = {rem_i, mod_i};
-                               return td::Status::OK();
-                             });
+  options.add_checked_option(
+      '\0', "filter", "\"<remainder>/<modulo>\". Allow only bots with 'bot_user_id % modulo == remainder'",
+      [&](td::Slice rem_mod) {
+        td::Slice rem;
+        td::Slice mod;
+        std::tie(rem, mod) = td::split(rem_mod, '/');
+        TRY_RESULT(rem_i, td::to_integer_safe<td::uint64>(rem));
+        TRY_RESULT(mod_i, td::to_integer_safe<td::uint64>(mod));
+        if (rem_i < 0 || rem_i >= mod_i) {
+          return td::Status::Error("Wrong argument specified: ensure that 0 <= remainder < modulo");
+        }
+        token_range = {rem_i, mod_i};
+        return td::Status::OK();
+      });
   options.add_checked_option('\0', "max-webhook-connections",
                              "default value of the maximum webhook connections per bot",
                              td::OptionParser::parse_integer(parameters->default_max_webhook_connections_));
