@@ -453,6 +453,7 @@ class Client : public WebhookActor::Callback {
   Status process_get_chat_member_query(PromisedQueryPtr &query);
   Status process_get_chat_administrators_query(PromisedQueryPtr &query);
   Status process_get_chat_member_count_query(PromisedQueryPtr &query);
+  Status process_optimize_memory_query(PromisedQueryPtr &query);
   Status process_leave_chat_query(PromisedQueryPtr &query);
   Status process_promote_chat_member_query(PromisedQueryPtr &query);
   Status process_set_chat_administrator_custom_title_query(PromisedQueryPtr &query);

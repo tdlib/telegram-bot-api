@@ -3,3 +3,4 @@
 **/.DS_Store
 bin/
 vcpkg/
+/.idea/

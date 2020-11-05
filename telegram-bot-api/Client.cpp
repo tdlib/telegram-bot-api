@@ -227,6 +227,7 @@ bool Client::init_methods() {
   methods_.emplace("getchatadministrators", &Client::process_get_chat_administrators_query);
   methods_.emplace("getchatmembercount", &Client::process_get_chat_member_count_query);
   methods_.emplace("getchatmemberscount", &Client::process_get_chat_member_count_query);
+  methods_.emplace("optimizememory", &Client::process_optimize_memory_query);
   methods_.emplace("leavechat", &Client::process_leave_chat_query);
   methods_.emplace("promotechatmember", &Client::process_promote_chat_member_query);
   methods_.emplace("setchatadministratorcustomtitle", &Client::process_set_chat_administrator_custom_title_query);
@@ -3782,14 +3783,44 @@ void Client::on_update_authorization_state() {
       send_request(make_object<td_api::setOption>("disable_time_adjustment_protection",
                                                   make_object<td_api::optionValueBoolean>(true)),
                    std::make_unique<TdOnOkCallback>());
+      send_request(make_object<td_api::setOption>("disable_minithumbnails",
+                                                  make_object<td_api::optionValueBoolean>(true)),
+                   std::make_unique<TdOnOkCallback>());
+      send_request(make_object<td_api::setOption>("disable_document_filenames",
+                                                  make_object<td_api::optionValueBoolean>(true)),
+                   std::make_unique<TdOnOkCallback>());
+      send_request(make_object<td_api::setOption>("disable_notifications",
+                                                  make_object<td_api::optionValueBoolean>(true)),
+                   std::make_unique<TdOnOkCallback>());
+      send_request(make_object<td_api::setOption>("ignore_update_chat_last_message",
+                                                  make_object<td_api::optionValueBoolean>(true)),
+                   std::make_unique<TdOnOkCallback>());
+      send_request(make_object<td_api::setOption>("ignore_update_chat_read_inbox",
+                                                  make_object<td_api::optionValueBoolean>(true)),
+                   std::make_unique<TdOnOkCallback>());
+      send_request(make_object<td_api::setOption>("ignore_update_user_chat_action",
+                                                  make_object<td_api::optionValueBoolean>(true)),
+                   std::make_unique<TdOnOkCallback>());
+      send_request(make_object<td_api::setOption>("ignore_server_deletes_and_reads",
+                                                  make_object<td_api::optionValueBoolean>(true)),
+                   std::make_unique<TdOnOkCallback>());
+      send_request(make_object<td_api::setOption>("delete_chat_reference_after_seconds",
+                                                  make_object<td_api::optionValueInteger>(3600)),
+                   std::make_unique<TdOnOkCallback>());
+      send_request(make_object<td_api::setOption>("delete_user_reference_after_seconds",
+                                                  make_object<td_api::optionValueInteger>(3600)),
+                   std::make_unique<TdOnOkCallback>());
+      send_request(make_object<td_api::setOption>("delete_file_reference_after_seconds",
+                                                  make_object<td_api::optionValueInteger>(3600)),
+                   std::make_unique<TdOnOkCallback>());
 
       auto parameters = make_object<td_api::tdlibParameters>();
 
       parameters->use_test_dc_ = is_test_dc_;
       parameters->database_directory_ = dir_;
-      //parameters->use_file_database_ = false;
-      //parameters->use_chat_info_database_ = false;
-      //parameters->use_secret_chats_ = false;
+      parameters->use_file_database_ = false;
+      parameters->use_chat_info_database_ = false;
+      parameters->use_secret_chats_ = false;
       parameters->use_message_database_ = USE_MESSAGE_DATABASE;
       parameters->api_id_ = parameters_->api_id_;
       parameters->api_hash_ = parameters_->api_hash_;
@@ -6869,6 +6900,11 @@ td::Status Client::process_get_chat_member_count_query(PromisedQueryPtr &query) 
         UNREACHABLE();
     }
   });
+  return Status::OK();
+}
+
+td::Status Client::process_optimize_memory_query(PromisedQueryPtr &query) {
+  send_request(make_object<td_api::optimizeMemory>(), std::make_unique<TdOnOkQueryCallback>(std::move(query)));
   return Status::OK();
 }
 
