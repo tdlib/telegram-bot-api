@@ -1,0 +1,52 @@
+name: Docker Build + Image Push
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+
+jobs:
+  build:
+    name: Build Image
+    runs-on: ubuntu-latest
+    env:
+        IMAGE_id: docker.pkg.github.com/${{ github.repository }}/${{ github.repository }}
+
+    steps:
+      - name: Checkout current repo
+        uses: actions/checkout@v2
+        with:
+            submodules: true
+
+      - name: Get Version
+        run: |
+          # get telegram bot api version
+          telegram_bot_api_version=$(git rev-parse --short HEAD)
+
+          # get tdlib version
+          tdlib_version=$(cd td && git rev-parse --short HEAD)
+
+          # concat tdlib and telegram bot api version
+          version=$telegram_bot_api_version-$tdlib_version
+
+          # store variable for future use
+          echo "version=$version" >> $GITHUB_ENV
+
+      - name: Build image
+        run: |
+          IMAGE_ID=docker.pkg.github.com/${{ github.repository }}/${{ github.repository }}
+          docker build \
+            --tag tdlight-team/tdlight-telegram-bot-api:latest \
+            --tag tdlight-team/tdlight-telegram-bot-api:$version \
+            .
+
+      - name: Login to registry
+        run: |
+          echo "${{ secrets.GITHUB_ACCESS_TOKEN }}" | docker login docker.pkg.github.com -u ${{ github.actor }} --password-stdin
+
+
+      - name: Push images
+        run: |
+          docker push $IMAGE_ID:$version
