@@ -41,8 +41,6 @@ class Client : public WebhookActor::Callback {
   Client(td::ActorShared<> parent, const td::string &bot_token, bool is_test_dc, td::int64 tqueue_id,
          std::shared_ptr<const ClientParameters> parameters, td::ActorId<BotStatActor> stat_actor);
 
-  void start_up() override;
-
   void send(PromisedQueryPtr query) override;
 
   void close();
@@ -516,6 +514,8 @@ class Client : public WebhookActor::Callback {
   void do_get_updates(int32 offset, int32 limit, int32 timeout, PromisedQueryPtr query);
 
   void long_poll_wakeup(bool force_flag);
+
+  void start_up() override;
 
   void raw_event(const td::Event::Raw &event) override;
 
