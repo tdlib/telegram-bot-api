@@ -386,11 +386,11 @@ class Client : public WebhookActor::Callback {
 
   static td::Result<td::MutableSlice> get_required_string_arg(const Query *query, Slice field_name);
 
-  static int64 get_message_id(const Query *query, Slice field_name = "message_id");
+  static int64 get_message_id(const Query *query, Slice field_name = Slice("message_id"));
 
-  static td::Result<Slice> get_inline_message_id(const Query *query, Slice field_name = "inline_message_id");
+  static td::Result<Slice> get_inline_message_id(const Query *query, Slice field_name = Slice("inline_message_id"));
 
-  static td::Result<int32> get_user_id(const Query *query, Slice field_name = "user_id");
+  static td::Result<int32> get_user_id(const Query *query, Slice field_name = Slice("user_id"));
 
   int64 extract_yet_unsent_message_query_id(int64 chat_id, int64 message_id, bool *is_reply_to_message_deleted);
 
