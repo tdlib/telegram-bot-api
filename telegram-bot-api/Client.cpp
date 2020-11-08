@@ -2557,6 +2557,44 @@ class Client::TdOnCheckChatCallback : public TdQueryCallback {
 };
 
 template <class OnSuccess>
+class Client::TdOnDisableInternetConnectionCallback : public TdQueryCallback {
+ public:
+  TdOnDisableInternetConnectionCallback(const Client *client, PromisedQueryPtr query, OnSuccess on_success)
+      : client_(client)
+      , query_(std::move(query))
+      , on_success_(std::move(on_success)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) override {
+    on_success_(std::move(query_));
+  }
+
+ private:
+  const Client *client_;
+  PromisedQueryPtr query_;
+  OnSuccess on_success_;
+};
+
+template <class OnSuccess>
+class Client::TdOnOptimizeMemoryCallback : public TdQueryCallback {
+ public:
+  TdOnOptimizeMemoryCallback(const Client *client, PromisedQueryPtr query, OnSuccess on_success)
+      : client_(client)
+      , query_(std::move(query))
+      , on_success_(std::move(on_success)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) override {
+    on_success_(std::move(query_));
+  }
+
+ private:
+  const Client *client_;
+  PromisedQueryPtr query_;
+  OnSuccess on_success_;
+};
+
+template <class OnSuccess>
 class Client::TdOnSearchStickerSetCallback : public TdQueryCallback {
  public:
   TdOnSearchStickerSetCallback(PromisedQueryPtr query, OnSuccess on_success)
@@ -6904,8 +6942,28 @@ td::Status Client::process_get_chat_member_count_query(PromisedQueryPtr &query) 
 }
 
 td::Status Client::process_optimize_memory_query(PromisedQueryPtr &query) {
-  send_request(make_object<td_api::optimizeMemory>(), std::make_unique<TdOnOkQueryCallback>(std::move(query)));
+  disable_internet_connection(std::move(query), [this](PromisedQueryPtr query) {
+    optimize_memory(std::move(query), [this](PromisedQueryPtr query) {
+      enable_internet_connection(std::move(query));
+    });
+  });
   return Status::OK();
+}
+
+template <class OnSuccess>
+void Client::disable_internet_connection(PromisedQueryPtr query, OnSuccess on_success) {
+  send_request(make_object<td_api::setNetworkType>(make_object<td_api::networkTypeNone>()),
+               std::make_unique<TdOnDisableInternetConnectionCallback<OnSuccess>>(this, std::move(query), std::move(on_success)));
+}
+
+void Client::enable_internet_connection(PromisedQueryPtr query) {
+  send_request(make_object<td_api::setNetworkType>(make_object<td_api::networkTypeOther>()), std::make_unique<TdOnOkQueryCallback>(std::move(query)));
+}
+
+template <class OnSuccess>
+void Client::optimize_memory(PromisedQueryPtr query, OnSuccess on_success) {
+  send_request(make_object<td_api::optimizeMemory>(),
+      std::make_unique<TdOnOptimizeMemoryCallback<OnSuccess>>(this, std::move(query), std::move(on_success)));
 }
 
 td::Status Client::process_leave_chat_query(PromisedQueryPtr &query) {

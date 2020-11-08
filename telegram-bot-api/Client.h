@@ -212,6 +212,12 @@ class Client : public WebhookActor::Callback {
   template <class OnSuccess>
   class TdOnCheckChatCallback;
   template <class OnSuccess>
+  class TdOnEnableInternetConnectionCallback;
+  template <class OnSuccess>
+  class TdOnOptimizeMemoryCallback;
+  template <class OnSuccess>
+  class TdOnDisableInternetConnectionCallback;
+  template <class OnSuccess>
   class TdOnCheckMessageCallback;
   template <class OnSuccess>
   class TdOnCheckRemoteFileIdCallback;
@@ -238,6 +244,14 @@ class Client : public WebhookActor::Callback {
 
   template <class OnSuccess>
   void check_chat(Slice chat_id_str, AccessRights access_rights, PromisedQueryPtr query, OnSuccess on_success);
+
+  template <class OnSuccess>
+  void disable_internet_connection(PromisedQueryPtr query, OnSuccess on_success);
+
+  template <class OnSuccess>
+  void optimize_memory(PromisedQueryPtr query, OnSuccess on_success);
+
+  void enable_internet_connection(PromisedQueryPtr query);
 
   template <class OnSuccess>
   void check_remote_file_id(td::string file_id, PromisedQueryPtr query, OnSuccess on_success);
