@@ -48,7 +48,7 @@ if (CLANG OR GCC)
   endif()
 endif()
 
-set(TG_HTTP_CLIENT_SOURCE
+set(TELEGRAM_BOT_API_SOURCE
   telegram-bot-api/telegram-bot-api.cpp
 
   telegram-bot-api/Client.cpp
@@ -70,7 +70,7 @@ set(TG_HTTP_CLIENT_SOURCE
   telegram-bot-api/WebhookActor.h
 )
 
-add_executable(telegram-bot-api ${TG_HTTP_CLIENT_SOURCE})
+add_executable(telegram-bot-api ${TELEGRAM_BOT_API_SOURCE})
 target_include_directories(telegram-bot-api PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
 target_link_libraries(telegram-bot-api PRIVATE memprof tdactor tdcore tddb tdnet tdutils)
 
