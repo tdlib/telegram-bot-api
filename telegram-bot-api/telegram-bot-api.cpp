@@ -192,8 +192,8 @@ int main(int argc, char *argv[]) {
         std::tie(rem, mod) = td::split(rem_mod, '/');
         TRY_RESULT(rem_i, td::to_integer_safe<td::uint64>(rem));
         TRY_RESULT(mod_i, td::to_integer_safe<td::uint64>(mod));
-        if (rem_i < 0 || rem_i >= mod_i) {
-          return td::Status::Error("Wrong argument specified: ensure that 0 <= remainder < modulo");
+        if (rem_i >= mod_i) {
+          return td::Status::Error("Wrong argument specified: ensure that remainder < modulo");
         }
         token_range = {rem_i, mod_i};
         return td::Status::OK();
