@@ -12,7 +12,8 @@ jobs:
     name: Build Image
     runs-on: ubuntu-latest
     env:
-        IMAGE_id: docker.pkg.github.com/${{ github.repository }}/${{ github.repository }}
+        REGISTRY: ghcr.io
+        IMAGE_TAG: ghcr.io/tdlight-team/tdlightbotapi
 
     steps:
       - name: Checkout current repo
@@ -20,33 +21,50 @@ jobs:
         with:
             submodules: "recursive"
 
-      - name: Get Version
+      - name: Get version
         run: |
-          # get telegram bot api version
-          telegram_bot_api_version=$(git rev-parse --short HEAD)
+          # Get latest commit short hash
+          HASH_VERSION=$(git rev-parse --short HEAD)
 
-          # get tdlib version
-          tdlib_version=$(cd td && git rev-parse --short HEAD)
+          # Strip git ref prefix from version
+          VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
+        
+          # Strip "v" prefix from tag name
+          [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
+        
+          # Use Docker `latest` tag convention
+          [ "$VERSION" == "master" ] && VERSION=latest
+ 
+          # Convert IMAGE_ID and VERSION to lowercase (repository name must be lowercase)
+          IMAGE_ID=$(echo "$IMAGE_ID" | awk '{print tolower($0)}')
+          HASH_VERSION=$(echo "$HASH_VERSION" | awk '{print tolower($0)}')
+          VERSION=$(echo "$VERSION" | awk '{print tolower($0)}')
 
-          # concat tdlib and telegram bot api version
-          version=$telegram_bot_api_version-$tdlib_version
+          # Store variable for future use
+          echo "HASH_VERSION=$HASH_VERSION" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-          # store variable for future use
-          echo "version=$version" >> $GITHUB_ENV
+          # Print debug info
+          echo "hash version: $HASH_VERSION"
+          echo "version: $VERSION"
 
       - name: Build image
         run: |
-          IMAGE_ID=docker.pkg.github.com/${{ github.repository }}/${{ github.repository }}
           docker build \
-            --tag tdlight-team/tdlight-telegram-bot-api:latest \
-            --tag tdlight-team/tdlight-telegram-bot-api:$version \
+            --cache-from $IMAGE_TAG:latest \
+            --tag $IMAGE_TAG:$HASH_VERSION \
+            --tag $IMAGE_TAG:$VERSION \
             .
 
       - name: Login to registry
         run: |
-          echo "${{ secrets.GITHUB_ACCESS_TOKEN }}" | docker login docker.pkg.github.com -u ${{ github.actor }} --password-stdin
-
+          echo "${{ secrets.GH_ACCESS_TOKEN }}" | docker login $REGISTRY -u ${{ github.actor }} --password-stdin
 
       - name: Push images
         run: |
-          docker push $IMAGE_ID:$version
+          docker push $IMAGE_TAG:$VERSION
+          docker push $IMAGE_TAG:$HASH_VERSION
+
+      - name: Logout from registry
+        run: |
+          docker logout $REGISTRY
