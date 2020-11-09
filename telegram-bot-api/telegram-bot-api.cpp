@@ -34,6 +34,7 @@
 #include "td/utils/MemoryLog.h"
 #include "td/utils/misc.h"
 #include "td/utils/OptionParser.h"
+#include "td/utils/port/IPAddress.h"
 #include "td/utils/port/path.h"
 #include "td/utils/port/rlimit.h"
 #include "td/utils/port/signals.h"
@@ -140,6 +141,8 @@ int main(int argc, char *argv[]) {
   bool need_print_usage = false;
   int http_port = 8081;
   int http_stat_port = 0;
+  td::string http_ip_address = "0.0.0.0";
+  td::string http_stat_ip_address = "0.0.0.0";
   td::string log_file_path;
   int verbosity_level = 0;
   td::int64 log_max_file_size = 2000000000;
@@ -184,23 +187,39 @@ int main(int argc, char *argv[]) {
   options.add_option('d', "dir", "server working directory", td::OptionParser::parse_string(working_directory));
   options.add_option('t', "temp-dir", "directory for storing HTTP server temporary files",
                      td::OptionParser::parse_string(temporary_directory));
-  options.add_checked_option(
-      '\0', "filter", "\"<remainder>/<modulo>\". Allow only bots with 'bot_user_id % modulo == remainder'",
-      [&](td::Slice rem_mod) {
-        td::Slice rem;
-        td::Slice mod;
-        std::tie(rem, mod) = td::split(rem_mod, '/');
-        TRY_RESULT(rem_i, td::to_integer_safe<td::uint64>(rem));
-        TRY_RESULT(mod_i, td::to_integer_safe<td::uint64>(mod));
-        if (rem_i >= mod_i) {
-          return td::Status::Error("Wrong argument specified: ensure that remainder < modulo");
-        }
-        token_range = {rem_i, mod_i};
-        return td::Status::OK();
-      });
+  options.add_checked_option('\0', "filter",
+                             "\"<remainder>/<modulo>\". Allow only bots with 'bot_user_id % modulo == remainder'",
+                             [&](td::Slice rem_mod) {
+                               td::Slice rem;
+                               td::Slice mod;
+                               std::tie(rem, mod) = td::split(rem_mod, '/');
+                               TRY_RESULT(rem_i, td::to_integer_safe<td::uint64>(rem));
+                               TRY_RESULT(mod_i, td::to_integer_safe<td::uint64>(mod));
+                               if (rem_i >= mod_i) {
+                                 return td::Status::Error("Wrong argument specified: ensure that remainder < modulo");
+                               }
+                               token_range = {rem_i, mod_i};
+                               return td::Status::OK();
+                             });
   options.add_checked_option('\0', "max-webhook-connections",
                              "default value of the maximum webhook connections per bot",
                              td::OptionParser::parse_integer(parameters->default_max_webhook_connections_));
+  options.add_checked_option('\0', "http-ip-address",
+                             "local IP address, HTTP connections to which will be accepted. By default, connections to "
+                             "any local IPv4 address are accepted",
+                             [&](td::Slice ip_address) {
+                               TRY_STATUS(td::IPAddress::get_ip_address(ip_address.str()));
+                               http_ip_address = ip_address.str();
+                               return td::Status::OK();
+                             });
+  options.add_checked_option('\0', "http-stat-ip-address",
+                             "local IP address, HTTP statistics connections to which will be accepted. By default, "
+                             "statistics connections to any local IPv4 address are accepted",
+                             [&](td::Slice ip_address) {
+                               TRY_STATUS(td::IPAddress::get_ip_address(ip_address.str()));
+                               http_stat_ip_address = ip_address.str();
+                               return td::Status::OK();
+                             });
 
   options.add_option('l', "log", "path to the file where the log will be written",
                      td::OptionParser::parse_string(log_file_path));
@@ -370,7 +389,7 @@ int main(int argc, char *argv[]) {
       sched.create_actor_unsafe<ClientManager>(0, "ClientManager", std::move(parameters), token_range).release();
   sched
       .create_actor_unsafe<HttpServer>(
-          0, "HttpServer", http_port,
+          0, "HttpServer", http_ip_address, http_port,
           [client_manager, shared_data] {
             return td::ActorOwn<td::HttpInboundConnection::Callback>(
                 td::create_actor<HttpConnection>("HttpConnection", client_manager, shared_data));
@@ -379,7 +398,7 @@ int main(int argc, char *argv[]) {
   if (http_stat_port != 0) {
     sched
         .create_actor_unsafe<HttpServer>(
-            0, "HttpStatsServer", http_stat_port,
+            0, "HttpStatsServer", http_stat_ip_address, http_stat_port,
             [client_manager] {
               return td::ActorOwn<td::HttpInboundConnection::Callback>(
                   td::create_actor<HttpStatConnection>("HttpStatConnection", client_manager));
