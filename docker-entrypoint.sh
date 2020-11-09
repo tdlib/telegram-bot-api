@@ -1,22 +1,23 @@
 #!/bin/sh
 set -e
 
-LOGS_DIR="/var/log/telegram-bot-api"
 LOG_FILENAME="telegram-bot-api.log"
-WORK_DIR="/etc/telegram-bot-api"
-TEMP_DIR="/tmp/telegram-bot-api"
+
+USERNAME=telegram-bot-api
+GROUPNAME=telegram-bot-api
+
+chown ${USERNAME}:${GROUPNAME} "${TELEGRAM_LOGS_DIR}" "${TELEGRAM_WORK_DIR}"
 
 if [ -n "${1}" ]; then
   exec "${*}"
 fi
 
-mkdir -p "${LOGS_DIR}"
-mkdir -p "${WORK_DIR}"
-mkdir -p "${TEMP_DIR}"
-
-DEFAULT_ARGS="--http-port 8081 --http-stat-port=8082 --dir=${WORK_DIR} --temp-dir=${TEMP_DIR} --log=${LOGS_DIR}/${LOG_FILENAME}"
+DEFAULT_ARGS="--http-port 8081 --dir=${TELEGRAM_WORK_DIR} --temp-dir=${TELEGRAM_TEMP_DIR} --log=${TELEGRAM_LOGS_DIR}/${LOG_FILENAME} --username=${USERNAME} --groupname=${GROUPNAME}"
 CUSTOM_ARGS=""
 
+if [ -n "$TELEGRAM_STAT" ]; then
+  CUSTOM_ARGS="${CUSTOM_ARGS} --http-stat-port=8082"
+fi
 if [ -n "$TELEGRAM_FILTER" ]; then
   CUSTOM_ARGS="${CUSTOM_ARGS} --filter=$TELEGRAM_FILTER"
 fi
