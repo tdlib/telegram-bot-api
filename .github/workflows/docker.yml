@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       IMAGE_TAG: ghcr.io/${{ github.repository_owner }}/tdlightbotapi
-      IMAGE_TAG_DH: ${{ github.repository_owner }}/tdlightbotapi
+      IMAGE_TAG_DH: ${{ secrets.DOCKERHUB_OWNER }}/tdlightbotapi
     strategy:
       matrix:
         arch: [linux/386, linux/amd64, linux/arm/v6, linux/arm/v7, linux/arm64, linux/ppc64le]
