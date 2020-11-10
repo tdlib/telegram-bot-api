@@ -40,6 +40,7 @@ Get information about a message
 - `message_id` Message id
 ##### Returns `message`
 
+<!--TODO: Document the following methods:
 #### Command `getparticipants`
 (todo)
 ##### Parameters
@@ -57,6 +58,13 @@ Get information about a message
 ##### Parameters
 - `(todo)`
 ##### Returns `(todo)`
+-->
+#### Executable flag `relative`
+If enabled, allow only relative paths for files in local mode.
+
+#### Executable flag `insecure` (not yet implemented)
+Allow http connection in non-local mode
+
 
 <a name="modified-features"></a>
 ### Modified features
