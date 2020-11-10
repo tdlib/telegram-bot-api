@@ -11,12 +11,17 @@ TDLight Telegram Bot API is 100% compatible with the official version.
 ### Command `optimize_memory`
 Calling `optimize_memory` will remove old data from the in-memory cache and give the freed memory back to the os
 
+### Additional features
+- getChat now resolves username for users
+- the `message` object now has the `views` field and `forwards` field
+- new method `getMessageInfo` to get a message (params: chat_id, message_id)
+
 -----
 
 
 The Telegram Bot API provides an HTTP API for creating [Telegram Bots](https://core.telegram.org/bots).
 
-If you've got any questions about bots or would like to report an issue with your bot, kindly contact us at [@BotSupport](https://t.me/BotSupport) in Telegram.
+If you've got any questions about bots or would like to report an issue with your bot, kindly contact [@BotSupport](https://t.me/BotSupport) in Telegram.
 
 Please note that only global Bot API issues that affect all bots are suitable for this repository.
 
