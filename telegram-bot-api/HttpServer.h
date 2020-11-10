@@ -45,9 +45,10 @@ class HttpServer : public td::TcpListener::Callback {
       return;
     }
     flood_control_.add_event(static_cast<td::int32>(now));
-    LOG(INFO) << "Create tcp listener " << td::tag("port", port_);
-    listener_ = td::create_actor<td::TcpListener>(PSLICE() << "TcpListener" << td::tag("port", port_), port_,
-                                                  actor_shared(this, 1), ip_address_);
+    LOG(INFO) << "Create tcp listener " << td::tag("address", ip_address_) << td::tag("port", port_);
+    listener_ = td::create_actor<td::TcpListener>(
+        PSLICE() << "TcpListener" << td::tag("address", ip_address_) << td::tag("port", port_), port_,
+        actor_shared(this, 1), ip_address_);
   }
 
   void hangup_shared() override {
