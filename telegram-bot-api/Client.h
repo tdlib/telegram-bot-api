@@ -487,6 +487,13 @@ class Client : public WebhookActor::Callback {
   Status process_get_webhook_info_query(PromisedQueryPtr &query);
   Status process_get_file_query(PromisedQueryPtr &query);
 
+  //custom methods
+  Status process_get_message_info_query(PromisedQueryPtr &query);
+  Status process_get_participants_query(PromisedQueryPtr &query);
+  Status process_delete_messages_query(PromisedQueryPtr &query);
+  Status process_toggle_group_invites_query(PromisedQueryPtr &query);
+
+
   void webhook_verified(td::string cached_ip_address) override;
   void webhook_success() override;
   void webhook_error(Status status) override;
@@ -642,6 +649,9 @@ class Client : public WebhookActor::Callback {
     int32 via_bot_user_id = 0;
     object_ptr<td_api::MessageContent> content;
     object_ptr<td_api::ReplyMarkup> reply_markup;
+
+    int32 views = 0;
+    int32 forwards = 0;
 
     mutable bool is_reply_to_message_deleted = false;
     mutable bool is_content_changed = false;

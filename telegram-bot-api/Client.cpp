@@ -250,6 +250,14 @@ bool Client::init_methods() {
   methods_.emplace("deletewebhook", &Client::process_set_webhook_query);
   methods_.emplace("getwebhookinfo", &Client::process_get_webhook_info_query);
   methods_.emplace("getfile", &Client::process_get_file_query);
+
+  //custom methods
+  methods_.emplace("getmessageinfo", &Client::process_get_message_info_query);
+  methods_.emplace("getparticipants", &Client::process_get_participants_query);
+  methods_.emplace("deletemessages", &Client::process_delete_messages_query);
+  methods_.emplace("togglegroupinvites", &Client::process_toggle_group_invites_query);
+
+
   return true;
 }
 
@@ -1478,6 +1486,12 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
   object("date", message_->date);
   if (message_->edit_date > 0) {
     object("edit_date", message_->edit_date);
+  }
+  if (message_->views != 0) {
+    object("views", message_->views);
+  }
+  if (message_->forwards != 0) {
+    object("forwards", message_->forwards);
   }
   if (message_->initial_send_date > 0) {
     if (message_->initial_sender_user_id != 0) {
@@ -3538,7 +3552,7 @@ void Client::check_chat(Slice chat_id_str, AccessRights access_rights, PromisedQ
 
   if (chat_id_str[0] == '@') {
     return send_request(make_object<td_api::searchPublicChat>(chat_id_str.str()),
-                        std::make_unique<TdOnCheckChatCallback<OnSuccess>>(this, true, access_rights, std::move(query),
+                        std::make_unique<TdOnCheckChatCallback<OnSuccess>>(this, false, access_rights, std::move(query),
                                                                            std::move(on_success)));
   }
 
@@ -7360,6 +7374,38 @@ td::Status Client::process_get_file_query(PromisedQueryPtr &query) {
   return Status::OK();
 }
 
+
+//start custom methods impl
+
+td::Status Client::process_get_message_info_query(PromisedQueryPtr &query) {
+    auto chat_id = query->arg("chat_id");
+    auto message_id = get_message_id(query.get(), "message_id");
+    check_message(chat_id, message_id, false, AccessRights::Read, "message", std::move(query),[this] (int64 chat_id, int64 message_id, PromisedQueryPtr query) {
+      auto message = get_message(chat_id, message_id);
+      answer_query(JsonMessage(message, false, "get message info", this), std::move(query));
+    });
+
+    return Status::OK();
+}
+
+td::Status Client::process_get_participants_query(PromisedQueryPtr &query) {
+    answer_query(td::JsonFalse(), std::move(query), "Not implemented");
+    return Status::OK();
+}
+
+td::Status Client::process_delete_messages_query(PromisedQueryPtr &query) {
+    answer_query(td::JsonFalse(), std::move(query), "Not implemented");
+    return Status::OK();
+
+}
+
+td::Status Client::process_toggle_group_invites_query(PromisedQueryPtr &query) {
+    answer_query(td::JsonFalse(), std::move(query), "Not implemented");
+    return Status::OK();
+}
+
+//end custom methods impl
+
 void Client::do_get_file(object_ptr<td_api::file> file, PromisedQueryPtr query) {
   if (!parameters_->local_mode_ &&
       td::max(file->expected_size_, file->local_->downloaded_size_) > MAX_DOWNLOAD_FILE_SIZE) {  // speculative check
@@ -7994,7 +8040,7 @@ void Client::json_store_file(td::JsonObjectScope &object, const td_api::file *fi
     object("file_size", file->size_);
   }
   if (with_path && file->local_->is_downloading_completed_) {
-    if (parameters_->local_mode_) {
+    if (parameters_->local_mode_ && !parameters_->use_relative_path_) {
       if (td::check_utf8(file->local_->path_)) {
         object("file_path", file->local_->path_);
       } else {
@@ -8920,6 +8966,11 @@ Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message,
       default:
         UNREACHABLE();
     }
+  }
+
+  if (message->interaction_info_ != nullptr) {
+    message_info->views = message->interaction_info_->view_count_;
+    message_info->forwards = message->interaction_info_->forward_count_;
   }
 
   message_info->author_signature = std::move(message->author_signature_);

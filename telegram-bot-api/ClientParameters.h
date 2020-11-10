@@ -55,6 +55,8 @@ struct SharedData {
 
 struct ClientParameters {
   bool local_mode_ = false;
+  bool allow_http_ = false;
+  bool use_relative_path_ = false;
 
   td::int32 api_id_ = 0;
   td::string api_hash_;
