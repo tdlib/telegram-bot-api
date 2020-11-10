@@ -62,7 +62,7 @@ Get information about a message
 #### Executable flag `relative`
 If enabled, allow only relative paths for files in local mode.
 
-#### Executable flag `insecure` (not yet implemented)
+#### Executable flag `insecure`
 Allow http connection in non-local mode
 
 

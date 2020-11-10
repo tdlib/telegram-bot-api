@@ -654,7 +654,7 @@ void WebhookActor::start_up() {
   pending_new_connection_flood_.add_limit(1, 1);
 
   if (!parameters_->local_mode_) {
-    if (url_.protocol_ == td::HttpUrl::Protocol::Https) {
+    if (url_.protocol_ == td::HttpUrl::Protocol::Https || (parameters_->allow_http_ && url_.protocol_ == td::HttpUrl::Protocol::Http)) {
       if (url_.port_ != 443 && url_.port_ != 88 && url_.port_ != 80 && url_.port_ != 8443) {
         VLOG(webhook) << "Can't create webhook: port " << url_.port_ << " is forbidden";
         on_error(td::Status::Error("Webhook can be set up only on ports 80, 88, 443 or 8443"));
