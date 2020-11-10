@@ -257,7 +257,6 @@ bool Client::init_methods() {
   methods_.emplace("deletemessages", &Client::process_delete_messages_query);
   methods_.emplace("togglegroupinvites", &Client::process_toggle_group_invites_query);
 
-
   return true;
 }
 
@@ -2586,9 +2585,7 @@ template <class OnSuccess>
 class Client::TdOnDisableInternetConnectionCallback : public TdQueryCallback {
  public:
   TdOnDisableInternetConnectionCallback(const Client *client, PromisedQueryPtr query, OnSuccess on_success)
-      : client_(client)
-      , query_(std::move(query))
-      , on_success_(std::move(on_success)) {
+      : client_(client), query_(std::move(query)), on_success_(std::move(on_success)) {
   }
 
   void on_result(object_ptr<td_api::Object> result) override {
@@ -2605,9 +2602,7 @@ template <class OnSuccess>
 class Client::TdOnOptimizeMemoryCallback : public TdQueryCallback {
  public:
   TdOnOptimizeMemoryCallback(const Client *client, PromisedQueryPtr query, OnSuccess on_success)
-      : client_(client)
-      , query_(std::move(query))
-      , on_success_(std::move(on_success)) {
+      : client_(client), query_(std::move(query)), on_success_(std::move(on_success)) {
   }
 
   void on_result(object_ptr<td_api::Object> result) override {
@@ -3847,15 +3842,15 @@ void Client::on_update_authorization_state() {
       send_request(make_object<td_api::setOption>("disable_time_adjustment_protection",
                                                   make_object<td_api::optionValueBoolean>(true)),
                    std::make_unique<TdOnOkCallback>());
-      send_request(make_object<td_api::setOption>("disable_minithumbnails",
-                                                  make_object<td_api::optionValueBoolean>(true)),
-                   std::make_unique<TdOnOkCallback>());
-      send_request(make_object<td_api::setOption>("disable_document_filenames",
-                                                  make_object<td_api::optionValueBoolean>(true)),
-                   std::make_unique<TdOnOkCallback>());
-      send_request(make_object<td_api::setOption>("disable_notifications",
-                                                  make_object<td_api::optionValueBoolean>(true)),
-                   std::make_unique<TdOnOkCallback>());
+      send_request(
+          make_object<td_api::setOption>("disable_minithumbnails", make_object<td_api::optionValueBoolean>(true)),
+          std::make_unique<TdOnOkCallback>());
+      send_request(
+          make_object<td_api::setOption>("disable_document_filenames", make_object<td_api::optionValueBoolean>(true)),
+          std::make_unique<TdOnOkCallback>());
+      send_request(
+          make_object<td_api::setOption>("disable_notifications", make_object<td_api::optionValueBoolean>(true)),
+          std::make_unique<TdOnOkCallback>());
       send_request(make_object<td_api::setOption>("ignore_update_chat_last_message",
                                                   make_object<td_api::optionValueBoolean>(true)),
                    std::make_unique<TdOnOkCallback>());
@@ -6969,9 +6964,7 @@ td::Status Client::process_get_chat_member_count_query(PromisedQueryPtr &query) 
 
 td::Status Client::process_optimize_memory_query(PromisedQueryPtr &query) {
   disable_internet_connection(std::move(query), [this](PromisedQueryPtr query) {
-    optimize_memory(std::move(query), [this](PromisedQueryPtr query) {
-      enable_internet_connection(std::move(query));
-    });
+    optimize_memory(std::move(query), [this](PromisedQueryPtr query) { enable_internet_connection(std::move(query)); });
   });
   return Status::OK();
 }
@@ -6979,17 +6972,19 @@ td::Status Client::process_optimize_memory_query(PromisedQueryPtr &query) {
 template <class OnSuccess>
 void Client::disable_internet_connection(PromisedQueryPtr query, OnSuccess on_success) {
   send_request(make_object<td_api::setNetworkType>(make_object<td_api::networkTypeNone>()),
-               std::make_unique<TdOnDisableInternetConnectionCallback<OnSuccess>>(this, std::move(query), std::move(on_success)));
+               std::make_unique<TdOnDisableInternetConnectionCallback<OnSuccess>>(this, std::move(query),
+                                                                                  std::move(on_success)));
 }
 
 void Client::enable_internet_connection(PromisedQueryPtr query) {
-  send_request(make_object<td_api::setNetworkType>(make_object<td_api::networkTypeOther>()), std::make_unique<TdOnOkQueryCallback>(std::move(query)));
+  send_request(make_object<td_api::setNetworkType>(make_object<td_api::networkTypeOther>()),
+               std::make_unique<TdOnOkQueryCallback>(std::move(query)));
 }
 
 template <class OnSuccess>
 void Client::optimize_memory(PromisedQueryPtr query, OnSuccess on_success) {
   send_request(make_object<td_api::optimizeMemory>(),
-      std::make_unique<TdOnOptimizeMemoryCallback<OnSuccess>>(this, std::move(query), std::move(on_success)));
+               std::make_unique<TdOnOptimizeMemoryCallback<OnSuccess>>(this, std::move(query), std::move(on_success)));
 }
 
 td::Status Client::process_leave_chat_query(PromisedQueryPtr &query) {
@@ -7386,16 +7381,16 @@ td::Status Client::process_get_file_query(PromisedQueryPtr &query) {
   return Status::OK();
 }
 
-
 //start custom methods impl
 
 td::Status Client::process_get_message_info_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
   auto message_id = get_message_id(query.get(), "message_id");
-  check_message(chat_id, message_id, false, AccessRights::Read, "message", std::move(query),[this] (int64 chat_id, int64 message_id, PromisedQueryPtr query) {
-    auto message = get_message(chat_id, message_id);
-    answer_query(JsonMessage(message, false, "get message info", this), std::move(query));
-  });
+  check_message(chat_id, message_id, false, AccessRights::Read, "message", std::move(query),
+                [this](int64 chat_id, int64 message_id, PromisedQueryPtr query) {
+                  auto message = get_message(chat_id, message_id);
+                  answer_query(JsonMessage(message, false, "get message info", this), std::move(query));
+                });
 
   return Status::OK();
 }
@@ -7403,13 +7398,11 @@ td::Status Client::process_get_message_info_query(PromisedQueryPtr &query) {
 td::Status Client::process_get_participants_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
 
-
   check_chat(chat_id, AccessRights::Read, std::move(query), [this](int64 chat_id, PromisedQueryPtr query) {
     auto chat_info = get_chat(chat_id);
     CHECK(chat_info != nullptr);
     td::int32 offset = get_integer_arg(query.get(), "offset", 0);
     td::int32 limit = get_integer_arg(query.get(), "limit", 200, 0, 200);
-
 
     switch (chat_info->type) {
       case ChatInfo::Type::Private:
@@ -7422,16 +7415,13 @@ td::Status Client::process_get_participants_query(PromisedQueryPtr &query) {
                             std::make_unique<TdOnGetGroupMembersCallback>(this, true, std::move(query)))
         */
         return fail_query(400, "Bad Request: method not available for group chats", std::move(query));
-
       }
       case ChatInfo::Type::Supergroup: {
         td_api::object_ptr<td_api::SupergroupMembersFilter> filter;
         td::string type = "members";
         if (query->has_arg("type")) {
           type = td::to_lower(query->arg("type"));
-
         }
-
 
         if (type == "members" || type == "participants") {
           filter = td_api::make_object<td_api::supergroupMembersFilterRecent>();
@@ -7457,7 +7447,7 @@ td::Status Client::process_get_participants_query(PromisedQueryPtr &query) {
         UNREACHABLE();
     }
   });
-    return Status::OK();
+  return Status::OK();
 }
 
 td::Status Client::process_delete_messages_query(PromisedQueryPtr &query) {
