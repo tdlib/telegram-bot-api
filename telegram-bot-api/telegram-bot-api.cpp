@@ -407,7 +407,7 @@ int main(int argc, char *argv[]) {
   }
   sched.start();
 
-  double last_cron_time = start_time;
+  double next_cron_time = start_time;
   double last_dump_time = start_time - 1000.0;
   double last_tqueue_gc_time = start_time - 1000.0;
   td::int64 tqueue_deleted_events = 0;
@@ -416,7 +416,7 @@ int main(int argc, char *argv[]) {
   std::atomic_bool can_quit{false};
   ServerCpuStat::instance();  // create ServerCpuStat instance
   while (true) {
-    sched.run_main(1);
+    sched.run_main(next_cron_time - td::Time::now());
 
     if (!need_rotate_log.test_and_set()) {
       td::log_interface->rotate();
@@ -462,8 +462,8 @@ int main(int argc, char *argv[]) {
     }
 
     double now = td::Time::now();
-    if (now > last_cron_time + 1.0) {
-      last_cron_time = now;
+    if (now >= next_cron_time) {
+      next_cron_time += 1.0;
       ServerCpuStat::update(now);
     }
 
