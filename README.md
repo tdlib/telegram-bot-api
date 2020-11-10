@@ -3,29 +3,16 @@ TDLight Telegram Bot API is a fork of the official Telegram Bot API, focused on 
 
 TDLight Telegram Bot API is 100% compatible with the official version.
 
-## Added features
-
-### TDLib replaced with TDLight
-[TDLight](https://github.com/tdlight-team/tdlight) provides constant memory usage, unlike tdlib that must be restarted to reduce the heap size.
-
-### Command `optimize_memory`
-Calling `optimize_memory` will remove old data from the in-memory cache and give the freed memory back to the os
-
-### Additional features
-- getChat now resolves username for users
-- the `message` object now has the `views` field and `forwards` field
-- new method `getMessageInfo` to get a message (params: chat_id, message_id)
-
------
-
-
 The Telegram Bot API provides an HTTP API for creating [Telegram Bots](https://core.telegram.org/bots).
 
 If you've got any questions about bots or would like to report an issue with your bot, kindly contact [@BotSupport](https://t.me/BotSupport) in Telegram.
 
-Please note that only global Bot API issues that affect all bots are suitable for this repository.
+Please note that only TDLight-specific issues are suitable for this repository.
 
 ## Table of Contents
+- [TDLight features](#tdlight-features)
+    - [Added features](#added-features)
+    - [Modified features](#modified-features)
 - [Installation](#installation)
 - [Dependencies](#dependencies)
 - [Usage](#usage)
@@ -33,6 +20,54 @@ Please note that only global Bot API issues that affect all bots are suitable fo
 - [Moving a bot to a local server](#switching)
 - [Moving a bot from one local server to another](#moving)
 - [License](#license)
+
+<a name="tdlight-features"></a>
+## TDLight features
+
+<a name="added-features"></a>
+### Added features
+
+#### TDLib replaced with TDLight
+[TDLight](https://github.com/tdlight-team/tdlight) provides constant memory usage, unlike tdlib that must be restarted to reduce the heap size.
+
+#### Command `optimize_memory`
+Calling `optimize_memory` will remove old data from the in-memory cache and give the freed memory back to the os
+
+#### Command `getmessageinfo`
+Get information about a message
+##### Parameters
+- `chat_id` Message chat id
+- `message_id` Message id
+##### Returns `message`
+
+#### Command `getparticipants`
+(todo)
+##### Parameters
+- `(todo)`
+##### Returns `(todo)`
+
+#### Command `deletemessages`
+(todo)
+##### Parameters
+- `(todo)`
+##### Returns `(todo)`
+
+#### Command `togglegroupinvites`
+(todo)
+##### Parameters
+- `(todo)`
+##### Returns `(todo)`
+
+<a name="modified-features"></a>
+### Modified features
+
+#### Command `getchat`
+The command `getchat` will also try to resolve the username online, if it can't be found locally
+
+#### Object `message`
+The `message` object now has two new fields:
+- `views`: how many views has the message (usually the views are shown only for channel messages)
+- `forwards`: how many times the message has been forwarded
 
 <a name="installation"></a>
 ## Installation
