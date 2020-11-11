@@ -36,6 +36,12 @@ fi
 if [ -n "$TELEGRAM_LOCAL" ]; then
   CUSTOM_ARGS="${CUSTOM_ARGS} --local"
 fi
+if [ -n "$TELEGRAM_INSECURE" ]; then
+  CUSTOM_ARGS="${CUSTOM_ARGS} --insecure"
+fi
+if [ -n "$TELEGRAM_RELATIVE" ]; then
+  CUSTOM_ARGS="${CUSTOM_ARGS} --relative"
+fi
 
 COMMAND="telegram-bot-api ${DEFAULT_ARGS}${CUSTOM_ARGS}"
 
