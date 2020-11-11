@@ -31,6 +31,6 @@ RUN addgroup -g 101 -S telegram-bot-api \
  && chown telegram-bot-api:telegram-bot-api ${TELEGRAM_LOGS_DIR} ${TELEGRAM_WORK_DIR} \
  && chown nobody:nobody /tmp/telegram-bot-api
 
-HEALTHCHECK CMD curl -f http://localhost:8081/ || exit 1
+HEALTHCHECK CMD curl -f http://localhost:8082/ || exit 1
 EXPOSE 8081/tcp 8082/tcp
 ENTRYPOINT ["/docker-entrypoint.sh"]
