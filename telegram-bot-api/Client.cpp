@@ -7476,15 +7476,9 @@ td::Status Client::process_delete_messages_query(PromisedQueryPtr &query) {
     }
 
     td::vector<td::int64> ids;
-    ids.reserve(200);
+    ids.reserve(end-start+1);
     for (td::int32 i = start; i <= end; i++) {
       ids.push_back(as_tdlib_message_id(i));
-
-      if (ids.size() == 200) {
-        send_request(make_object<td_api::deleteMessages>(chat_id, std::move(ids), true),
-                     std::make_unique<TdOnOkCallback>());
-        ids.clear();
-      }
     }
 
     if (ids.size() != 0) {
