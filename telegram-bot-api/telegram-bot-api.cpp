@@ -238,6 +238,9 @@ int main(int argc, char *argv[]) {
   options.add_checked_option('c', "max-connections", "maximum number of open file descriptors",
                              td::OptionParser::parse_integer(max_connections));
 
+  options.add_checked_option('\0', "max-batch-operations", PSLICE() << "maximum number of batch operations (default: " << parameters->max_batch_operations << ")",
+                             td::OptionParser::parse_integer(parameters->max_batch_operations));
+
   options.add_checked_option(
       '\0', "proxy", PSLICE() << "HTTP proxy server for outgoing webhook requests in the format http://host:port",
       [&](td::Slice address) {

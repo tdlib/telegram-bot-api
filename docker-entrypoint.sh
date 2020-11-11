@@ -42,6 +42,9 @@ fi
 if [ -n "$TELEGRAM_RELATIVE" ]; then
   CUSTOM_ARGS="${CUSTOM_ARGS} --relative"
 fi
+if [ -n "$TELEGRAM_MAX_BATCH" ]; then
+  CUSTOM_ARGS="${CUSTOM_ARGS} ---max-batch-operations=$TELEGRAM_MAX_BATCH"
+fi
 
 COMMAND="telegram-bot-api ${DEFAULT_ARGS}${CUSTOM_ARGS}"
 

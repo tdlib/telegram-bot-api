@@ -7470,6 +7470,10 @@ td::Status Client::process_delete_messages_query(PromisedQueryPtr &query) {
     return Status::Error(400, "Initial message identifier is not lower than last message identifier");
   }
 
+  if (static_cast<td::uint32>(end-start) > parameters_->max_batch_operations) {
+    return Status::Error(400, PSLICE() << "Too many operations: maximum number of batch operation is " << parameters_->max_batch_operations);
+  }
+
   check_chat(chat_id, AccessRights::Write, std::move(query), [this, start, end](int64 chat_id, PromisedQueryPtr query) {
     if (get_chat_type(chat_id) != ChatType::Supergroup) {
       return fail_query(400, "Bad Request: method is available only for supergroups", std::move(query));
