@@ -7453,7 +7453,47 @@ td::Status Client::process_get_participants_query(PromisedQueryPtr &query) {
 }
 
 td::Status Client::process_delete_messages_query(PromisedQueryPtr &query) {
-  answer_query(td::JsonFalse(), std::move(query), "Not implemented");
+  auto chat_id = query->arg("chat_id");
+
+  if (chat_id.empty()) {
+    return Status::Error(400, "Chat identifier is not specified");
+  }
+
+  auto start = as_client_message_id(get_message_id(query.get(), "start"));
+  auto end = as_client_message_id(get_message_id(query.get(), "end"));
+
+  if (start == 0 || end == 0) {
+    return Status::Error(400, "Message identifier is not specified");
+  }
+
+  if (start >= end) {
+    return Status::Error(400, "Initial message identifier is not lower than last message identifier");
+  }
+
+  check_chat(chat_id, AccessRights::Write, std::move(query), [this, start, end](int64 chat_id, PromisedQueryPtr query) {
+    if (get_chat_type(chat_id) != ChatType::Supergroup) {
+      return fail_query(400, "Bad Request: method is available only for supergroups", std::move(query));
+    }
+
+    td::vector<td::int64> ids;
+    ids.reserve(200);
+    for (td::int32 i = start; i <= end; i++) {
+      ids.push_back(as_tdlib_message_id(i));
+
+      if (ids.size() == 200) {
+        send_request(make_object<td_api::deleteMessages>(chat_id, std::move(ids), true),
+                     std::make_unique<TdOnOkCallback>());
+        ids.clear();
+      }
+    }
+
+    if (ids.size() != 0) {
+      send_request(make_object<td_api::deleteMessages>(chat_id, std::move(ids), true),
+                   std::make_unique<TdOnOkCallback>());
+    }
+    answer_query(td::JsonTrue(), std::move(query));
+  });
+
   return Status::OK();
 }
 
