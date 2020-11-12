@@ -169,8 +169,10 @@ int main(int argc, char *argv[]) {
   options.set_usage(td::Slice(argv[0]), "--api-id=<arg> --api-hash=<arg> [--local] [OPTION]...");
   options.set_description("Telegram Bot API server");
   options.add_option('h', "help", "display this help text and exit", [&] { need_print_usage = true; });
-  options.add_option('\0', "local", "allow the Bot API server to serve local requests",
+  options.add_option('\0', "local", "allow the Bot API server to serve local requests and disables the file limits",
                      [&] { parameters->local_mode_ = true; });
+  options.add_option('\0', "no-file-limit", "disable the file limits",
+		             [&] { parameters->no_file_limit_ = true; });
   options.add_option('\0', "insecure", "allow the Bot API to send request via insecure HTTP", [&] { parameters->allow_http_ = true; });
   options.add_option('\0', "relative", "use relative file path in local mode", [&] { parameters->use_relative_path_ = true; });
 
