@@ -3805,7 +3805,7 @@ void Client::on_update_file(object_ptr<td_api::file> file) {
   if (!is_file_being_downloaded(file_id)) {
     return;
   }
-  if ((!parameters_->local_mode_ || !parameters_->no_file_limit) && file->local_->downloaded_size_ > MAX_DOWNLOAD_FILE_SIZE) {
+  if ((!parameters_->local_mode_ || !parameters_->no_file_limit_) && file->local_->downloaded_size_ > MAX_DOWNLOAD_FILE_SIZE) {
     if (file->local_->is_downloading_active_) {
       send_request(make_object<td_api::cancelDownloadFile>(file_id, false),
                    std::make_unique<TdOnCancelDownloadFileCallback>());
