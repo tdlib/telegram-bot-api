@@ -3805,7 +3805,7 @@ void Client::on_update_file(object_ptr<td_api::file> file) {
   if (!is_file_being_downloaded(file_id)) {
     return;
   }
-  if (!parameters_->local_mode_ && file->local_->downloaded_size_ > MAX_DOWNLOAD_FILE_SIZE) {
+  if ((!parameters_->local_mode_ || !parameters_->no_file_limit_) && file->local_->downloaded_size_ > MAX_DOWNLOAD_FILE_SIZE) {
     if (file->local_->is_downloading_active_) {
       send_request(make_object<td_api::cancelDownloadFile>(file_id, false),
                    std::make_unique<TdOnCancelDownloadFileCallback>());
@@ -7503,7 +7503,7 @@ td::Status Client::process_toggle_group_invites_query(PromisedQueryPtr &query) {
 //end custom methods impl
 
 void Client::do_get_file(object_ptr<td_api::file> file, PromisedQueryPtr query) {
-  if (!parameters_->local_mode_ &&
+  if ((!parameters_->local_mode_ || !parameters_->no_file_limit_) &&
       td::max(file->expected_size_, file->local_->downloaded_size_) > MAX_DOWNLOAD_FILE_SIZE) {  // speculative check
     return fail_query(400, "Bad Request: file is too big", std::move(query));
   }
