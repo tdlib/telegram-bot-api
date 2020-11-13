@@ -23,13 +23,15 @@ namespace telegram_bot_api {
 
 class HttpServer : public td::TcpListener::Callback {
  public:
-  HttpServer(int port, std::function<td::ActorOwn<td::HttpInboundConnection::Callback>()> creator)
-      : port_(port), creator_(std::move(creator)) {
+  HttpServer(td::string ip_address, int port,
+             std::function<td::ActorOwn<td::HttpInboundConnection::Callback>()> creator)
+      : ip_address_(std::move(ip_address)), port_(port), creator_(std::move(creator)) {
     flood_control_.add_limit(1, 1);    // 1 in a second
     flood_control_.add_limit(60, 10);  // 10 in a minute
   }
 
  private:
+  td::string ip_address_;
   td::int32 port_;
   std::function<td::ActorOwn<td::HttpInboundConnection::Callback>()> creator_;
   td::ActorOwn<td::TcpListener> listener_;
@@ -45,13 +47,15 @@ class HttpServer : public td::TcpListener::Callback {
     flood_control_.add_event(static_cast<td::int32>(now));
     LOG(INFO) << "Create tcp listener " << td::tag("port", port_);
     listener_ = td::create_actor<td::TcpListener>(PSLICE() << "TcpListener" << td::tag("port", port_), port_,
-                                                  actor_shared(this, 1));
+                                                  actor_shared(this, 1), ip_address_);
   }
+
   void hangup_shared() override {
     LOG(ERROR) << "TCP listener was closed";
     listener_.release();
     yield();
   }
+
   void accept(td::SocketFd fd) override {
     auto scheduler_count = td::Scheduler::instance()->sched_count();
     auto scheduler_id = scheduler_count - 1;
@@ -62,6 +66,7 @@ class HttpServer : public td::TcpListener::Callback {
                                                 scheduler_id)
         .release();
   }
+
   void loop() override {
     if (listener_.empty()) {
       start_up();

@@ -32,6 +32,8 @@ select.large { font-size: large; }
     <select id="linuxSelect" onchange="onOsChanged(false)" class="large">
       <option>Choose a Linux distro:</option>
       <option>Alpine</option>
+      <option>CentOS 7</option>
+      <option>CentOS 8</option>
       <option>Debian 8</option>
       <option>Debian 9</option>
       <option>Debian 10</option>
@@ -58,7 +60,7 @@ select.large { font-size: large; }
     <div id="buildCompilerDiv" class="hide">
       <span>Choose which compiler you want to use to build the Telegram Bot API server:</span><br>
       <label><input type="radio" id="buildCompilerRadioGcc" name="buildCompilerRadio" onchange="onOptionsChanged()" checked/>g++</label>
-      <label><input type="radio" id="buildCompilerRadioClang" name="buildCompilerRadio" onchange="onOptionsChanged()"/>clang++ (recommended)</label>
+      <label><input type="radio" id="buildCompilerRadioClang" name="buildCompilerRadio" onchange="onOptionsChanged()"/>clang (recommended)</label>
       <p></p>
     </div>
 
@@ -174,7 +176,7 @@ function onOptionsChanged() {
   document.getElementById('buildCommandsDiv').style.display = 'block';
 
   var use_clang = os_freebsd || os_openbsd;
-  if (os_linux && linux_distro !== 'Alpine') {
+  if (os_linux && linux_distro !== 'Alpine' && !linux_distro.includes('CentOS')) {
     document.getElementById('buildCompilerDiv').style.display = 'block';
     use_clang = document.getElementById('buildCompilerRadioClang').checked;
   } else {
@@ -250,7 +252,7 @@ function onOptionsChanged() {
     pre_text.push('Download and install <a href="https://sourceforge.net/projects/gnuwin32/files/gperf/3.0.1/">gperf</a>. Add the path to gperf.exe to the PATH environment variable.');
   }
   if (os_linux && linux_distro === 'Other') {
-    var compiler = use_clang ? 'clang++ >= 3.4' : 'g++ >= 4.9.2';
+    var compiler = use_clang ? 'clang >= 3.4' : 'g++ >= 4.9.2';
     pre_text.push('Install Git, ' + compiler + ', make, CMake >= 3.0.2, OpenSSL-dev, zlib-dev, gperf using your package manager.');
   }
   if (os_freebsd) {
@@ -309,6 +311,7 @@ function onOptionsChanged() {
 
   var commands = [];
 
+  var cmake = 'cmake';
   if (os_mac) {
     commands.push('xcode-select --install');
     commands.push('/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"');
@@ -320,6 +323,21 @@ function onOptionsChanged() {
         commands.push(sudo + 'apk upgrade');
         var packages = 'alpine-sdk linux-headers git zlib-dev openssl-dev gperf cmake';
         commands.push(sudo + 'apk add --update ' + packages);
+        break;
+      case 'CentOS 7':
+      case 'CentOS 8':
+        commands.push(sudo + 'yum update -y');
+        var packages = 'gcc-c++ make git zlib-devel openssl-devel';
+        if (linux_distro === 'CentOS 7') {
+          commands.push(sudo + 'yum install -y centos-release-scl-rh epel-release');
+          commands.push(sudo + 'yum install -y devtoolset-9-gcc devtoolset-9-gcc-c++');
+          cmake = 'cmake3';
+          packages += ' gperf';
+        } else {
+          commands.push(sudo + 'dnf --enablerepo=PowerTools install gperf');
+        }
+        packages += ' ' + cmake;
+        commands.push(sudo + 'yum install -y ' + packages);
         break;
       case 'Debian 8':
       case 'Debian 9':
@@ -367,7 +385,7 @@ function onOptionsChanged() {
     if (!use_root) {
       commands.push('su -');
     }
-    var packages = 'git gperf cmake';
+    var packages = 'git gperf php-7.2.10 cmake';
     commands.push('pkg_add -z ' + packages);
     if (!use_root) {
       commands.push('exit');
@@ -418,34 +436,6 @@ function onOptionsChanged() {
   commands.push('mkdir build');
   commands.push('cd build');
 
-  if (!use_msvc) {
-    var c_flags = [];
-    var cxx_flags = [];
-
-    if (build_32bit) {
-      c_flags.push('-m32');
-      cxx_flags.push('-m32');
-    } else if (build_64bit) {
-      c_flags.push('-m64');
-      cxx_flags.push('-m64');
-    }
-
-    if (os_linux) {
-      if (use_clang) {
-        cxx_flags.push('-stdlib=libc++');
-      } else {
-        cxx_flags.push('');
-      }
-    }
-
-    if (c_flags.length) {
-      commands.push('export CFLAGS="' + c_flags.join(' ') + '"');
-    }
-    if (cxx_flags.length) {
-      commands.push('export CXXFLAGS="' + cxx_flags.join(' ') + '"');
-    }
-  }
-
   cmake_init_options = getBacicCmakeInitOptions();
   if (os_mac) {
     cmake_init_options.push('-DOPENSSL_ROOT_DIR=/usr/local/opt/openssl/');
@@ -460,16 +450,24 @@ function onOptionsChanged() {
     if (os_linux) {
       if (use_clang) {
         var clang_version_suffix = getClangVersionSuffix();
-        prefix = 'CC=/usr/bin/clang' + clang_version_suffix + ' CXX=/usr/bin/clang++' + clang_version_suffix + ' ';
+        prefix = 'CXXFLAGS="-stdlib=libc++" CC=/usr/bin/clang' + clang_version_suffix + ' CXX=/usr/bin/clang++' + clang_version_suffix + ' ';
       } else if (linux_distro === 'Ubuntu 14') {
         prefix = 'CC=/usr/bin/gcc-4.9 CXX=/usr/bin/g++-4.9 ';
+      } else if (linux_distro === 'CentOS 7') {
+        prefix = 'CC=/opt/rh/devtoolset-9/root/usr/bin/gcc CXX=/opt/rh/devtoolset-9/root/usr/bin/g++ ';
       }
     }
-    return prefix + 'cmake ' + options.join(' ') + ' ..';
+    return prefix + cmake + ' ' + options.join(' ') + ' ..';
   }
   commands.push(getCmakeInitCommand(cmake_init_options));
 
-  let build_command = 'cmake --build . --target install';
+  if (os_openbsd) {
+    commands.push(cmake + ' --build . --target prepare_cross_compiling');
+    commands.push('cd ../td');
+    commands.push('php-7.2 SplitSource.php');
+    commands.push('cd ../build');
+  }
+  let build_command = cmake + ' --build . --target install';
   if (use_msvc) {
     if (!is_debug_build) {
       commands.push(build_command + ' --config Release');
@@ -479,6 +477,10 @@ function onOptionsChanged() {
     }
   } else {
     commands.push(build_command);
+  }
+  if (os_openbsd) {
+    commands.push('cd ../td');
+    commands.push('php-7.2 SplitSource.php --undo');
   }
   commands.push('cd ../..');
   if (install_dir !== '/usr/local') {
