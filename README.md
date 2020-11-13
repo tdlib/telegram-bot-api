@@ -7,6 +7,8 @@ The Telegram Bot API provides an HTTP API for creating [Telegram Bots](https://c
 
 If you've got any questions about bots or would like to report an issue with your bot, kindly contact [@BotSupport](https://t.me/BotSupport) in Telegram.
 
+If you've got any questions about our fork, instead, join [@TDLightChat](https://t.me/TDLightChat) in Telegram, or see the news at [@TDLight](https://t.me/TDLight).
+
 Please note that only TDLight-specific issues are suitable for this repository.
 
 ## Table of Contents
