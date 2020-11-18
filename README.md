@@ -71,6 +71,15 @@ The maximum number of messages to be deleted in a single batch is determined by 
 - `end` Last message id to delete
 ##### Returns `true`
 
+#### Command `ping`
+Send an MTProto ping message to the telegram servers. 
+Useful to detect the delay of the bot api server.
+
+##### Parameters
+No parameters
+##### Returns `string`
+Ping delay in seconds represented as string.
+
 <!--TODO:
 #### Command `togglegroupinvites`
 (todo)
