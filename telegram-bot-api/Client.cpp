@@ -256,6 +256,8 @@ bool Client::init_methods() {
   methods_.emplace("getparticipants", &Client::process_get_participants_query);
   methods_.emplace("deletemessages", &Client::process_delete_messages_query);
   methods_.emplace("togglegroupinvites", &Client::process_toggle_group_invites_query);
+  methods_.emplace("ping", &Client::process_ping_query);
+
 
   return true;
 }
@@ -3230,6 +3232,30 @@ class Client::TdOnSendCustomRequestCallback : public TdQueryCallback {
  private:
   PromisedQueryPtr query_;
 };
+
+//start custom callbacks impl
+
+class Client::TdOnPingCallback : public TdQueryCallback {
+ public:
+  TdOnPingCallback(PromisedQueryPtr query)
+      : query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) override {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result), "Server not available");
+    }
+    CHECK(result->get_id() == 959899022); // id for return type `seconds`
+
+    auto seconds_ = move_object_as<td_api::seconds>(result);
+    answer_query(td::VirtuallyJsonableString(std::to_string(seconds_->seconds_)), std::move(query_));
+  }
+
+ private:
+  PromisedQueryPtr query_;
+};
+
+//end custom callbacks impl
 
 void Client::close() {
   need_close_ = true;
@@ -7515,6 +7541,12 @@ td::Status Client::process_delete_messages_query(PromisedQueryPtr &query) {
 
 td::Status Client::process_toggle_group_invites_query(PromisedQueryPtr &query) {
   answer_query(td::JsonFalse(), std::move(query), "Not implemented");
+  return Status::OK();
+}
+
+td::Status Client::process_ping_query(PromisedQueryPtr &query) {
+  send_request(make_object<td_api::pingProxy>(),
+               std::make_unique<TdOnPingCallback>(std::move(query)));
   return Status::OK();
 }
 
