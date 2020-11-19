@@ -256,6 +256,8 @@ bool Client::init_methods() {
   methods_.emplace("getparticipants", &Client::process_get_participants_query);
   methods_.emplace("deletemessages", &Client::process_delete_messages_query);
   methods_.emplace("togglegroupinvites", &Client::process_toggle_group_invites_query);
+  methods_.emplace("ping", &Client::process_ping_query);
+
 
   return true;
 }
@@ -328,6 +330,12 @@ class Client::JsonUser : public Jsonable {
     }
     if (user_info != nullptr && !user_info->language_code.empty()) {
       object("language_code", user_info->language_code);
+    }
+    if (user_info != nullptr && user_info->is_verified) {
+      object("is_verified", td::JsonBool(user_info->is_verified));
+    }
+    if (user_info != nullptr && user_info->is_scam) {
+      object("is_scam", td::JsonBool(user_info->is_scam));
     }
     if (is_bot && full_bot_info_) {
       object("can_join_groups", td::JsonBool(user_info->can_join_groups));
@@ -582,6 +590,12 @@ class Client::JsonChat : public Jsonable {
           object("username", user_info->username);
         }
         object("type", "private");
+        if (user_info->is_verified) {
+          object("is_verified", td::JsonBool(user_info->is_verified));
+        }
+        if (user_info->is_scam) {
+          object("is_scam", td::JsonBool(user_info->is_scam));
+        }
         if (is_full_) {
           if (!user_info->bio.empty()) {
             object("bio", user_info->bio);
@@ -626,6 +640,12 @@ class Client::JsonChat : public Jsonable {
           object("type", "supergroup");
         } else {
           object("type", "channel");
+        }
+        if (supergroup_info->is_verified) {
+          object("is_verified", td::JsonBool(supergroup_info->is_verified));
+        }
+        if (supergroup_info->is_scam) {
+          object("is_scam", td::JsonBool(supergroup_info->is_scam));
         }
         if (is_full_) {
           if (!supergroup_info->description.empty()) {
@@ -3212,6 +3232,30 @@ class Client::TdOnSendCustomRequestCallback : public TdQueryCallback {
  private:
   PromisedQueryPtr query_;
 };
+
+//start custom callbacks impl
+
+class Client::TdOnPingCallback : public TdQueryCallback {
+ public:
+  TdOnPingCallback(PromisedQueryPtr query)
+      : query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) override {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result), "Server not available");
+    }
+    CHECK(result->get_id() == 959899022); // id for return type `seconds`
+
+    auto seconds_ = move_object_as<td_api::seconds>(result);
+    answer_query(td::VirtuallyJsonableString(std::to_string(seconds_->seconds_)), std::move(query_));
+  }
+
+ private:
+  PromisedQueryPtr query_;
+};
+
+//end custom callbacks impl
 
 void Client::close() {
   need_close_ = true;
@@ -7500,6 +7544,12 @@ td::Status Client::process_toggle_group_invites_query(PromisedQueryPtr &query) {
   return Status::OK();
 }
 
+td::Status Client::process_ping_query(PromisedQueryPtr &query) {
+  send_request(make_object<td_api::pingProxy>(),
+               std::make_unique<TdOnPingCallback>(std::move(query)));
+  return Status::OK();
+}
+
 //end custom methods impl
 
 void Client::do_get_file(object_ptr<td_api::file> file, PromisedQueryPtr query) {
@@ -7934,6 +7984,8 @@ void Client::add_user(std::unordered_map<int32, UserInfo> &users, object_ptr<td_
   user_info->last_name = user->last_name_;
   user_info->username = user->username_;
   user_info->language_code = user->language_code_;
+  user_info->is_verified = user->is_verified_;
+  user_info->is_scam = user->is_scam_;
 
   user_info->have_access = user->have_access_;
 
@@ -8003,6 +8055,8 @@ void Client::add_supergroup(std::unordered_map<int32, SupergroupInfo> &supergrou
   supergroup_info->status = std::move(supergroup->status_);
   supergroup_info->is_supergroup = !supergroup->is_channel_;
   supergroup_info->has_location = supergroup->has_location_;
+  supergroup_info->is_verified = supergroup->is_verified_;
+  supergroup_info->is_scam = supergroup->is_scam_;
 }
 
 void Client::set_supergroup_description(int32 supergroup_id, td::string &&descripton) {

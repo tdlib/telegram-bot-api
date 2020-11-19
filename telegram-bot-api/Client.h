@@ -178,6 +178,10 @@ class Client : public WebhookActor::Callback {
   class TdOnCancelDownloadFileCallback;
   class TdOnSendCustomRequestCallback;
 
+  //start custom callbacks
+  class TdOnPingCallback;
+  //end custom callbacks
+
   void on_get_reply_message(int64 chat_id, object_ptr<td_api::message> reply_to_message);
 
   void on_get_edited_message(object_ptr<td_api::message> edited_message);
@@ -492,6 +496,7 @@ class Client : public WebhookActor::Callback {
   Status process_get_participants_query(PromisedQueryPtr &query);
   Status process_delete_messages_query(PromisedQueryPtr &query);
   Status process_toggle_group_invites_query(PromisedQueryPtr &query);
+  Status process_ping_query(PromisedQueryPtr &query);
 
 
   void webhook_verified(td::string cached_ip_address) override;
@@ -556,6 +561,8 @@ class Client : public WebhookActor::Callback {
 
     td::string bio;
 
+    bool is_verified = false;
+    bool is_scam = false;
     bool have_access = false;
     bool can_join_groups = false;
     bool can_read_all_group_messages = false;
@@ -592,6 +599,8 @@ class Client : public WebhookActor::Callback {
     bool is_supergroup = false;
     bool can_set_sticker_set = false;
     bool has_location = false;
+    bool is_verified = false;
+    bool is_scam = false;
   };
   static void add_supergroup(std::unordered_map<int32, SupergroupInfo> &supergroups,
                              object_ptr<td_api::supergroup> &&supergroup);
