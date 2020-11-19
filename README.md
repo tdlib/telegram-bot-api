@@ -124,6 +124,8 @@ The `User` object now has two new fields:
 
 In addition, the member list now shows the full bot list (previously only the bot that executed the query was shown)
 
+The bot will now receive Updates for all received media, even if a destruction timer is set.
+
 <a name="installation"></a>
 ## Installation
 
