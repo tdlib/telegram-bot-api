@@ -3198,6 +3198,11 @@ void Client::start_up() {
   next_bot_updates_warning_time_ = start_time_ + 600;
   schedule_next_delete_messages_lru();
   webhook_set_time_ = start_time_;
+  next_allowed_set_webhook_time_ = start_time_;
+  next_set_webhook_logging_time_ = start_time_;
+  next_webhook_is_not_modified_warning_time_ = start_time_;
+  previous_get_updates_start_time_ = start_time_ - 100;
+  previous_get_updates_finish_time_ = start_time_ - 100;
 
   sticker_set_names_[GREAT_MINDS_SET_ID] = GREAT_MINDS_SET_NAME.str();
 
