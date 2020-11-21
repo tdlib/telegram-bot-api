@@ -133,7 +133,7 @@ int main(int argc, char *argv[]) {
   auto shared_data = std::make_shared<SharedData>();
   auto parameters = std::make_unique<ClientParameters>();
   parameters->shared_data_ = shared_data;
-  parameters->start_timestamp_ = start_time;
+  parameters->start_time_ = start_time;
   auto net_query_stats = td::create_net_query_stats();
   parameters->net_query_stats_ = net_query_stats;
 

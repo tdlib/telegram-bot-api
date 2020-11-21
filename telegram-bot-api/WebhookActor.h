@@ -137,7 +137,7 @@ class WebhookActor : public td::HttpOutboundConnection::Callback {
 
   td::IPAddress ip_address_;
   td::int32 ip_generation_ = 0;
-  double next_ip_address_resolve_timestamp_ = 0;
+  double next_ip_address_resolve_time_ = 0;
   td::FutureActor<td::IPAddress> future_ip_address_;
 
   class Connection : public td::ListNode {
@@ -168,7 +168,7 @@ class WebhookActor : public td::HttpOutboundConnection::Callback {
   td::ListNode ready_connections_;
   td::FloodControlFast active_new_connection_flood_;
   td::FloodControlFast pending_new_connection_flood_;
-  double last_success_timestamp_ = 0;
+  double last_success_time_ = 0;
   double wakeup_at_ = 0;
   bool last_update_was_successful_ = true;
 

@@ -86,8 +86,7 @@ class ServerBotInfo {
   td::int32 tail_update_id_ = 0;
   td::int32 webhook_max_connections_ = 0;
   std::size_t pending_update_count_ = 0;
-  double start_timestamp_ = 0;
-  double last_query_timestamp_ = 0;
+  double start_time_ = 0;
 };
 
 struct ServerBotStat {

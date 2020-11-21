@@ -86,8 +86,8 @@ void WebhookActor::resolve_ip_address() {
   if (fix_ip_address_) {
     return;
   }
-  if (td::Time::now() < next_ip_address_resolve_timestamp_) {
-    relax_wakeup_at(next_ip_address_resolve_timestamp_, "resolve_ip_address");
+  if (td::Time::now() < next_ip_address_resolve_time_) {
+    relax_wakeup_at(next_ip_address_resolve_time_, "resolve_ip_address");
     return;
   }
 
@@ -101,9 +101,9 @@ void WebhookActor::resolve_ip_address() {
   }
 
   if (future_ip_address_.is_ready()) {
-    next_ip_address_resolve_timestamp_ =
+    next_ip_address_resolve_time_ =
         td::Time::now() + IP_ADDRESS_CACHE_TIME + td::Random::fast(0, IP_ADDRESS_CACHE_TIME / 10);
-    relax_wakeup_at(next_ip_address_resolve_timestamp_, "resolve_ip_address");
+    relax_wakeup_at(next_ip_address_resolve_time_, "resolve_ip_address");
 
     auto r_ip_address = future_ip_address_.move_as_result();
     if (r_ip_address.is_error()) {
@@ -264,7 +264,7 @@ void WebhookActor::create_new_connections() {
   auto now = td::Time::now();
   td::FloodControlFast *flood;
   bool active;
-  if (last_success_timestamp_ + 10 < now) {
+  if (last_success_time_ + 10 < now) {
     flood = &pending_new_connection_flood_;
     if (need_connections > 1) {
       need_connections = 1;
@@ -458,7 +458,7 @@ void WebhookActor::drop_event(td::TQueue::EventId event_id) {
 
 void WebhookActor::on_update_ok(td::TQueue::EventId event_id) {
   last_update_was_successful_ = true;
-  last_success_timestamp_ = td::Time::now();
+  last_success_time_ = td::Time::now();
   VLOG(webhook) << "Receive ok for update " << event_id;
 
   drop_event(event_id);
@@ -647,7 +647,7 @@ void WebhookActor::handle(td::unique_ptr<td::HttpQuery> response) {
 void WebhookActor::start_up() {
   max_loaded_updates_ = max_connections_ * 2;
 
-  last_success_timestamp_ = td::Time::now();
+  last_success_time_ = td::Time::now();
   active_new_connection_flood_.add_limit(1, 10 * max_connections_);
   active_new_connection_flood_.add_limit(5, 20 * max_connections_);
 

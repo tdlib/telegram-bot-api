@@ -190,7 +190,7 @@ void ClientManager::get_stats(td::PromiseActor<td::BufferSlice> promise,
 
   sb << stat_.get_description() << "\n";
   if (id_filter.empty()) {
-    sb << "uptime\t" << now - parameters_->start_timestamp_ << "\n";
+    sb << "uptime\t" << now - parameters_->start_time_ << "\n";
     sb << "bot_count\t" << clients_.size() << "\n";
     sb << "active_bot_count\t" << active_bot_count << "\n";
     auto r_mem_stat = td::mem_stat();
@@ -227,7 +227,7 @@ void ClientManager::get_stats(td::PromiseActor<td::BufferSlice> promise,
     auto bot_info = client_info->client_->get_actor_unsafe()->get_bot_info();
     sb << "\n";
     sb << "id\t" << bot_info.id_ << "\n";
-    sb << "uptime\t" << now - bot_info.start_timestamp_ << "\n";
+    sb << "uptime\t" << now - bot_info.start_time_ << "\n";
     sb << "token\t" << bot_info.token_ << "\n";
     sb << "username\t" << bot_info.username_ << "\n";
     sb << "webhook\t" << bot_info.webhook_ << "\n";
