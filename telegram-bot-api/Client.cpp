@@ -8603,9 +8603,9 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     }
   }
 
-  if (message->ttl_ > 0) {
-    return true;
-  }
+  //if (message->ttl_ > 0) {
+  //  return true;
+  //}
 
   switch (message->content_->get_id()) {
     case td_api::messagePhoto::ID: {
