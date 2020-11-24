@@ -81,7 +81,7 @@ jobs:
 
       - name: Login to ghcr registry
         uses: docker/login-action@v1
-        if: ${{ ! github.event_name == 'pull_request' }}
+        if: ${{ github.event_name != 'pull_request' }}
         with:
           registry: ghcr.io
           username: ${{ secrets.GH_USERNAME }}
@@ -89,7 +89,7 @@ jobs:
 
       - name: Login to Docker Hub registry
         uses: docker/login-action@v1
-        if: ${{ ! github.event_name == 'pull_request' }}
+        if: ${{ github.event_name != 'pull_request' }}
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_ACCESS_TOKEN }}
@@ -108,7 +108,7 @@ jobs:
             tdlightbotapi:${{ env.HASH_VERSION }}-${{ env.SAFE_ARCH }}
 
       - name: Tag and push image
-        if: ${{ ! github.event_name == 'pull_request' }}
+        if: ${{ github.event_name != 'pull_request' }}
         run: |
           docker tag tdlightbotapi:${{ env.HASH_VERSION }}-${{ env.SAFE_ARCH }} ${{ env.IMAGE_TAG }}:${{ env.HASH_VERSION }}-${{ env.SAFE_ARCH }}
           docker tag tdlightbotapi:${{ env.HASH_VERSION }}-${{ env.SAFE_ARCH }} ${{ env.IMAGE_TAG }}:${{ env.VERSION }}-${{ env.SAFE_ARCH }}
@@ -120,7 +120,7 @@ jobs:
           docker push ${{ env.IMAGE_TAG_DH }}:${{ env.VERSION }}-${{ env.SAFE_ARCH }}
 
       - name: Save image as tar archive
-        if: ${{ ! github.event_name == 'pull_request' }}
+        if: ${{ github.event_name != 'pull_request' }}
         run: |
           docker image ls  # debug
           docker save ${{ env.IMAGE_TAG }}:${{ env.HASH_VERSION }}-${{ env.SAFE_ARCH }} -o ${{ env.SAFE_ARCH }}.tar
@@ -140,7 +140,7 @@ jobs:
   push-manifest:
     name: Create and push multi-arch Docker manifest
     runs-on: ubuntu-latest
-    if: ${{ ! github.event_name == 'pull_request' }}
+    if: ${{ github.event_name != 'pull_request' }}
     env:
       DOCKER_CLI_EXPERIMENTAL: enabled
     needs: build
