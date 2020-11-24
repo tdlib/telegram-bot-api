@@ -3652,7 +3652,8 @@ bool Client::have_message_access(int64 chat_id) const {
     case ChatInfo::Type::Supergroup: {
       auto supergroup_info = get_supergroup_info(chat_info->supergroup_id);
       CHECK(supergroup_info != nullptr);
-      return is_chat_member(supergroup_info->status);
+      return !supergroup_info->is_supergroup || is_chat_member(supergroup_info->status);
+//      return is_chat_member(supergroup_info->status);
     }
     case ChatInfo::Type::Unknown:
     default:
