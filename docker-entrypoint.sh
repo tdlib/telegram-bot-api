@@ -1,18 +1,17 @@
 #!/bin/sh
 set -e
 
-LOG_FILENAME="telegram-bot-api.log"
 
 USERNAME=telegram-bot-api
 GROUPNAME=telegram-bot-api
 
-chown ${USERNAME}:${GROUPNAME} "${TELEGRAM_LOGS_DIR}" "${TELEGRAM_WORK_DIR}"
+chown ${USERNAME}:${GROUPNAME} "${TELEGRAM_WORK_DIR}"
 
 if [ -n "${1}" ]; then
   exec "${*}"
 fi
 
-DEFAULT_ARGS="--http-port 8081 --dir=${TELEGRAM_WORK_DIR} --temp-dir=${TELEGRAM_TEMP_DIR} --log=${TELEGRAM_LOGS_DIR}/${LOG_FILENAME} --username=${USERNAME} --groupname=${GROUPNAME}"
+DEFAULT_ARGS="--http-port 8081 --dir=${TELEGRAM_WORK_DIR} --temp-dir=${TELEGRAM_TEMP_DIR}"
 CUSTOM_ARGS=""
 
 if [ -n "$TELEGRAM_STAT" ]; then
@@ -47,6 +46,11 @@ if [ -n "$TELEGRAM_RELATIVE" ]; then
 fi
 if [ -n "$TELEGRAM_MAX_BATCH" ]; then
   CUSTOM_ARGS="${CUSTOM_ARGS} ---max-batch-operations=$TELEGRAM_MAX_BATCH"
+fi
+if [ -n "$TELEGRAM_LOGS" ]; then
+  CUSTOM_ARGS="$CUSTOM_ARGS --log=${TELEGRAM_LOGS}"
+else
+  CUSTOM_ARGS="$CUSTOM_ARGS --log=/proc/1/fd/1"
 fi
 
 COMMAND="telegram-bot-api ${DEFAULT_ARGS}${CUSTOM_ARGS}"

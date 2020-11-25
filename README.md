@@ -129,7 +129,12 @@ The bot will now receive Updates for all received media, even if a destruction t
 <a name="installation"></a>
 ## Installation
 
-The simplest way to build and install `Telegram Bot API server` is to use our [Telegram Bot API server build instructions generator](https://tdlib.github.io/telegram-bot-api/build.html).
+The simplest way to use it is with this docker command:
+```
+docker run -p 8081:8081 --env TELEGRAM_API_ID=API_ID --env TELEGRAM_API_HASH=API_HASH tdlight/tdlightbotapi 
+```
+
+The simplest way to build `Telegram Bot API server` is to use our [Telegram Bot API server build instructions generator](https://tdlib.github.io/telegram-bot-api/build.html).
 If you do that, you'll only need to choose the target operating system to receive the complete build instructions.
 
 In general, you need to install all `Telegram Bot API server` [dependencies](#dependencies) and compile the source code using CMake:
