@@ -26,8 +26,8 @@ RUN addgroup -g 101 -S telegram-bot-api \
  && adduser -S -D -H -u 101 -h ${TELEGRAM_WORK_DIR} -s /sbin/nologin -G telegram-bot-api -g telegram-bot-api telegram-bot-api \
  && chmod +x /docker-entrypoint.sh \
  && mkdir -p ${TELEGRAM_WORK_DIR} ${TELEGRAM_TEMP_DIR} \
- && chown telegram-bot-api:telegram-bot-api ${TELEGRAM_WORK_DIR} \
- && chown nobody:nobody ${TELEGRAM_TEMP_DIR}
+ && chown telegram-bot-api:telegram-bot-api ${TELEGRAM_WORK_DIR} ${TELEGRAM_TEMP_DIR}\
+ && chmod 666 ${TELEGRAM_TEMP_DIR}
 USER telegram-bot-api:telegram-bot-api
 
 HEALTHCHECK CMD curl -f http://localhost:8082/ || exit 1

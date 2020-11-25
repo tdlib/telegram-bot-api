@@ -5,7 +5,9 @@ set -e
 USERNAME=telegram-bot-api
 GROUPNAME=telegram-bot-api
 
-chown ${USERNAME}:${GROUPNAME} "${TELEGRAM_WORK_DIR}"
+chown ${USERNAME}:${GROUPNAME} "${TELEGRAM_WORK_DIR}" "${TELEGRAM_TEMP_DIR}"
+
+chmod 666 "${TELEGRAM_TEMP_DIR}"
 
 if [ -n "${1}" ]; then
   exec "${*}"
