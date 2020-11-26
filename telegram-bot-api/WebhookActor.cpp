@@ -356,20 +356,21 @@ void WebhookActor::load_updates() {
   }
   VLOG(webhook) << "Trying to load new updates from offset " << tqueue_offset_;
 
+  auto offset = tqueue_offset_;
   auto limit = td::min(SharedData::TQUEUE_EVENT_BUFFER_SIZE, max_loaded_updates_ - queue_updates_.size());
   auto updates = mutable_span(parameters_->shared_data_->event_buffer_, limit);
 
   auto now = td::Time::now();
   auto unix_time_now = parameters_->shared_data_->get_unix_time(now);
   size_t total_size = 0;
-  if (tqueue_offset_.empty()) {
+  if (offset.empty()) {
     updates.truncate(0);
   } else {
-    auto r_size = tqueue->get(tqueue_id_, tqueue_offset_, false, unix_time_now, updates);
+    auto r_size = tqueue->get(tqueue_id_, offset, false, unix_time_now, updates);
     if (r_size.is_error()) {
       VLOG(webhook) << "Failed to get new updates: " << r_size.error();
-      tqueue_offset_ = tqueue->get_head(tqueue_id_);
-      r_size = tqueue->get(tqueue_id_, tqueue_offset_, false, unix_time_now, updates);
+      offset = tqueue_offset_ = tqueue->get_head(tqueue_id_);
+      r_size = tqueue->get(tqueue_id_, offset, false, unix_time_now, updates);
       r_size.ensure();
     }
     total_size = r_size.ok();
@@ -420,8 +421,8 @@ void WebhookActor::load_updates() {
     }
   }
   if (need_warning) {
-    LOG(WARNING) << "Found " << updates.size() << " updates out of " << total_size - update_map_.size() << " + "
-                 << update_map_.size() << " in " << queues_.size() << " queues after last error \""
+    LOG(WARNING) << "Loaded " << updates.size() << " updates out of " << total_size << ". Have total of "
+                 << update_map_.size() << " loaded in " << queues_.size() << " queues after last error \""
                  << last_error_message_ << "\" at " << last_error_date_;
   }
 
@@ -430,9 +431,9 @@ void WebhookActor::load_updates() {
   }
 
   if (!updates.empty()) {
-    VLOG(webhook) << "Loaded " << updates.size() << " new updates from offset " << tqueue_offset_
-                  << " out of requested " << limit << ". Have total of " << update_map_.size() << " updates loaded in "
-                  << queue_updates_.size() << " queues";
+    VLOG(webhook) << "Loaded " << updates.size() << " new updates from offset " << offset << " out of requested "
+                  << limit << ". Have total of " << update_map_.size() << " updates loaded in " << queue_updates_.size()
+                  << " queues";
   }
 }
 
