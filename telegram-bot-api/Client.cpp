@@ -1508,7 +1508,7 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
                    << message_->chat_id << " while storing " << source_ << " " << message_->id;
     }
   }
-  if (message_->media_album_id > 0) {
+  if (message_->media_album_id != 0) {
     object("media_group_id", td::to_string(message_->media_album_id));
   }
   switch (message_->content->get_id()) {
