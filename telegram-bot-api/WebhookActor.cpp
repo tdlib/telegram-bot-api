@@ -470,19 +470,24 @@ void WebhookActor::on_update_error(td::TQueue::EventId event_id, td::Slice error
   double now = td::Time::now();
 
   auto it = update_map_.find(event_id);
-  if (parameters_->shared_data_->get_unix_time(now) > it->second.expires_at_) {
+
+  const int MAX_RETRY_AFTER = 3600;
+  retry_after = td::clamp(retry_after, 0, MAX_RETRY_AFTER);
+  int next_delay = it->second.delay_;
+  int next_effective_delay = retry_after;
+  if (retry_after == 0 && it->second.fail_count_ > 0) {
+    next_delay = td::min(WEBHOOK_MAX_RESEND_TIMEOUT, next_delay * 2);
+    next_effective_delay = next_delay;
+  }
+  if (parameters_->shared_data_->get_unix_time(now) + next_effective_delay > it->second.expires_at_) {
     LOG(WARNING) << "Drop update " << event_id << ": " << error;
     drop_event(event_id);
     return;
   }
   auto &update = it->second;
   update.state_ = Update::State::Begin;
-  const int MAX_RETRY_AFTER = 3600;
-  retry_after = td::clamp(retry_after, 0, MAX_RETRY_AFTER);
-  update.delay_ = retry_after != 0
-                      ? retry_after
-                      : td::min(WEBHOOK_MAX_RESEND_TIMEOUT, update.delay_ * (update.fail_count_ > 0 ? 2 : 1));
-  update.wakeup_at_ = update.fail_count_ > 0 ? now + update.delay_ : now;
+  update.delay_ = next_delay;
+  update.wakeup_at_ = now + next_effective_delay;
   update.fail_count_++;
   queues_.emplace(update.wakeup_at_, update.queue_id_);
   VLOG(webhook) << "Delay update " << event_id << " for " << (update.wakeup_at_ - now) << " seconds because of "
