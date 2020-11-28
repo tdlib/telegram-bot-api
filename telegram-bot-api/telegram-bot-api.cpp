@@ -464,6 +464,9 @@ int main(int argc, char *argv[]) {
 
     double now = td::Time::now();
     if (now >= next_cron_time) {
+      if (now >= next_cron_time + 1.0) {
+        next_cron_time = now;
+      }
       next_cron_time += 1.0;
       ServerCpuStat::update(now);
     }
