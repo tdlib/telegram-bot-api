@@ -1544,7 +1544,7 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
                    << message_->chat_id << " while storing " << source_ << " " << message_->id;
     }
   }
-  if (message_->media_album_id > 0) {
+  if (message_->media_album_id != 0) {
     object("media_group_id", td::to_string(message_->media_album_id));
   }
   switch (message_->content->get_id()) {
@@ -3293,17 +3293,22 @@ ServerBotInfo Client::get_bot_info() const {
   auto &tqueue = parameters_->shared_data_->tqueue_;
   res.head_update_id_ = tqueue->get_head(tqueue_id_).value();
   res.tail_update_id_ = tqueue->get_tail(tqueue_id_).value();
-  res.pending_update_count_ = tqueue->get_size(tqueue_id_);
   res.webhook_max_connections_ = webhook_max_connections_;
-  res.start_timestamp_ = start_timestamp_;
+  res.pending_update_count_ = tqueue->get_size(tqueue_id_);
+  res.start_time_ = start_time_;
   return res;
 }
 
 void Client::start_up() {
-  start_timestamp_ = td::Time::now();
-  next_bot_updates_warning_date_ = start_timestamp_ + 600;
+  start_time_ = td::Time::now();
+  next_bot_updates_warning_time_ = start_time_ + 600;
   schedule_next_delete_messages_lru();
-  webhook_set_date_ = start_timestamp_;
+  webhook_set_time_ = start_time_;
+  next_allowed_set_webhook_time_ = start_time_;
+  next_set_webhook_logging_time_ = start_time_;
+  next_webhook_is_not_modified_warning_time_ = start_time_;
+  previous_get_updates_start_time_ = start_time_ - 100;
+  previous_get_updates_finish_time_ = start_time_ - 100;
 
   sticker_set_names_[GREAT_MINDS_SET_ID] = GREAT_MINDS_SET_NAME.str();
 
@@ -3932,7 +3937,7 @@ void Client::on_update_authorization_state() {
       parameters->api_hash_ = parameters_->api_hash_;
       parameters->system_language_code_ = "en";
       parameters->device_model_ = "server";
-      parameters->application_version_ = "5.0";
+      parameters->application_version_ = "5.0.1";
       parameters->enable_storage_optimizer_ = true;
       parameters->ignore_file_names_ = true;
 
@@ -6012,8 +6017,8 @@ void Client::on_cmd(PromisedQueryPtr query) {
   LOG(DEBUG) << "Process query " << *query;
   if (!td_client_.empty()) {
     if (query->method() == "close") {
-      auto retry_after = static_cast<int>(10 * 60 - (td::Time::now() - start_timestamp_));
-      if (retry_after > 0 && start_timestamp_ > parameters_->start_timestamp_ + 10 * 60) {
+      auto retry_after = static_cast<int>(10 * 60 - (td::Time::now() - start_time_));
+      if (retry_after > 0 && start_time_ > parameters_->start_time_ + 10 * 60) {
         return query->set_retry_after_error(retry_after);
       }
       need_close_ = true;
@@ -7340,11 +7345,11 @@ td::Status Client::process_get_updates_query(PromisedQueryPtr &query) {
   update_allowed_update_types(query.get());
 
   auto now = td::Time::now_cached();
-  if (offset == previous_get_updates_offset_ && timeout < 3 && now < previous_get_updates_start_date_ + 3.0) {
+  if (offset == previous_get_updates_offset_ && timeout < 3 && now < previous_get_updates_start_time_ + 3.0) {
     timeout = 3;
   }
   previous_get_updates_offset_ = offset;
-  previous_get_updates_start_date_ = now;
+  previous_get_updates_start_time_ = now;
   do_get_updates(offset, limit, timeout, std::move(query));
   return Status::OK();
 }
@@ -7357,15 +7362,15 @@ td::Status Client::process_set_webhook_query(PromisedQueryPtr &query) {
 
   auto now = td::Time::now_cached();
   if (!new_url.empty()) {
-    if (now < next_allowed_set_webhook_date_) {
+    if (now < next_allowed_set_webhook_time_) {
       query->set_retry_after_error(1);
       return Status::OK();
     }
-    next_allowed_set_webhook_date_ = now + 1;
+    next_allowed_set_webhook_time_ = now + 1;
   }
 
   // do not send warning just after webhook was deleted or set
-  next_bot_updates_warning_date_ = td::max(next_bot_updates_warning_date_, now + BOT_UPDATES_WARNING_DELAY);
+  next_bot_updates_warning_time_ = td::max(next_bot_updates_warning_time_, now + BOT_UPDATES_WARNING_DELAY);
 
   int32 new_max_connections = new_url.empty() ? 0 : get_webhook_max_connections(query.get());
   Slice new_ip_address = new_url.empty() ? Slice() : query->arg("ip_address");
@@ -7380,8 +7385,8 @@ td::Status Client::process_set_webhook_query(PromisedQueryPtr &query) {
              (!new_fix_ip_address || new_ip_address == webhook_ip_address_) && !drop_pending_updates) {
     if (update_allowed_update_types(query.get())) {
       save_webhook();
-    } else if (now > next_webhook_is_not_modified_warning_date_) {
-      next_webhook_is_not_modified_warning_date_ = now + 300;
+    } else if (now > next_webhook_is_not_modified_warning_time_) {
+      next_webhook_is_not_modified_warning_time_ = now + 300;
       LOG(WARNING) << "Webhook is not modified: \"" << new_url << '"';
     }
     answer_query(td::JsonTrue(), std::move(query),
@@ -7389,8 +7394,8 @@ td::Status Client::process_set_webhook_query(PromisedQueryPtr &query) {
     return Status::OK();
   }
 
-  if (now > next_set_webhook_logging_date_ || webhook_url_ != new_url) {
-    next_set_webhook_logging_date_ = now + 300;
+  if (now > next_set_webhook_logging_time_ || webhook_url_ != new_url) {
+    next_set_webhook_logging_time_ = now + 300;
     LOG(WARNING) << "Set webhook to " << new_url << ", max_connections = " << new_max_connections
                  << ", IP address = " << new_ip_address;
   }
@@ -7633,7 +7638,7 @@ void Client::save_webhook() const {
 }
 
 void Client::webhook_success() {
-  next_bot_updates_warning_date_ = td::Time::now() + BOT_UPDATES_WARNING_DELAY;
+  next_bot_updates_warning_time_ = td::Time::now() + BOT_UPDATES_WARNING_DELAY;
   if (was_bot_updates_warning_) {
     send_request(make_object<td_api::setBotUpdatesStatus>(0, ""), std::make_unique<TdOnOkCallback>());
     was_bot_updates_warning_ = false;
@@ -7646,11 +7651,11 @@ void Client::webhook_error(Status status) {
   last_webhook_error_ = std::move(status);
 
   auto pending_update_count = get_pending_update_count();
-  if (pending_update_count >= MIN_PENDING_UPDATES_WARNING && td::Time::now() > next_bot_updates_warning_date_) {
+  if (pending_update_count >= MIN_PENDING_UPDATES_WARNING && td::Time::now() > next_bot_updates_warning_time_) {
     send_request(make_object<td_api::setBotUpdatesStatus>(td::narrow_cast<int32>(pending_update_count),
                                                           "Webhook error. " + last_webhook_error_.message().str()),
                  std::make_unique<TdOnOkCallback>());
-    next_bot_updates_warning_date_ = td::Time::now_cached() + BOT_UPDATES_WARNING_DELAY;
+    next_bot_updates_warning_time_ = td::Time::now_cached() + BOT_UPDATES_WARNING_DELAY;
     was_bot_updates_warning_ = true;
   }
 }
@@ -7667,7 +7672,7 @@ void Client::webhook_closed(Status status) {
   webhook_max_connections_ = 0;
   webhook_ip_address_ = td::string();
   webhook_fix_ip_address_ = false;
-  webhook_set_date_ = td::Time::now();
+  webhook_set_time_ = td::Time::now();
   last_webhook_error_date_ = 0;
   last_webhook_error_ = Status::OK();
   parameters_->shared_data_->webhook_db_->erase(bot_token_with_dc_);
@@ -7737,7 +7742,7 @@ void Client::do_set_webhook(PromisedQueryPtr query, bool was_deleted) {
       has_webhook_certificate_ = true;
     }
     webhook_url_ = new_url.str();
-    webhook_set_date_ = td::Time::now();
+    webhook_set_time_ = td::Time::now();
     webhook_max_connections_ = get_webhook_max_connections(query.get());
     webhook_ip_address_ = query->arg("ip_address").str();
     webhook_fix_ip_address_ = get_webhook_fix_ip_address(query.get());
@@ -7833,9 +7838,9 @@ void Client::abort_long_poll(bool from_set_webhook) {
 
 void Client::fail_query_conflict(Slice message, PromisedQueryPtr &&query) {
   auto now = td::Time::now_cached();
-  if (now >= next_conflict_response_date_) {
+  if (now >= previous_get_updates_finish_time_) {
     fail_query(409, message, std::move(query));
-    next_conflict_response_date_ = now + 3.0;
+    previous_get_updates_finish_time_ = now + 3.0;
   } else {
     td::create_actor<td::SleepActor>(
         "FailQueryConflictSleepActor", 3.0,
@@ -7944,7 +7949,7 @@ void Client::do_get_updates(int32 offset, int32 limit, int32 timeout, PromisedQu
     return;
   }
   previous_get_updates_finish_date_ = td::Clocks::system();  // local time to output it to the log
-  next_bot_updates_warning_date_ = td::Time::now() + BOT_UPDATES_WARNING_DELAY;
+  next_bot_updates_warning_time_ = td::Time::now() + BOT_UPDATES_WARNING_DELAY;
   if (total_size == updates.size() && was_bot_updates_warning_) {
     send_request(make_object<td_api::setBotUpdatesStatus>(0, ""), std::make_unique<TdOnOkCallback>());
     was_bot_updates_warning_ = false;
@@ -7955,11 +7960,11 @@ void Client::do_get_updates(int32 offset, int32 limit, int32 timeout, PromisedQu
 void Client::long_poll_wakeup(bool force_flag) {
   if (!long_poll_query_) {
     auto pending_update_count = get_pending_update_count();
-    if (pending_update_count >= MIN_PENDING_UPDATES_WARNING && td::Time::now() > next_bot_updates_warning_date_) {
+    if (pending_update_count >= MIN_PENDING_UPDATES_WARNING && td::Time::now() > next_bot_updates_warning_time_) {
       send_request(make_object<td_api::setBotUpdatesStatus>(td::narrow_cast<int32>(pending_update_count),
                                                             "The getUpdates method is not called for too long"),
                    std::make_unique<TdOnOkCallback>());
-      next_bot_updates_warning_date_ =
+      next_bot_updates_warning_time_ =
           td::Time::now_cached() + BOT_UPDATES_WARNING_DELAY;  // do not send warnings too often
       was_bot_updates_warning_ = true;
     }
@@ -8900,7 +8905,7 @@ void Client::process_new_message_queue(int64 chat_id) {
 
     int32 message_date = message->edit_date_ == 0 ? message->date_ : message->edit_date_;
     auto now = get_unix_time();
-    auto update_delay_time = now - td::max(message_date, parameters_->shared_data_->get_unix_time(webhook_set_date_));
+    auto update_delay_time = now - td::max(message_date, parameters_->shared_data_->get_unix_time(webhook_set_time_));
     const auto UPDATE_DELAY_WARNING_TIME = 10 * 60;
     LOG_IF(ERROR, update_delay_time > UPDATE_DELAY_WARNING_TIME)
         << "Receive very old update " << get_update_type_name(update_type) << " sent at " << message_date << " to chat "

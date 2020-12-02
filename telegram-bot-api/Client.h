@@ -830,7 +830,7 @@ class Client : public WebhookActor::Callback {
   td::string bot_token_id_;
   bool is_test_dc_;
   int64 tqueue_id_;
-  double start_timestamp_ = 0;
+  double start_time_ = 0;
 
   int32 my_id_ = -1;
   int32 authorization_date_ = -1;
@@ -930,7 +930,7 @@ class Client : public WebhookActor::Callback {
   PromisedQueryPtr long_poll_query_;
 
   static constexpr int32 BOT_UPDATES_WARNING_DELAY = 30;
-  double next_bot_updates_warning_date_ = 0;
+  double next_bot_updates_warning_time_ = 0;
   bool was_bot_updates_warning_ = false;
 
   td::uint32 allowed_update_types_ = DEFAULT_ALLOWED_UPDATE_TYPES;
@@ -941,23 +941,23 @@ class Client : public WebhookActor::Callback {
   td::ActorOwn<WebhookActor> webhook_id_;
   PromisedQueryPtr webhook_set_query_;
   td::string webhook_url_;
-  double webhook_set_date_ = 0;
+  double webhook_set_time_ = 0;
   int32 webhook_max_connections_ = 0;
   td::string webhook_ip_address_;
   bool webhook_fix_ip_address_ = false;
   int32 last_webhook_error_date_ = 0;
   Status last_webhook_error_;
-  double next_allowed_set_webhook_date_ = 0;
-  double next_set_webhook_logging_date_ = 0;
-  double next_webhook_is_not_modified_warning_date_ = 0;
+  double next_allowed_set_webhook_time_ = 0;
+  double next_set_webhook_logging_time_ = 0;
+  double next_webhook_is_not_modified_warning_time_ = 0;
   std::size_t last_pending_update_count_ = MIN_PENDING_UPDATES_WARNING;
 
   double local_unix_time_difference_ = 0;  // Unix time - now()
 
   int32 previous_get_updates_offset_ = -1;
-  double previous_get_updates_start_date_ = 0;
+  double previous_get_updates_start_time_ = 0;
   double previous_get_updates_finish_date_ = 0;
-  double next_conflict_response_date_ = 0;
+  double previous_get_updates_finish_time_ = 0;
 
   td::uint64 webhook_generation_ = 1;
 

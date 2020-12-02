@@ -86,8 +86,8 @@ void WebhookActor::resolve_ip_address() {
   if (fix_ip_address_) {
     return;
   }
-  if (td::Time::now() < next_ip_address_resolve_timestamp_) {
-    relax_wakeup_at(next_ip_address_resolve_timestamp_, "resolve_ip_address");
+  if (td::Time::now() < next_ip_address_resolve_time_) {
+    relax_wakeup_at(next_ip_address_resolve_time_, "resolve_ip_address");
     return;
   }
 
@@ -101,9 +101,9 @@ void WebhookActor::resolve_ip_address() {
   }
 
   if (future_ip_address_.is_ready()) {
-    next_ip_address_resolve_timestamp_ =
+    next_ip_address_resolve_time_ =
         td::Time::now() + IP_ADDRESS_CACHE_TIME + td::Random::fast(0, IP_ADDRESS_CACHE_TIME / 10);
-    relax_wakeup_at(next_ip_address_resolve_timestamp_, "resolve_ip_address");
+    relax_wakeup_at(next_ip_address_resolve_time_, "resolve_ip_address");
 
     auto r_ip_address = future_ip_address_.move_as_result();
     if (r_ip_address.is_error()) {
@@ -264,7 +264,7 @@ void WebhookActor::create_new_connections() {
   auto now = td::Time::now();
   td::FloodControlFast *flood;
   bool active;
-  if (last_success_timestamp_ + 10 < now) {
+  if (last_success_time_ + 10 < now) {
     flood = &pending_new_connection_flood_;
     if (need_connections > 1) {
       need_connections = 1;
@@ -356,20 +356,21 @@ void WebhookActor::load_updates() {
   }
   VLOG(webhook) << "Trying to load new updates from offset " << tqueue_offset_;
 
+  auto offset = tqueue_offset_;
   auto limit = td::min(SharedData::TQUEUE_EVENT_BUFFER_SIZE, max_loaded_updates_ - queue_updates_.size());
   auto updates = mutable_span(parameters_->shared_data_->event_buffer_, limit);
 
   auto now = td::Time::now();
   auto unix_time_now = parameters_->shared_data_->get_unix_time(now);
   size_t total_size = 0;
-  if (tqueue_offset_.empty()) {
+  if (offset.empty()) {
     updates.truncate(0);
   } else {
-    auto r_size = tqueue->get(tqueue_id_, tqueue_offset_, false, unix_time_now, updates);
+    auto r_size = tqueue->get(tqueue_id_, offset, false, unix_time_now, updates);
     if (r_size.is_error()) {
       VLOG(webhook) << "Failed to get new updates: " << r_size.error();
-      tqueue_offset_ = tqueue->get_head(tqueue_id_);
-      r_size = tqueue->get(tqueue_id_, tqueue_offset_, false, unix_time_now, updates);
+      offset = tqueue_offset_ = tqueue->get_head(tqueue_id_);
+      r_size = tqueue->get(tqueue_id_, offset, false, unix_time_now, updates);
       r_size.ensure();
     }
     total_size = r_size.ok();
@@ -420,8 +421,8 @@ void WebhookActor::load_updates() {
     }
   }
   if (need_warning) {
-    LOG(WARNING) << "Found " << updates.size() << " updates out of " << total_size - update_map_.size() << " + "
-                 << update_map_.size() << " in " << queues_.size() << " queues after last error \""
+    LOG(WARNING) << "Loaded " << updates.size() << " updates out of " << total_size << ". Have total of "
+                 << update_map_.size() << " loaded in " << queues_.size() << " queues after last error \""
                  << last_error_message_ << "\" at " << last_error_date_;
   }
 
@@ -430,9 +431,9 @@ void WebhookActor::load_updates() {
   }
 
   if (!updates.empty()) {
-    VLOG(webhook) << "Loaded " << updates.size() << " new updates from offset " << tqueue_offset_
-                  << " out of requested " << limit << ". Have total of " << update_map_.size() << " updates loaded in "
-                  << queue_updates_.size() << " queues";
+    VLOG(webhook) << "Loaded " << updates.size() << " new updates from offset " << offset << " out of requested "
+                  << limit << ". Have total of " << update_map_.size() << " updates loaded in " << queue_updates_.size()
+                  << " queues";
   }
 }
 
@@ -458,7 +459,7 @@ void WebhookActor::drop_event(td::TQueue::EventId event_id) {
 
 void WebhookActor::on_update_ok(td::TQueue::EventId event_id) {
   last_update_was_successful_ = true;
-  last_success_timestamp_ = td::Time::now();
+  last_success_time_ = td::Time::now();
   VLOG(webhook) << "Receive ok for update " << event_id;
 
   drop_event(event_id);
@@ -469,19 +470,24 @@ void WebhookActor::on_update_error(td::TQueue::EventId event_id, td::Slice error
   double now = td::Time::now();
 
   auto it = update_map_.find(event_id);
-  if (parameters_->shared_data_->get_unix_time(now) > it->second.expires_at_) {
+
+  const int MAX_RETRY_AFTER = 3600;
+  retry_after = td::clamp(retry_after, 0, MAX_RETRY_AFTER);
+  int next_delay = it->second.delay_;
+  int next_effective_delay = retry_after;
+  if (retry_after == 0 && it->second.fail_count_ > 0) {
+    next_delay = td::min(WEBHOOK_MAX_RESEND_TIMEOUT, next_delay * 2);
+    next_effective_delay = next_delay;
+  }
+  if (parameters_->shared_data_->get_unix_time(now) + next_effective_delay > it->second.expires_at_) {
     LOG(WARNING) << "Drop update " << event_id << ": " << error;
     drop_event(event_id);
     return;
   }
   auto &update = it->second;
   update.state_ = Update::State::Begin;
-  const int MAX_RETRY_AFTER = 3600;
-  retry_after = td::clamp(retry_after, 0, MAX_RETRY_AFTER);
-  update.delay_ = retry_after != 0
-                      ? retry_after
-                      : td::min(WEBHOOK_MAX_RESEND_TIMEOUT, update.delay_ * (update.fail_count_ > 0 ? 2 : 1));
-  update.wakeup_at_ = update.fail_count_ > 0 ? now + update.delay_ : now;
+  update.delay_ = next_delay;
+  update.wakeup_at_ = now + next_effective_delay;
   update.fail_count_++;
   queues_.emplace(update.wakeup_at_, update.queue_id_);
   VLOG(webhook) << "Delay update " << event_id << " for " << (update.wakeup_at_ - now) << " seconds because of "
@@ -647,7 +653,7 @@ void WebhookActor::handle(td::unique_ptr<td::HttpQuery> response) {
 void WebhookActor::start_up() {
   max_loaded_updates_ = max_connections_ * 2;
 
-  last_success_timestamp_ = td::Time::now();
+  next_ip_address_resolve_time_ = last_success_time_ = td::Time::now();
   active_new_connection_flood_.add_limit(1, 10 * max_connections_);
   active_new_connection_flood_.add_limit(5, 20 * max_connections_);
 
