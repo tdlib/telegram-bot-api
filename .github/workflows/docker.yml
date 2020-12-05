@@ -122,13 +122,11 @@ jobs:
       - name: Save image as tar archive
         if: ${{ github.event_name != 'pull_request' }}
         run: |
-          docker image ls  # debug
           docker save ${{ env.IMAGE_TAG }}:${{ env.HASH_VERSION }}-${{ env.SAFE_ARCH }} -o ${{ env.SAFE_ARCH }}.tar
 
       - name: Save image as tar archive (pull request)
         if: ${{ github.event_name == 'pull_request' }}
         run: |
-          docker image ls  # debug
           docker save tdlightbotapi:${{ env.HASH_VERSION }}-${{ env.SAFE_ARCH }} -o ${{ env.SAFE_ARCH }}.tar
 
       - name: Upload image as artifact
