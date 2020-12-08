@@ -13,6 +13,7 @@
 
 #include "td/db/TQueue.h"
 
+#include "td/utils/algorithm.h"
 #include "td/utils/base64.h"
 #include "td/utils/filesystem.h"
 #include "td/utils/HttpUrl.h"
@@ -1746,6 +1747,12 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
       object("proximity_alert_triggered", JsonProximityAlertTriggered(content, client_));
       break;
     }
+    case td_api::messageVoiceChatStarted::ID:
+      break;
+    case td_api::messageVoiceChatEnded::ID:
+      break;
+    case td_api::messageInviteVoiceChatParticipants::ID:
+      break;
     default:
       UNREACHABLE();
   }
@@ -2056,6 +2063,7 @@ class Client::JsonChatMember : public Jsonable {
           object("can_pin_messages", td::JsonBool(administrator->can_pin_messages_));
         }
         object("can_promote_members", td::JsonBool(administrator->can_promote_members_));
+        object("can_manage_voice_chats", td::JsonBool(administrator->can_manage_voice_chats_));
         if (!administrator->custom_title_.empty()) {
           object("custom_title", administrator->custom_title_);
         }
@@ -5021,7 +5029,7 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
     TRY_RESULT(sticker_file_id, get_json_object_string_field(object, "sticker_file_id", false));
 
     if (input_message_content == nullptr) {
-      input_message_content = make_object<td_api::inputMessageSticker>(nullptr, nullptr, 0, 0);
+      input_message_content = make_object<td_api::inputMessageSticker>(nullptr, nullptr, 0, 0, td::string());
     }
     return make_object<td_api::inputInlineQueryResultSticker>(id, "", sticker_file_id, 0, 0, std::move(reply_markup),
                                                               std::move(input_message_content));
@@ -6021,7 +6029,8 @@ td::Status Client::process_send_sticker_query(PromisedQueryPtr &query) {
   if (sticker == nullptr) {
     return Status::Error(400, "There is no sticker in the request");
   }
-  do_send_message(make_object<td_api::inputMessageSticker>(std::move(sticker), nullptr, 0, 0), std::move(query));
+  do_send_message(make_object<td_api::inputMessageSticker>(std::move(sticker), nullptr, 0, 0, td::string()),
+                  std::move(query));
   return Status::OK();
 }
 
@@ -6897,10 +6906,11 @@ td::Status Client::process_promote_chat_member_query(PromisedQueryPtr &query) {
   auto can_restrict_members = to_bool(query->arg("can_restrict_members"));
   auto can_pin_messages = to_bool(query->arg("can_pin_messages"));
   auto can_promote_members = to_bool(query->arg("can_promote_members"));
+  auto can_manage_voice_chats = to_bool(query->arg("can_manage_voice_chats"));
   auto is_anonymous = to_bool(query->arg("is_anonymous"));
   auto status = make_object<td_api::chatMemberStatusAdministrator>(
       td::string(), true, can_change_info, can_post_messages, can_edit_messages, can_delete_messages, can_invite_users,
-      can_restrict_members, can_pin_messages, can_promote_members, is_anonymous);
+      can_restrict_members, can_pin_messages, can_promote_members, can_manage_voice_chats, is_anonymous);
   check_chat(chat_id, AccessRights::Write, std::move(query),
              [this, user_id, status = std::move(status)](int64 chat_id, PromisedQueryPtr query) mutable {
                auto chat_info = get_chat(chat_id);
@@ -8390,6 +8400,12 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageExpiredVideo::ID:
       return true;
     case td_api::messageCustomServiceAction::ID:
+      return true;
+    case td_api::messageVoiceChatStarted::ID:
+      return true;
+    case td_api::messageVoiceChatEnded::ID:
+      return true;
+    case td_api::messageInviteVoiceChatParticipants::ID:
       return true;
     default:
       break;
