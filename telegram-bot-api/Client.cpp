@@ -1798,10 +1798,12 @@ class Client::JsonMessageId : public Jsonable {
 class Client::JsonInlineQuery : public Jsonable {
  public:
   JsonInlineQuery(int64 inline_query_id, int32 sender_user_id, const td_api::location *user_location,
-                  const td::string &query, const td::string &offset, const Client *client)
+                  const td_api::ChatType *chat_type, const td::string &query, const td::string &offset,
+                  const Client *client)
       : inline_query_id_(inline_query_id)
       , sender_user_id_(sender_user_id)
       , user_location_(user_location)
+      , chat_type_(chat_type)
       , query_(query)
       , offset_(offset)
       , client_(client) {
@@ -1814,6 +1816,35 @@ class Client::JsonInlineQuery : public Jsonable {
     if (user_location_ != nullptr) {
       object("location", JsonLocation(user_location_));
     }
+    if (chat_type_ != nullptr) {
+      auto chat_type = [&] {
+        switch (chat_type_->get_id()) {
+          case td_api::chatTypePrivate::ID: {
+            auto type = static_cast<const td_api::chatTypePrivate *>(chat_type_);
+            if (type->user_id_ == sender_user_id_) {
+              return "sender";
+            }
+            return "private";
+          }
+          case td_api::chatTypeBasicGroup::ID:
+            return "group";
+          case td_api::chatTypeSupergroup::ID: {
+            auto type = static_cast<const td_api::chatTypeSupergroup *>(chat_type_);
+            if (type->is_channel_) {
+              return "channel";
+            } else {
+              return "supergroup";
+            }
+          }
+          case td_api::chatTypeSecret::ID:
+            return "";
+          default:
+            UNREACHABLE();
+            return "";
+        }
+      }();
+      object("chat_type", chat_type);
+    }
     object("query", query_);
     object("offset", offset_);
   }
@@ -1822,6 +1853,7 @@ class Client::JsonInlineQuery : public Jsonable {
   int64 inline_query_id_;
   int32 sender_user_id_;
   const td_api::location *user_location_;
+  const td_api::ChatType *chat_type_;
   const td::string &query_;
   const td::string &offset_;
   const Client *client_;
@@ -3952,33 +3984,32 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       bool need_warning = false;
       switch (chat->type_->get_id()) {
         case td_api::chatTypePrivate::ID: {
-          auto info = move_object_as<td_api::chatTypePrivate>(chat->type_);
+          auto type = move_object_as<td_api::chatTypePrivate>(chat->type_);
           chat_info->type = ChatInfo::Type::Private;
-          auto user_id = info->user_id_;
+          auto user_id = type->user_id_;
           chat_info->user_id = user_id;
           need_warning = get_user_info(user_id) == nullptr;
           break;
         }
         case td_api::chatTypeBasicGroup::ID: {
-          auto info = move_object_as<td_api::chatTypeBasicGroup>(chat->type_);
+          auto type = move_object_as<td_api::chatTypeBasicGroup>(chat->type_);
           chat_info->type = ChatInfo::Type::Group;
-          auto group_id = info->basic_group_id_;
+          auto group_id = type->basic_group_id_;
           chat_info->group_id = group_id;
           need_warning = get_group_info(group_id) == nullptr;
           break;
         }
         case td_api::chatTypeSupergroup::ID: {
-          auto info = move_object_as<td_api::chatTypeSupergroup>(chat->type_);
+          auto type = move_object_as<td_api::chatTypeSupergroup>(chat->type_);
           chat_info->type = ChatInfo::Type::Supergroup;
-          auto supergroup_id = info->supergroup_id_;
+          auto supergroup_id = type->supergroup_id_;
           chat_info->supergroup_id = supergroup_id;
           need_warning = get_supergroup_info(supergroup_id) == nullptr;
           break;
         }
-        case td_api::chatTypeSecret::ID: {
+        case td_api::chatTypeSecret::ID:
           // unsupported
           break;
-        }
         default:
           UNREACHABLE();
       }
@@ -4108,8 +4139,8 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       break;
     case td_api::updateNewInlineQuery::ID: {
       auto update = move_object_as<td_api::updateNewInlineQuery>(result);
-      add_new_inline_query(update->id_, update->sender_user_id_, std::move(update->user_location_), update->query_,
-                           update->offset_);
+      add_new_inline_query(update->id_, update->sender_user_id_, std::move(update->user_location_),
+                           std::move(update->chat_type_), update->query_, update->offset_);
       break;
     }
     case td_api::updateNewChosenInlineResult::ID: {
@@ -8149,9 +8180,10 @@ void Client::add_update_poll_answer(object_ptr<td_api::updatePollAnswer> &&updat
 }
 
 void Client::add_new_inline_query(int64 inline_query_id, int32 sender_user_id, object_ptr<td_api::location> location,
-                                  const td::string &query, const td::string &offset) {
+                                  object_ptr<td_api::ChatType> chat_type, const td::string &query,
+                                  const td::string &offset) {
   add_update(UpdateType::InlineQuery,
-             JsonInlineQuery(inline_query_id, sender_user_id, location.get(), query, offset, this), 30,
+             JsonInlineQuery(inline_query_id, sender_user_id, location.get(), chat_type.get(), query, offset, this), 30,
              sender_user_id + (static_cast<int64>(1) << 33));
 }
 

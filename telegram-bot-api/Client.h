@@ -719,7 +719,7 @@ class Client : public WebhookActor::Callback {
   void add_update_poll_answer(object_ptr<td_api::updatePollAnswer> &&update);
 
   void add_new_inline_query(int64 inline_query_id, int32 sender_user_id, object_ptr<td_api::location> location,
-                            const td::string &query, const td::string &offset);
+                            object_ptr<td_api::ChatType> chat_type, const td::string &query, const td::string &offset);
 
   void add_new_chosen_inline_result(int32 sender_user_id, object_ptr<td_api::location> location,
                                     const td::string &query, const td::string &result_id,
