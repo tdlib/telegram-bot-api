@@ -130,7 +130,7 @@ The bot will now receive Updates for all received media, even if a destruction t
 ## Installation
 
 The simplest way to use it is with this docker command:
-```
+```bash
 docker run -p 8081:8081 --env TELEGRAM_API_ID=API_ID --env TELEGRAM_API_HASH=API_HASH tdlight/tdlightbotapi 
 ```
 
@@ -139,13 +139,19 @@ If you do that, you'll only need to choose the target operating system to receiv
 
 In general, you need to install all `Telegram Bot API server` [dependencies](#dependencies) and compile the source code using CMake:
 
-```
-git clone --recursive https://github.com/tdlib/telegram-bot-api.git
+```bash
+git clone --recursive https://github.com/tdlight-team/tdlight-telegram-bot-api
 cd telegram-bot-api
 mkdir build
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
 cmake --build . --target install
+```
+
+If you forgot that `--recursive` flag at the clone part, you can just navigate into that created folder and run
+```bash
+cd tdlight-telegram-bot-api
+git submodule update --init --recursive
 ```
 
 <a name="dependencies"></a>
@@ -157,6 +163,7 @@ To build and run `Telegram Bot API server` you will need:
 * C++14 compatible compiler (e.g., Clang 3.4+, GCC 4.9+, MSVC 19.0+ (Visual Studio 2015+), Intel C++ Compiler 17+) (build only)
 * gperf (build only)
 * CMake (3.0.2+, build only)
+* _having it cloned with `--recursive` (see [above](#installation)) to get `tdlib`_
 
 <a name="usage"></a>
 ## Usage
