@@ -37,6 +37,9 @@ class Query : public td::ListNode {
   td::Slice token() const {
     return token_;
   }
+  bool is_user() const {
+    return is_user_;
+  }
   bool is_test_dc() const {
     return is_test_dc_;
   }
@@ -122,7 +125,7 @@ class Query : public td::ListNode {
     is_internal_ = is_internal;
   }
 
-  Query(td::vector<td::BufferSlice> &&container, td::Slice token, bool is_test_dc, td::MutableSlice method,
+  Query(td::vector<td::BufferSlice> &&container, td::Slice token, bool is_user, bool is_test_dc, td::MutableSlice method,
         td::vector<std::pair<td::MutableSlice, td::MutableSlice>> &&args,
         td::vector<std::pair<td::MutableSlice, td::MutableSlice>> &&headers, td::vector<td::HttpFile> &&files,
         std::shared_ptr<SharedData> shared_data, const td::IPAddress &peer_address);
@@ -155,6 +158,7 @@ class Query : public td::ListNode {
   // request
   td::vector<td::BufferSlice> container_;
   td::Slice token_;
+  bool is_user_;
   bool is_test_dc_;
   td::MutableSlice method_;
   td::vector<std::pair<td::MutableSlice, td::MutableSlice>> args_;

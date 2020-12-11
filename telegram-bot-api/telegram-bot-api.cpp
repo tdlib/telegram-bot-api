@@ -176,6 +176,9 @@ int main(int argc, char *argv[]) {
 		             [&] { parameters->no_file_limit_ = true; });
   options.add_option('\0', "insecure", "allow the Bot API to send request via insecure HTTP", [&] { parameters->allow_http_ = true; });
   options.add_option('\0', "relative", "use relative file path in local mode", [&] { parameters->use_relative_path_ = true; });
+  options.add_option('\0', "allow-users", "allow user accounts to use the API", [&] { parameters->allow_users_ = true; });
+  options.add_option('\0', "allow-users-registration", "allow user accounts to be registered on the API",
+                     [&] { parameters->allow_users_registration_ = true; });
 
   options.add_checked_option(
       '\0', "api-id",

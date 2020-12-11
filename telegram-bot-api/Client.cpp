@@ -34,6 +34,21 @@
 
 #include <cstdlib>
 
+#define CHECK_IS_BOT()                                                     \
+  if (is_user_) {                                                          \
+    return Status::Error(BOT_ONLY_ERROR_CODE, BOT_ONLY_ERROR_DESCRIPTION); \
+  }
+
+#define CHECK_IS_USER()                                                      \
+  if (!is_user_) {                                                           \
+    return Status::Error(USER_ONLY_ERROR_CODE, USER_ONLY_ERROR_DESCRIPTION); \
+  }
+
+#define CHECK_USER_REPLY_MARKUP()                                          \
+  if (reply_markup != nullptr && is_user_) {                               \
+    return Status::Error(BOT_ONLY_ERROR_CODE, BOT_ONLY_ERROR_DESCRIPTION); \
+  }
+
 namespace telegram_bot_api {
 
 using td::Jsonable;
@@ -124,6 +139,9 @@ void Client::fail_query_with_error(PromisedQueryPtr query, int32 error_code, Sli
     case 403:
       prefix = Slice("Forbidden");
       break;
+    case 405:
+      prefix = Slice("Method Not Allowed");
+      break;
     case 500:
       prefix = Slice("Internal Server Error");
       break;
@@ -156,11 +174,31 @@ void Client::fail_query_with_error(PromisedQueryPtr &&query, object_ptr<td_api::
   fail_query_with_error(std::move(query), error->code_, error->message_, default_message);
 }
 
-Client::Client(td::ActorShared<> parent, const td::string &bot_token, bool is_test_dc, int64 tqueue_id,
+Client::Client(td::ActorShared<> parent, const td::string &bot_token, bool is_user, bool is_test_dc, int64 tqueue_id,
                std::shared_ptr<const ClientParameters> parameters, td::ActorId<BotStatActor> stat_actor)
     : parent_(std::move(parent))
     , bot_token_(bot_token)
     , bot_token_id_("<unknown>")
+    , is_user_(is_user)
+    , is_test_dc_(is_test_dc)
+    , tqueue_id_(tqueue_id)
+    , parameters_(std::move(parameters))
+    , stat_actor_(std::move(stat_actor)) {
+  messages_lru_root_.lru_next = &messages_lru_root_;
+  messages_lru_root_.lru_prev = &messages_lru_root_;
+
+  static auto is_inited = init_methods();
+  CHECK(is_inited);
+}
+
+Client::Client(td::ActorShared<> parent, const td::string &bot_token, const td::string &phone_number, bool is_user,
+               bool is_test_dc, int64 tqueue_id, std::shared_ptr<const ClientParameters> parameters,
+               td::ActorId<BotStatActor> stat_actor)
+    : parent_(std::move(parent))
+    , bot_token_(bot_token)
+    , bot_token_id_("<unknown>")
+    , phone_number_(phone_number)
+    , is_user_(is_user)
     , is_test_dc_(is_test_dc)
     , tqueue_id_(tqueue_id)
     , parameters_(std::move(parameters))
@@ -2295,7 +2333,10 @@ class Client::TdOnAuthorizationCallback : public TdQueryCallback {
   }
 
   void on_result(object_ptr<td_api::Object> result) override {
-    bool was_ready = client_->authorization_state_->get_id() != td_api::authorizationStateWaitPhoneNumber::ID;
+    bool was_ready = client_->authorization_state_->get_id() != td_api::authorizationStateWaitPhoneNumber::ID &&
+                     client_->authorization_state_->get_id() != td_api::authorizationStateWaitCode::ID &&
+                     client_->authorization_state_->get_id() != td_api::authorizationStateWaitPassword::ID &&
+                     client_->authorization_state_->get_id() != td_api::authorizationStateWaitRegistration::ID;
     if (result->get_id() == td_api::error::ID) {
       auto error = move_object_as<td_api::error>(result);
       if (error->code_ == 429 || error->code_ >= 500 || (error->code_ != 401 && was_ready)) {
@@ -2312,6 +2353,38 @@ class Client::TdOnAuthorizationCallback : public TdQueryCallback {
 
  private:
   Client *client_;
+};
+
+class Client::TdOnAuthorizationQueryCallback : public TdQueryCallback {
+ public:
+  TdOnAuthorizationQueryCallback(Client *client, PromisedQueryPtr query) :
+      client_(client), query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) override {
+    bool was_ready = client_->authorization_state_->get_id() != td_api::authorizationStateWaitPhoneNumber::ID &&
+                     client_->authorization_state_->get_id() != td_api::authorizationStateWaitCode::ID &&
+                     client_->authorization_state_->get_id() != td_api::authorizationStateWaitPassword::ID &&
+                     client_->authorization_state_->get_id() != td_api::authorizationStateWaitRegistration::ID;
+    if (result->get_id() == td_api::error::ID) {
+      auto error = move_object_as<td_api::error>(result);
+      if (error->code_ == 429 || error->code_ >= 500 || (error->code_ != 401 && was_ready)) {
+        // try again
+        return client_->on_update_authorization_state();
+      }
+      fail_query(401, "Unauthorized: Log in failed, logging out due to " + td::oneline(to_string(error)),
+                 std::move(query_));
+      LOG(WARNING) << "Logging out due to " << td::oneline(to_string(error));
+      client_->log_out();
+    } else {
+      answer_query(td::JsonTrue(), std::move(query_));
+      client_->on_update_authorization_state();
+    }
+  }
+
+ private:
+  Client *client_;
+  PromisedQueryPtr query_;
 };
 
 class Client::TdOnInitCallback : public TdQueryCallback {
@@ -3237,7 +3310,7 @@ class Client::TdOnSendCustomRequestCallback : public TdQueryCallback {
 
 class Client::TdOnPingCallback : public TdQueryCallback {
  public:
-  TdOnPingCallback(PromisedQueryPtr query)
+  explicit TdOnPingCallback(PromisedQueryPtr query)
       : query_(std::move(query)) {
   }
 
@@ -3245,7 +3318,7 @@ class Client::TdOnPingCallback : public TdQueryCallback {
     if (result->get_id() == td_api::error::ID) {
       return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result), "Server not available");
     }
-    CHECK(result->get_id() == 959899022); // id for return type `seconds`
+    CHECK(result->get_id() == td_api::seconds::ID);
 
     auto seconds_ = move_object_as<td_api::seconds>(result);
     answer_query(td::VirtuallyJsonableString(std::to_string(seconds_->seconds_)), std::move(query_));
@@ -3386,7 +3459,7 @@ void Client::raw_event(const td::Event::Raw &event) {
 }
 
 void Client::loop() {
-  if (logging_out_ || closing_ || was_authorized_) {
+  if (logging_out_ || closing_ || was_authorized_ || waiting_for_auth_input_) {
     while (!cmd_queue_.empty()) {
       auto query = std::move(cmd_queue_.front());
       cmd_queue_.pop();
@@ -3947,9 +4020,20 @@ void Client::on_update_authorization_state() {
     case td_api::authorizationStateWaitEncryptionKey::ID:
       return send_request(make_object<td_api::checkDatabaseEncryptionKey>(), std::make_unique<TdOnInitCallback>(this));
     case td_api::authorizationStateWaitPhoneNumber::ID:
-      return send_request(make_object<td_api::checkAuthenticationBotToken>(bot_token_),
-                          std::make_unique<TdOnAuthorizationCallback>(this));
+      if (is_user_) {
+        return send_request(make_object<td_api::setAuthenticationPhoneNumber>(phone_number_, nullptr),
+            std::make_unique<TdOnAuthorizationCallback>(this));
+      } else {
+        return send_request(make_object<td_api::checkAuthenticationBotToken>(bot_token_),
+                            std::make_unique<TdOnAuthorizationCallback>(this));
+      }
+    case td_api::authorizationStateWaitCode::ID:
+    case td_api::authorizationStateWaitPassword::ID:
+    case td_api::authorizationStateWaitRegistration::ID:
+      waiting_for_auth_input_ = true;
+      return loop();
     case td_api::authorizationStateReady::ID: {
+      waiting_for_auth_input_ = false;
       auto user_info = get_user_info(my_id_);
       if (my_id_ <= 0 || user_info == nullptr) {
         return send_request(make_object<td_api::getMe>(), std::make_unique<TdOnAuthorizationCallback>(this));
@@ -3970,12 +4054,14 @@ void Client::on_update_authorization_state() {
       return loop();
     }
     case td_api::authorizationStateLoggingOut::ID:
+      waiting_for_auth_input_ = false;
       if (!logging_out_) {
         LOG(WARNING) << "Logging out";
         logging_out_ = true;
       }
       break;
     case td_api::authorizationStateClosing::ID:
+      waiting_for_auth_input_ = false;
       if (!closing_) {
         LOG(WARNING) << "Closing";
         closing_ = true;
@@ -4334,6 +4420,7 @@ void Client::on_closed() {
 
   if (logging_out_) {
     parameters_->shared_data_->webhook_db_->erase(bot_token_with_dc_);
+    parameters_->shared_data_->user_db_->erase(bot_token_with_dc_);
 
     class RmWorker : public td::Actor {
      public:
@@ -6029,6 +6116,17 @@ void Client::on_cmd(PromisedQueryPtr query) {
       return do_send_request(make_object<td_api::logOut>(), std::make_unique<TdOnOkQueryCallback>(std::move(query)));
     }
   }
+  if (waiting_for_auth_input_) {
+    if (query->method() == "authcode") {
+      return process_authcode_query(query);
+    } else if (query->method() == "2fapassword") {
+      return process_2fapassword_query(query);
+    } else if (query->method() == "registeruser" && parameters_->allow_users_registration_) {
+      return process_register_user_query(query);
+    } else {
+      return fail_query(404, "Not Found: method not found", std::move(query));
+    }
+  }
 
   if (logging_out_) {
     return fail_query(LOGGING_OUT_ERROR_CODE, LOGGING_OUT_ERROR_DESCRIPTION, std::move(query));
@@ -6063,6 +6161,7 @@ td::Status Client::process_get_my_commands_query(PromisedQueryPtr &query) {
 }
 
 td::Status Client::process_set_my_commands_query(PromisedQueryPtr &query) {
+  CHECK_IS_BOT();
   TRY_RESULT(bot_commands, get_bot_commands(query.get()));
   send_request(make_object<td_api::setCommands>(std::move(bot_commands)),
                std::make_unique<TdOnOkQueryCallback>(std::move(query)));
@@ -6208,12 +6307,14 @@ td::Status Client::process_send_voice_query(PromisedQueryPtr &query) {
 }
 
 td::Status Client::process_send_game_query(PromisedQueryPtr &query) {
+  CHECK_IS_BOT();
   TRY_RESULT(game_short_name, get_required_string_arg(query.get(), "game_short_name"));
   do_send_message(make_object<td_api::inputMessageGame>(my_id_, game_short_name.str()), std::move(query));
   return Status::OK();
 }
 
 td::Status Client::process_send_invoice_query(PromisedQueryPtr &query) {
+  CHECK_IS_BOT();
   TRY_RESULT(title, get_required_string_arg(query.get(), "title"));
   TRY_RESULT(description, get_required_string_arg(query.get(), "description"));
   TRY_RESULT(payload, get_required_string_arg(query.get(), "payload"));
@@ -6351,6 +6452,7 @@ td::Status Client::process_stop_poll_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
   auto message_id = get_message_id(query.get());
   TRY_RESULT(reply_markup, get_reply_markup(query.get()));
+  CHECK_USER_REPLY_MARKUP();
 
   resolve_reply_markup_bot_usernames(
       std::move(reply_markup), std::move(query),
@@ -6446,6 +6548,7 @@ td::Status Client::process_edit_message_text_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
   auto message_id = get_message_id(query.get());
   TRY_RESULT(reply_markup, get_reply_markup(query.get()));
+  CHECK_USER_REPLY_MARKUP();
 
   if (chat_id.empty() && message_id == 0) {
     TRY_RESULT(inline_message_id, get_inline_message_id(query.get()));
@@ -6485,6 +6588,7 @@ td::Status Client::process_edit_message_live_location_query(PromisedQueryPtr &qu
   auto chat_id = query->arg("chat_id");
   auto message_id = get_message_id(query.get());
   TRY_RESULT(reply_markup, get_reply_markup(query.get()));
+  CHECK_USER_REPLY_MARKUP();
 
   if (chat_id.empty() && message_id == 0) {
     TRY_RESULT(inline_message_id, get_inline_message_id(query.get()));
@@ -6520,6 +6624,7 @@ td::Status Client::process_edit_message_media_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
   auto message_id = get_message_id(query.get());
   TRY_RESULT(reply_markup, get_reply_markup(query.get()));
+  CHECK_USER_REPLY_MARKUP();
   TRY_RESULT(input_media, get_input_media(query.get(), "media", false));
 
   if (chat_id.empty() && message_id == 0) {
@@ -6554,6 +6659,7 @@ td::Status Client::process_edit_message_caption_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
   auto message_id = get_message_id(query.get());
   TRY_RESULT(reply_markup, get_reply_markup(query.get()));
+  CHECK_USER_REPLY_MARKUP();
   TRY_RESULT(caption, get_caption(query.get()));
 
   if (chat_id.empty() && message_id == 0) {
@@ -6584,9 +6690,11 @@ td::Status Client::process_edit_message_caption_query(PromisedQueryPtr &query) {
 }
 
 td::Status Client::process_edit_message_reply_markup_query(PromisedQueryPtr &query) {
+  CHECK_IS_BOT();
   auto chat_id = query->arg("chat_id");
   auto message_id = get_message_id(query.get());
   TRY_RESULT(reply_markup, get_reply_markup(query.get()));
+  CHECK_USER_REPLY_MARKUP();
 
   if (chat_id.empty() && message_id == 0) {
     TRY_RESULT(inline_message_id, get_inline_message_id(query.get()));
@@ -6636,6 +6744,7 @@ td::Status Client::process_delete_message_query(PromisedQueryPtr &query) {
 }
 
 td::Status Client::process_set_game_score_query(PromisedQueryPtr &query) {
+  CHECK_IS_BOT();
   auto chat_id = query->arg("chat_id");
   auto message_id = get_message_id(query.get());
   TRY_RESULT(user_id, get_user_id(query.get()));
@@ -6673,6 +6782,7 @@ td::Status Client::process_set_game_score_query(PromisedQueryPtr &query) {
 }
 
 td::Status Client::process_get_game_high_scores_query(PromisedQueryPtr &query) {
+  CHECK_IS_BOT();
   auto chat_id = query->arg("chat_id");
   auto message_id = get_message_id(query.get());
   TRY_RESULT(user_id, get_user_id(query.get()));
@@ -6698,6 +6808,7 @@ td::Status Client::process_get_game_high_scores_query(PromisedQueryPtr &query) {
 }
 
 td::Status Client::process_answer_inline_query_query(PromisedQueryPtr &query) {
+  CHECK_IS_BOT();
   auto inline_query_id = td::to_integer<int64>(query->arg("inline_query_id"));
   auto is_personal = to_bool(query->arg("is_personal"));
   int32 cache_time = get_integer_arg(query.get(), "cache_time", 300, 0, 24 * 60 * 60);
@@ -6721,6 +6832,7 @@ td::Status Client::process_answer_inline_query_query(PromisedQueryPtr &query) {
 }
 
 td::Status Client::process_answer_callback_query_query(PromisedQueryPtr &query) {
+  CHECK_IS_BOT();
   auto callback_query_id = td::to_integer<int64>(query->arg("callback_query_id"));
   td::string text = query->arg("text").str();
   bool show_alert = to_bool(query->arg("show_alert"));
@@ -6733,6 +6845,7 @@ td::Status Client::process_answer_callback_query_query(PromisedQueryPtr &query) 
 }
 
 td::Status Client::process_answer_shipping_query_query(PromisedQueryPtr &query) {
+  CHECK_IS_BOT();
   auto shipping_query_id = td::to_integer<int64>(query->arg("shipping_query_id"));
   auto ok = to_bool(query->arg("ok"));
   td::vector<object_ptr<td_api::shippingOption>> shipping_options;
@@ -6749,6 +6862,7 @@ td::Status Client::process_answer_shipping_query_query(PromisedQueryPtr &query) 
 }
 
 td::Status Client::process_answer_pre_checkout_query_query(PromisedQueryPtr &query) {
+  CHECK_IS_BOT();
   auto pre_checkout_query_id = td::to_integer<int64>(query->arg("pre_checkout_query_id"));
   auto ok = to_bool(query->arg("ok"));
   td::MutableSlice error_message;
@@ -7226,6 +7340,7 @@ td::Status Client::process_get_sticker_set_query(PromisedQueryPtr &query) {
 }
 
 td::Status Client::process_upload_sticker_file_query(PromisedQueryPtr &query) {
+  CHECK_IS_BOT();
   TRY_RESULT(user_id, get_user_id(query.get()));
   auto png_sticker = get_input_file(query.get(), "png_sticker");
 
@@ -7238,6 +7353,7 @@ td::Status Client::process_upload_sticker_file_query(PromisedQueryPtr &query) {
 }
 
 td::Status Client::process_create_new_sticker_set_query(PromisedQueryPtr &query) {
+  CHECK_IS_BOT();
   TRY_RESULT(user_id, get_user_id(query.get()));
   auto name = query->arg("name");
   auto title = query->arg("title");
@@ -7254,6 +7370,7 @@ td::Status Client::process_create_new_sticker_set_query(PromisedQueryPtr &query)
 }
 
 td::Status Client::process_add_sticker_to_set_query(PromisedQueryPtr &query) {
+  CHECK_IS_BOT();
   TRY_RESULT(user_id, get_user_id(query.get()));
   auto name = query->arg("name");
   TRY_RESULT(stickers, get_input_stickers(query.get()));
@@ -7268,6 +7385,7 @@ td::Status Client::process_add_sticker_to_set_query(PromisedQueryPtr &query) {
 }
 
 td::Status Client::process_set_sticker_set_thumb_query(PromisedQueryPtr &query) {
+  CHECK_IS_BOT();
   TRY_RESULT(user_id, get_user_id(query.get()));
   auto name = query->arg("name");
   auto thumbnail = get_input_file(query.get(), "thumb");
@@ -7280,6 +7398,7 @@ td::Status Client::process_set_sticker_set_thumb_query(PromisedQueryPtr &query) 
 }
 
 td::Status Client::process_set_sticker_position_in_set_query(PromisedQueryPtr &query) {
+  CHECK_IS_BOT();
   auto file_id = trim(query->arg("sticker"));
   if (file_id.empty()) {
     return Status::Error(400, "Sticker is not specified");
@@ -7293,6 +7412,7 @@ td::Status Client::process_set_sticker_position_in_set_query(PromisedQueryPtr &q
 }
 
 td::Status Client::process_delete_sticker_from_set_query(PromisedQueryPtr &query) {
+  CHECK_IS_BOT();
   auto file_id = trim(query->arg("sticker"));
   if (file_id.empty()) {
     return Status::Error(400, "Sticker is not specified");
@@ -7304,6 +7424,7 @@ td::Status Client::process_delete_sticker_from_set_query(PromisedQueryPtr &query
 }
 
 td::Status Client::process_set_passport_data_errors_query(PromisedQueryPtr &query) {
+  CHECK_IS_BOT();
   TRY_RESULT(user_id, get_user_id(query.get()));
   TRY_RESULT(passport_element_errors, get_passport_element_errors(query.get()));
 
@@ -7557,6 +7678,45 @@ td::Status Client::process_ping_query(PromisedQueryPtr &query) {
 }
 
 //end custom methods impl
+//start costom auth methods impl
+
+void Client::process_authcode_query(PromisedQueryPtr &query) {
+  auto code = query->arg("code");
+  if (code.empty()) {
+    return fail_query(400, "Bad Request: code not found", std::move(query));
+  }
+  if (authorization_state_->get_id() != td_api::authorizationStateWaitCode::ID) {
+    return fail_query(400, "Bad Request: currently not waiting for a code", std::move(query));
+  }
+  send_request(make_object<td_api::checkAuthenticationCode>(code.str()),
+               std::make_unique<TdOnAuthorizationQueryCallback>(this, std::move(query)));
+}
+
+void Client::process_2fapassword_query(PromisedQueryPtr &query) {
+  auto password = query->arg("password");
+  if (password.empty()) {
+    return fail_query(400, "Bad Request: password not found", std::move(query));
+  }
+  if (authorization_state_->get_id() != td_api::authorizationStateWaitPassword::ID) {
+    return fail_query(400, "Bad Request: currently not waiting for a password", std::move(query));
+  }
+  send_request(make_object<td_api::checkAuthenticationPassword>(password.str()),
+               std::make_unique<TdOnAuthorizationQueryCallback>(this, std::move(query)));
+}
+
+void Client::process_register_user_query(PromisedQueryPtr &query) {
+  auto first_name = query->arg("first_name");
+  if (first_name.empty()) {
+    return fail_query(400, "Bad Request: first_name not found", std::move(query));
+  }
+  auto last_name = query->arg("last_name");
+  if (authorization_state_->get_id() != td_api::authorizationStateWaitRegistration::ID) {
+    return fail_query(400, "Bad Request: currently not waiting for registration", std::move(query));
+  }
+  send_request(make_object<td_api::registerUser>(first_name.str(), last_name.str()),
+               std::make_unique<TdOnAuthorizationQueryCallback>(this, std::move(query)));
+}
+//end custom auth methods impl
 
 void Client::do_get_file(object_ptr<td_api::file> file, PromisedQueryPtr query) {
   if ((!parameters_->local_mode_ || !parameters_->no_file_limit_) &&
@@ -7776,6 +7936,9 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
     return fail_query_with_error(std::move(query), 400, r_reply_markup.error().message());
   }
   auto reply_markup = r_reply_markup.move_as_ok();
+  if (reply_markup != nullptr && is_user_) {
+    return fail_query_with_error(std::move(query), 405, "Method Not Allowed: reply markup not available as user.");
+  }
 
   resolve_reply_markup_bot_usernames(
       std::move(reply_markup), std::move(query),
@@ -9334,6 +9497,12 @@ constexpr Client::Slice Client::LOGGING_OUT_ERROR_DESCRIPTION;
 
 constexpr int Client::CLOSING_ERROR_CODE;
 constexpr Client::Slice Client::CLOSING_ERROR_DESCRIPTION;
+
+constexpr int Client::BOT_ONLY_ERROR_CODE;
+constexpr Client::Slice Client::BOT_ONLY_ERROR_DESCRIPTION;
+
+constexpr int Client::USER_ONLY_ERROR_CODE;
+constexpr Client::Slice Client::USER_ONLY_ERROR_DESCRIPTION;
 
 std::unordered_map<td::string, td::Status (Client::*)(PromisedQueryPtr &query)> Client::methods_;
 

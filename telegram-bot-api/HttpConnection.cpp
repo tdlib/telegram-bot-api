@@ -28,22 +28,37 @@ void HttpConnection::handle(td::unique_ptr<td::HttpQuery> http_query,
     return send_http_error(404, "Not Found: absolute URI is specified in the Request-Line");
   }
 
-  if (!url_path_parser.try_skip("/bot")) {
+  bool is_login = false;
+  bool is_user = false;
+  if (url_path_parser.try_skip("/bot")) {
+  } else if (url_path_parser.try_skip("/userlogin")) {
+    is_user = true;
+    is_login = true;
+  } else if (url_path_parser.try_skip("/user")) {
+    is_user = true;
+  } else {
     return send_http_error(404, "Not Found");
   }
 
-  auto token = url_path_parser.read_till('/');
+  td::MutableSlice token;
   bool is_test_dc = false;
-  if (url_path_parser.try_skip("/test")) {
-    is_test_dc = true;
-  }
-  url_path_parser.skip('/');
-  if (url_path_parser.status().is_error()) {
-    return send_http_error(404, "Not Found");
+  td::MutableSlice method;
+  if (!is_login) {
+    token = url_path_parser.read_till('/');
+    is_test_dc = false;
+    if (url_path_parser.try_skip("/test")) {
+      is_test_dc = true;
+    }
+    url_path_parser.skip('/');
+    if (url_path_parser.status().is_error()) {
+      return send_http_error(404, "Not Found");
+    }
+
+    method = url_path_parser.data();
   }
 
-  auto method = url_path_parser.data();
-  auto query = std::make_unique<Query>(std::move(http_query->container_), token, is_test_dc, method,
+
+  auto query = std::make_unique<Query>(std::move(http_query->container_), token, is_user, is_test_dc, method,
                                        std::move(http_query->args_), std::move(http_query->headers_),
                                        std::move(http_query->files_), shared_data_, http_query->peer_address_);
 
@@ -52,7 +67,11 @@ void HttpConnection::handle(td::unique_ptr<td::HttpQuery> http_query,
   td::init_promise_future(&promise, &future);
   future.set_event(td::EventCreator::yield(actor_id()));
   auto promised_query = PromisedQueryPtr(query.release(), PromiseDeleter(std::move(promise)));
-  send_closure(client_manager_, &ClientManager::send, std::move(promised_query));
+  if (is_login) {
+    send_closure(client_manager_, &ClientManager::user_login, std::move(promised_query));
+  } else {
+    send_closure(client_manager_, &ClientManager::send, std::move(promised_query));
+  }
   result_ = std::move(future);
 }
 

@@ -38,8 +38,12 @@ namespace td_api = td::td_api;
 
 class Client : public WebhookActor::Callback {
  public:
-  Client(td::ActorShared<> parent, const td::string &bot_token, bool is_test_dc, td::int64 tqueue_id,
+  Client(td::ActorShared<> parent, const td::string &bot_token, bool is_user, bool is_test_dc, td::int64 tqueue_id,
          std::shared_ptr<const ClientParameters> parameters, td::ActorId<BotStatActor> stat_actor);
+
+  Client(td::ActorShared<> parent, const td::string &bot_token, const td::string &phone_number, bool is_user,
+         bool is_test_dc, td::int64 tqueue_id, std::shared_ptr<const ClientParameters> parameters,
+         td::ActorId<BotStatActor> stat_actor);
 
   void send(PromisedQueryPtr query) override;
 
@@ -81,6 +85,12 @@ class Client : public WebhookActor::Callback {
 
   static constexpr int CLOSING_ERROR_CODE = 500;
   static constexpr Slice CLOSING_ERROR_DESCRIPTION = "Internal Server Error: restart";
+
+  static constexpr int BOT_ONLY_ERROR_CODE = 405;
+  static constexpr Slice BOT_ONLY_ERROR_DESCRIPTION = "Method Not Allowed: You can only use this method as a bot";
+
+  static constexpr int USER_ONLY_ERROR_CODE = 405;
+  static constexpr Slice USER_ONLY_ERROR_DESCRIPTION = "Method Not Allowed: You can only use this method as a user";
 
   class JsonFile;
   class JsonDatedFile;
@@ -149,6 +159,7 @@ class Client : public WebhookActor::Callback {
 
   class TdOnOkCallback;
   class TdOnAuthorizationCallback;
+  class TdOnAuthorizationQueryCallback;
   class TdOnInitCallback;
   class TdOnGetUserProfilePhotosCallback;
   class TdOnSendMessageCallback;
@@ -498,6 +509,11 @@ class Client : public WebhookActor::Callback {
   Status process_toggle_group_invites_query(PromisedQueryPtr &query);
   Status process_ping_query(PromisedQueryPtr &query);
 
+  //custom auth methods
+  void process_authcode_query(PromisedQueryPtr &query);
+  void process_2fapassword_query(PromisedQueryPtr &query);
+  void process_register_user_query(PromisedQueryPtr &query);
+
 
   void webhook_verified(td::string cached_ip_address) override;
   void webhook_success() override;
@@ -823,11 +839,14 @@ class Client : public WebhookActor::Callback {
   bool logging_out_ = false;
   bool need_close_ = false;
   bool clear_tqueue_ = false;
+  bool waiting_for_auth_input_ = false;
 
   td::ActorShared<> parent_;
   td::string bot_token_;
   td::string bot_token_with_dc_;
   td::string bot_token_id_;
+  td::string phone_number_;
+  bool is_user_;
   bool is_test_dc_;
   int64 tqueue_id_;
   double start_time_ = 0;

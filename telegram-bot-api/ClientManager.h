@@ -42,6 +42,9 @@ class ClientManager final : public td::Actor {
   }
 
   void send(PromisedQueryPtr query);
+  void user_login(PromisedQueryPtr query);
+
+  bool check_flood_limits(PromisedQueryPtr &query, bool is_user_login=false);
 
   void get_stats(td::PromiseActor<td::BufferSlice> promise, td::vector<std::pair<td::string, td::string>> args);
 
@@ -68,7 +71,7 @@ class ClientManager final : public td::Actor {
 
   static td::int64 get_tqueue_id(td::int64 user_id, bool is_test_dc);
 
-  static PromisedQueryPtr get_webhook_restore_query(td::Slice token, td::Slice webhook_info,
+  static PromisedQueryPtr get_webhook_restore_query(td::Slice token, bool is_user, td::Slice webhook_info,
                                                     std::shared_ptr<SharedData> shared_data);
 
   void start_up() override;

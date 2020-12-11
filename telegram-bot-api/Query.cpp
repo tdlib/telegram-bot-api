@@ -22,7 +22,7 @@ namespace telegram_bot_api {
 
 std::unordered_map<td::string, std::unique_ptr<td::VirtuallyJsonable>> empty_parameters;
 
-Query::Query(td::vector<td::BufferSlice> &&container, td::Slice token, bool is_test_dc, td::MutableSlice method,
+Query::Query(td::vector<td::BufferSlice> &&container, td::Slice token, bool is_user, bool is_test_dc, td::MutableSlice method,
              td::vector<std::pair<td::MutableSlice, td::MutableSlice>> &&args,
              td::vector<std::pair<td::MutableSlice, td::MutableSlice>> &&headers, td::vector<td::HttpFile> &&files,
              std::shared_ptr<SharedData> shared_data, const td::IPAddress &peer_address)
@@ -31,6 +31,7 @@ Query::Query(td::vector<td::BufferSlice> &&container, td::Slice token, bool is_t
     , peer_address_(peer_address)
     , container_(std::move(container))
     , token_(token)
+    , is_user_(is_user)
     , is_test_dc_(is_test_dc)
     , method_(method)
     , args_(std::move(args))

@@ -33,6 +33,8 @@
 #include "td/utils/StackAllocator.h"
 #include "td/utils/StringBuilder.h"
 #include "td/utils/Time.h"
+#include "td/utils/Random.h"
+#include "td/utils/base64.h"
 
 #include <map>
 #include <tuple>
@@ -62,7 +64,9 @@ void ClientManager::send(PromisedQueryPtr query) {
     // automatically send 429
     return;
   }
-
+  if (!parameters_->allow_users_ && query->is_user()) {
+    return fail_query(405, "Method Not Allowed: Users are not allowed to use the api", std::move(query));
+  }
   td::string token = query->token().str();
   if (token[0] == '0' || token.size() > 80u || token.find('/') != td::string::npos ||
       token.find(':') == td::string::npos) {
@@ -77,55 +81,29 @@ void ClientManager::send(PromisedQueryPtr query) {
     token += "/test";
   }
 
+  auto bot_token_with_dc = PSTRING() << query->token() << (query->is_test_dc() ? ":T" : "");
+  if (parameters_->shared_data_->user_db_->isset(bot_token_with_dc) != query->is_user()) {
+    return fail_query(400, "Bad Request: Please use the correct api endpoint for bots or users", std::move(query));
+  }
+
   auto id_it = token_to_id_.find(token);
   if (id_it == token_to_id_.end()) {
-    std::string ip_address;
-    if (query->peer_address().is_valid() && !query->peer_address().is_reserved()) {  // external connection
-      ip_address = query->peer_address().get_ip_str().str();
-    } else {
-      // invalid peer address or connection from the local network
-      ip_address = query->get_header("x-real-ip").str();
+    if (!check_flood_limits(query)) {
+      return;
     }
-    if (!ip_address.empty()) {
-      td::IPAddress tmp;
-      tmp.init_host_port(ip_address, 0).ignore();
-      tmp.clear_ipv6_interface();
-      if (tmp.is_valid()) {
-        ip_address = tmp.get_ip_str().str();
-      }
-    }
-    LOG(DEBUG) << "Receive incoming query for new bot " << token << " from " << query->peer_address();
-    if (!ip_address.empty()) {
-      LOG(DEBUG) << "Check Client creation flood control for IP address " << ip_address;
-      auto res = flood_controls_.emplace(std::move(ip_address), td::FloodControlFast());
-      auto &flood_control = res.first->second;
-      if (res.second) {
-        flood_control.add_limit(60, 20);        // 20 in a minute
-        flood_control.add_limit(60 * 60, 600);  // 600 in an hour
-      }
-      td::uint32 now = static_cast<td::uint32>(td::Time::now());
-      td::uint32 wakeup_at = flood_control.get_wakeup_at();
-      if (wakeup_at > now) {
-        LOG(INFO) << "Failed to create Client from IP address " << ip_address;
-        return query->set_retry_after_error(static_cast<int>(wakeup_at - now) + 1);
-      }
-      flood_control.add_event(static_cast<td::int32>(now));
-    }
-
     auto id = clients_.create(ClientInfo{BotStatActor(stat_.actor_id(&stat_)), token, td::ActorOwn<Client>()});
     auto *client_info = clients_.get(id);
     auto stat_actor = client_info->stat_.actor_id(&client_info->stat_);
     auto client_id = td::create_actor<Client>(
-        PSLICE() << "Client/" << token, actor_shared(this, id), query->token().str(), query->is_test_dc(),
-        get_tqueue_id(r_user_id.ok(), query->is_test_dc()), parameters_, std::move(stat_actor));
+        PSLICE() << "Client/" << token, actor_shared(this, id), query->token().str(), query->is_user(),
+        query->is_test_dc(), get_tqueue_id(r_user_id.ok(), query->is_test_dc()), parameters_, std::move(stat_actor));
 
     auto method = query->method();
     if (method != "deletewebhook" && method != "setwebhook") {
-      auto bot_token_with_dc = PSTRING() << query->token() << (query->is_test_dc() ? ":T" : "");
       auto webhook_info = parameters_->shared_data_->webhook_db_->get(bot_token_with_dc);
       if (!webhook_info.empty()) {
         send_closure(client_id, &Client::send,
-                     get_webhook_restore_query(bot_token_with_dc, webhook_info, parameters_->shared_data_));
+            get_webhook_restore_query(bot_token_with_dc, query->is_user(), webhook_info, parameters_->shared_data_));
       }
     }
 
@@ -138,6 +116,89 @@ void ClientManager::send(PromisedQueryPtr query) {
     query->set_stat_actor(client_info->stat_.actor_id(&client_info->stat_));
   }
   send_closure(client_info->client_, &Client::send, std::move(query));  // will send 429 if the client is already closed
+}
+
+void ClientManager::user_login(PromisedQueryPtr query) {
+  if (!check_flood_limits(query, true)) {
+    return;
+  }
+  if (!parameters_->allow_users_) {
+    return fail_query(405, "Method Not Allowed: Users are not allowed to use the api", std::move(query));
+  }
+  td::MutableSlice r_phone_number = query->arg("phone_number");
+  if (r_phone_number.size() < 5 || r_phone_number.size() > 15) {
+    return fail_query(401, "Unauthorized: invalid phone number specified", std::move(query));
+  }
+  td::int64 phone_number = 0;
+  for (char const &c: r_phone_number) {
+    if (isdigit(c)) {
+      phone_number = phone_number * 10 + (c - 48);
+    }
+  }
+  td::UInt256 token_data;
+  td::Random::secure_bytes(token_data.raw, sizeof(token_data));
+  td::string user_token = td::to_string(phone_number) + ":" + td::base64url_encode(token_data.as_slice());
+  auto user_token_with_dc = PSTRING() << user_token << (query->is_test_dc() ? ":T" : "");
+
+  long token_hash = std::hash<td::string>{}(user_token);
+
+  auto id = clients_.create(ClientInfo{BotStatActor(stat_.actor_id(&stat_)), user_token, td::ActorOwn<Client>()});
+  auto *client_info = clients_.get(id);
+  auto stat_actor = client_info->stat_.actor_id(&client_info->stat_);
+  auto client_id = td::create_actor<Client>(
+      PSLICE() << "Client/" << user_token, actor_shared(this, id), user_token, td::to_string(phone_number),
+      true, query->is_test_dc(), get_tqueue_id(token_hash, query->is_test_dc()), parameters_, std::move(stat_actor));
+
+  clients_.get(id)->client_ = std::move(client_id);
+  auto id_it = token_to_id_.end();
+  std::tie(id_it, std::ignore) = token_to_id_.emplace(user_token, id);
+  parameters_->shared_data_->user_db_->set(user_token_with_dc, "1");
+  answer_query(td::VirtuallyJsonableString(user_token), std::move(query));
+}
+
+bool ClientManager::check_flood_limits(PromisedQueryPtr &query, bool is_user_login) {
+  td::string ip_address;
+  if (query->peer_address().is_valid() && !query->peer_address().is_reserved()) {  // external connection
+    ip_address = query->peer_address().get_ip_str().str();
+  } else {
+    // invalid peer address or connection from the local network
+    ip_address = query->get_header("x-real-ip").str();
+  }
+  if (!ip_address.empty()) {
+    td::IPAddress tmp;
+    tmp.init_host_port(ip_address, 0).ignore();
+    tmp.clear_ipv6_interface();
+    if (tmp.is_valid()) {
+      ip_address = tmp.get_ip_str().str();
+    }
+  }
+  LOG(DEBUG) << "Receive incoming query for new bot " << query->token() << " from " << query->peer_address();
+  if (!ip_address.empty()) {
+    LOG(DEBUG) << "Check Client creation flood control for IP address " << ip_address;
+    if (is_user_login) {
+      ip_address += "/user";
+    }
+    auto res = flood_controls_.emplace(std::move(ip_address), td::FloodControlFast());
+    auto &flood_control = res.first->second;
+    if (res.second) {
+      if (is_user_login) {
+        flood_control.add_limit(60, 5);         // 5 in a minute
+        flood_control.add_limit(60 * 60, 15);   // 15 in an hour
+      } else {
+        flood_control.add_limit(60, 20);        // 20 in a minute
+        flood_control.add_limit(60 * 60, 600);  // 600 in an hour
+      }
+    }
+    auto now = static_cast<td::uint32>(td::Time::now());
+    td::uint32 wakeup_at = flood_control.get_wakeup_at();
+    if (wakeup_at > now) {
+      LOG(INFO) << "Failed to create Client from IP address " << ip_address;
+      query->set_retry_after_error(static_cast<int>(wakeup_at - now) + 1);
+      return false;
+    }
+    flood_control.add_event(static_cast<td::int32>(now));
+  }
+  return true;
 }
 
 void ClientManager::get_stats(td::PromiseActor<td::BufferSlice> promise,
@@ -297,13 +358,19 @@ void ClientManager::start_up() {
     parameters_->shared_data_->tqueue_ = std::move(tqueue);
   }
 
-  // init webhook_db
+  // init webhook_db and user_db
   auto concurrent_webhook_db = td::make_unique<td::BinlogKeyValue<td::ConcurrentBinlog>>();
   auto status = concurrent_webhook_db->init("webhooks_db.binlog", td::DbKey::empty(), scheduler_id);
   LOG_IF(FATAL, status.is_error()) << "Can't open webhooks_db.binlog " << status.error();
   parameters_->shared_data_->webhook_db_ = std::move(concurrent_webhook_db);
 
+  auto concurrent_user_db = td::make_unique<td::BinlogKeyValue<td::ConcurrentBinlog>>();
+  status = concurrent_user_db->init("user_db.binlog", td::DbKey::empty(), scheduler_id);
+  LOG_IF(FATAL, status.is_error()) << "Can't open user_db.binlog " << status.error();
+  parameters_->shared_data_->user_db_ = std::move(concurrent_user_db);
+
   auto &webhook_db = *parameters_->shared_data_->webhook_db_;
+  auto &user_db = *parameters_->shared_data_->user_db_;
   for (auto key_value : webhook_db.get_all()) {
     if (!token_range_(td::to_integer<td::uint64>(key_value.first))) {
       LOG(WARNING) << "DROP WEBHOOK: " << key_value.first << " ---> " << key_value.second;
@@ -311,12 +378,13 @@ void ClientManager::start_up() {
       continue;
     }
 
-    auto query = get_webhook_restore_query(key_value.first, key_value.second, parameters_->shared_data_);
+    auto query = get_webhook_restore_query(key_value.first, user_db.isset(key_value.first), key_value.second, parameters_->shared_data_);
     send_closure_later(actor_id(this), &ClientManager::send, std::move(query));
   }
+
 }
 
-PromisedQueryPtr ClientManager::get_webhook_restore_query(td::Slice token, td::Slice webhook_info,
+PromisedQueryPtr ClientManager::get_webhook_restore_query(td::Slice token, bool is_user, td::Slice webhook_info,
                                                           std::shared_ptr<SharedData> shared_data) {
   // create Query with empty promise
   td::vector<td::BufferSlice> containers;
@@ -364,7 +432,7 @@ PromisedQueryPtr ClientManager::get_webhook_restore_query(td::Slice token, td::S
   args.emplace_back(add_string("url"), add_string(parser.read_all()));
 
   const auto method = add_string("setwebhook");
-  auto query = std::make_unique<Query>(std::move(containers), token, is_test_dc, method, std::move(args),
+  auto query = std::make_unique<Query>(std::move(containers), token, is_user, is_test_dc, method, std::move(args),
                                        td::vector<std::pair<td::MutableSlice, td::MutableSlice>>(),
                                        td::vector<td::HttpFile>(), std::move(shared_data), td::IPAddress());
   query->set_internal(true);
@@ -392,6 +460,7 @@ void ClientManager::close_db() {
 
   parameters_->shared_data_->tqueue_->close(mpromise.get_promise());
   parameters_->shared_data_->webhook_db_->close(mpromise.get_promise());
+  parameters_->shared_data_->user_db_->close(mpromise.get_promise());
 }
 
 void ClientManager::finish_close() {

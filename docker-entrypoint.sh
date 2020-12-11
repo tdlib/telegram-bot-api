@@ -40,6 +40,12 @@ fi
 if [ -n "$TELEGRAM_NO_FILE_LIMIT" ]; then
   CUSTOM_ARGS="${CUSTOM_ARGS} --no-file-limit"
 fi
+if [ -n "$TELEGRAM_ALLOW_USERS" ]; then
+  CUSTOM_ARGS="${CUSTOM_ARGS} --allow-users"
+fi
+if [ -n "$TELEGRAM_ALLOW_USERS_REGISTRATION" ]; then
+  CUSTOM_ARGS="${CUSTOM_ARGS} --allow-users-registration"
+fi
 if [ -n "$TELEGRAM_INSECURE" ]; then
   CUSTOM_ARGS="${CUSTOM_ARGS} --insecure"
 fi

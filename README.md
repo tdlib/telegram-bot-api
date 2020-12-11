@@ -15,6 +15,7 @@ Please note that only TDLight-specific issues are suitable for this repository.
 - [TDLight features](#tdlight-features)
     - [Added features](#added-features)
     - [Modified features](#modified-features)
+    - [User Mode](#user-mode)
 - [Installation](#installation)
 - [Dependencies](#dependencies)
 - [Usage](#usage)
@@ -125,6 +126,81 @@ The `User` object now has two new fields:
 In addition, the member list now shows the full bot list (previously only the bot that executed the query was shown)
 
 The bot will now receive Updates for all received media, even if a destruction timer is set.
+
+<a name="user-mode"></a>
+### User Mode
+
+You can allow user accounts to access the bot api with the command-line option `--allow-users` or set the env variable 
+`TELEGRAM_ALLOW_USERS` to `1` when using docker. User Mode is disabled by default, so only bots can access the api.
+
+You can now log into the bot api with user accounts to create userbots running on your account.
+
+Note: Never send your 2fa password over a plain http connection. Make sure https is enabled or use this api locally.
+
+#### User Authorization Process
+1. Send a request to `{api_url}/userlogin`
+
+   Parameters:
+   - `phone_number`: `string`. The phone number of your Telegram Account.
+   
+   Returns your `user_token` as `string`. You can use this just like a normal bot token on the `/user` endpoint
+   
+2. Send the received code to `{api_url}/user{user_token}/authcode`
+
+   Parameters:
+   - `code`: `int`. The code send to you by Telegram In-App or by SMS
+   
+   Will send `{"ok": true, "result": true}` on success. 
+   
+3. Optional: Send your 2fa password to `{api_url}/user{user_token}/2fapassword`
+   
+   Parameters:
+   - `password`: `string`. Password for 2fa authentication
+   
+   Will send `{"ok": true, "result": true}` on success. 
+   
+4. Optional: Register the user by calling `{api_url}/user{user_token}/registerUser`. 
+   
+   User registration is disabled by default. You can enable it with the `--allow-users-registration` command line
+   option or the env variable `TELEGRAM_ALLOW_USERS_REGISTRATION` set to `1` when using docker.
+   
+   Parameters:
+   - `first_name`: `string`. First name for the new account.
+   - `last_name`: `string`, optional. Last name for the new account.
+   
+   Will send `{"ok": true, "result": true}` on success. 
+   
+You are now logged in and can use all methods like in the bot api, just replace the 
+`/bot{bot_token}/` in your urls with `/user{token}/`. 
+   
+You only need to authenticate once, the account will stay logged in. You can use the `logOut` method to log out
+or simply close the session in your account settings.
+
+Some methods are (obviously) not available as a user. This includes:
+- `answerCallbackQuery`
+- `setMyCommands`
+- `editMessageReplyMarkup`
+- `uploadStickerFile`
+- `createNewStickerSet`
+- `addStickerToSet`
+- `setStickerPositionInSet`
+- `deleteStickerFromSet`
+- `setStickerSetThumb`
+- `sendInvoice`
+- `answerShippingQuery`
+- `answerPreCheckoutQuery`
+- `setPassportDataErrors`
+- `sendGame`
+- `setGameScore`
+- `getGameHighscores`
+
+It is also not possible to attach a `reply_markup` to any message.
+
+Your api wrapper may behave different in
+some cases, for examples command message-entities are not created in chats that don't contain any
+bots, so your Command Handler may not detect it.
+
+It is possible to have multiple user-tokens to multiple client instances on the same bot api server.
 
 <a name="installation"></a>
 ## Installation
