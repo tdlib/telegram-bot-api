@@ -22,7 +22,9 @@
 namespace telegram_bot_api {
 
 class HttpServer : public td::TcpListener::Callback {
- public:
+ public:HttpServer.h
+
+
   HttpServer(td::string ip_address, int port,
              std::function<td::ActorOwn<td::HttpInboundConnection::Callback>()> creator)
       : ip_address_(std::move(ip_address)), port_(port), creator_(std::move(creator)) {
