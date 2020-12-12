@@ -14,6 +14,8 @@ Please note that only TDLight-specific issues are suitable for this repository.
 ## Table of Contents
 - [TDLight features](#tdlight-features)
     - [Added features](#added-features)
+      - [Added API Methods](#added-api-methods)
+      - [Added Command Line Parameters](#added-command-line-parameters)
     - [Modified features](#modified-features)
     - [User Mode](#user-mode)
 - [Installation](#installation)
@@ -33,29 +35,31 @@ Please note that only TDLight-specific issues are suitable for this repository.
 #### TDLib replaced with TDLight
 [TDLight](https://github.com/tdlight-team/tdlight) provides constant memory usage, unlike tdlib that must be restarted to reduce the heap size.
 
-#### Command `optimize_memory`
+<a name="added-api-methods"></a>
+#### Added API Methods
+##### Method `optimize_memory`
 Calling `optimize_memory` will remove old data from the in-memory cache and give the freed memory back to the os
 
-#### Command `getmessageinfo`
+##### Method `getMessageInfo`
 Get information about a message
-##### Parameters
+###### Parameters
 - `chat_id` Message chat id
 - `message_id` Message id
-##### Returns `message`
+###### Returns `message`
 
  Document the following methods:
-#### Command `getparticipants`
+##### Method `getParticipants`
 Get the member list of a supergroup or channel
-##### Parameters
+###### Parameters
 - `chat_id` Chat id
 - `filter` String, possible values are
     `members`, `parameters`, `admins`, `administators`, `restricted`, `banned`, `bots`
 - `offset` Number of users to skip
 - `limit` The maximum number of users be returned; up to 200
 
-##### Returns `ChatMember`
+###### Returns `ChatMember`
 
-#### Command `deletemessages`
+##### Method `deleteMessages`
 Delete all the messages with message_id in range between `start` and `end`.  
 The `start` parameter MUST be less than the `end` parameter  
 Both `start` and `end` must be positive non zero numbers  
@@ -66,59 +70,76 @@ It is not suggested to delete more than 200 messages per call
 **NOTE**  
 The maximum number of messages to be deleted in a single batch is determined by the `max-batch-operations` parameter and is 10000 by default
 
-##### Parameters
+###### Parameters
 - `chat_id` Chat id
 - `start` First message id to delete
 - `end` Last message id to delete
-##### Returns `true`
+###### Returns `true`
 
-#### Command `ping`
+##### Command `ping`
 Send an MTProto ping message to the telegram servers. 
 Useful to detect the delay of the bot api server.
 
-##### Parameters
+###### Parameters
 No parameters
-##### Returns `string`
+###### Returns `string`
 Ping delay in seconds represented as string.
 
 <!--TODO:
-#### Command `togglegroupinvites`
+#### Command `toggleGroupInvites`
 (todo)
 ##### Parameters
 - `(todo)`
 ##### Returns `(todo)`
 -->
-#### Executable flag `relative`
+
+<a name="added-command-line-parameters"></a>
+#### Added Command Line Parameters
+##### Flag `--relative`
 If enabled, allow only relative paths for files in local mode.
 
-#### Executable flag `insecure`
+##### Flag `--insecure`
 Allow http connection in non-local mode
 
-#### Executable parameter `max-batch-operations`
+##### Flag `--max-batch-operations=<number>`
 maximum number of batch operations (default 10000)
 
+#### Existing Command Line Parameters
+Which are not properly documented, so they are written down here.
+
+##### Flag `-v<number>`/`--verbose=<number>`
+Verbosity of logging.
+The [loglevels](https://github.com/tdlib/td/blob/eb80924dad30af4e6d8385d058bb7e847174df5e/tdutils/td/utils/logging.h#L103-L109) are
+- `0`: Only fatal errors (least noisy)
+- `1`: All errors
+- `2`: Warnings, too
+- `3`: Infos
+- `4`: Debug output (very spammy)
+- `1024`: Also the stuff which is considered to "never" appear (as of writing there's no such stuff).
+_For Docker containers, `$TELEGRAM_VERBOSITY` can be set._
+
 <a name="modified-features"></a>
-### Modified features
+#### Modified features
 
-#### Command `getchat`
-The command `getchat` will also try to resolve the username online, if it can't be found locally
+##### Method `getChat`
+The command `getChat` will also try to resolve the username online, if it can't be found locally
 
-#### Object `message`
-The `message` object now has two new fields:
+##### Object `Message`
+The `Message` object now has two new fields:
 - `views`: how many views has the message (usually the views are shown only for channel messages)
 - `forwards`: how many times the message has been forwarded
 
-#### Object `ChatMember`
+##### Object `ChatMember`
 The `ChatMember` object now has two new fields:
 - `joined_date`: integer, unix timestamp, when has the user joined
 - `inviter`: `User`, the inviter
 
-#### Object `Chat`
+##### Object `Chat`
 The `Chat` object now has two new fields:
 - `is_verified`: bool, optional, default false. Is the chat verified by Telegram, clients show a verified batch
 - `is_scam`: bool, optional, default false. Is the chat reported for scam, clients show a warning to the user
 
-#### Object `User`
+##### Object `User`
 The `User` object now has two new fields:
 - `is_verified`: bool, optional, default false. Is the user verified by Telegram, clients show a verified batch
 - `is_scam`: bool, optional, default false. Is the user reported for scam, clients show a warning to the user
