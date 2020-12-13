@@ -295,6 +295,7 @@ bool Client::init_methods() {
   methods_.emplace("deletemessages", &Client::process_delete_messages_query);
   methods_.emplace("togglegroupinvites", &Client::process_toggle_group_invites_query);
   methods_.emplace("ping", &Client::process_ping_query);
+  methods_.emplace("getmemorystats", &Client::process_get_memory_stats_query);
 
 
   return true;
@@ -3322,6 +3323,26 @@ class Client::TdOnPingCallback : public TdQueryCallback {
 
     auto seconds_ = move_object_as<td_api::seconds>(result);
     answer_query(td::VirtuallyJsonableString(std::to_string(seconds_->seconds_)), std::move(query_));
+  }
+
+ private:
+  PromisedQueryPtr query_;
+};
+
+class Client::TdOnGetMemoryStatisticsCallback : public TdQueryCallback {
+ public:
+  explicit TdOnGetMemoryStatisticsCallback(PromisedQueryPtr query)
+      : query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) override {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    auto res = move_object_as<td_api::memoryStatistics>(result);
+
+    answer_query(td::JsonRaw(res->statistics_), std::move(query_));
   }
 
  private:
@@ -7677,8 +7698,13 @@ td::Status Client::process_ping_query(PromisedQueryPtr &query) {
   return Status::OK();
 }
 
+td::Status Client::process_get_memory_stats_query(PromisedQueryPtr &query) {
+  send_request(make_object<td_api::getMemoryStatistics>(),
+               std::make_unique<TdOnGetMemoryStatisticsCallback>(std::move(query)));
+  return Status::OK();
+}
 //end custom methods impl
-//start costom auth methods impl
+//start custom auth methods impl
 
 void Client::process_authcode_query(PromisedQueryPtr &query) {
   auto code = query->arg("code");
