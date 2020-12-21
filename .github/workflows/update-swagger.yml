@@ -34,7 +34,7 @@ jobs:
           mv dist/index.html .
           # Fix references in index.html
           sed -i "s|https://petstore.swagger.io/v2/swagger.json|$SWAGGER_YAML|g" index.html
-          sed -i "s|href=\"./|href=\"dist/|g" docs/index.html
+          sed -i "s|href=\"./|href=\"dist/|g" index.html
           sed -i "s|src=\"./|src=\"dist/|g" index.html
           sed -i "s|dist/favicon|icons/favicon|g" index.html
           sed -i "s|<title>.*</title>|<title>$TITLE</title>|g" index.html
