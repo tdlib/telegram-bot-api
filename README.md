@@ -244,7 +244,7 @@ In general, you need to install all `Telegram Bot API server` [dependencies](#de
 
 ```bash
 git clone --recursive https://github.com/tdlight-team/tdlight-telegram-bot-api
-cd telegram-bot-api
+cd tdlight-telegram-bot-api
 mkdir build
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
