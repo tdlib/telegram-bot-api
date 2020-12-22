@@ -100,7 +100,8 @@ paths:
                     default: true
                     type: boolean
                   result:
-                    $ref: '#/components/schemas/Message'
+                    default: true
+                    type: boolean
                 required:
                   - ok
                   - result
