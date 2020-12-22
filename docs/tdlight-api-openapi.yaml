@@ -42,6 +42,8 @@ tags:
     description: Added Methods in the tdlight-bot-api
   - name: user-only
     description: These methods can only be called as user
+  - name: modified
+    description: These methods are modified in the tdlight-bot-api
 paths:
   /userlogin:
     post:
@@ -1892,6 +1894,169 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /getScheduledMessages:
+    post:
+      tags:
+        - added
+        - user-only
+      description: |-
+        *ONLY FOR USERS*
+        
+        Returns all scheduled messages in a chat. The messages are returned in a reverse chronological order. Returns an array of `Message` on success.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                chat_id:
+                  description: Unique identifier for the target chat or username of the target channel (in the format `@channelusername`)
+                  anyOf:
+                    - type: integer
+                    - type: string
+              required:
+                - chat_id
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                chat_id:
+                  description: Unique identifier for the target chat or username of the target channel (in the format `@channelusername`)
+                  anyOf:
+                    - type: integer
+                    - type: string
+              required:
+                - chat_id
+          application/json:
+            schema:
+              type: object
+              properties:
+                chat_id:
+                  description: Unique identifier for the target chat or username of the target channel (in the format `@channelusername`)
+                  anyOf:
+                    - type: integer
+                    - type: string
+              required:
+                - chat_id
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    default: true
+                    type: boolean
+                  result:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Message'
+                required:
+                  - ok
+                  - result
+        default:
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /editMessageScheduling:
+    post:
+      tags:
+        - added
+        - user-only
+      description: |-
+        *ONLY FOR USERS*
+        
+        Edits the time when a scheduled message will be sent. Scheduling state of all messages in the same album or forwarded together with the message will be also changed. Returns `true` on success.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                chat_id:
+                  description: Unique identifier for the target chat or username of the target channel (in the format `@channelusername`)
+                  anyOf:
+                    - type: integer
+                    - type: string
+                message_id:
+                  description: Message identifier in the chat specified in *from\_chat\_id*. Message IDs for scheduled messages are negative.
+                  type: integer
+                send_at:
+                  description: 'Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly'
+                  anyOf:
+                    - type: integer
+                    - type: string
+              required:
+                - chat_id
+                - message_id
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                chat_id:
+                  description: Unique identifier for the target chat or username of the target channel (in the format `@channelusername`)
+                  anyOf:
+                    - type: integer
+                    - type: string
+                message_id:
+                  description: Message identifier in the chat specified in *from\_chat\_id*
+                  type: integer
+                send_at:
+                  description: 'Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly'
+                  anyOf:
+                    - type: integer
+                    - type: string
+              required:
+                - chat_id
+                - message_id
+          application/json:
+            schema:
+              type: object
+              properties:
+                chat_id:
+                  description: Unique identifier for the target chat or username of the target channel (in the format `@channelusername`)
+                  anyOf:
+                    - type: integer
+                    - type: string
+                message_id:
+                  description: Message identifier in the chat specified in *from\_chat\_id*
+                  type: integer
+                send_at:
+                  description: 'Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly'
+                  anyOf:
+                    - type: integer
+                    - type: string
+              required:
+                - chat_id
+                - message_id
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    default: true
+                    type: boolean
+                  result:
+                    $ref: '#/components/schemas/Message'
+                required:
+                  - ok
+                  - result
+        default:
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /getUpdates:
     post:
@@ -2226,6 +2391,8 @@ paths:
                 $ref: '#/components/schemas/Error'
   /sendMessage:
     post:
+      tags:
+        - modified
       description: 'Use this method to send text messages. On success, the sent [Message](https://core.telegram.org/bots/api/#message) is returned.'
       externalDocs:
         url: 'https://core.telegram.org/bots/api/#sendmessage'
@@ -2270,6 +2437,11 @@ paths:
                     - $ref: '#/components/schemas/ReplyKeyboardMarkup'
                     - $ref: '#/components/schemas/ReplyKeyboardRemove'
                     - $ref: '#/components/schemas/ForceReply'
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
                 - text
@@ -2312,6 +2484,11 @@ paths:
                     - $ref: '#/components/schemas/ReplyKeyboardMarkup'
                     - $ref: '#/components/schemas/ReplyKeyboardRemove'
                     - $ref: '#/components/schemas/ForceReply'
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
                 - text
@@ -2354,6 +2531,11 @@ paths:
                     - $ref: '#/components/schemas/ReplyKeyboardMarkup'
                     - $ref: '#/components/schemas/ReplyKeyboardRemove'
                     - $ref: '#/components/schemas/ForceReply'
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
                 - text
@@ -2382,6 +2564,8 @@ paths:
                 $ref: '#/components/schemas/Error'
   /forwardMessage:
     post:
+      tags:
+        - modified
       description: 'Use this method to forward messages of any kind. On success, the sent [Message](https://core.telegram.org/bots/api/#message) is returned.'
       externalDocs:
         url: 'https://core.telegram.org/bots/api/#forwardmessage'
@@ -2407,6 +2591,11 @@ paths:
                 message_id:
                   description: Message identifier in the chat specified in *from\_chat\_id*
                   type: integer
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
                 - from_chat_id
@@ -2431,6 +2620,11 @@ paths:
                 message_id:
                   description: Message identifier in the chat specified in *from\_chat\_id*
                   type: integer
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
                 - from_chat_id
@@ -2455,6 +2649,11 @@ paths:
                 message_id:
                   description: Message identifier in the chat specified in *from\_chat\_id*
                   type: integer
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
                 - from_chat_id
@@ -2484,6 +2683,8 @@ paths:
                 $ref: '#/components/schemas/Error'
   /copyMessage:
     post:
+      tags:
+        - modified
       description: 'Use this method to copy messages of any kind. The method is analogous to the method [forwardMessages](https://core.telegram.org/bots/api/#forwardmessages), but the copied message doesn''t have a link to the original message. Returns the [MessageId](https://core.telegram.org/bots/api/#messageid) of the sent message on success.'
       externalDocs:
         url: 'https://core.telegram.org/bots/api/#copymessage'
@@ -2533,6 +2734,11 @@ paths:
                     - $ref: '#/components/schemas/ReplyKeyboardMarkup'
                     - $ref: '#/components/schemas/ReplyKeyboardRemove'
                     - $ref: '#/components/schemas/ForceReply'
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
                 - from_chat_id
@@ -2581,6 +2787,11 @@ paths:
                     - $ref: '#/components/schemas/ReplyKeyboardMarkup'
                     - $ref: '#/components/schemas/ReplyKeyboardRemove'
                     - $ref: '#/components/schemas/ForceReply'
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
                 - from_chat_id
@@ -2629,6 +2840,11 @@ paths:
                     - $ref: '#/components/schemas/ReplyKeyboardMarkup'
                     - $ref: '#/components/schemas/ReplyKeyboardRemove'
                     - $ref: '#/components/schemas/ForceReply'
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
                 - from_chat_id
@@ -2658,6 +2874,8 @@ paths:
                 $ref: '#/components/schemas/Error'
   /sendPhoto:
     post:
+      tags:
+        - modified
       description: 'Use this method to send photos. On success, the sent [Message](https://core.telegram.org/bots/api/#message) is returned.'
       externalDocs:
         url: 'https://core.telegram.org/bots/api/#sendphoto'
@@ -2704,6 +2922,11 @@ paths:
                     - $ref: '#/components/schemas/ReplyKeyboardMarkup'
                     - $ref: '#/components/schemas/ReplyKeyboardRemove'
                     - $ref: '#/components/schemas/ForceReply'
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
                 - photo
@@ -2732,6 +2955,8 @@ paths:
                 $ref: '#/components/schemas/Error'
   /sendAudio:
     post:
+      tags:
+        - modified
       description: |-
         Use this method to send audio files, if you want Telegram clients to display them in the music player. Your audio must be in the .MP3 or .M4A format. On success, the sent [Message](https://core.telegram.org/bots/api/#message) is returned. Bots can currently send audio files of up to 50 MB in size, this limit may be changed in the future.
 
@@ -2795,6 +3020,11 @@ paths:
                     - $ref: '#/components/schemas/ReplyKeyboardMarkup'
                     - $ref: '#/components/schemas/ReplyKeyboardRemove'
                     - $ref: '#/components/schemas/ForceReply'
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
                 - audio
@@ -2823,6 +3053,8 @@ paths:
                 $ref: '#/components/schemas/Error'
   /sendDocument:
     post:
+      tags:
+        - modified
       description: 'Use this method to send general files. On success, the sent [Message](https://core.telegram.org/bots/api/#message) is returned. Bots can currently send files of any type of up to 50 MB in size, this limit may be changed in the future.'
       externalDocs:
         url: 'https://core.telegram.org/bots/api/#senddocument'
@@ -2877,6 +3109,11 @@ paths:
                     - $ref: '#/components/schemas/ReplyKeyboardMarkup'
                     - $ref: '#/components/schemas/ReplyKeyboardRemove'
                     - $ref: '#/components/schemas/ForceReply'
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
                 - document
@@ -2905,6 +3142,8 @@ paths:
                 $ref: '#/components/schemas/Error'
   /sendVideo:
     post:
+      tags:
+        - modified
       description: 'Use this method to send video files, Telegram clients support mp4 videos (other formats may be sent as [Document](https://core.telegram.org/bots/api/#document)). On success, the sent [Message](https://core.telegram.org/bots/api/#message) is returned. Bots can currently send video files of up to 50 MB in size, this limit may be changed in the future.'
       externalDocs:
         url: 'https://core.telegram.org/bots/api/#sendvideo'
@@ -2968,6 +3207,11 @@ paths:
                     - $ref: '#/components/schemas/ReplyKeyboardMarkup'
                     - $ref: '#/components/schemas/ReplyKeyboardRemove'
                     - $ref: '#/components/schemas/ForceReply'
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
                 - video
@@ -2996,6 +3240,8 @@ paths:
                 $ref: '#/components/schemas/Error'
   /sendAnimation:
     post:
+      tags:
+        - modified
       description: 'Use this method to send animation files (GIF or H.264/MPEG-4 AVC video without sound). On success, the sent [Message](https://core.telegram.org/bots/api/#message) is returned. Bots can currently send animation files of up to 50 MB in size, this limit may be changed in the future.'
       externalDocs:
         url: 'https://core.telegram.org/bots/api/#sendanimation'
@@ -3056,6 +3302,11 @@ paths:
                     - $ref: '#/components/schemas/ReplyKeyboardMarkup'
                     - $ref: '#/components/schemas/ReplyKeyboardRemove'
                     - $ref: '#/components/schemas/ForceReply'
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
                 - animation
@@ -3084,6 +3335,8 @@ paths:
                 $ref: '#/components/schemas/Error'
   /sendVoice:
     post:
+      tags:
+        - modified
       description: 'Use this method to send audio files, if you want Telegram clients to display the file as a playable voice message. For this to work, your audio must be in an .OGG file encoded with OPUS (other formats may be sent as [Audio](https://core.telegram.org/bots/api/#audio) or [Document](https://core.telegram.org/bots/api/#document)). On success, the sent [Message](https://core.telegram.org/bots/api/#message) is returned. Bots can currently send voice messages of up to 50 MB in size, this limit may be changed in the future.'
       externalDocs:
         url: 'https://core.telegram.org/bots/api/#sendvoice'
@@ -3133,6 +3386,11 @@ paths:
                     - $ref: '#/components/schemas/ReplyKeyboardMarkup'
                     - $ref: '#/components/schemas/ReplyKeyboardRemove'
                     - $ref: '#/components/schemas/ForceReply'
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
                 - voice
@@ -3161,6 +3419,8 @@ paths:
                 $ref: '#/components/schemas/Error'
   /sendVideoNote:
     post:
+      tags:
+        - modified
       description: 'As of [v.4.0](https://telegram.org/blog/video-messages-and-telescope), Telegram clients support rounded square mp4 videos of up to 1 minute long. Use this method to send video messages. On success, the sent [Message](https://core.telegram.org/bots/api/#message) is returned.'
       externalDocs:
         url: 'https://core.telegram.org/bots/api/#sendvideonote'
@@ -3207,6 +3467,11 @@ paths:
                     - $ref: '#/components/schemas/ReplyKeyboardMarkup'
                     - $ref: '#/components/schemas/ReplyKeyboardRemove'
                     - $ref: '#/components/schemas/ForceReply'
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
                 - video_note
@@ -3267,6 +3532,11 @@ paths:
                 allow_sending_without_reply:
                   description: 'Pass *True*, if the message should be sent even if the specified replied-to message is not found'
                   type: boolean
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
                 - media
@@ -3297,6 +3567,8 @@ paths:
                 $ref: '#/components/schemas/Error'
   /sendLocation:
     post:
+      tags:
+        - modified
       description: 'Use this method to send point on the map. On success, the sent [Message](https://core.telegram.org/bots/api/#message) is returned.'
       externalDocs:
         url: 'https://core.telegram.org/bots/api/#sendlocation'
@@ -3345,6 +3617,11 @@ paths:
                     - $ref: '#/components/schemas/ReplyKeyboardMarkup'
                     - $ref: '#/components/schemas/ReplyKeyboardRemove'
                     - $ref: '#/components/schemas/ForceReply'
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly. Live locations can not be scheduled.'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
                 - latitude
@@ -3392,6 +3669,11 @@ paths:
                     - $ref: '#/components/schemas/ReplyKeyboardMarkup'
                     - $ref: '#/components/schemas/ReplyKeyboardRemove'
                     - $ref: '#/components/schemas/ForceReply'
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly. Live locations can not be scheduled.'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
                 - latitude
@@ -3439,6 +3721,11 @@ paths:
                     - $ref: '#/components/schemas/ReplyKeyboardMarkup'
                     - $ref: '#/components/schemas/ReplyKeyboardRemove'
                     - $ref: '#/components/schemas/ForceReply'
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly. Live locations can not be scheduled.'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
                 - latitude
@@ -3690,6 +3977,8 @@ paths:
                 $ref: '#/components/schemas/Error'
   /sendVenue:
     post:
+      tags:
+        - modified
       description: 'Use this method to send information about a venue. On success, the sent [Message](https://core.telegram.org/bots/api/#message) is returned.'
       externalDocs:
         url: 'https://core.telegram.org/bots/api/#sendvenue'
@@ -3744,6 +4033,11 @@ paths:
                     - $ref: '#/components/schemas/ReplyKeyboardMarkup'
                     - $ref: '#/components/schemas/ReplyKeyboardRemove'
                     - $ref: '#/components/schemas/ForceReply'
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly.'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
                 - latitude
@@ -3799,6 +4093,11 @@ paths:
                     - $ref: '#/components/schemas/ReplyKeyboardMarkup'
                     - $ref: '#/components/schemas/ReplyKeyboardRemove'
                     - $ref: '#/components/schemas/ForceReply'
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly.'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
                 - latitude
@@ -3854,6 +4153,11 @@ paths:
                     - $ref: '#/components/schemas/ReplyKeyboardMarkup'
                     - $ref: '#/components/schemas/ReplyKeyboardRemove'
                     - $ref: '#/components/schemas/ForceReply'
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly.'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
                 - latitude
@@ -3885,6 +4189,8 @@ paths:
                 $ref: '#/components/schemas/Error'
   /sendContact:
     post:
+      tags:
+        - modified
       description: 'Use this method to send phone contacts. On success, the sent [Message](https://core.telegram.org/bots/api/#message) is returned.'
       externalDocs:
         url: 'https://core.telegram.org/bots/api/#sendcontact'
@@ -3927,6 +4233,11 @@ paths:
                     - $ref: '#/components/schemas/ReplyKeyboardMarkup'
                     - $ref: '#/components/schemas/ReplyKeyboardRemove'
                     - $ref: '#/components/schemas/ForceReply'
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly.'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
                 - phone_number
@@ -3968,6 +4279,11 @@ paths:
                     - $ref: '#/components/schemas/ReplyKeyboardMarkup'
                     - $ref: '#/components/schemas/ReplyKeyboardRemove'
                     - $ref: '#/components/schemas/ForceReply'
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly.'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
                 - phone_number
@@ -4009,6 +4325,11 @@ paths:
                     - $ref: '#/components/schemas/ReplyKeyboardMarkup'
                     - $ref: '#/components/schemas/ReplyKeyboardRemove'
                     - $ref: '#/components/schemas/ForceReply'
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly.'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
                 - phone_number
@@ -4038,6 +4359,8 @@ paths:
                 $ref: '#/components/schemas/Error'
   /sendPoll:
     post:
+      tags:
+        - modified
       description: 'Use this method to send a native poll. On success, the sent [Message](https://core.telegram.org/bots/api/#message) is returned.'
       externalDocs:
         url: 'https://core.telegram.org/bots/api/#sendpoll'
@@ -4108,6 +4431,11 @@ paths:
                     - $ref: '#/components/schemas/ReplyKeyboardMarkup'
                     - $ref: '#/components/schemas/ReplyKeyboardRemove'
                     - $ref: '#/components/schemas/ForceReply'
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly.'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
                 - question
@@ -4275,6 +4603,8 @@ paths:
                 $ref: '#/components/schemas/Error'
   /sendDice:
     post:
+      tags:
+        - modified
       description: 'Use this method to send an animated emoji that will display a random value. On success, the sent [Message](https://core.telegram.org/bots/api/#message) is returned.'
       externalDocs:
         url: 'https://core.telegram.org/bots/api/#senddice'
@@ -4315,6 +4645,11 @@ paths:
                     - $ref: '#/components/schemas/ReplyKeyboardMarkup'
                     - $ref: '#/components/schemas/ReplyKeyboardRemove'
                     - $ref: '#/components/schemas/ForceReply'
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly.'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
           multipart/form-data:
@@ -4352,6 +4687,11 @@ paths:
                     - $ref: '#/components/schemas/ReplyKeyboardMarkup'
                     - $ref: '#/components/schemas/ReplyKeyboardRemove'
                     - $ref: '#/components/schemas/ForceReply'
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly.'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
           application/json:
@@ -4389,6 +4729,11 @@ paths:
                     - $ref: '#/components/schemas/ReplyKeyboardMarkup'
                     - $ref: '#/components/schemas/ReplyKeyboardRemove'
                     - $ref: '#/components/schemas/ForceReply'
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly.'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
         required: true
@@ -6991,6 +7336,8 @@ paths:
                 $ref: '#/components/schemas/Error'
   /sendSticker:
     post:
+      tags:
+        - modified
       description: 'Use this method to send static .WEBP or [animated](https://telegram.org/blog/animated-stickers) .TGS stickers. On success, the sent [Message](https://core.telegram.org/bots/api/#message) is returned.'
       externalDocs:
         url: 'https://core.telegram.org/bots/api/#sendsticker'
@@ -7026,6 +7373,11 @@ paths:
                     - $ref: '#/components/schemas/ReplyKeyboardMarkup'
                     - $ref: '#/components/schemas/ReplyKeyboardRemove'
                     - $ref: '#/components/schemas/ForceReply'
+                send_at:
+                  description: 'Users only. Send the message as a scheduled message. Scheduled Messages have a negative `message_id`. Must be either a unix timestamp not further than 365 days in the future or `online` as string to send when the other chat participant comes online. Leave empty to send the message instantly.'
+                  anyOf:
+                    - type: integer
+                    - type: string
               required:
                 - chat_id
                 - sticker
@@ -8780,8 +9132,13 @@ components:
           description: '*Optional*. Amount of views. Only for channel messages.'
           type: integer
         forwards:
-          description: '*Optional*. how many times the message has been forwarded'
+          description: '*Optional*. How many times the message has been forwarded'
           type: integer
+        is_scheduled:
+          description: '*Optional*. Is the message scheduled.'
+          type: boolean
+        scheduled_at:
+          description: '*Optional*. Time the message will be sent.'
       required:
         - message_id
         - date
