@@ -9501,7 +9501,7 @@ td::int64 Client::as_tdlib_message_id(int32 message_id) {
 
 td::int32 Client::as_client_message_id(int64 message_id) {
   int32 result = static_cast<int32>(message_id >> 20);
-  CHECK(as_tdlib_message_id(result) == message_id);
+  CHECK(as_tdlib_message_id(result) >> 2 == message_id >> 2);
   return result;
 }
 
