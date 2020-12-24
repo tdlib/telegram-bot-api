@@ -57,7 +57,7 @@ paths:
 
         Note: You don't have your token yet, so the domain is just {base_url}/userlogin
 
-        Returns the user_token on success.
+        Returns an `AuthorizationState` with the user token on success.
       requestBody:
         content:
           application/x-www-form-urlencoded:
@@ -100,8 +100,7 @@ paths:
                     default: true
                     type: boolean
                   result:
-                    default: true
-                    type: boolean
+                    $ref: '#/components/schemas/AuthorizationState'
                 required:
                   - ok
                   - result
@@ -126,7 +125,7 @@ paths:
       description: |-
         *ONLY FOR USERS*
 
-        Use this method in the authorization process to check your authentication code. Returns *True* on success.
+        Use this method in the authorization process to check your authentication code. Returns an `AuthorizationState` on success.
       requestBody:
         content:
           application/x-www-form-urlencoded:
@@ -169,8 +168,7 @@ paths:
                     default: true
                     type: boolean
                   result:
-                    default: true
-                    type: boolean
+                    $ref: '#/components/schemas/AuthorizationState'
                 required:
                   - ok
                   - result
@@ -188,7 +186,7 @@ paths:
       description: |-
         *ONLY FOR USERS*
 
-        Use this method in the authorization process to check your 2-factor-authorization password for correctness. Returns *True* on success.
+        Use this method in the authorization process to check your 2-factor-authorization password for correctness. Returns an `AuthorizationState` on success.
 
         *Never* send your password over a plain http connection. Make sure https is enabled or use this API locally.
       requestBody:
@@ -233,8 +231,7 @@ paths:
                     default: true
                     type: boolean
                   result:
-                    default: true
-                    type: boolean
+                    $ref: '#/components/schemas/AuthorizationState'
                 required:
                   - ok
                   - result
@@ -252,7 +249,7 @@ paths:
       description: |-
         *ONLY FOR USERS*
 
-        Use this method to register a new user account. Only works after sending the authcode if the user is not yet registered. Returns *True* on success.
+        Use this method to register a new user account. Only works after sending the authcode if the user is not yet registered. Returns an `AuthorizationState` on success.
 
         User registration is disabled by default. You can enable it with the `--allow-users-registration` command line option or the env variable `TELEGRAM_ALLOW_USERS_REGISTRATION` set to `1` when using docker.s
       requestBody:
@@ -306,8 +303,7 @@ paths:
                     default: true
                     type: boolean
                   result:
-                    default: true
-                    type: boolean
+                    $ref: '#/components/schemas/AuthorizationState'
                 required:
                   - ok
                   - result
@@ -648,7 +644,7 @@ paths:
     post:
       tags:
         - added
-      description: Send an MTProto ping message to the telegram servers. Useful to detect the delay of the bot api server. Returns the time in seconds as `string`
+      description: Send an MTProto ping message to the telegram servers. Useful to detect the delay of the bot api server. Returns the time in seconds as double-precision floating-point number.
       responses:
         '200':
           description: ''
@@ -661,7 +657,7 @@ paths:
                     default: true
                     type: boolean
                   result:
-                    type: string
+                    type: number
                 required:
                   - ok
                   - result
@@ -12035,6 +12031,33 @@ components:
         - user
         - score
     
+    AuthorizationState:
+      description: Used in the User Authorization process, used to return the current state of the authorization and the token.
+      type: object
+      properties:
+        authorization_state:
+          description: 'Returns the current state of the authorization process. Is one of `wait_code`, `wait_password`, `wait_registration`, `ready` or `unknown`'
+          type: string
+          enum:
+            - wait_code
+            - wait_password
+            - wait_registration
+            - ready
+            - unknown
+        token:
+          description: 'Optional. Token to be used for calling methods at the bot api. Only returned once after the `userlogin` method.'
+          type: string
+        timeout:
+          description: 'Optional. Timeout for entering the authorization code.'
+          type: integer
+        password_hint:
+          description: 'Optional. The password hint for your 2fa password. May be empty even if you set a hint.'
+          type: string
+        has_recovery_email_address:
+          description: 'Optional. True, if a recovery email address has been set up.'
+          type: boolean
+      required:
+        - authorization_state
     CallbackQueryAnswer:
       description: Contains a bot's answer to a callback query.
       type: object
