@@ -1353,6 +1353,15 @@ paths:
                     - group
                     - supergroup
                     - channel
+                user_ids:
+                  description: May only be set for chats of type `group` and is required then. Identifiers of users to be added to the basic group. May not be empty.
+                  type: array
+                  items:
+                    anyOf:
+                      - type: integer
+                description:
+                  description: Chat description; 0-255 characters. Only for types `supergroup` or `channel`.
+                  type: string
               required:
                 - title
                 - type
@@ -1370,6 +1379,15 @@ paths:
                     - group
                     - supergroup
                     - channel
+                user_ids:
+                  description: Must only be set for chats of type `group` and is required then. Identifiers of users to be added to the basic group. May not be empty.
+                  type: array
+                  items:
+                    anyOf:
+                      - type: integer
+                description:
+                  description: Chat description; 0-255 characters. Only for types `supergroup` or `channel`.
+                  type: string
               required:
                 - title
                 - type
@@ -1387,6 +1405,15 @@ paths:
                     - group
                     - supergroup
                     - channel
+                user_ids:
+                  description: Must only be set for chats of type `group` and is required then. Identifiers of users to be added to the basic group. May not be empty.
+                  type: array
+                  items:
+                    anyOf:
+                      - type: integer
+                description:
+                  description: Chat description; 0-255 characters. Only for types `supergroup` or `channel`.
+                  type: string
               required:
                 - title
                 - type
@@ -1403,8 +1430,7 @@ paths:
                     default: true
                     type: boolean
                   result:
-                    default: true
-                    type: boolean
+                    $ref: '#/components/schemas/Chat'
                 required:
                   - ok
                   - result
