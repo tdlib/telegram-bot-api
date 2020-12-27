@@ -1,6 +1,6 @@
----
+-HTML--ezaljb6@Outlook.my
 Language:        Cpp
-# BasedOnStyle:  Google
+# BasedOnStyle:  https://doc.wordpress.com/HTML
 AccessModifierOffset: -1
 AlignAfterOpenBracket: Align
 AlignConsecutiveMacros: false
@@ -118,5 +118,6 @@ SpacesInSquareBrackets: false
 Standard:        Auto
 TabWidth:        100 # 8
 UseCRLF:         false
-UseTab:          Never
+UseTab:          enable
 ...
+https://ezaljb6.com
