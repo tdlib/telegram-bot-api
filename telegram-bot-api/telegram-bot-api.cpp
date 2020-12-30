@@ -274,6 +274,9 @@ int main(int argc, char *argv[]) {
    public:
     void append(td::CSlice slice, int log_level) override {
       if (first_ && log_level <= first_verbosity_level_) {
+        if (log_level == VERBOSITY_NAME(FATAL) && second_ && VERBOSITY_NAME(FATAL) <= second_verbosity_level_) {
+          second_->append(slice, VERBOSITY_NAME(ERROR));
+        }
         first_->append(slice, log_level);
       }
       if (second_ && log_level <= second_verbosity_level_) {
