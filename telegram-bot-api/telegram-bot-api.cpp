@@ -297,6 +297,14 @@ int main(int argc, char *argv[]) {
       second_verbosity_level_ = verbosity_level;
     }
 
+    int get_first_verbosity_level() const {
+      return first_verbosity_level_;
+    }
+
+    int get_second_verbosity_level() const {
+      return second_verbosity_level_;
+    }
+
     void rotate() override {
       if (first_) {
         first_->rotate();
@@ -368,10 +376,14 @@ int main(int argc, char *argv[]) {
 
   ::td::VERBOSITY_NAME(dns_resolver) = VERBOSITY_NAME(WARNING);
 
-  int memory_verbosity_level = td::max(VERBOSITY_NAME(INFO), verbosity_level);
-  SET_VERBOSITY_LEVEL(memory_verbosity_level);
-  log.set_first_verbosity_level(verbosity_level);
-  log.set_second_verbosity_level(memory_verbosity_level);
+  auto set_verbosity_level = [&log](int new_verbosity_level) {
+    int memory_verbosity_level = td::max(VERBOSITY_NAME(INFO), new_verbosity_level);
+    SET_VERBOSITY_LEVEL(memory_verbosity_level);
+
+    log.set_first_verbosity_level(new_verbosity_level);
+    log.set_second_verbosity_level(memory_verbosity_level);
+  };
+  set_verbosity_level(verbosity_level);
 
   // LOG(WARNING) << "Bot API server with commit " << td::GitInfo::commit() << ' '
   //              << (td::GitInfo::is_dirty() ? "(dirty)" : "") << " started";
@@ -443,20 +455,18 @@ int main(int argc, char *argv[]) {
     }
 
     if (!need_change_verbosity_level.test_and_set()) {
-      auto current_global_verbosity_level = GET_VERBOSITY_LEVEL();
-      SET_VERBOSITY_LEVEL(256 - current_global_verbosity_level);
-      verbosity_level = 256 - verbosity_level;
-      log.set_first_verbosity_level(verbosity_level);
+      if (log.get_first_verbosity_level() == verbosity_level) {
+        // increase default log verbosity level
+        set_verbosity_level(100);
+      } else {
+        // return back verbosity level
+        set_verbosity_level(verbosity_level);
+      }
     }
 
     auto next_verbosity_level = shared_data->next_verbosity_level_.exchange(-1);
     if (next_verbosity_level != -1) {
-      verbosity_level = next_verbosity_level;
-      memory_verbosity_level = td::max(VERBOSITY_NAME(INFO), verbosity_level);
-      SET_VERBOSITY_LEVEL(memory_verbosity_level);
-
-      log.set_first_verbosity_level(verbosity_level);
-      log.set_second_verbosity_level(memory_verbosity_level);
+      set_verbosity_level(next_verbosity_level);
     }
 
     if (!need_dump_log.test_and_set()) {
