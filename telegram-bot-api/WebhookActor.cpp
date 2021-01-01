@@ -653,7 +653,7 @@ void WebhookActor::handle(td::unique_ptr<td::HttpQuery> response) {
 void WebhookActor::start_up() {
   max_loaded_updates_ = max_connections_ * 2;
 
-  next_ip_address_resolve_time_ = last_success_time_ = td::Time::now();
+  next_ip_address_resolve_time_ = last_success_time_ = td::Time::now() - 3600;
   active_new_connection_flood_.add_limit(1, 10 * max_connections_);
   active_new_connection_flood_.add_limit(5, 20 * max_connections_);
 
