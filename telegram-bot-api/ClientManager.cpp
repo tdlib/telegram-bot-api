@@ -145,15 +145,17 @@ void ClientManager::user_login(PromisedQueryPtr query) {
   auto id = clients_.create(ClientInfo{BotStatActor(stat_.actor_id(&stat_)), user_token, td::ActorOwn<Client>()});
   auto *client_info = clients_.get(id);
   auto stat_actor = client_info->stat_.actor_id(&client_info->stat_);
-  auto client_id = td::create_actor<Client>(
-      PSLICE() << "Client/" << user_token, actor_shared(this, id), user_token, td::to_string(phone_number),
-      true, query->is_test_dc(), get_tqueue_id(token_hash, query->is_test_dc()), parameters_, std::move(stat_actor));
+  auto client_id = td::create_actor<Client>(PSLICE() << "Client/" << user_token, actor_shared(this, id), user_token,
+                                            true, query->is_test_dc(), get_tqueue_id(token_hash, query->is_test_dc()),
+                                            parameters_, std::move(stat_actor));
 
   clients_.get(id)->client_ = std::move(client_id);
   auto id_it = token_to_id_.end();
   std::tie(id_it, std::ignore) = token_to_id_.emplace(user_token, id);
+  send_closure(client_info->client_, &Client::send, std::move(query));  // will send 429 if the client is already closed
+
   parameters_->shared_data_->user_db_->set(user_token_with_dc, "1");
-  answer_query(td::VirtuallyJsonableString(user_token), std::move(query));
+  // answer_query(td::VirtuallyJsonableString(user_token), std::move(query));
 }
 
 bool ClientManager::check_flood_limits(PromisedQueryPtr &query, bool is_user_login) {
