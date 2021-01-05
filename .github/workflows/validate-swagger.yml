@@ -10,4 +10,4 @@ jobs:
       id: validate
       uses: mbowman100/swagger-validator-action@2.0
       with:
-        files: docs/tdlight-api-openapi.yaml
+        files: tdlight-api-openapi.yaml
