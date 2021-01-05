@@ -1,0 +1,46 @@
+name: Generate and Deploy Swagger Docs on Github Pages
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - tdlight-api-openapi.yaml
+      
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Get latest swagger version
+        id: swagger-ui
+        run: |
+          echo ::set-output name=release_tag::$(curl -sL https://api.github.com/repos/swagger-api/swagger-ui/releases/latest | jq -r ".tag_name")
+      - name: Generate Docs
+        env: 
+          RELEASE_TAG: ${{ steps.swagger-ui.outputs.release_tag }}
+          SWAGGER_YAML: "tdlight-api-openapi.yaml"
+          TITLE: "tdlight Telegram bot API docs"
+        run: |
+          mkdir docs
+          cp -r icons/ docs/icons/
+          cp tdlight-api-openapi.yaml docs/tdlight-api-openapi.yaml
+          cd docs
+          # Download the release
+          curl -sL -o $RELEASE_TAG https://api.github.com/repos/swagger-api/swagger-ui/tarball/$RELEASE_TAG
+          # Extract the dist directory
+          tar -xzf $RELEASE_TAG --strip-components=1 $(tar -tzf $RELEASE_TAG | head -1 | cut -f1 -d"/")/dist
+          rm $RELEASE_TAG
+          # Move index.html
+          mv dist/index.html .
+          # Fix references in index.html
+          sed -i "s|https://petstore.swagger.io/v2/swagger.json|$SWAGGER_YAML|g" index.html
+          sed -i "s|href=\"./|href=\"dist/|g" index.html
+          sed -i "s|src=\"./|src=\"dist/|g" index.html
+          sed -i "s|dist/favicon|icons/favicon|g" index.html
+          sed -i "s|<title>.*</title>|<title>$TITLE</title>|g" index.html
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
