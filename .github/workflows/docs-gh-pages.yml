@@ -5,7 +5,7 @@ on:
     branches:
       - master
     paths:
-      - tdlight-api-openapi.yml
+      - tdlight-api-openapi.yaml
       
 jobs:
   docs:
