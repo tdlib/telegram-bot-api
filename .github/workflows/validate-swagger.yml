@@ -1,4 +1,4 @@
-name: Validate API swagger documentation
+name: Documentation
 on: [push, pull_request]
 jobs:
   validate:
