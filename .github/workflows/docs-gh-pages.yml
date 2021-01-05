@@ -3,7 +3,7 @@ name: Generate and Deploy Swagger Docs on Github Pages
 on:
   push:
     branches:
-      - main
+      - master
       
 jobs:
   docs:
