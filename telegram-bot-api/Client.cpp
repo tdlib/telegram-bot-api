@@ -1620,6 +1620,9 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
   if (message_->media_album_id != 0) {
     object("media_group_id", td::to_string(message_->media_album_id));
   }
+  if (message_->message_thread_id != 0) {
+    object("message_thread_id", td::to_string(message_->message_thread_id));
+  }
   switch (message_->content->get_id()) {
     case td_api::messageText::ID: {
       auto message_text = static_cast<const td_api::messageText *>(message_->content.get());

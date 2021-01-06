@@ -725,6 +725,7 @@ class Client : public WebhookActor::Callback {
     td::string initial_sender_name;
     td::string author_signature;
     int64 reply_to_message_id = 0;
+    int64 message_thread_id = 0;
     int64 media_album_id = 0;
     int32 via_bot_user_id = 0;
     object_ptr<td_api::MessageContent> content;
