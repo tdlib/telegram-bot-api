@@ -9053,6 +9053,9 @@ components:
         media_group_id:
           description: '*Optional*. The unique identifier of a media message group this message belongs to'
           type: string
+        message_thread_id:
+          description: '*Optional*. The unique identifier of a thread this message belongs to'
+          type: string
         author_signature:
           description: '*Optional*. Signature of the post author for messages in channels, or the custom title of an anonymous group administrator'
           type: string
