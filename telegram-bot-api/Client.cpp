@@ -9925,6 +9925,7 @@ Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message,
   message_info->edit_date = message->edit_date_;
   message_info->media_album_id = message->media_album_id_;
   message_info->via_bot_user_id = message->via_bot_user_id_;
+  message_info->message_thread_id = message->message_thread_id_;
 
   CHECK(message->sender_ != nullptr);
   switch (message->sender_->get_id()) {
