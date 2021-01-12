@@ -1,5 +1,5 @@
 # TDLight Telegram Bot API
-Documentation -> https://tdlightbotapidocs.mchv.eu/
+The official documentation is [here](https://tdlight-team.github.io/tdlight-telegram-bot-api/).
 
 TDLight Telegram Bot API is a fork of the official Telegram Bot API, focused on memory footprint and performance.
 
