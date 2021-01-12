@@ -6,6 +6,7 @@ on:
       - master
     paths:
       - tdlight-api-openapi.yaml
+  workflow_dispatch:
       
 jobs:
   docs:
@@ -25,6 +26,7 @@ jobs:
           mkdir docs
           cp -r icons/ docs/icons/
           cp tdlight-api-openapi.yaml docs/tdlight-api-openapi.yaml
+          cp build.html docs/build.html
           cd docs
           # Download the release
           curl -sL -o $RELEASE_TAG https://api.github.com/repos/swagger-api/swagger-ui/tarball/$RELEASE_TAG

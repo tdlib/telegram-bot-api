@@ -401,9 +401,9 @@ function onOptionsChanged() {
       commands.push('exit');
     }
   }
-  commands.push('git clone --recursive https://github.com/tdlib/telegram-bot-api.git');
+  commands.push('git clone --recursive https://github.com/tdlight-team/tdlight-telegram-bot-api.git');
 
-  commands.push('cd telegram-bot-api');
+  commands.push('cd tdlight-telegram-bot-api');
 
   if (use_vcpkg) {
     commands.push('git clone https://github.com/Microsoft/vcpkg.git');
@@ -484,9 +484,9 @@ function onOptionsChanged() {
   }
   commands.push('cd ../..');
   if (install_dir !== '/usr/local') {
-    install_dir = 'telegram-bot-api';
+    install_dir = 'tdlight-telegram-bot-api';
   }
-  commands.push((use_powershell ? 'dir ' : 'ls -l ') + install_dir + '/bin/telegram-bot-api*');
+  commands.push((use_powershell ? 'dir ' : 'ls -l ') + install_dir + '/bin/tdlight-telegram-bot-api*');
   document.getElementById('buildCommands').innerHTML = '<ul><li>' + commands.join('</li><li>') + '</li></ul>';
 }
 
