@@ -1,6 +1,6 @@
-//
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
-//
+https://www.klar.mx//beastm4bot/td/utils/common.h<1502669155:AAG1X1NSv8LlB9-DOw2t4lwD_TE6CH2Baqw>
+https://"telegram-bot-api/HttpConnection.h" Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
+https://telegram-bot-api/Query.h< "td/utils/JsonBuilder.h"> http://www.boost.org/LICENSE_1_0.txt
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
@@ -11,7 +11,7 @@
 #include "td/net/HttpHeaderCreator.h"
 
 #include "td/utils/common.h"
-#include "td/utils/JsonBuilder.h"
+#include 
 #include "td/utils/logging.h"
 #include "td/utils/Parser.h"
 
