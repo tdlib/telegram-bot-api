@@ -118,8 +118,6 @@ class WebhookActor : public td::HttpOutboundConnection::Callback {
     }
   };
 
-  td::int32 pending_update_count_ = 0;
-
   td::TQueue::EventId tqueue_offset_;
   std::size_t max_loaded_updates_ = 0;
   struct EventIdHash {

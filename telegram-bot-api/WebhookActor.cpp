@@ -253,7 +253,7 @@ void WebhookActor::on_socket_ready_async(td::Result<td::SocketFd> r_fd, td::int6
 }
 
 void WebhookActor::create_new_connections() {
-  size_t need_connections = queues_.size();
+  size_t need_connections = queue_updates_.size();
   if (need_connections > static_cast<size_t>(max_connections_)) {
     need_connections = max_connections_;
   }
@@ -394,7 +394,6 @@ void WebhookActor::load_updates() {
     dest.expires_at_ = update.expires_at;
     dest.queue_id_ = update.extra;
     tqueue_offset_ = update.id.next().move_as_ok();
-    pending_update_count_++;
 
     if (dest.queue_id_ == 0) {
       dest.queue_id_ = unique_queue_id_++;
@@ -490,7 +489,6 @@ void WebhookActor::on_update_error(td::TQueue::EventId event_id, td::Slice error
   queues_.emplace(update.wakeup_at_, update.queue_id_);
   VLOG(webhook) << "Delay update " << event_id << " for " << (update.wakeup_at_ - now) << " seconds because of "
                 << error << " after " << update.fail_count_ << " fails";
-  pending_update_count_++;
 }
 
 td::Status WebhookActor::send_update() {
@@ -499,7 +497,7 @@ td::Status WebhookActor::send_update() {
   }
 
   if (queues_.empty()) {
-    return td::Status::Error("No updates");
+    return td::Status::Error("No pending updates");
   }
   auto it = queues_.begin();
   if (it->wakeup_at > td::Time::now()) {
@@ -531,7 +529,6 @@ td::Status WebhookActor::send_update() {
   }
 
   auto &connection = *Connection::from_list_node(ready_connections_.get());
-  pending_update_count_--;
   connection.event_id_ = update.id_;
 
   VLOG(webhook) << "Send update " << update.id_ << " from queue " << queue_id << " into connection " << connection.id_
@@ -545,11 +542,9 @@ td::Status WebhookActor::send_update() {
 }
 
 void WebhookActor::send_updates() {
-  VLOG(webhook) << "Have " << pending_update_count_ << " pending updates to send";
-  while (pending_update_count_ > 0) {
-    if (send_update().is_error()) {
-      return;
-    }
+  VLOG(webhook) << "Have " << (queues_.size() + update_map_.size() - queue_updates_.size()) << " pending updates in "
+                << queues_.size() << " queues to send";
+  while (send_update().is_ok()) {
   }
 }
 
