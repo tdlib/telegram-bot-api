@@ -79,7 +79,7 @@ class WebhookActor : public td::HttpOutboundConnection::Callback {
   td::string cert_path_;
   std::shared_ptr<const ClientParameters> parameters_;
 
-  double last_error_date_ = 0;
+  double last_error_time_ = 0;
   td::string last_error_message_ = "<none>";
 
   bool fix_ip_address_ = false;

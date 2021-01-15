@@ -922,8 +922,8 @@ class Client : public WebhookActor::Callback {
 
   int32 previous_get_updates_offset_ = -1;
   double previous_get_updates_start_time_ = 0;
-  double previous_get_updates_finish_date_ = 0;
   double previous_get_updates_finish_time_ = 0;
+  double next_get_updates_conflict_time_ = 0;
 
   td::uint64 webhook_generation_ = 1;
 

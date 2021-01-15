@@ -21,7 +21,6 @@
 #include "td/utils/logging.h"
 #include "td/utils/misc.h"
 #include "td/utils/PathView.h"
-#include "td/utils/port/Clocks.h"
 #include "td/utils/port/path.h"
 #include "td/utils/port/Stat.h"
 #include "td/utils/Random.h"
@@ -3242,7 +3241,7 @@ void Client::start_up() {
   next_set_webhook_logging_time_ = start_time_;
   next_webhook_is_not_modified_warning_time_ = start_time_;
   previous_get_updates_start_time_ = start_time_ - 100;
-  previous_get_updates_finish_time_ = start_time_ - 100;
+  next_get_updates_conflict_time_ = start_time_ - 100;
 
   sticker_set_names_[GREAT_MINDS_SET_ID] = GREAT_MINDS_SET_NAME.str();
 
@@ -7592,9 +7591,9 @@ void Client::abort_long_poll(bool from_set_webhook) {
 
 void Client::fail_query_conflict(Slice message, PromisedQueryPtr &&query) {
   auto now = td::Time::now_cached();
-  if (now >= previous_get_updates_finish_time_) {
+  if (now >= next_get_updates_conflict_time_) {
     fail_query(409, message, std::move(query));
-    previous_get_updates_finish_time_ = now + 3.0;
+    next_get_updates_conflict_time_ = now + 3.0;
   } else {
     td::create_actor<td::SleepActor>(
         "FailQueryConflictSleepActor", 3.0,
@@ -7686,7 +7685,8 @@ void Client::do_get_updates(int32 offset, int32 limit, int32 timeout, PromisedQu
   }
   if (need_warning) {
     LOG(WARNING) << "Found " << updates.size() << " updates out of " << total_size << " + " << updates.size()
-                 << " after last getUpdates call at " << previous_get_updates_finish_date_;
+                 << " after last getUpdates call " << (td::Time::now() - previous_get_updates_finish_time_)
+                 << " seconds ago";
   } else {
     LOG(DEBUG) << "Found " << updates.size() << " updates out of " << total_size << " from " << from;
   }
@@ -7702,7 +7702,7 @@ void Client::do_get_updates(int32 offset, int32 limit, int32 timeout, PromisedQu
     long_poll_slot_.set_timeout_at(long_poll_hard_timeout_);
     return;
   }
-  previous_get_updates_finish_date_ = td::Clocks::system();  // local time to output it to the log
+  previous_get_updates_finish_time_ = td::Time::now();
   next_bot_updates_warning_time_ = td::Time::now() + BOT_UPDATES_WARNING_DELAY;
   if (total_size == updates.size() && was_bot_updates_warning_) {
     send_request(make_object<td_api::setBotUpdatesStatus>(0, ""), std::make_unique<TdOnOkCallback>());

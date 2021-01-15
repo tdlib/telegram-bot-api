@@ -8,8 +8,6 @@
 
 #include "telegram-bot-api/ClientParameters.h"
 
-#include "td/db/TQueue.h"
-
 #include "td/net/GetHostByNameActor.h"
 #include "td/net/HttpHeaderCreator.h"
 #include "td/net/HttpProxy.h"
@@ -26,7 +24,6 @@
 #include "td/utils/JsonBuilder.h"
 #include "td/utils/logging.h"
 #include "td/utils/misc.h"
-#include "td/utils/port/Clocks.h"
 #include "td/utils/port/IPAddress.h"
 #include "td/utils/port/SocketFd.h"
 #include "td/utils/Random.h"
@@ -419,9 +416,10 @@ void WebhookActor::load_updates() {
     }
   }
   if (need_warning) {
-    LOG(WARNING) << "Loaded " << updates.size() << " updates out of " << total_size << ". Have total of "
-                 << update_map_.size() << " loaded in " << queues_.size() << " queues after last error \""
-                 << last_error_message_ << "\" at " << last_error_date_;
+    LOG(WARNING) << "Loaded " << updates.size() << " updates out of " << total_size << ". Have " << update_map_.size()
+                 << " updates loaded in " << queue_updates_.size() << " queues after last error \""
+                 << last_error_message_ << "\" " << (last_error_time_ == 0 ? -1 : td::Time::now() - last_error_time_)
+                 << " seconds ago";
   }
 
   if (updates.size() == total_size && last_update_was_successful_) {
@@ -741,7 +739,7 @@ void WebhookActor::on_connection_error(td::Status error) {
 void WebhookActor::on_webhook_error(td::Slice error) {
   if (was_checked_) {
     send_closure(callback_, &Callback::webhook_error, td::Status::Error(error));
-    last_error_date_ = td::Clocks::system();  // local time to output it to the log
+    last_error_time_ = td::Time::now();
     last_error_message_ = error.str();
   }
 }
