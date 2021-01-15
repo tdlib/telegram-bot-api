@@ -70,7 +70,7 @@ void ClientManager::send(PromisedQueryPtr query) {
   }
   auto r_user_id = td::to_integer_safe<td::int64>(query->token().substr(0, token.find(':')));
   if (r_user_id.is_error() || r_user_id.ok() < 0 || !token_range_(r_user_id.ok())) {
-    return fail_query(401, "Unauthorized: unallowed token specified", std::move(query));
+    return fail_query(421, "Misdirected Request: unallowed token specified", std::move(query));
   }
 
   if (query->is_test_dc()) {
