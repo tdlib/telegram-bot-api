@@ -31,7 +31,7 @@ void HttpConnection::handle(td::unique_ptr<td::HttpQuery> http_query,
   bool is_login = false;
   bool is_user = false;
   if (url_path_parser.try_skip("/bot")) {
-  } else if (url_path_parser.try_skip("/userlogin")) {
+  } else if (url_path_parser.try_skip("/userlogin") || url_path_parser.try_skip("/userLogin")) {
     is_user = true;
     is_login = true;
   } else if (url_path_parser.try_skip("/user")) {
