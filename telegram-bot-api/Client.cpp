@@ -6575,7 +6575,7 @@ void Client::on_cmd(PromisedQueryPtr query) {
     } else if (query->method() == "registeruser" && parameters_->allow_users_registration_) {
       return process_register_user_query(query);
     } else {
-      return fail_query(404, "Not Found: login not yet completed", std::move(query));
+      return fail_query(404, "Not Found: method not found or login not yet completed", std::move(query));
     }
   }
 
