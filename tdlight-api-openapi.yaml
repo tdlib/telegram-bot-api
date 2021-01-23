@@ -45,7 +45,7 @@ tags:
   - name: modified
     description: These methods are modified in the tdlight-bot-api
 paths:
-  /userlogin:
+  /userLogin:
     post:
       tags:
         - added
@@ -55,7 +55,7 @@ paths:
 
         Use this method to receive the authorization token to log in as user.
 
-        Note: You don't have your token yet, so the domain is just {base_url}/userlogin
+        Note: You don't have your token yet, so the domain is just {base_url}/userLogin
 
         Returns an `AuthorizationState` with the user token on success.
       requestBody:
