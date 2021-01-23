@@ -3670,7 +3670,11 @@ std::size_t Client::get_pending_update_count() const {
 
 ServerBotInfo Client::get_bot_info() const {
   ServerBotInfo res;
-  res.id_ = bot_token_id_;
+  if (is_user_) {
+    res.id_ = td::to_string(my_id_);
+  } else {
+    res.id_ = bot_token_id_;
+  }
   res.token_ = bot_token_;
   auto user_info = get_user_info(my_id_);
   if (user_info != nullptr) {
@@ -6571,7 +6575,7 @@ void Client::on_cmd(PromisedQueryPtr query) {
     } else if (query->method() == "registeruser" && parameters_->allow_users_registration_) {
       return process_register_user_query(query);
     } else {
-      return fail_query(404, "Not Found: method not found", std::move(query));
+      return fail_query(404, "Not Found: method not found or login not yet completed", std::move(query));
     }
   }
 
