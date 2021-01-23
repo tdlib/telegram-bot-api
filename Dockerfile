@@ -19,7 +19,7 @@ FROM alpine:3.12
 ENV TELEGRAM_WORK_DIR="/var/lib/telegram-bot-api" \
     TELEGRAM_TEMP_DIR="/tmp/telegram-bot-api"
 
-RUN apk add --no-cache --update openssl libstdc++ curl
+RUN apk add --no-cache --update openssl libstdc++
 COPY --from=build /usr/src/telegram-bot-api/bin/telegram-bot-api /usr/local/bin/telegram-bot-api
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN addgroup -g 101 -S telegram-bot-api \
@@ -30,6 +30,6 @@ RUN addgroup -g 101 -S telegram-bot-api \
  && chmod 700 ${TELEGRAM_TEMP_DIR}
 USER telegram-bot-api:telegram-bot-api
 
-HEALTHCHECK CMD curl -f http://localhost:8082/ || exit 1
+HEALTHCHECK CMD nc -z localhost 8081
 EXPOSE 8081/tcp 8082/tcp
 ENTRYPOINT ["/docker-entrypoint.sh"]
