@@ -27,6 +27,7 @@ class HttpStatConnection : public td::HttpInboundConnection::Callback {
   void wakeup() override;
 
  private:
+  bool as_json_;
   td::FutureActor<td::BufferSlice> result_;
   td::ActorId<ClientManager> client_manager_;
   td::ActorOwn<td::HttpInboundConnection> connection_;

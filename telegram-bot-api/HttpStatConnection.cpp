@@ -23,7 +23,9 @@ void HttpStatConnection::handle(td::unique_ptr<td::HttpQuery> http_query,
   init_promise_future(&promise, &future);
   future.set_event(td::EventCreator::yield(actor_id()));
   LOG(DEBUG) << "SEND";
-  send_closure(client_manager_, &ClientManager::get_stats, std::move(promise), http_query->get_args());
+  td::Parser url_path_parser(http_query->url_path_);
+  as_json_ = url_path_parser.try_skip("/json");
+  send_closure(client_manager_, &ClientManager::get_stats, std::move(promise), http_query->get_args(), as_json_);
   result_ = std::move(future);
 }
 
@@ -37,7 +39,11 @@ void HttpStatConnection::wakeup() {
   td::HttpHeaderCreator hc;
   hc.init_status_line(200);
   hc.set_keep_alive();
-  hc.set_content_type("text/plain");
+  if (as_json_) {
+    hc.set_content_type("application/json");
+  } else {
+    hc.set_content_type("text/plain");
+  }
   hc.set_content_size(content.size());
 
   auto r_header = hc.finish();

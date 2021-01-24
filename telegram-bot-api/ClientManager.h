@@ -46,7 +46,7 @@ class ClientManager final : public td::Actor {
 
   bool check_flood_limits(PromisedQueryPtr &query, bool is_user_login=false);
 
-  void get_stats(td::PromiseActor<td::BufferSlice> promise, td::vector<std::pair<td::string, td::string>> args);
+  void get_stats(td::PromiseActor<td::BufferSlice> promise, td::vector<std::pair<td::string, td::string>> args, bool as_json);
 
   void close(td::Promise<td::Unit> &&promise);
 

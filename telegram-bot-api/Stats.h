@@ -61,10 +61,11 @@ class ServerCpuStat {
   td::string get_description() const;
 
   td::vector<StatItem> as_vector(double now);
+  td::vector<td::vector<StatItem>> as_json_ready_vector(double now);
 
- private:
   static constexpr std::size_t SIZE = 4;
   static constexpr const char *DESCR[SIZE] = {"inf", "5sec", "1min", "1hour"};
+ private:
   static constexpr int DURATIONS[SIZE] = {0, 5, 60, 60 * 60};
 
   std::mutex mutex_;
@@ -179,15 +180,16 @@ class BotStatActor final : public td::Actor {
   }
 
   td::vector<StatItem> as_vector(double now);
+  td::vector<ServerBotStat> as_json_ready_vector(double now);
   td::string get_description() const;
+  td::vector<td::string> get_jsonable_description() const;
 
   bool is_active(double now) const;
 
- private:
   static constexpr std::size_t SIZE = 4;
-  static constexpr const char *DESCR[SIZE] = {"inf", "5sec", "1min", "1hour"};
   static constexpr int DURATIONS[SIZE] = {0, 5, 60, 60 * 60};
-
+  static constexpr const char *DESCR[SIZE] = {"inf", "5sec", "1min", "1hour"};
+ private:
   td::TimedStat<ServerBotStat> stat_[SIZE];
   td::ActorId<BotStatActor> parent_;
   double last_activity_timestamp_ = -1e9;

@@ -72,6 +72,21 @@ td::vector<StatItem> ServerCpuStat::as_vector(double now) {
   return res;
 }
 
+td::vector<td::vector<StatItem>> ServerCpuStat::as_json_ready_vector(double now) {
+  std::lock_guard<std::mutex> guard(mutex_);
+
+  td::vector<td::vector<StatItem>> res;
+  auto first = stat_[0].get_stat(now).as_vector();
+  auto first_size = first.size();
+  res.push_back(first);
+  for (std::size_t i = 1; i < SIZE; i++) {
+    auto other = stat_[i].get_stat(now).as_vector();
+    CHECK(other.size() == first_size);
+    res.push_back(other);
+  }
+  return res;
+}
+
 constexpr int ServerCpuStat::DURATIONS[SIZE];
 constexpr const char *ServerCpuStat::DESCR[SIZE];
 
@@ -140,6 +155,18 @@ td::vector<StatItem> BotStatActor::as_vector(double now) {
   return res;
 }
 
+td::vector<ServerBotStat> BotStatActor::as_json_ready_vector(double now) {
+  std::pair<ServerBotStat, double> first_sd = stat_[0].stat_duration(now);
+  first_sd.first.normalize(first_sd.second);
+  td::vector<ServerBotStat> res;
+  for (auto & single_stat : stat_) {
+    auto next_sd = single_stat.stat_duration(now);
+    next_sd.first.normalize(next_sd.second);
+    res.push_back(next_sd.first);
+  }
+  return res;
+}
+
 td::string BotStatActor::get_description() const {
   td::string res = "DURATION";
   for (auto &descr : DESCR) {
@@ -148,6 +175,15 @@ td::string BotStatActor::get_description() const {
   }
   return res;
 }
+td::vector<td::string> BotStatActor::get_jsonable_description() const {
+  td::vector<td::string> strings;
+  strings.push_back("duration");
+  for (auto &descr : DESCR) {
+    strings.push_back(descr);
+  }
+  return strings;
+}
+
 
 bool BotStatActor::is_active(double now) const {
   return last_activity_timestamp_ > now - 86400;
