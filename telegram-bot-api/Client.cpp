@@ -8714,21 +8714,23 @@ void Client::delete_message(int64 chat_id, int64 message_id, bool only_from_cach
   auto it = messages_.find({chat_id, message_id});
   if (it == messages_.end()) {
     if (yet_unsent_messages_.count({chat_id, message_id}) > 0) {
-      // yet unsent message is deleted, possible only if we are trying to write to inaccessible supergroup
+      // yet unsent message is deleted, possible only if we are trying to write to inaccessible supergroup or
+      // sent message was deleted before added to the chat
       auto chat_info = get_chat(chat_id);
       CHECK(chat_info != nullptr);
 
-      Status error;
-      if (chat_info->type != ChatInfo::Type::Supergroup) {
-        LOG(ERROR) << "Yet unsent message " << message_id << " is deleted in the chat " << chat_id;
-        error = Status::Error(403, "Forbidden: bot is not a member of the chat");
-      } else {
+      Status error =
+          Status::Error(500, "Internal Server Error: sent message was immediately deleted and can't be returned");
+      if (chat_info->type == ChatInfo::Type::Supergroup) {
         auto supergroup_info = get_supergroup_info(chat_info->supergroup_id);
         CHECK(supergroup_info != nullptr);
-        if (supergroup_info->is_supergroup) {
-          error = Status::Error(403, "Forbidden: bot is not a member of the supergroup chat");
-        } else {
-          error = Status::Error(403, "Forbidden: bot is not a member of the channel chat");
+        if (supergroup_info->status->get_id() == td_api::chatMemberStatusBanned::ID ||
+            supergroup_info->status->get_id() == td_api::chatMemberStatusLeft::ID) {
+          if (supergroup_info->is_supergroup) {
+            error = Status::Error(403, "Forbidden: bot is not a member of the supergroup chat");
+          } else {
+            error = Status::Error(403, "Forbidden: bot is not a member of the channel chat");
+          }
         }
       }
 
