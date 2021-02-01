@@ -78,6 +78,7 @@ class Client : public WebhookActor::Callback {
 
   static constexpr int LOGGING_OUT_ERROR_CODE = 401;
   static constexpr Slice LOGGING_OUT_ERROR_DESCRIPTION = "Unauthorized";
+  static constexpr Slice API_ID_INVALID_ERROR_DESCRIPTION = "Unauthorized: invalid api-id/api-hash";
 
   static constexpr int CLOSING_ERROR_CODE = 500;
   static constexpr Slice CLOSING_ERROR_DESCRIPTION = "Internal Server Error: restart";
@@ -267,7 +268,8 @@ class Client : public WebhookActor::Callback {
   void on_result(td::uint64 id, object_ptr<td_api::Object> result);
 
   void on_update_authorization_state();
-  void log_out();
+  void log_out(bool is_api_id_invalid);
+  Slice get_logging_out_error_description() const;
   void on_closed();
   void finish_closing();
 
@@ -787,6 +789,7 @@ class Client : public WebhookActor::Callback {
   bool was_authorized_ = false;
   bool closing_ = false;
   bool logging_out_ = false;
+  bool is_api_id_invalid_ = false;
   bool need_close_ = false;
   bool clear_tqueue_ = false;
 

@@ -2295,7 +2295,7 @@ class Client::TdOnAuthorizationCallback : public TdQueryCallback {
       }
 
       LOG(WARNING) << "Logging out due to " << td::oneline(to_string(error));
-      client_->log_out();
+      client_->log_out(error->message_ == "API_ID_INVALID");
     } else if (was_ready) {
       client_->on_update_authorization_state();
     }
@@ -3199,7 +3199,8 @@ void Client::close() {
   }
 }
 
-void Client::log_out() {
+void Client::log_out(bool is_api_id_invalid) {
+  is_api_id_invalid_ |= is_api_id_invalid;
   if (!td_client_.empty() && !logging_out_ && !closing_) {
     do_send_request(make_object<td_api::logOut>(), std::make_unique<TdOnOkCallback>());
   }
@@ -3763,7 +3764,8 @@ void Client::get_chat_member(int64 chat_id, int32 user_id, PromisedQueryPtr quer
 
 void Client::send_request(object_ptr<td_api::Function> &&f, std::unique_ptr<TdQueryCallback> handler) {
   if (logging_out_) {
-    return handler->on_result(make_object<td_api::error>(LOGGING_OUT_ERROR_CODE, LOGGING_OUT_ERROR_DESCRIPTION.str()));
+    return handler->on_result(
+        make_object<td_api::error>(LOGGING_OUT_ERROR_CODE, get_logging_out_error_description().str()));
   }
   if (closing_) {
     return handler->on_result(make_object<td_api::error>(CLOSING_ERROR_CODE, CLOSING_ERROR_DESCRIPTION.str()));
@@ -3801,7 +3803,7 @@ void Client::on_update_file(object_ptr<td_api::file> file) {
     // also includes all 5xx and 429 errors
     auto error = Status::Error(400, "Bad Request: wrong file_id or the file is temporarily unavailable");
     if (logging_out_) {
-      error = Status::Error(LOGGING_OUT_ERROR_CODE, LOGGING_OUT_ERROR_DESCRIPTION);
+      error = Status::Error(LOGGING_OUT_ERROR_CODE, get_logging_out_error_description());
     }
     if (closing_) {
       error = Status::Error(CLOSING_ERROR_CODE, CLOSING_ERROR_DESCRIPTION);
@@ -3886,7 +3888,7 @@ void Client::on_update_authorization_state() {
     case td_api::authorizationStateClosed::ID:
       return on_closed();
     default:
-      return log_out();  // just in case
+      return log_out(false);  // just in case
   }
 }
 
@@ -4185,6 +4187,10 @@ void Client::on_result(td::uint64 id, object_ptr<td_api::Object> result) {
   handlers_.erase(id);
 }
 
+td::Slice Client::get_logging_out_error_description() const {
+  return is_api_id_invalid_ ? API_ID_INVALID_ERROR_DESCRIPTION : LOGGING_OUT_ERROR_DESCRIPTION;
+}
+
 void Client::on_closed() {
   LOG(WARNING) << "Closed";
   CHECK(logging_out_ || closing_);
@@ -4192,7 +4198,7 @@ void Client::on_closed() {
   td_client_.reset();
 
   int http_status_code = logging_out_ ? LOGGING_OUT_ERROR_CODE : CLOSING_ERROR_CODE;
-  Slice description = logging_out_ ? LOGGING_OUT_ERROR_DESCRIPTION : CLOSING_ERROR_DESCRIPTION;
+  Slice description = logging_out_ ? get_logging_out_error_description() : CLOSING_ERROR_DESCRIPTION;
   if (webhook_set_query_) {
     fail_query(http_status_code, description, std::move(webhook_set_query_));
   }
@@ -5932,10 +5938,10 @@ void Client::on_cmd(PromisedQueryPtr query) {
   }
 
   if (logging_out_) {
-    return fail_query(LOGGING_OUT_ERROR_CODE, LOGGING_OUT_ERROR_DESCRIPTION, std::move(query));
+    return fail_query(LOGGING_OUT_ERROR_CODE, get_logging_out_error_description(), std::move(query));
   }
   if (closing_) {
-    return fail_query(CLOSING_ERROR_CODE, LOGGING_OUT_ERROR_DESCRIPTION, std::move(query));
+    return fail_query(CLOSING_ERROR_CODE, CLOSING_ERROR_DESCRIPTION, std::move(query));
   }
   CHECK(was_authorized_);
 
@@ -9085,6 +9091,7 @@ constexpr Client::Slice Client::MASK_POINTS[MASK_POINTS_SIZE];
 
 constexpr int Client::LOGGING_OUT_ERROR_CODE;
 constexpr Client::Slice Client::LOGGING_OUT_ERROR_DESCRIPTION;
+constexpr Client::Slice Client::API_ID_INVALID_ERROR_DESCRIPTION;
 
 constexpr int Client::CLOSING_ERROR_CODE;
 constexpr Client::Slice Client::CLOSING_ERROR_DESCRIPTION;
