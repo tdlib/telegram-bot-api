@@ -435,6 +435,7 @@ void WebhookActor::load_updates() {
 
 void WebhookActor::drop_event(td::TQueue::EventId event_id) {
   auto it = update_map_.find(event_id);
+  CHECK(it != update_map_.end());
   auto queue_id = it->second.queue_id_;
   update_map_.erase(it);
 
@@ -456,7 +457,12 @@ void WebhookActor::drop_event(td::TQueue::EventId event_id) {
 void WebhookActor::on_update_ok(td::TQueue::EventId event_id) {
   last_update_was_successful_ = true;
   last_success_time_ = td::Time::now();
-  VLOG(webhook) << "Receive ok for update " << event_id;
+
+  auto it = update_map_.find(event_id);
+  CHECK(it != update_map_.end());
+
+  VLOG(webhook) << "Receive ok for update " << event_id << " in " << (last_success_time_ - it->second.last_send_time_)
+                << " seconds";
 
   drop_event(event_id);
 }
@@ -466,6 +472,7 @@ void WebhookActor::on_update_error(td::TQueue::EventId event_id, td::Slice error
   double now = td::Time::now();
 
   auto it = update_map_.find(event_id);
+  CHECK(it != update_map_.end());
 
   const int MAX_RETRY_AFTER = 3600;
   retry_after = td::clamp(retry_after, 0, MAX_RETRY_AFTER);
@@ -486,7 +493,8 @@ void WebhookActor::on_update_error(td::TQueue::EventId event_id, td::Slice error
   update.fail_count_++;
   queues_.emplace(update.wakeup_at_, update.queue_id_);
   VLOG(webhook) << "Delay update " << event_id << " for " << (update.wakeup_at_ - now) << " seconds because of "
-                << error << " after " << update.fail_count_ << " fails";
+                << error << " after " << update.fail_count_ << " fails received in " << (now - update.last_send_time_)
+                << " seconds";
 }
 
 td::Status WebhookActor::send_update() {
@@ -498,7 +506,8 @@ td::Status WebhookActor::send_update() {
     return td::Status::Error("No pending updates");
   }
   auto it = queues_.begin();
-  if (it->wakeup_at > td::Time::now()) {
+  auto now = td::Time::now();
+  if (it->wakeup_at > now) {
     relax_wakeup_at(it->wakeup_at, "send_update");
     return td::Status::Error("No ready updates");
   }
@@ -508,6 +517,7 @@ td::Status WebhookActor::send_update() {
   auto event_id = queue_updates_[queue_id].event_ids.front();
 
   auto &update = update_map_[event_id];
+  update.last_send_time_ = now;
 
   auto body = td::json_encode<td::BufferSlice>(JsonUpdate(update.id_.value(), update.json_));
 

@@ -94,10 +94,11 @@ class WebhookActor : public td::HttpOutboundConnection::Callback {
     td::TQueue::EventId id_;
     td::string json_;
     td::int32 expires_at_ = 0;
+    double last_send_time_ = 0;
     double wakeup_at_ = 0;
     int delay_ = 0;
     int fail_count_ = 0;
-    td::int64 queue_id_{0};
+    td::int64 queue_id_ = 0;
   };
 
   struct QueueUpdates {
