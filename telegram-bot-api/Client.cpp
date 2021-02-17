@@ -7083,13 +7083,14 @@ td::Status Client::process_ban_chat_member_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
   TRY_RESULT(user_id, get_user_id(query.get()));
   int32 until_date = get_integer_arg(query.get(), "until_date", 0);
+  auto revoke_messages = to_bool(query->arg("revoke_messages"));
 
   check_chat(chat_id, AccessRights::Write, std::move(query),
-             [this, user_id, until_date](int64 chat_id, PromisedQueryPtr query) {
+             [this, user_id, until_date, revoke_messages](int64 chat_id, PromisedQueryPtr query) {
                check_user_no_fail(
-                   user_id, std::move(query), [this, chat_id, user_id, until_date](PromisedQueryPtr query) {
-                     send_request(make_object<td_api::setChatMemberStatus>(
-                                      chat_id, user_id, make_object<td_api::chatMemberStatusBanned>(until_date)),
+                   user_id, std::move(query),
+                   [this, chat_id, user_id, until_date, revoke_messages](PromisedQueryPtr query) {
+                     send_request(make_object<td_api::banChatMember>(chat_id, user_id, until_date, revoke_messages),
                                   std::make_unique<TdOnOkQueryCallback>(std::move(query)));
                    });
              });
