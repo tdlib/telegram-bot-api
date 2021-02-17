@@ -1412,6 +1412,19 @@ class Client::JsonInviteVoiceChatParticipants : public Jsonable {
   const Client *client_;
 };
 
+class Client::JsonChatSetTtl : public Jsonable {
+ public:
+  explicit JsonChatSetTtl(const td_api::messageChatSetTtl *chat_set_ttl) : chat_set_ttl_(chat_set_ttl) {
+  }
+  void store(JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("message_auto_delete_time", chat_set_ttl_->ttl_);
+  }
+
+ private:
+  const td_api::messageChatSetTtl *chat_set_ttl_;
+};
+
 class Client::JsonCallbackGame : public Jsonable {
  public:
   void store(JsonValueScope *scope) const {
@@ -1752,8 +1765,11 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
       break;
     case td_api::messageScreenshotTaken::ID:
       break;
-    case td_api::messageChatSetTtl::ID:
+    case td_api::messageChatSetTtl::ID: {
+      auto content = static_cast<const td_api::messageChatSetTtl *>(message_->content.get());
+      object("message_auto_delete_time_changed", JsonChatSetTtl(content));
       break;
+    }
     case td_api::messageUnsupported::ID:
       break;
     case td_api::messageContactRegistered::ID:
