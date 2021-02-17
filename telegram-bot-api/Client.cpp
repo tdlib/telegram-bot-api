@@ -3150,9 +3150,9 @@ class Client::TdOnGetSupergroupMembersCountCallback : public TdQueryCallback {
   PromisedQueryPtr query_;
 };
 
-class Client::TdOnGenerateChatInviteLinkCallback : public TdQueryCallback {
+class Client::TdOnReplacePermanentChatInviteLinkCallback : public TdQueryCallback {
  public:
-  explicit TdOnGenerateChatInviteLinkCallback(PromisedQueryPtr query) : query_(std::move(query)) {
+  explicit TdOnReplacePermanentChatInviteLinkCallback(PromisedQueryPtr query) : query_(std::move(query)) {
   }
 
   void on_result(object_ptr<td_api::Object> result) override {
@@ -4131,8 +4131,11 @@ void Client::on_update(object_ptr<td_api::Object> result) {
     case td_api::updateBasicGroupFullInfo::ID: {
       auto update = move_object_as<td_api::updateBasicGroupFullInfo>(result);
       auto group_id = update->basic_group_id_;
-      set_group_description(group_id, std::move(update->basic_group_full_info_->description_));
-      set_group_invite_link(group_id, std::move(update->basic_group_full_info_->invite_link_));
+      auto full_info = std::move(update->basic_group_full_info_);
+      set_group_description(group_id, std::move(full_info->description_));
+      set_group_invite_link(group_id, full_info->invite_link_ != nullptr
+                                          ? std::move(full_info->invite_link_->invite_link_)
+                                          : td::string());
       break;
     }
     case td_api::updateSupergroup::ID: {
@@ -4143,13 +4146,16 @@ void Client::on_update(object_ptr<td_api::Object> result) {
     case td_api::updateSupergroupFullInfo::ID: {
       auto update = move_object_as<td_api::updateSupergroupFullInfo>(result);
       auto supergroup_id = update->supergroup_id_;
-      set_supergroup_description(supergroup_id, std::move(update->supergroup_full_info_->description_));
-      set_supergroup_invite_link(supergroup_id, std::move(update->supergroup_full_info_->invite_link_));
-      set_supergroup_sticker_set_id(supergroup_id, update->supergroup_full_info_->sticker_set_id_);
-      set_supergroup_can_set_sticker_set(supergroup_id, update->supergroup_full_info_->can_set_sticker_set_);
-      set_supergroup_slow_mode_delay(supergroup_id, update->supergroup_full_info_->slow_mode_delay_);
-      set_supergroup_linked_chat_id(supergroup_id, update->supergroup_full_info_->linked_chat_id_);
-      set_supergroup_location(supergroup_id, std::move(update->supergroup_full_info_->location_));
+      auto full_info = std::move(update->supergroup_full_info_);
+      set_supergroup_description(supergroup_id, std::move(full_info->description_));
+      set_supergroup_invite_link(supergroup_id, full_info->invite_link_ != nullptr
+                                                    ? std::move(full_info->invite_link_->invite_link_)
+                                                    : td::string());
+      set_supergroup_sticker_set_id(supergroup_id, full_info->sticker_set_id_);
+      set_supergroup_can_set_sticker_set(supergroup_id, full_info->can_set_sticker_set_);
+      set_supergroup_slow_mode_delay(supergroup_id, full_info->slow_mode_delay_);
+      set_supergroup_linked_chat_id(supergroup_id, full_info->linked_chat_id_);
+      set_supergroup_location(supergroup_id, std::move(full_info->location_));
       break;
     }
     case td_api::updateOption::ID: {
@@ -6741,8 +6747,8 @@ td::Status Client::process_export_chat_invite_link_query(PromisedQueryPtr &query
   auto chat_id = query->arg("chat_id");
 
   check_chat(chat_id, AccessRights::Write, std::move(query), [this](int64 chat_id, PromisedQueryPtr query) {
-    send_request(make_object<td_api::generateChatInviteLink>(chat_id),
-                 std::make_unique<TdOnGenerateChatInviteLinkCallback>(std::move(query)));
+    send_request(make_object<td_api::replacePermanentChatInviteLink>(chat_id),
+                 std::make_unique<TdOnReplacePermanentChatInviteLinkCallback>(std::move(query)));
   });
   return Status::OK();
 }
@@ -8441,6 +8447,11 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     return true;
   }
 
+  if (message->forward_info_ != nullptr &&
+      message->forward_info_->origin_->get_id() == td_api::messageForwardOriginMessageImport::ID) {
+    return true;
+  }
+
   switch (message->content_->get_id()) {
     case td_api::messagePhoto::ID: {
       auto message_photo = static_cast<const td_api::messagePhoto *>(message->content_.get());
@@ -8947,6 +8958,11 @@ Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message,
         message_info->initial_chat_id = forward_info->chat_id_;
         message_info->initial_message_id = forward_info->message_id_;
         message_info->initial_author_signature = forward_info->author_signature_;
+        break;
+      }
+      case td_api::messageForwardOriginMessageImport::ID: {
+        auto forward_info = move_object_as<td_api::messageForwardOriginMessageImport>(origin);
+        message_info->initial_sender_name = forward_info->sender_name_;
         break;
       }
       default:

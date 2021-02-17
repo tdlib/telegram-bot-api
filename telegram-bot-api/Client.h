@@ -175,7 +175,7 @@ class Client : public WebhookActor::Callback {
   class TdOnGetGroupMembersCallback;
   class TdOnGetSupergroupMembersCallback;
   class TdOnGetSupergroupMembersCountCallback;
-  class TdOnGenerateChatInviteLinkCallback;
+  class TdOnReplacePermanentChatInviteLinkCallback;
   class TdOnGetGameHighScoresCallback;
   class TdOnReturnFileCallback;
   class TdOnReturnStickerSetCallback;
