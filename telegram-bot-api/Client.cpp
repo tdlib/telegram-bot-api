@@ -1369,6 +1369,49 @@ class Client::JsonProximityAlertTriggered : public Jsonable {
   const Client *client_;
 };
 
+class Client::JsonVoiceChatStarted : public Jsonable {
+ public:
+  explicit JsonVoiceChatStarted(const td_api::messageVoiceChatStarted *voice_chat_started)
+      : voice_chat_started_(voice_chat_started) {
+  }
+  void store(JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+  }
+
+ private:
+  const td_api::messageVoiceChatStarted *voice_chat_started_;
+};
+
+class Client::JsonVoiceChatEnded : public Jsonable {
+ public:
+  explicit JsonVoiceChatEnded(const td_api::messageVoiceChatEnded *voice_chat_ended)
+      : voice_chat_ended_(voice_chat_ended) {
+  }
+  void store(JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("duration", voice_chat_ended_->duration_);
+  }
+
+ private:
+  const td_api::messageVoiceChatEnded *voice_chat_ended_;
+};
+
+class Client::JsonInviteVoiceChatParticipants : public Jsonable {
+ public:
+  JsonInviteVoiceChatParticipants(const td_api::messageInviteVoiceChatParticipants *invite_voice_chat_participants,
+                                  const Client *client)
+      : invite_voice_chat_participants_(invite_voice_chat_participants), client_(client) {
+  }
+  void store(JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("users", JsonUsers(invite_voice_chat_participants_->user_ids_, client_));
+  }
+
+ private:
+  const td_api::messageInviteVoiceChatParticipants *invite_voice_chat_participants_;
+  const Client *client_;
+};
+
 class Client::JsonCallbackGame : public Jsonable {
  public:
   void store(JsonValueScope *scope) const {
@@ -1746,12 +1789,21 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
       object("proximity_alert_triggered", JsonProximityAlertTriggered(content, client_));
       break;
     }
-    case td_api::messageVoiceChatStarted::ID:
+    case td_api::messageVoiceChatStarted::ID: {
+      auto content = static_cast<const td_api::messageVoiceChatStarted *>(message_->content.get());
+      object("voice_chat_started", JsonVoiceChatStarted(content));
       break;
-    case td_api::messageVoiceChatEnded::ID:
+    }
+    case td_api::messageVoiceChatEnded::ID: {
+      auto content = static_cast<const td_api::messageVoiceChatEnded *>(message_->content.get());
+      object("voice_chat_ended", JsonVoiceChatEnded(content));
       break;
-    case td_api::messageInviteVoiceChatParticipants::ID:
+    }
+    case td_api::messageInviteVoiceChatParticipants::ID: {
+      auto content = static_cast<const td_api::messageInviteVoiceChatParticipants *>(message_->content.get());
+      object("voice_chat_members_invited", JsonInviteVoiceChatParticipants(content, client_));
       break;
+    }
     default:
       UNREACHABLE();
   }
@@ -8335,6 +8387,9 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       case td_api::messageChatDeleteMember::ID:
       case td_api::messagePinMessage::ID:
       case td_api::messageProximityAlertTriggered::ID:
+      case td_api::messageVoiceChatStarted::ID:
+      case td_api::messageVoiceChatEnded::ID:
+      case td_api::messageInviteVoiceChatParticipants::ID:
         // don't skip
         break;
       default:
@@ -8438,12 +8493,6 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageExpiredVideo::ID:
       return true;
     case td_api::messageCustomServiceAction::ID:
-      return true;
-    case td_api::messageVoiceChatStarted::ID:
-      return true;
-    case td_api::messageVoiceChatEnded::ID:
-      return true;
-    case td_api::messageInviteVoiceChatParticipants::ID:
       return true;
     default:
       break;
