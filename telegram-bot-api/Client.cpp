@@ -4160,7 +4160,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
     }
     case td_api::updateOption::ID: {
       auto update = move_object_as<td_api::updateOption>(result);
-      auto name = update->name_;
+      const td::string &name = update->name_;
       if (name == "my_id") {
         if (update->value_->get_id() == td_api::optionValueEmpty::ID) {
           CHECK(logging_out_);
@@ -7821,10 +7821,10 @@ void Client::long_poll_wakeup(bool force_flag) {
 
 void Client::add_user(std::unordered_map<int32, UserInfo> &users, object_ptr<td_api::user> &&user) {
   auto user_info = &users[user->id_];
-  user_info->first_name = user->first_name_;
-  user_info->last_name = user->last_name_;
-  user_info->username = user->username_;
-  user_info->language_code = user->language_code_;
+  user_info->first_name = std::move(user->first_name_);
+  user_info->last_name = std::move(user->last_name_);
+  user_info->username = std::move(user->username_);
+  user_info->language_code = std::move(user->language_code_);
 
   user_info->have_access = user->have_access_;
 
@@ -8946,24 +8946,24 @@ Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message,
       case td_api::messageForwardOriginChat::ID: {
         auto forward_info = move_object_as<td_api::messageForwardOriginChat>(origin);
         message_info->initial_sender_chat_id = forward_info->sender_chat_id_;
-        message_info->initial_author_signature = forward_info->author_signature_;
+        message_info->initial_author_signature = std::move(forward_info->author_signature_);
         break;
       }
       case td_api::messageForwardOriginHiddenUser::ID: {
         auto forward_info = move_object_as<td_api::messageForwardOriginHiddenUser>(origin);
-        message_info->initial_sender_name = forward_info->sender_name_;
+        message_info->initial_sender_name = std::move(forward_info->sender_name_);
         break;
       }
       case td_api::messageForwardOriginChannel::ID: {
         auto forward_info = move_object_as<td_api::messageForwardOriginChannel>(origin);
         message_info->initial_chat_id = forward_info->chat_id_;
         message_info->initial_message_id = forward_info->message_id_;
-        message_info->initial_author_signature = forward_info->author_signature_;
+        message_info->initial_author_signature = std::move(forward_info->author_signature_);
         break;
       }
       case td_api::messageForwardOriginMessageImport::ID: {
         auto forward_info = move_object_as<td_api::messageForwardOriginMessageImport>(origin);
-        message_info->initial_sender_name = forward_info->sender_name_;
+        message_info->initial_sender_name = std::move(forward_info->sender_name_);
         break;
       }
       default:
