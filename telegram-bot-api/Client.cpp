@@ -9076,7 +9076,7 @@ void Client::json_store_file(td::JsonObjectScope &object, const td_api::file *fi
       }
     } else {
       Slice relative_path = td::PathView::relative(file->local_->path_, absolute_dir_, true);
-      if (!relative_path.empty() && file->local_->downloaded_size_ <= MAX_DOWNLOAD_FILE_SIZE) {
+      if (!relative_path.empty() && (parameters_->local_mode_ || parameters_->no_file_limit_ || file->local_->downloaded_size_ <= MAX_DOWNLOAD_FILE_SIZE)) {
         object("file_path", relative_path);
       }
     }
