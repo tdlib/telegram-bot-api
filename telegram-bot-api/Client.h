@@ -595,6 +595,7 @@ class Client : public WebhookActor::Callback {
     enum class Type { Private, Group, Supergroup, Unknown };
     Type type = Type::Unknown;
     td::string title;
+    int32 message_auto_delete_time = 0;
     object_ptr<td_api::chatPhotoInfo> photo;
     object_ptr<td_api::chatPermissions> permissions;
     union {
