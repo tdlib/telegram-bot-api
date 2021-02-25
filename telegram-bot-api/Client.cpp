@@ -2180,6 +2180,7 @@ class Client::JsonChatMember : public Jsonable {
       case td_api::chatMemberStatusAdministrator::ID: {
         auto administrator = static_cast<const td_api::chatMemberStatusAdministrator *>(member_->status_.get());
         object("can_be_edited", td::JsonBool(administrator->can_be_edited_));
+        object("can_manage_chat", td::JsonBool(administrator->can_manage_chat_));
         object("can_change_info", td::JsonBool(administrator->can_change_info_));
         if (chat_type_ == Client::ChatType::Channel) {
           object("can_post_messages", td::JsonBool(administrator->can_post_messages_));
@@ -7117,6 +7118,7 @@ td::Status Client::process_leave_chat_query(PromisedQueryPtr &query) {
 td::Status Client::process_promote_chat_member_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
   TRY_RESULT(user_id, get_user_id(query.get()));
+  auto can_manage_chat = to_bool(query->arg("can_manage_chat"));
   auto can_change_info = to_bool(query->arg("can_change_info"));
   auto can_post_messages = to_bool(query->arg("can_post_messages"));
   auto can_edit_messages = to_bool(query->arg("can_edit_messages"));
@@ -7128,7 +7130,7 @@ td::Status Client::process_promote_chat_member_query(PromisedQueryPtr &query) {
   auto can_manage_voice_chats = to_bool(query->arg("can_manage_voice_chats"));
   auto is_anonymous = to_bool(query->arg("is_anonymous"));
   auto status = make_object<td_api::chatMemberStatusAdministrator>(
-      td::string(), true, false, can_change_info, can_post_messages, can_edit_messages, can_delete_messages,
+      td::string(), true, can_manage_chat, can_change_info, can_post_messages, can_edit_messages, can_delete_messages,
       can_invite_users, can_restrict_members, can_pin_messages, can_promote_members, can_manage_voice_chats,
       is_anonymous);
   check_chat(chat_id, AccessRights::Write, std::move(query),
