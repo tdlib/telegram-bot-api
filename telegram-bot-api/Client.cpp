@@ -212,6 +212,7 @@ bool Client::init_methods() {
   methods_.emplace("answershippingquery", &Client::process_answer_shipping_query_query);
   methods_.emplace("answerprecheckoutquery", &Client::process_answer_pre_checkout_query_query);
   methods_.emplace("exportchatinvitelink", &Client::process_export_chat_invite_link_query);
+  methods_.emplace("createchatinvitelink", &Client::process_create_chat_invite_link_query);
   methods_.emplace("getchat", &Client::process_get_chat_query);
   methods_.emplace("setchatphoto", &Client::process_set_chat_photo_query);
   methods_.emplace("deletechatphoto", &Client::process_delete_chat_photo_query);
@@ -523,6 +524,30 @@ class Client::JsonChatLocation : public Jsonable {
 
  private:
   const td_api::chatLocation *chat_location_;
+};
+
+class Client::JsonChatInviteLink : public Jsonable {
+ public:
+  JsonChatInviteLink(const td_api::chatInviteLink *chat_invite_link, const Client *client)
+      : chat_invite_link_(chat_invite_link), client_(client) {
+  }
+  void store(JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("invite_link", chat_invite_link_->invite_link_);
+    object("creator", JsonUser(chat_invite_link_->creator_user_id_, client_));
+    if (chat_invite_link_->expire_date_ != 0) {
+      object("expire_date", chat_invite_link_->expire_date_);
+    }
+    if (chat_invite_link_->member_limit_ != 0) {
+      object("member_limit", chat_invite_link_->member_limit_);
+    }
+    object("is_primary", td::JsonBool(chat_invite_link_->is_primary_));
+    object("is_revoked", td::JsonBool(chat_invite_link_->is_revoked_));
+  }
+
+ private:
+  const td_api::chatInviteLink *chat_invite_link_;
+  const Client *client_;
 };
 
 class Client::JsonMessage : public Jsonable {
@@ -3150,9 +3175,9 @@ class Client::TdOnGetSupergroupMembersCountCallback : public TdQueryCallback {
   PromisedQueryPtr query_;
 };
 
-class Client::TdOnReplacePermanentChatInviteLinkCallback : public TdQueryCallback {
+class Client::TdOnReplacePrimaryChatInviteLinkCallback : public TdQueryCallback {
  public:
-  explicit TdOnReplacePermanentChatInviteLinkCallback(PromisedQueryPtr query) : query_(std::move(query)) {
+  explicit TdOnReplacePrimaryChatInviteLinkCallback(PromisedQueryPtr query) : query_(std::move(query)) {
   }
 
   void on_result(object_ptr<td_api::Object> result) override {
@@ -3166,6 +3191,27 @@ class Client::TdOnReplacePermanentChatInviteLinkCallback : public TdQueryCallbac
   }
 
  private:
+  PromisedQueryPtr query_;
+};
+
+class Client::TdOnGetChatInviteLinkCallback : public TdQueryCallback {
+ public:
+  TdOnGetChatInviteLinkCallback(const Client *client, PromisedQueryPtr query)
+      : client_(client), query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) override {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::chatInviteLink::ID);
+    auto invite_link = move_object_as<td_api::chatInviteLink>(result);
+    return answer_query(JsonChatInviteLink(invite_link.get(), client_), std::move(query_));
+  }
+
+ private:
+  const Client *client_;
   PromisedQueryPtr query_;
 };
 
@@ -6747,9 +6793,22 @@ td::Status Client::process_export_chat_invite_link_query(PromisedQueryPtr &query
   auto chat_id = query->arg("chat_id");
 
   check_chat(chat_id, AccessRights::Write, std::move(query), [this](int64 chat_id, PromisedQueryPtr query) {
-    send_request(make_object<td_api::replacePermanentChatInviteLink>(chat_id),
-                 std::make_unique<TdOnReplacePermanentChatInviteLinkCallback>(std::move(query)));
+    send_request(make_object<td_api::replacePrimaryChatInviteLink>(chat_id),
+                 std::make_unique<TdOnReplacePrimaryChatInviteLinkCallback>(std::move(query)));
   });
+  return Status::OK();
+}
+
+td::Status Client::process_create_chat_invite_link_query(PromisedQueryPtr &query) {
+  auto chat_id = query->arg("chat_id");
+  auto expire_date = get_integer_arg(query.get(), "expire_date", 0, 0);
+  auto member_limit = get_integer_arg(query.get(), "member_limit", 0, 0, 100000);
+
+  check_chat(chat_id, AccessRights::Write, std::move(query),
+             [this, expire_date, member_limit](int64 chat_id, PromisedQueryPtr query) {
+               send_request(make_object<td_api::createChatInviteLink>(chat_id, expire_date, member_limit),
+                            std::make_unique<TdOnGetChatInviteLinkCallback>(this, std::move(query)));
+             });
   return Status::OK();
 }
 
@@ -7019,8 +7078,9 @@ td::Status Client::process_promote_chat_member_query(PromisedQueryPtr &query) {
   auto can_manage_voice_chats = to_bool(query->arg("can_manage_voice_chats"));
   auto is_anonymous = to_bool(query->arg("is_anonymous"));
   auto status = make_object<td_api::chatMemberStatusAdministrator>(
-      td::string(), true, can_change_info, can_post_messages, can_edit_messages, can_delete_messages, can_invite_users,
-      can_restrict_members, can_pin_messages, can_promote_members, can_manage_voice_chats, is_anonymous);
+      td::string(), true, false, can_change_info, can_post_messages, can_edit_messages, can_delete_messages,
+      can_invite_users, can_restrict_members, can_pin_messages, can_promote_members, can_manage_voice_chats,
+      is_anonymous);
   check_chat(chat_id, AccessRights::Write, std::move(query),
              [this, user_id, status = std::move(status)](int64 chat_id, PromisedQueryPtr query) mutable {
                auto chat_info = get_chat(chat_id);
@@ -8444,7 +8504,7 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     }
   }
 
-  if (message->ttl_ > 0) {
+  if (message->ttl_ > 0 && message->ttl_expires_in_ == 0) {
     return true;
   }
 

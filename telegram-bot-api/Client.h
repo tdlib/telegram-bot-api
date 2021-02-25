@@ -91,6 +91,7 @@ class Client : public WebhookActor::Callback {
   class JsonChatPermissions;
   class JsonChatPhotoInfo;
   class JsonChatLocation;
+  class JsonChatInviteLink;
   class JsonChat;
   class JsonMessageSender;
   class JsonAnimation;
@@ -175,7 +176,8 @@ class Client : public WebhookActor::Callback {
   class TdOnGetGroupMembersCallback;
   class TdOnGetSupergroupMembersCallback;
   class TdOnGetSupergroupMembersCountCallback;
-  class TdOnReplacePermanentChatInviteLinkCallback;
+  class TdOnReplacePrimaryChatInviteLinkCallback;
+  class TdOnGetChatInviteLinkCallback;
   class TdOnGetGameHighScoresCallback;
   class TdOnReturnFileCallback;
   class TdOnReturnStickerSetCallback;
@@ -443,6 +445,7 @@ class Client : public WebhookActor::Callback {
   Status process_answer_shipping_query_query(PromisedQueryPtr &query);
   Status process_answer_pre_checkout_query_query(PromisedQueryPtr &query);
   Status process_export_chat_invite_link_query(PromisedQueryPtr &query);
+  Status process_create_chat_invite_link_query(PromisedQueryPtr &query);
   Status process_get_chat_query(PromisedQueryPtr &query);
   Status process_set_chat_photo_query(PromisedQueryPtr &query);
   Status process_delete_chat_photo_query(PromisedQueryPtr &query);
