@@ -3723,9 +3723,14 @@ void Client::check_message(Slice chat_id_str, int64 message_id, bool allow_empty
   check_chat(chat_id_str, access_rights, std::move(query),
              [this, message_id, allow_empty, message_type, on_success = std::move(on_success)](
                  int64 chat_id, PromisedQueryPtr query) mutable {
-               if (!have_message_access(chat_id)) {
+               if ((message_id <= 0 && !allow_empty) || !have_message_access(chat_id)) {
                  return fail_query_with_error(std::move(query), 400, "MESSAGE_NOT_FOUND",
                                               PSLICE() << message_type << " not found");
+               }
+
+               if (message_id <= 0) {
+                 CHECK(allow_empty);
+                 return on_success(chat_id, 0, std::move(query));
                }
 
                send_request(make_object<td_api::getMessage>(chat_id, message_id),
@@ -6460,7 +6465,7 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
                        std::make_unique<TdOnSendMessageAlbumCallback>(this, std::move(query)));
         };
         check_message(chat_id, reply_to_message_id, reply_to_message_id <= 0 || allow_sending_without_reply,
-                      AccessRights::Write, "reply message", std::move(query), std::move(on_success));
+                      AccessRights::Write, "replied message", std::move(query), std::move(on_success));
       });
   return Status::OK();
 }
@@ -7696,7 +7701,7 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
                        std::make_unique<TdOnSendMessageCallback>(this, std::move(query)));
         };
         check_message(chat_id, reply_to_message_id, reply_to_message_id <= 0 || allow_sending_without_reply,
-                      AccessRights::Write, "reply message", std::move(query), std::move(on_success));
+                      AccessRights::Write, "replied message", std::move(query), std::move(on_success));
       });
 }
 
