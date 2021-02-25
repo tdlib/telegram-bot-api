@@ -213,6 +213,7 @@ bool Client::init_methods() {
   methods_.emplace("answerprecheckoutquery", &Client::process_answer_pre_checkout_query_query);
   methods_.emplace("exportchatinvitelink", &Client::process_export_chat_invite_link_query);
   methods_.emplace("createchatinvitelink", &Client::process_create_chat_invite_link_query);
+  methods_.emplace("editchatinvitelink", &Client::process_edit_chat_invite_link_query);
   methods_.emplace("getchat", &Client::process_get_chat_query);
   methods_.emplace("setchatphoto", &Client::process_set_chat_photo_query);
   methods_.emplace("deletechatphoto", &Client::process_delete_chat_photo_query);
@@ -6825,6 +6826,21 @@ td::Status Client::process_create_chat_invite_link_query(PromisedQueryPtr &query
                send_request(make_object<td_api::createChatInviteLink>(chat_id, expire_date, member_limit),
                             std::make_unique<TdOnGetChatInviteLinkCallback>(this, std::move(query)));
              });
+  return Status::OK();
+}
+
+td::Status Client::process_edit_chat_invite_link_query(PromisedQueryPtr &query) {
+  auto chat_id = query->arg("chat_id");
+  auto invite_link = query->arg("invite_link");
+  auto expire_date = get_integer_arg(query.get(), "expire_date", 0, 0);
+  auto member_limit = get_integer_arg(query.get(), "member_limit", 0, 0, 100000);
+
+  check_chat(
+      chat_id, AccessRights::Write, std::move(query),
+      [this, invite_link = invite_link.str(), expire_date, member_limit](int64 chat_id, PromisedQueryPtr query) {
+        send_request(make_object<td_api::editChatInviteLink>(chat_id, invite_link, expire_date, member_limit),
+                     std::make_unique<TdOnGetChatInviteLinkCallback>(this, std::move(query)));
+      });
   return Status::OK();
 }
 

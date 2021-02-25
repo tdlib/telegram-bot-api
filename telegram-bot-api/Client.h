@@ -446,6 +446,7 @@ class Client : public WebhookActor::Callback {
   Status process_answer_pre_checkout_query_query(PromisedQueryPtr &query);
   Status process_export_chat_invite_link_query(PromisedQueryPtr &query);
   Status process_create_chat_invite_link_query(PromisedQueryPtr &query);
+  Status process_edit_chat_invite_link_query(PromisedQueryPtr &query);
   Status process_get_chat_query(PromisedQueryPtr &query);
   Status process_set_chat_photo_query(PromisedQueryPtr &query);
   Status process_delete_chat_photo_query(PromisedQueryPtr &query);
