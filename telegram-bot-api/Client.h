@@ -136,6 +136,7 @@ class Client : public WebhookActor::Callback {
   class JsonChatPhotos;
   class JsonChatMember;
   class JsonChatMembers;
+  class JsonChatMemberUpdated;
   class JsonGameHighScore;
   class JsonAddress;
   class JsonOrderInfo;
@@ -750,6 +751,8 @@ class Client : public WebhookActor::Callback {
 
   void add_new_custom_query(object_ptr<td_api::updateNewCustomQuery> &&query);
 
+  void add_update_chat_member(object_ptr<td_api::updateChatMember> &&update);
+
   // append only before Size
   enum class UpdateType : int32 {
     Message,
@@ -765,6 +768,7 @@ class Client : public WebhookActor::Callback {
     PreCheckoutQuery,
     Poll,
     PollAnswer,
+    ChatMember,
     Size
   };
 
@@ -792,8 +796,8 @@ class Client : public WebhookActor::Callback {
 
   bool have_message_access(int64 chat_id) const;
 
-  // by default all 13 update types up to PollAnswer are allowed
-  static constexpr td::uint32 DEFAULT_ALLOWED_UPDATE_TYPES = ((1 << 13) - 1);
+  // by default all 14 update types up to ChatMember are allowed
+  static constexpr td::uint32 DEFAULT_ALLOWED_UPDATE_TYPES = ((1 << 14) - 1);
 
   object_ptr<td_api::AuthorizationState> authorization_state_;
   bool was_authorized_ = false;

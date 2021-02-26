@@ -2266,6 +2266,29 @@ class Client::JsonChatMembers : public Jsonable {
   const Client *client_;
 };
 
+class Client::JsonChatMemberUpdated : public Jsonable {
+ public:
+  JsonChatMemberUpdated(const td_api::updateChatMember *update, const Client *client)
+      : update_(update), client_(client) {
+  }
+  void store(JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("chat", JsonChat(update_->chat_id_, false, client_));
+    object("actor", JsonUser(update_->actor_user_id_, client_));
+    object("date", update_->date_);
+    auto chat_type = client_->get_chat_type(update_->chat_id_);
+    object("old_chat_member", JsonChatMember(update_->old_chat_member_.get(), chat_type, client_));
+    object("new_chat_member", JsonChatMember(update_->new_chat_member_.get(), chat_type, client_));
+    if (update_->invite_link_ != nullptr) {
+      object("invite_link", JsonChatInviteLink(update_->invite_link_.get(), client_));
+    }
+  }
+
+ private:
+  const td_api::updateChatMember *update_;
+  const Client *client_;
+};
+
 class Client::JsonGameHighScore : public Jsonable {
  public:
   JsonGameHighScore(const td_api::gameHighScore *score, const Client *client) : score_(score), client_(client) {
@@ -4312,6 +4335,9 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       break;
     case td_api::updateNewCustomQuery::ID:
       add_new_custom_query(move_object_as<td_api::updateNewCustomQuery>(result));
+      break;
+    case td_api::updateChatMember::ID:
+      add_update_chat_member(move_object_as<td_api::updateChatMember>(result));
       break;
     default:
       // we are not interested in this updates
@@ -8227,6 +8253,8 @@ Client::Slice Client::get_update_type_name(UpdateType update_type) {
       return Slice("poll");
     case UpdateType::PollAnswer:
       return Slice("poll_answer");
+    case UpdateType::ChatMember:
+      return Slice("chat_member");
     default:
       UNREACHABLE();
       return Slice();
@@ -8496,6 +8524,15 @@ void Client::add_new_custom_query(object_ptr<td_api::updateNewCustomQuery> &&que
   CHECK(query != nullptr);
   int32 timeout = query->timeout_ <= 0 ? 86400 : query->timeout_;
   add_update(UpdateType::CustomQuery, JsonCustomJson(query->data_), timeout, 0);
+}
+
+void Client::add_update_chat_member(object_ptr<td_api::updateChatMember> &&update) {
+  CHECK(update != nullptr);
+  auto left_time = update->date_ + 86400 - get_unix_time();
+  if (left_time > 0) {
+    auto webhook_queue_id = update->chat_id_ + (static_cast<int64>(5) << 33);
+    add_update(UpdateType::ChatMember, JsonChatMemberUpdated(update.get(), this), left_time, webhook_queue_id);
+  }
 }
 
 td::int32 Client::choose_added_member_id(const td_api::messageChatAddMembers *message_add_members) const {
