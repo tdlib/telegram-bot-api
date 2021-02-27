@@ -5579,16 +5579,23 @@ td::Result<td::vector<td_api::object_ptr<td_api::inputPassportElementError>>> Cl
   return std::move(errors);
 }
 
-td::Result<td_api::object_ptr<td_api::formattedText>> Client::get_caption(const Query *query) {
-  JsonValue entities;
-  auto r_value = json_decode(query->arg("caption_entities"));
-  if (r_value.is_ok()) {
-    entities = r_value.move_as_ok();
-  } else {
-    LOG(INFO) << "Can't parse JSON object: " << r_value.error();
+JsonValue Client::get_input_entities(const Query *query, Slice field_name) {
+  auto entities = query->arg(field_name);
+  if (!entities.empty()) {
+    auto r_value = json_decode(entities);
+    if (r_value.is_ok()) {
+      return r_value.move_as_ok();
+    }
+
+    LOG(INFO) << "Can't parse entities JSON object: " << r_value.error();
   }
 
-  return get_formatted_text(query->arg("caption").str(), query->arg("parse_mode").str(), std::move(entities));
+  return JsonValue();
+}
+
+td::Result<td_api::object_ptr<td_api::formattedText>> Client::get_caption(const Query *query) {
+  return get_formatted_text(query->arg("caption").str(), query->arg("parse_mode").str(),
+                            get_input_entities(query, "caption_entities"));
 }
 
 td::Result<td_api::object_ptr<td_api::TextEntityType>> Client::get_text_entity_type(td::JsonObject &object) {
@@ -5697,16 +5704,8 @@ td::Result<td_api::object_ptr<td_api::formattedText>> Client::get_formatted_text
 }
 
 td::Result<td_api::object_ptr<td_api::inputMessageText>> Client::get_input_message_text(const Query *query) {
-  JsonValue entities;
-  auto r_value = json_decode(query->arg("entities"));
-  if (r_value.is_ok()) {
-    entities = r_value.move_as_ok();
-  } else {
-    LOG(INFO) << "Can't parse JSON object: " << r_value.error();
-  }
-
   return get_input_message_text(query->arg("text").str(), to_bool(query->arg("disable_web_page_preview")),
-                                query->arg("parse_mode").str(), std::move(entities));
+                                query->arg("parse_mode").str(), get_input_entities(query, "entities"));
 }
 
 td::Result<td_api::object_ptr<td_api::inputMessageText>> Client::get_input_message_text(td::string text,
@@ -6401,15 +6400,9 @@ td::Status Client::process_send_poll_query(PromisedQueryPtr &query) {
   object_ptr<td_api::PollType> poll_type;
   auto type = query->arg("type");
   if (type == "quiz") {
-    JsonValue entities;
-    auto r_value = json_decode(query->arg("explanation_entities"));
-    if (r_value.is_ok()) {
-      entities = r_value.move_as_ok();
-    } else {
-      LOG(INFO) << "Can't parse JSON object: " << r_value.error();
-    }
-    TRY_RESULT(explanation, get_formatted_text(query->arg("explanation").str(),
-                                               query->arg("explanation_parse_mode").str(), std::move(entities)));
+    TRY_RESULT(explanation,
+               get_formatted_text(query->arg("explanation").str(), query->arg("explanation_parse_mode").str(),
+                                  get_input_entities(query.get(), "explanation_entities")));
 
     poll_type = make_object<td_api::pollTypeQuiz>(get_integer_arg(query.get(), "correct_option_id", -1),
                                                   std::move(explanation));

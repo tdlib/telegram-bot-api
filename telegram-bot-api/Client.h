@@ -351,6 +351,8 @@ class Client : public WebhookActor::Callback {
   static td::Result<td::vector<object_ptr<td_api::inputPassportElementError>>> get_passport_element_errors(
       const Query *query);
 
+  static td::JsonValue get_input_entities(const Query *query, Slice field_name);
+
   static td::Result<object_ptr<td_api::formattedText>> get_caption(const Query *query);
 
   static td::Result<object_ptr<td_api::TextEntityType>> get_text_entity_type(td::JsonObject &object);
