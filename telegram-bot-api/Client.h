@@ -768,6 +768,7 @@ class Client : public WebhookActor::Callback {
     PreCheckoutQuery,
     Poll,
     PollAnswer,
+    MyChatMember,
     ChatMember,
     Size
   };
@@ -796,8 +797,9 @@ class Client : public WebhookActor::Callback {
 
   bool have_message_access(int64 chat_id) const;
 
-  // by default all 14 update types up to ChatMember are allowed
-  static constexpr td::uint32 DEFAULT_ALLOWED_UPDATE_TYPES = ((1 << 14) - 1);
+  // by default ChatMember updates are disabled
+  static constexpr td::uint32 DEFAULT_ALLOWED_UPDATE_TYPES =
+      (1 << static_cast<int32>(UpdateType::Size)) - 1 - (1 << static_cast<int32>(UpdateType::ChatMember));
 
   object_ptr<td_api::AuthorizationState> authorization_state_;
   bool was_authorized_ = false;

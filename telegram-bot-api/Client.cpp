@@ -8254,6 +8254,8 @@ Client::Slice Client::get_update_type_name(UpdateType update_type) {
       return Slice("poll");
     case UpdateType::PollAnswer:
       return Slice("poll_answer");
+    case UpdateType::MyChatMember:
+      return Slice("my_chat_member");
     case UpdateType::ChatMember:
       return Slice("chat_member");
     default:
@@ -8531,8 +8533,10 @@ void Client::add_update_chat_member(object_ptr<td_api::updateChatMember> &&updat
   CHECK(update != nullptr);
   auto left_time = update->date_ + 86400 - get_unix_time();
   if (left_time > 0) {
-    auto webhook_queue_id = update->chat_id_ + (static_cast<int64>(5) << 33);
-    add_update(UpdateType::ChatMember, JsonChatMemberUpdated(update.get(), this), left_time, webhook_queue_id);
+    bool is_my = (update->old_chat_member_->user_id_ == my_id_);
+    auto webhook_queue_id = update->chat_id_ + (static_cast<int64>(is_my ? 5 : 6) << 33);
+    auto update_type = is_my ? UpdateType::MyChatMember : UpdateType::ChatMember;
+    add_update(update_type, JsonChatMemberUpdated(update.get(), this), left_time, webhook_queue_id);
   }
 }
 
