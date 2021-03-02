@@ -126,7 +126,9 @@ void Client::fail_query_with_error(PromisedQueryPtr query, int32 error_code, Sli
       break;
     case 500:
       prefix = Slice("Internal Server Error");
-      LOG(ERROR) << "Receive Internal Server Error: " << real_error_message;
+      if (real_error_message != Slice("Request aborted")) {
+        LOG(ERROR) << "Receive Internal Server Error: " << real_error_message;
+      }
       break;
     default:
       LOG(ERROR) << "Unsupported error " << real_error_code << ": " << real_error_message;
