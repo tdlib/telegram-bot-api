@@ -1800,7 +1800,7 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
       break;
     case td_api::messageChatSetTtl::ID: {
       auto content = static_cast<const td_api::messageChatSetTtl *>(message_->content.get());
-      object("message_auto_delete_time_changed", JsonChatSetTtl(content));
+      object("message_auto_delete_timer_changed", JsonChatSetTtl(content));
       break;
     }
     case td_api::messageUnsupported::ID:
@@ -1850,7 +1850,7 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
     }
     case td_api::messageInviteVoiceChatParticipants::ID: {
       auto content = static_cast<const td_api::messageInviteVoiceChatParticipants *>(message_->content.get());
-      object("voice_chat_members_invited", JsonInviteVoiceChatParticipants(content, client_));
+      object("voice_chat_participants_invited", JsonInviteVoiceChatParticipants(content, client_));
       break;
     }
     default:
