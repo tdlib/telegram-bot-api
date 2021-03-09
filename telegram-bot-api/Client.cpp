@@ -2277,7 +2277,7 @@ class Client::JsonChatMemberUpdated : public Jsonable {
   void store(JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("chat", JsonChat(update_->chat_id_, false, client_));
-    object("actor", JsonUser(update_->actor_user_id_, client_));
+    object("from", JsonUser(update_->actor_user_id_, client_));
     object("date", update_->date_);
     auto chat_type = client_->get_chat_type(update_->chat_id_);
     object("old_chat_member", JsonChatMember(update_->old_chat_member_.get(), chat_type, client_));
