@@ -3996,7 +3996,7 @@ void Client::on_update_authorization_state() {
       parameters->api_hash_ = parameters_->api_hash_;
       parameters->system_language_code_ = "en";
       parameters->device_model_ = "server";
-      parameters->application_version_ = "5.1";
+      parameters->application_version_ = parameters_->version_;
       parameters->enable_storage_optimizer_ = true;
       parameters->ignore_file_names_ = true;
 

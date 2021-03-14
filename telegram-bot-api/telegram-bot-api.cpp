@@ -134,6 +134,7 @@ int main(int argc, char *argv[]) {
   auto start_time = td::Time::now();
   auto shared_data = std::make_shared<SharedData>();
   auto parameters = std::make_unique<ClientParameters>();
+  parameters->version_ = "5.1";
   parameters->shared_data_ = shared_data;
   parameters->start_time_ = start_time;
   auto net_query_stats = td::create_net_query_stats();
@@ -399,7 +400,7 @@ int main(int argc, char *argv[]) {
 
   // LOG(WARNING) << "Bot API server with commit " << td::GitInfo::commit() << ' '
   //              << (td::GitInfo::is_dirty() ? "(dirty)" : "") << " started";
-  LOG(WARNING) << "Bot API server started";
+  LOG(WARNING) << "Bot API " << parameters->version_ << " server started";
 
   const int threads_n = 5;  // +3 for Td, one for slow HTTP connections and one for DNS resolving
   td::ConcurrentScheduler sched;
