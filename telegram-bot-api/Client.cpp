@@ -53,7 +53,7 @@ void Client::fail_query_with_error(PromisedQueryPtr query, int32 error_code, Sli
         return query->set_retry_after_error(r_retry_after.ok());
       }
     }
-    LOG(ERROR) << "Wrong error message: " << error_message;
+    LOG(ERROR) << "Wrong error message: " << error_message << " from " << *query;
     return fail_query(500, error_message, std::move(query));
   }
   int32 real_error_code = error_code;
@@ -109,8 +109,6 @@ void Client::fail_query_with_error(PromisedQueryPtr query, int32 error_code, Sli
     } else if (error_message == "MESSAGE_DELETE_FORBIDDEN") {
       error_code = 400;
       error_message = Slice("message can't be deleted");
-    } else if (error_message == "Requested data is inaccessible") {
-      LOG(ERROR) << "Receive 'Requested data is inaccessible' from " << *query;
     }
   }
   Slice prefix;
@@ -127,11 +125,11 @@ void Client::fail_query_with_error(PromisedQueryPtr query, int32 error_code, Sli
     case 500:
       prefix = Slice("Internal Server Error");
       if (real_error_message != Slice("Request aborted")) {
-        LOG(ERROR) << "Receive Internal Server Error: " << real_error_message;
+        LOG(ERROR) << "Receive Internal Server Error \"" << real_error_message << "\" from " << *query;
       }
       break;
     default:
-      LOG(ERROR) << "Unsupported error " << real_error_code << ": " << real_error_message;
+      LOG(ERROR) << "Unsupported error " << real_error_code << ": " << real_error_message << " from " << *query;
       return fail_query(400, PSLICE() << "Bad Request: " << error_message, std::move(query));
   }
 
@@ -140,7 +138,7 @@ void Client::fail_query_with_error(PromisedQueryPtr query, int32 error_code, Sli
   } else {
     td::string error_str = prefix.str();
     if (error_message.empty()) {
-      LOG(ERROR) << "Empty error message with code " << real_error_code;
+      LOG(ERROR) << "Empty error message with code " << real_error_code << " from " << *query;
     } else {
       error_str += ": ";
       if (error_message.size() >= 2u &&
