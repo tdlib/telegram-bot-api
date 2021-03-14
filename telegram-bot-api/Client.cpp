@@ -8003,6 +8003,9 @@ void Client::add_group(std::unordered_map<int32, GroupInfo> &groups, object_ptr<
   group_info->kicked = group->status_->get_id() == td_api::chatMemberStatusBanned::ID;
   group_info->is_active = group->is_active_;
   group_info->upgraded_to_supergroup_id = group->upgraded_to_supergroup_id_;
+  if (!group_info->left && !group_info->kicked && group_info->member_count == 0) {
+    group_info->member_count = 1;
+  }
 }
 
 const Client::GroupInfo *Client::get_group_info(int32 group_id) const {
