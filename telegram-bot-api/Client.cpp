@@ -2703,7 +2703,7 @@ class Client::TdOnAuthorizationQueryCallback : public TdQueryCallback {
       fail_query(401, "Unauthorized: Log in failed, logging out due to " + td::oneline(to_string(error)),
                  std::move(query_));
       LOG(WARNING) << "Logging out due to " << td::oneline(to_string(error));
-      client_->log_out();
+      client_->log_out(false);
     } else {
       if (client_->authorization_state_->get_id() == td_api::authorizationStateWaitRegistration::ID &&
           !client_->parameters_->allow_users_registration_) {
@@ -2711,7 +2711,7 @@ class Client::TdOnAuthorizationQueryCallback : public TdQueryCallback {
                    "Unauthorized: It is not allowed to register users with this api. You can enable it with the "
                    "command line option --allow-users-registration. Logging out",
                    std::move(query_));
-        return client_->log_out();
+        return client_->log_out(false);
       }
       if (send_token_) {
         answer_query(JsonAuthorizationState(client_->authorization_state_.get(), client_->bot_token_), std::move(query_));
