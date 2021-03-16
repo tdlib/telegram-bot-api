@@ -6649,7 +6649,7 @@ td::Result<td_api::object_ptr<td_api::ChatReportReason>> Client::get_report_reas
   } else if (reason == "violence") {
     result = make_object<td_api::chatReportReasonViolence>();
   } else {
-    result = make_object<td_api::chatReportReasonCustom>(reason.str());
+    result = make_object<td_api::chatReportReasonCustom>();
   }
   return std::move(result);
 }
@@ -8494,7 +8494,8 @@ td::Status Client::process_report_chat_query(PromisedQueryPtr &query) {
   check_chat(chat_id, AccessRights::Read, std::move(query),
              [this, reason = std::move(reason), message_ids = std::move(message_ids)](int64 chat_id,
                                                                                       PromisedQueryPtr query) mutable {
-               send_request(make_object<td_api::reportChat>(chat_id, std::move(reason), std::move(message_ids)),
+
+               send_request(make_object<td_api::reportChat>(chat_id, std::move(message_ids), std::move(reason), reason->get_id() == td_api::chatReportReasonCustom::ID ? query->arg("reason").str() : td::string()),
                             std::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
   return Status::OK();
