@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -7,8 +7,6 @@
 #include "telegram-bot-api/WebhookActor.h"
 
 #include "telegram-bot-api/ClientParameters.h"
-
-#include "td/db/TQueue.h"
 
 #include "td/net/GetHostByNameActor.h"
 #include "td/net/HttpHeaderCreator.h"
@@ -26,7 +24,6 @@
 #include "td/utils/JsonBuilder.h"
 #include "td/utils/logging.h"
 #include "td/utils/misc.h"
-#include "td/utils/port/Clocks.h"
 #include "td/utils/port/IPAddress.h"
 #include "td/utils/port/SocketFd.h"
 #include "td/utils/Random.h"
@@ -253,7 +250,7 @@ void WebhookActor::on_socket_ready_async(td::Result<td::SocketFd> r_fd, td::int6
 }
 
 void WebhookActor::create_new_connections() {
-  size_t need_connections = queues_.size();
+  size_t need_connections = queue_updates_.size();
   if (need_connections > static_cast<size_t>(max_connections_)) {
     need_connections = max_connections_;
   }
@@ -382,20 +379,18 @@ void WebhookActor::load_updates() {
   for (auto &update : updates) {
     VLOG(webhook) << "Load update " << update.id;
     if (update_map_.find(update.id) != update_map_.end()) {
-      LOG(ERROR) << "Receive duplicated event from tqueue " << update.id;
+      LOG(ERROR) << "Receive duplicated event " << update.id << " from tqueue";
       continue;
     }
     auto &dest = update_map_[update.id];
     dest.id_ = update.id;
     dest.json_ = update.data.str();
-    dest.state_ = Update::State::Begin;
     dest.delay_ = 1;
     dest.wakeup_at_ = now;
     CHECK(update.expires_at >= unix_time_now);
     dest.expires_at_ = update.expires_at;
     dest.queue_id_ = update.extra;
     tqueue_offset_ = update.id.next().move_as_ok();
-    begin_updates_n_++;
 
     if (dest.queue_id_ == 0) {
       dest.queue_id_ = unique_queue_id_++;
@@ -421,9 +416,10 @@ void WebhookActor::load_updates() {
     }
   }
   if (need_warning) {
-    LOG(WARNING) << "Loaded " << updates.size() << " updates out of " << total_size << ". Have total of "
-                 << update_map_.size() << " loaded in " << queues_.size() << " queues after last error \""
-                 << last_error_message_ << "\" at " << last_error_date_;
+    LOG(WARNING) << "Loaded " << updates.size() << " updates out of " << total_size << ". Have " << update_map_.size()
+                 << " updates loaded in " << queue_updates_.size() << " queues after last error \""
+                 << last_error_message_ << "\" " << (last_error_time_ == 0 ? -1 : td::Time::now() - last_error_time_)
+                 << " seconds ago";
   }
 
   if (updates.size() == total_size && last_update_was_successful_) {
@@ -439,6 +435,7 @@ void WebhookActor::load_updates() {
 
 void WebhookActor::drop_event(td::TQueue::EventId event_id) {
   auto it = update_map_.find(event_id);
+  CHECK(it != update_map_.end());
   auto queue_id = it->second.queue_id_;
   update_map_.erase(it);
 
@@ -460,7 +457,12 @@ void WebhookActor::drop_event(td::TQueue::EventId event_id) {
 void WebhookActor::on_update_ok(td::TQueue::EventId event_id) {
   last_update_was_successful_ = true;
   last_success_time_ = td::Time::now();
-  VLOG(webhook) << "Receive ok for update " << event_id;
+
+  auto it = update_map_.find(event_id);
+  CHECK(it != update_map_.end());
+
+  VLOG(webhook) << "Receive ok for update " << event_id << " in " << (last_success_time_ - it->second.last_send_time_)
+                << " seconds";
 
   drop_event(event_id);
 }
@@ -470,6 +472,7 @@ void WebhookActor::on_update_error(td::TQueue::EventId event_id, td::Slice error
   double now = td::Time::now();
 
   auto it = update_map_.find(event_id);
+  CHECK(it != update_map_.end());
 
   const int MAX_RETRY_AFTER = 3600;
   retry_after = td::clamp(retry_after, 0, MAX_RETRY_AFTER);
@@ -485,14 +488,13 @@ void WebhookActor::on_update_error(td::TQueue::EventId event_id, td::Slice error
     return;
   }
   auto &update = it->second;
-  update.state_ = Update::State::Begin;
   update.delay_ = next_delay;
   update.wakeup_at_ = now + next_effective_delay;
   update.fail_count_++;
   queues_.emplace(update.wakeup_at_, update.queue_id_);
   VLOG(webhook) << "Delay update " << event_id << " for " << (update.wakeup_at_ - now) << " seconds because of "
-                << error << " after " << update.fail_count_ << " fails";
-  begin_updates_n_++;
+                << error << " after " << update.fail_count_ << " fails received in " << (now - update.last_send_time_)
+                << " seconds";
 }
 
 td::Status WebhookActor::send_update() {
@@ -501,10 +503,11 @@ td::Status WebhookActor::send_update() {
   }
 
   if (queues_.empty()) {
-    return td::Status::Error("No updates");
+    return td::Status::Error("No pending updates");
   }
   auto it = queues_.begin();
-  if (it->wakeup_at > td::Time::now()) {
+  auto now = td::Time::now();
+  if (it->wakeup_at > now) {
     relax_wakeup_at(it->wakeup_at, "send_update");
     return td::Status::Error("No ready updates");
   }
@@ -514,6 +517,7 @@ td::Status WebhookActor::send_update() {
   auto event_id = queue_updates_[queue_id].event_ids.front();
 
   auto &update = update_map_[event_id];
+  update.last_send_time_ = now;
 
   auto body = td::json_encode<td::BufferSlice>(JsonUpdate(update.id_.value(), update.json_));
 
@@ -533,8 +537,6 @@ td::Status WebhookActor::send_update() {
   }
 
   auto &connection = *Connection::from_list_node(ready_connections_.get());
-  begin_updates_n_--;
-  update.state_ = Update::State::Send;
   connection.event_id_ = update.id_;
 
   VLOG(webhook) << "Send update " << update.id_ << " from queue " << queue_id << " into connection " << connection.id_
@@ -548,11 +550,9 @@ td::Status WebhookActor::send_update() {
 }
 
 void WebhookActor::send_updates() {
-  VLOG(webhook) << "Have " << begin_updates_n_ << " pending updates to send";
-  while (begin_updates_n_ > 0) {
-    if (send_update().is_error()) {
-      return;
-    }
+  VLOG(webhook) << "Have " << (queues_.size() + update_map_.size() - queue_updates_.size()) << " pending updates in "
+                << queues_.size() << " queues to send";
+  while (send_update().is_ok()) {
   }
 }
 
@@ -653,7 +653,7 @@ void WebhookActor::handle(td::unique_ptr<td::HttpQuery> response) {
 void WebhookActor::start_up() {
   max_loaded_updates_ = max_connections_ * 2;
 
-  next_ip_address_resolve_time_ = last_success_time_ = td::Time::now();
+  next_ip_address_resolve_time_ = last_success_time_ = td::Time::now() - 3600;
   active_new_connection_flood_.add_limit(1, 10 * max_connections_);
   active_new_connection_flood_.add_limit(5, 20 * max_connections_);
 
@@ -749,7 +749,7 @@ void WebhookActor::on_connection_error(td::Status error) {
 void WebhookActor::on_webhook_error(td::Slice error) {
   if (was_checked_) {
     send_closure(callback_, &Callback::webhook_error, td::Status::Error(error));
-    last_error_date_ = td::Clocks::system();  // local time to output it to the log
+    last_error_time_ = td::Time::now();
     last_error_message_ = error.str();
   }
 }

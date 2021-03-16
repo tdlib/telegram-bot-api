@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -78,6 +78,7 @@ class Client : public WebhookActor::Callback {
 
   static constexpr int LOGGING_OUT_ERROR_CODE = 401;
   static constexpr Slice LOGGING_OUT_ERROR_DESCRIPTION = "Unauthorized";
+  static constexpr Slice API_ID_INVALID_ERROR_DESCRIPTION = "Unauthorized: invalid api-id/api-hash";
 
   static constexpr int CLOSING_ERROR_CODE = 500;
   static constexpr Slice CLOSING_ERROR_DESCRIPTION = "Internal Server Error: restart";
@@ -96,6 +97,7 @@ class Client : public WebhookActor::Callback {
   class JsonChatPermissions;
   class JsonChatPhotoInfo;
   class JsonChatLocation;
+  class JsonChatInviteLink;
   class JsonChat;
   class JsonMessageSender;
   class JsonAnimation;
@@ -140,6 +142,7 @@ class Client : public WebhookActor::Callback {
   class JsonChatPhotos;
   class JsonChatMember;
   class JsonChatMembers;
+  class JsonChatMemberUpdated;
   class JsonGameHighScore;
   class JsonAddress;
   class JsonOrderInfo;
@@ -148,6 +151,10 @@ class Client : public WebhookActor::Callback {
   class JsonEncryptedCredentials;
   class JsonPassportData;
   class JsonProximityAlertTriggered;
+  class JsonVoiceChatStarted;
+  class JsonVoiceChatEnded;
+  class JsonInviteVoiceChatParticipants;
+  class JsonChatSetTtl;
   class JsonUpdateTypes;
   class JsonWebhookInfo;
   class JsonStickerSet;
@@ -185,7 +192,8 @@ class Client : public WebhookActor::Callback {
   class TdOnGetGroupMembersCallback;
   class TdOnGetSupergroupMembersCallback;
   class TdOnGetSupergroupMembersCountCallback;
-  class TdOnGenerateChatInviteLinkCallback;
+  class TdOnReplacePrimaryChatInviteLinkCallback;
+  class TdOnGetChatInviteLinkCallback;
   class TdOnGetGameHighScoresCallback;
   class TdOnReturnFileCallback;
   class TdOnReturnStickerSetCallback;
@@ -307,7 +315,8 @@ class Client : public WebhookActor::Callback {
   void on_result(td::uint64 id, object_ptr<td_api::Object> result);
 
   void on_update_authorization_state();
-  void log_out();
+  void log_out(bool is_api_id_invalid);
+  Slice get_logging_out_error_description() const;
   void on_closed();
   void finish_closing();
 
@@ -381,6 +390,8 @@ class Client : public WebhookActor::Callback {
 
   static td::Result<td::vector<object_ptr<td_api::inputPassportElementError>>> get_passport_element_errors(
       const Query *query);
+
+  static td::JsonValue get_input_entities(const Query *query, Slice field_name);
 
   static td::Result<object_ptr<td_api::formattedText>> get_caption(const Query *query);
 
@@ -495,6 +506,9 @@ class Client : public WebhookActor::Callback {
   Status process_answer_shipping_query_query(PromisedQueryPtr &query);
   Status process_answer_pre_checkout_query_query(PromisedQueryPtr &query);
   Status process_export_chat_invite_link_query(PromisedQueryPtr &query);
+  Status process_create_chat_invite_link_query(PromisedQueryPtr &query);
+  Status process_edit_chat_invite_link_query(PromisedQueryPtr &query);
+  Status process_revoke_chat_invite_link_query(PromisedQueryPtr &query);
   Status process_get_chat_query(PromisedQueryPtr &query);
   Status process_set_chat_photo_query(PromisedQueryPtr &query);
   Status process_delete_chat_photo_query(PromisedQueryPtr &query);
@@ -688,6 +702,7 @@ class Client : public WebhookActor::Callback {
     enum class Type { Private, Group, Supergroup, Unknown };
     Type type = Type::Unknown;
     td::string title;
+    int32 message_auto_delete_time = 0;
     object_ptr<td_api::chatPhotoInfo> photo;
     object_ptr<td_api::chatPermissions> permissions;
     union {
@@ -832,7 +847,7 @@ class Client : public WebhookActor::Callback {
   void add_update_poll_answer(object_ptr<td_api::updatePollAnswer> &&update);
 
   void add_new_inline_query(int64 inline_query_id, int32 sender_user_id, object_ptr<td_api::location> location,
-                            const td::string &query, const td::string &offset);
+                            object_ptr<td_api::ChatType> chat_type, const td::string &query, const td::string &offset);
 
   void add_new_chosen_inline_result(int32 sender_user_id, object_ptr<td_api::location> location,
                                     const td::string &query, const td::string &result_id,
@@ -851,6 +866,8 @@ class Client : public WebhookActor::Callback {
 
   void add_new_custom_query(object_ptr<td_api::updateNewCustomQuery> &&query);
 
+  void add_update_chat_member(object_ptr<td_api::updateChatMember> &&update);
+
   // append only before Size
   enum class UpdateType : int32 {
     Message,
@@ -866,6 +883,8 @@ class Client : public WebhookActor::Callback {
     PreCheckoutQuery,
     Poll,
     PollAnswer,
+    MyChatMember,
+    ChatMember,
     Size
   };
 
@@ -893,13 +912,15 @@ class Client : public WebhookActor::Callback {
 
   bool have_message_access(int64 chat_id) const;
 
-  // by default all 13 update types up to PollAnswer are allowed
-  static constexpr td::uint32 DEFAULT_ALLOWED_UPDATE_TYPES = ((1 << 13) - 1);
+  // by default ChatMember updates are disabled
+  static constexpr td::uint32 DEFAULT_ALLOWED_UPDATE_TYPES =
+      (1 << static_cast<int32>(UpdateType::Size)) - 1 - (1 << static_cast<int32>(UpdateType::ChatMember));
 
   object_ptr<td_api::AuthorizationState> authorization_state_;
   bool was_authorized_ = false;
   bool closing_ = false;
   bool logging_out_ = false;
+  bool is_api_id_invalid_ = false;
   bool need_close_ = false;
   bool clear_tqueue_ = false;
   bool waiting_for_auth_input_ = false;
@@ -1037,8 +1058,8 @@ class Client : public WebhookActor::Callback {
 
   int32 previous_get_updates_offset_ = -1;
   double previous_get_updates_start_time_ = 0;
-  double previous_get_updates_finish_date_ = 0;
   double previous_get_updates_finish_time_ = 0;
+  double next_get_updates_conflict_time_ = 0;
 
   td::uint64 webhook_generation_ = 1;
 
