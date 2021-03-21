@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2020
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2021
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -79,7 +79,7 @@ class WebhookActor : public td::HttpOutboundConnection::Callback {
   td::string cert_path_;
   std::shared_ptr<const ClientParameters> parameters_;
 
-  double last_error_date_ = 0;
+  double last_error_time_ = 0;
   td::string last_error_message_ = "<none>";
 
   bool fix_ip_address_ = false;
@@ -94,11 +94,11 @@ class WebhookActor : public td::HttpOutboundConnection::Callback {
     td::TQueue::EventId id_;
     td::string json_;
     td::int32 expires_at_ = 0;
+    double last_send_time_ = 0;
     double wakeup_at_ = 0;
     int delay_ = 0;
     int fail_count_ = 0;
-    enum State { Begin, Send } state_ = State::Begin;
-    td::int64 queue_id_{0};
+    td::int64 queue_id_ = 0;
   };
 
   struct QueueUpdates {
@@ -118,8 +118,6 @@ class WebhookActor : public td::HttpOutboundConnection::Callback {
       return std::tie(integer_wakeup_at, id) < std::tie(other.integer_wakeup_at, other.id);
     }
   };
-
-  td::int32 begin_updates_n_ = 0;
 
   td::TQueue::EventId tqueue_offset_;
   std::size_t max_loaded_updates_ = 0;
