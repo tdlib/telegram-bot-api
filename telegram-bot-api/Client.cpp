@@ -5051,6 +5051,45 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
         make_object<td_api::contact>(phone_number, first_name, last_name, vcard, 0));
   }
 
+  if (has_json_object_field(object, "payload")) {
+    TRY_RESULT(title, get_json_object_string_field(object, "title", false));
+    TRY_RESULT(description, get_json_object_string_field(object, "description", false));
+    TRY_RESULT(payload, get_json_object_string_field(object, "payload", false));
+    if (!td::check_utf8(payload)) {
+      return Status::Error(400, "InputInvoiceMessageContent payload must be encoded in UTF-8");
+    }
+    TRY_RESULT(provider_token, get_json_object_string_field(object, "provider_token", false));
+    TRY_RESULT(currency, get_json_object_string_field(object, "currency", false));
+    TRY_RESULT(prices_object, get_json_object_field(object, "prices", JsonValue::Type::Array, false));
+    TRY_RESULT(prices, get_labeled_price_parts(prices_object));
+    TRY_RESULT(provider_data, get_json_object_string_field(object, "provider_data"));
+    TRY_RESULT(max_tip_amount, get_json_object_long_field(object, "max_tip_amount"));
+    td::vector<int64> suggested_tip_amounts;
+    TRY_RESULT(suggested_tip_amounts_array,
+               get_json_object_field(object, "suggested_tip_amounts", JsonValue::Type::Array));
+    if (suggested_tip_amounts_array.type() == JsonValue::Type::Array) {
+      TRY_RESULT_ASSIGN(suggested_tip_amounts, get_suggested_tip_amounts(suggested_tip_amounts_array));
+    }
+    TRY_RESULT(photo_url, get_json_object_string_field(object, "photo_url"));
+    TRY_RESULT(photo_size, get_json_object_int_field(object, "photo_size"));
+    TRY_RESULT(photo_width, get_json_object_int_field(object, "photo_width"));
+    TRY_RESULT(photo_height, get_json_object_int_field(object, "photo_height"));
+    TRY_RESULT(need_name, get_json_object_bool_field(object, "need_name"));
+    TRY_RESULT(need_phone_number, get_json_object_bool_field(object, "need_phone_number"));
+    TRY_RESULT(need_email_address, get_json_object_bool_field(object, "need_email"));
+    TRY_RESULT(need_shipping_address, get_json_object_bool_field(object, "need_shipping_address"));
+    TRY_RESULT(send_phone_number_to_provider, get_json_object_bool_field(object, "send_phone_number_to_provider"));
+    TRY_RESULT(send_email_address_to_provider, get_json_object_bool_field(object, "send_email_to_provider"));
+    TRY_RESULT(is_flexible, get_json_object_bool_field(object, "is_flexible"));
+
+    return make_object<td_api::inputMessageInvoice>(
+        make_object<td_api::invoice>(currency, std::move(prices), max_tip_amount, std::move(suggested_tip_amounts),
+                                     false, need_name, need_phone_number, need_email_address, need_shipping_address,
+                                     send_phone_number_to_provider, send_email_address_to_provider, is_flexible),
+        title, description, photo_url, photo_size, photo_width, photo_height, payload, provider_token, provider_data,
+        td::string());
+  }
+
   if (is_input_message_content_required) {
     return Status::Error(400, "Input message content is not specified");
   }
