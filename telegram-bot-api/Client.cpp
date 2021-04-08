@@ -4789,6 +4789,30 @@ td::Result<td::vector<td_api::object_ptr<td_api::labeledPricePart>>> Client::get
   return std::move(prices);
 }
 
+td::Result<td::vector<td::int64>> Client::get_suggested_tip_amounts(JsonValue &value) {
+  if (value.type() != JsonValue::Type::Array) {
+    return Status::Error(400, "Expected an Array of suggested tip amounts");
+  }
+
+  td::vector<int64> suggested_tip_amounts;
+  for (auto &amount : value.get_array()) {
+    Slice number;
+    if (amount.type() == JsonValue::Type::Number) {
+      number = amount.get_number();
+    } else if (amount.type() == JsonValue::Type::String) {
+      number = amount.get_string();
+    } else {
+      return Status::Error(400, "Suggested tip amount must be of type Number or String");
+    }
+    auto parsed_amount = td::to_integer_safe<int64>(number);
+    if (parsed_amount.is_error()) {
+      return Status::Error(400, "Can't parse suggested tip amount as Number");
+    }
+    suggested_tip_amounts.push_back(parsed_amount.ok());
+  }
+  return std::move(suggested_tip_amounts);
+}
+
 td::Result<td_api::object_ptr<td_api::shippingOption>> Client::get_shipping_option(JsonValue &option) {
   if (option.type() != JsonValue::Type::Object) {
     return Status::Error(400, "ShippingOption must be an Object");
@@ -6318,16 +6342,39 @@ td::Status Client::process_send_invoice_query(PromisedQueryPtr &query) {
   }
   TRY_RESULT(provider_token, get_required_string_arg(query.get(), "provider_token"));
   auto provider_data = query->arg("provider_data");
-  TRY_RESULT(start_parameter, get_required_string_arg(query.get(), "start_parameter"));
+  auto start_parameter = query->arg("start_parameter");
   TRY_RESULT(currency, get_required_string_arg(query.get(), "currency"));
 
   TRY_RESULT(labeled_price_parts, get_required_string_arg(query.get(), "prices"));
-  auto r_value = json_decode(labeled_price_parts);
-  if (r_value.is_error()) {
+  auto r_labeled_price_parts_value = json_decode(labeled_price_parts);
+  if (r_labeled_price_parts_value.is_error()) {
     return Status::Error(400, "Can't parse prices JSON object");
   }
 
-  TRY_RESULT(prices, get_labeled_price_parts(r_value.ok_ref()));
+  TRY_RESULT(prices, get_labeled_price_parts(r_labeled_price_parts_value.ok_ref()));
+
+  int64 max_tip_amount = 0;
+  td::vector<int64> suggested_tip_amounts;
+  {
+    auto max_tip_amount_str = query->arg("max_tip_amount");
+    if (!max_tip_amount_str.empty()) {
+      auto r_max_tip_amount = td::to_integer_safe<int64>(max_tip_amount_str);
+      if (r_max_tip_amount.is_error()) {
+        return Status::Error(400, "Can't parse \"max_tip_amount\" as Number");
+      }
+      max_tip_amount = r_max_tip_amount.ok();
+    }
+
+    auto suggested_tip_amounts_str = query->arg("suggested_tip_amounts");
+    if (!suggested_tip_amounts_str.empty()) {
+      auto r_suggested_tip_amounts_value = json_decode(suggested_tip_amounts_str);
+      if (r_suggested_tip_amounts_value.is_error()) {
+        return Status::Error(400, "Can't parse suggested_tip_amounts JSON object");
+      }
+
+      TRY_RESULT_ASSIGN(suggested_tip_amounts, get_suggested_tip_amounts(r_suggested_tip_amounts_value.ok_ref()));
+    }
+  }
 
   auto photo_url = query->arg("photo_url");
   int32 photo_size = get_integer_arg(query.get(), "photo_size", 0, 0, 1000000000);
@@ -6342,14 +6389,14 @@ td::Status Client::process_send_invoice_query(PromisedQueryPtr &query) {
   auto send_email_address_to_provider = to_bool(query->arg("send_email_to_provider"));
   auto is_flexible = to_bool(query->arg("is_flexible"));
 
-  do_send_message(
-      make_object<td_api::inputMessageInvoice>(
-          make_object<td_api::invoice>(currency.str(), std::move(prices), 0, td::vector<int64>(), false, need_name,
-                                       need_phone_number, need_email_address, need_shipping_address,
-                                       send_phone_number_to_provider, send_email_address_to_provider, is_flexible),
-          title.str(), description.str(), photo_url.str(), photo_size, photo_width, photo_height, payload.str(),
-          provider_token.str(), provider_data.str(), start_parameter.str()),
-      std::move(query));
+  do_send_message(make_object<td_api::inputMessageInvoice>(
+                      make_object<td_api::invoice>(
+                          currency.str(), std::move(prices), max_tip_amount, std::move(suggested_tip_amounts), false,
+                          need_name, need_phone_number, need_email_address, need_shipping_address,
+                          send_phone_number_to_provider, send_email_address_to_provider, is_flexible),
+                      title.str(), description.str(), photo_url.str(), photo_size, photo_width, photo_height,
+                      payload.str(), provider_token.str(), provider_data.str(), start_parameter.str()),
+                  std::move(query));
   return Status::OK();
 }
 
