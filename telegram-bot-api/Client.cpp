@@ -1400,6 +1400,20 @@ class Client::JsonProximityAlertTriggered : public Jsonable {
   const Client *client_;
 };
 
+class Client::JsonVoiceChatScheduled : public Jsonable {
+ public:
+  explicit JsonVoiceChatScheduled(const td_api::messageVoiceChatScheduled *voice_chat_scheduled)
+      : voice_chat_scheduled_(voice_chat_scheduled) {
+  }
+  void store(JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("start_date", voice_chat_scheduled_->start_date_);
+  }
+
+ private:
+  const td_api::messageVoiceChatScheduled *voice_chat_scheduled_;
+};
+
 class Client::JsonVoiceChatStarted : public Jsonable {
  public:
   explicit JsonVoiceChatStarted(const td_api::messageVoiceChatStarted *voice_chat_started)
@@ -1834,6 +1848,11 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
     case td_api::messageProximityAlertTriggered::ID: {
       auto content = static_cast<const td_api::messageProximityAlertTriggered *>(message_->content.get());
       object("proximity_alert_triggered", JsonProximityAlertTriggered(content, client_));
+      break;
+    }
+    case td_api::messageVoiceChatScheduled::ID: {
+      auto content = static_cast<const td_api::messageVoiceChatScheduled *>(message_->content.get());
+      object("voice_chat_scheduled", JsonVoiceChatScheduled(content));
       break;
     }
     case td_api::messageVoiceChatStarted::ID: {
@@ -8638,6 +8657,7 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       case td_api::messageChatDeleteMember::ID:
       case td_api::messagePinMessage::ID:
       case td_api::messageProximityAlertTriggered::ID:
+      case td_api::messageVoiceChatScheduled::ID:
       case td_api::messageVoiceChatStarted::ID:
       case td_api::messageVoiceChatEnded::ID:
       case td_api::messageInviteVoiceChatParticipants::ID:
