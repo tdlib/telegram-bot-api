@@ -7897,9 +7897,9 @@ void Client::do_get_updates(int32 offset, int32 limit, int32 timeout, PromisedQu
     }
   }
   if (need_warning) {
-    LOG(WARNING) << "Found " << updates.size() << " updates out of " << total_size << " + " << updates.size()
-                 << " after last getUpdates call " << (td::Time::now() - previous_get_updates_finish_time_)
-                 << " seconds ago";
+    LOG(WARNING) << "Found " << updates.size() << " updates out of " << (total_size + updates.size())
+                 << " after last getUpdates call " << (query->start_timestamp() - previous_get_updates_finish_time_)
+                 << " seconds ago in " << (td::Time::now() - query->start_timestamp()) << " seconds";
   } else {
     LOG(DEBUG) << "Found " << updates.size() << " updates out of " << total_size << " from " << from;
   }
