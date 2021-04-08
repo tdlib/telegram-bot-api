@@ -1941,7 +1941,9 @@ class Client::JsonInlineQuery : public Jsonable {
             return "";
         }
       }();
-      object("chat_type", chat_type);
+      if (chat_type[0] != '\0') {
+        object("chat_type", chat_type);
+      }
     }
     object("query", query_);
     object("offset", offset_);
