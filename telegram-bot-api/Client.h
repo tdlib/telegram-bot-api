@@ -151,6 +151,7 @@ class Client : public WebhookActor::Callback {
   class JsonEncryptedCredentials;
   class JsonPassportData;
   class JsonProximityAlertTriggered;
+  class JsonVoiceChatScheduled;
   class JsonVoiceChatStarted;
   class JsonVoiceChatEnded;
   class JsonInviteVoiceChatParticipants;
@@ -340,6 +341,8 @@ class Client : public WebhookActor::Callback {
   static td::Result<object_ptr<td_api::labeledPricePart>> get_labeled_price_part(td::JsonValue &value);
 
   static td::Result<td::vector<object_ptr<td_api::labeledPricePart>>> get_labeled_price_parts(td::JsonValue &value);
+
+  static td::Result<td::vector<int64>> get_suggested_tip_amounts(td::JsonValue &value);
 
   static td::Result<object_ptr<td_api::shippingOption>> get_shipping_option(td::JsonValue &option);
 
