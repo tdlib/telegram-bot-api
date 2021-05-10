@@ -3682,9 +3682,7 @@ void Client::check_chat_access(int64 chat_id, AccessRights access_rights, const 
           return fail_query(400, "Bad Request: group chat was upgraded to a supergroup chat", std::move(query),
                             std::move(parameters));
         } else {
-          LOG(WARNING) << "Group chat " << chat_info->group_id << " with " << group_info->member_count
-                       << " members and title \"" << chat_info->title << "\" is deactivated";
-          return fail_query(400, "Bad Request: group chat was deactivated", std::move(query));
+          return fail_query(403, "Forbidden: the group chat was deleted", std::move(query));
         }
       }
       if (group_info->is_active && group_info->kicked && need_edit_access) {
