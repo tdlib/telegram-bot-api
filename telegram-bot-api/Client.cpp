@@ -3672,6 +3672,10 @@ void Client::check_chat_access(int64 chat_id, AccessRights access_rights, const 
       break;
     }
     case ChatInfo::Type::Group: {
+      if (access_rights == AccessRights::ReadMembers) {  // member list is inaccessible in deactivated groups
+        need_write_access = true;
+        need_edit_access = true;
+      }
       auto group_info = get_group_info(chat_info->group_id);
       CHECK(group_info != nullptr);
       if (!group_info->is_active && need_write_access) {
@@ -7182,31 +7186,29 @@ td::Status Client::process_get_chat_member_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
   TRY_RESULT(user_id, get_user_id(query.get()));
 
-  check_chat(chat_id, AccessRights::Read, std::move(query), [this, user_id](int64 chat_id, PromisedQueryPtr query) {
-    get_chat_member(chat_id, user_id, std::move(query),
-                    [this, chat_type = get_chat_type(chat_id)](td_api::object_ptr<td_api::chatMember> &&chat_member,
-                                                               PromisedQueryPtr query) {
-                      answer_query(JsonChatMember(chat_member.get(), chat_type, this), std::move(query));
-                    });
-  });
+  check_chat(chat_id, AccessRights::ReadMembers, std::move(query),
+             [this, user_id](int64 chat_id, PromisedQueryPtr query) {
+               get_chat_member(chat_id, user_id, std::move(query),
+                               [this, chat_type = get_chat_type(chat_id)](
+                                   td_api::object_ptr<td_api::chatMember> &&chat_member, PromisedQueryPtr query) {
+                                 answer_query(JsonChatMember(chat_member.get(), chat_type, this), std::move(query));
+                               });
+             });
   return Status::OK();
 }
 
 td::Status Client::process_get_chat_administrators_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
 
-  check_chat(chat_id, AccessRights::Read, std::move(query), [this](int64 chat_id, PromisedQueryPtr query) {
+  check_chat(chat_id, AccessRights::ReadMembers, std::move(query), [this](int64 chat_id, PromisedQueryPtr query) {
     auto chat_info = get_chat(chat_id);
     CHECK(chat_info != nullptr);
     switch (chat_info->type) {
       case ChatInfo::Type::Private:
         return fail_query(400, "Bad Request: there are no administrators in the private chat", std::move(query));
-      case ChatInfo::Type::Group: {
-        auto group_info = get_group_info(chat_info->group_id);
-        CHECK(group_info != nullptr);
+      case ChatInfo::Type::Group:
         return send_request(make_object<td_api::getBasicGroupFullInfo>(chat_info->group_id),
                             std::make_unique<TdOnGetGroupMembersCallback>(this, true, std::move(query)));
-      }
       case ChatInfo::Type::Supergroup:
         return send_request(
             make_object<td_api::getSupergroupMembers>(
@@ -7223,7 +7225,7 @@ td::Status Client::process_get_chat_administrators_query(PromisedQueryPtr &query
 td::Status Client::process_get_chat_member_count_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
 
-  check_chat(chat_id, AccessRights::Read, std::move(query), [this](int64 chat_id, PromisedQueryPtr query) {
+  check_chat(chat_id, AccessRights::ReadMembers, std::move(query), [this](int64 chat_id, PromisedQueryPtr query) {
     auto chat_info = get_chat(chat_id);
     CHECK(chat_info != nullptr);
     switch (chat_info->type) {
@@ -7232,9 +7234,6 @@ td::Status Client::process_get_chat_member_count_query(PromisedQueryPtr &query) 
       case ChatInfo::Type::Group: {
         auto group_info = get_group_info(chat_info->group_id);
         CHECK(group_info != nullptr);
-        if (group_info->member_count == 0) {
-          return fail_query(403, "Forbidden: bot is not a member of the group chat", std::move(query));
-        }
         return answer_query(td::VirtuallyJsonableInt(group_info->member_count), std::move(query));
       }
       case ChatInfo::Type::Supergroup:
@@ -7251,7 +7250,7 @@ td::Status Client::process_get_chat_member_count_query(PromisedQueryPtr &query) 
 td::Status Client::process_leave_chat_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
 
-  check_chat(chat_id, AccessRights::Read, std::move(query), [this](int64 chat_id, PromisedQueryPtr query) {
+  check_chat(chat_id, AccessRights::ReadMembers, std::move(query), [this](int64 chat_id, PromisedQueryPtr query) {
     send_request(make_object<td_api::leaveChat>(chat_id), std::make_unique<TdOnOkQueryCallback>(std::move(query)));
   });
   return Status::OK();

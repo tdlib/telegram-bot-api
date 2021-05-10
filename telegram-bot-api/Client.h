@@ -212,7 +212,7 @@ class Client : public WebhookActor::Callback {
   struct UserInfo;
   struct ChatInfo;
 
-  enum class AccessRights { Read, Edit, Write };
+  enum class AccessRights { Read, ReadMembers, Edit, Write };
 
   template <class OnSuccess>
   class TdOnCheckUserCallback;
