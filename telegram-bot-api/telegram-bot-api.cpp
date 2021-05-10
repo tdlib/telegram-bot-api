@@ -142,6 +142,7 @@ int main(int argc, char *argv[]) {
 
   td::OptionParser options;
   bool need_print_usage = false;
+  bool need_print_version = false;
   int http_port = 8081;
   int http_stat_port = 0;
   td::string http_ip_address = "0.0.0.0";
@@ -173,6 +174,7 @@ int main(int argc, char *argv[]) {
   options.set_usage(td::Slice(argv[0]), "--api-id=<arg> --api-hash=<arg> [--local] [OPTION]...");
   options.set_description("Telegram Bot API server");
   options.add_option('h', "help", "display this help text and exit", [&] { need_print_usage = true; });
+  options.add_option('\0', "version", "display version number and exit", [&] { need_print_version = true; });
   options.add_option('\0', "local", "allow the Bot API server to serve local requests",
                      [&] { parameters->local_mode_ = true; });
   options.add_checked_option(
@@ -273,6 +275,10 @@ int main(int argc, char *argv[]) {
   auto r_non_options = options.run(argc, argv, 0);
   if (need_print_usage) {
     LOG(PLAIN) << options;
+    return 0;
+  }
+  if (need_print_version) {
+    LOG(PLAIN) << "Bot API " << parameters->version_;
     return 0;
   }
   if (r_non_options.is_error()) {
