@@ -555,6 +555,7 @@ class Client : public WebhookActor::Callback {
     bool can_join_groups = false;
     bool can_read_all_group_messages = false;
     bool is_inline_bot = false;
+    td::string inline_query_placeholder;
   };
   static void add_user(std::unordered_map<int32, UserInfo> &users, object_ptr<td_api::user> &&user);
   void set_user_bio(int32 user_id, td::string &&bio);

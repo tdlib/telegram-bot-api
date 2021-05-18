@@ -327,6 +327,9 @@ class Client::JsonUser : public Jsonable {
       object("can_join_groups", td::JsonBool(user_info->can_join_groups));
       object("can_read_all_group_messages", td::JsonBool(user_info->can_read_all_group_messages));
       object("supports_inline_queries", td::JsonBool(user_info->is_inline_bot));
+      if (user_info->is_inline_bot) {
+        object("inline_query_placeholder", user_info->inline_query_placeholder);
+      }
     }
   }
 
@@ -8100,6 +8103,7 @@ void Client::add_user(std::unordered_map<int32, UserInfo> &users, object_ptr<td_
       user_info->can_join_groups = bot->can_join_groups_;
       user_info->can_read_all_group_messages = bot->can_read_all_group_messages_;
       user_info->is_inline_bot = bot->is_inline_;
+      user_info->inline_query_placeholder = bot->inline_query_placeholder_;
       break;
     }
     case td_api::userTypeDeleted::ID:
