@@ -28,6 +28,7 @@
 #include "td/utils/port/SocketFd.h"
 #include "td/utils/Random.h"
 #include "td/utils/ScopeGuard.h"
+#include "td/utils/SliceBuilder.h"
 #include "td/utils/Span.h"
 #include "td/utils/Time.h"
 

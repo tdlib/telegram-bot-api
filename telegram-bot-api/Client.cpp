@@ -25,6 +25,7 @@
 #include "td/utils/port/Stat.h"
 #include "td/utils/Random.h"
 #include "td/utils/Slice.h"
+#include "td/utils/SliceBuilder.h"
 #include "td/utils/Span.h"
 #include "td/utils/StackAllocator.h"
 #include "td/utils/Status.h"

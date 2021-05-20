@@ -24,8 +24,8 @@
 #include "td/actor/ConcurrentScheduler.h"
 #include "td/actor/PromiseFuture.h"
 
-#include "td/utils/algorithm.h"
 #include "td/utils/buffer.h"
+#include "td/utils/CombinedLog.h"
 #include "td/utils/common.h"
 #include "td/utils/crypto.h"
 #include "td/utils/ExitGuard.h"
@@ -43,8 +43,10 @@
 #include "td/utils/port/stacktrace.h"
 #include "td/utils/port/user.h"
 #include "td/utils/Slice.h"
+#include "td/utils/SliceBuilder.h"
 #include "td/utils/Status.h"
 #include "td/utils/Time.h"
+#include "td/utils/TsLog.h"
 
 #include "memprof/memprof.h"
 
@@ -56,10 +58,10 @@
 
 namespace telegram_bot_api {
 
-static std::atomic_flag need_rotate_log;
+static std::atomic_flag need_reopen_log;
 
-static void rotate_log_signal_handler(int sig) {
-  need_rotate_log.clear();
+static void after_log_rotation_signal_handler(int sig) {
+  need_reopen_log.clear();
 }
 
 static std::atomic_flag need_quit;
@@ -110,7 +112,7 @@ int main(int argc, char *argv[]) {
   SET_VERBOSITY_LEVEL(VERBOSITY_NAME(FATAL));
   td::ExitGuard exit_guard;
 
-  need_rotate_log.test_and_set();
+  need_reopen_log.test_and_set();
   need_quit.test_and_set();
   need_change_verbosity_level.test_and_set();
   need_dump_log.test_and_set();
@@ -118,7 +120,7 @@ int main(int argc, char *argv[]) {
   td::Stacktrace::init();
 
   td::setup_signals_alt_stack().ensure();
-  td::set_signal_handler(td::SignalType::User, rotate_log_signal_handler).ensure();
+  td::set_signal_handler(td::SignalType::User, after_log_rotation_signal_handler).ensure();
   td::ignore_signal(td::SignalType::HangUp).ensure();
   td::ignore_signal(td::SignalType::Pipe).ensure();
   td::set_signal_handler(td::SignalType::Quit, quit_signal_handler).ensure();
@@ -287,71 +289,7 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  class CombineLog : public td::LogInterface {
-   public:
-    void append(td::CSlice slice, int log_level) override {
-      if (first_ && log_level <= first_verbosity_level_) {
-        if (log_level == VERBOSITY_NAME(FATAL) && second_ && VERBOSITY_NAME(FATAL) <= second_verbosity_level_) {
-          second_->append(slice, VERBOSITY_NAME(ERROR));
-        }
-        first_->append(slice, log_level);
-      }
-      if (second_ && log_level <= second_verbosity_level_) {
-        second_->append(slice, log_level);
-      }
-    }
-
-    void set_first(LogInterface *first) {
-      first_ = first;
-    }
-
-    void set_second(LogInterface *second) {
-      second_ = second;
-    }
-
-    void set_first_verbosity_level(int verbosity_level) {
-      first_verbosity_level_ = verbosity_level;
-    }
-
-    void set_second_verbosity_level(int verbosity_level) {
-      second_verbosity_level_ = verbosity_level;
-    }
-
-    int get_first_verbosity_level() const {
-      return first_verbosity_level_;
-    }
-
-    int get_second_verbosity_level() const {
-      return second_verbosity_level_;
-    }
-
-    void rotate() override {
-      if (first_) {
-        first_->rotate();
-      }
-      if (second_) {
-        second_->rotate();
-      }
-    }
-
-    td::vector<td::string> get_file_paths() override {
-      td::vector<td::string> result;
-      if (first_) {
-        td::append(result, first_->get_file_paths());
-      }
-      if (second_) {
-        td::append(result, second_->get_file_paths());
-      }
-      return result;
-    }
-
-   private:
-    LogInterface *first_ = nullptr;
-    int first_verbosity_level_ = VERBOSITY_NAME(FATAL);
-    LogInterface *second_ = nullptr;
-    int second_verbosity_level_ = VERBOSITY_NAME(FATAL);
-  };
-  CombineLog log;
+  td::CombinedLog log;
   log.set_first(td::default_log_interface);
   log.set_second(&memory_log);
   td::log_interface = &log;
@@ -451,8 +389,8 @@ int main(int argc, char *argv[]) {
   while (true) {
     sched.run_main(next_cron_time - td::Time::now());
 
-    if (!need_rotate_log.test_and_set()) {
-      td::log_interface->rotate();
+    if (!need_reopen_log.test_and_set()) {
+      td::log_interface->after_rotation();
     }
 
     if (!need_quit.test_and_set()) {
