@@ -1500,7 +1500,7 @@ class Client::JsonInlineKeyboardButton : public Jsonable {
       case td_api::inlineKeyboardButtonTypeCallbackWithPassword::ID: {
         auto data = get_callback_data(button_->type_);
         if (!td::check_utf8(data)) {
-          object("callback_data", td::JsonRawString(data));
+          object("callback_data", "INVALID");
         } else {
           object("callback_data", data);
         }
