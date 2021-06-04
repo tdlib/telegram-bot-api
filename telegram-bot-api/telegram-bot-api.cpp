@@ -41,6 +41,7 @@
 #include "td/utils/port/rlimit.h"
 #include "td/utils/port/signals.h"
 #include "td/utils/port/stacktrace.h"
+#include "td/utils/port/Stat.h"
 #include "td/utils/port/user.h"
 #include "td/utils/Slice.h"
 #include "td/utils/SliceBuilder.h"
@@ -477,6 +478,14 @@ int main(int argc, char *argv[]) {
         LOG(WARNING) << td::tag("total size", td::format::as_size(total_size));
         LOG(WARNING) << td::tag("total traces", get_ht_size());
         LOG(WARNING) << td::tag("fast_backtrace_success_rate", get_fast_backtrace_success_rate());
+      }
+      auto r_mem_stat = td::mem_stat();
+      if (r_mem_stat.is_ok()) {
+        auto mem_stat = r_mem_stat.move_as_ok();
+        LOG(WARNING) << td::tag("rss", td::format::as_size(mem_stat.resident_size_));
+        LOG(WARNING) << td::tag("vm", td::format::as_size(mem_stat.virtual_size_));
+        LOG(WARNING) << td::tag("rss_peak", td::format::as_size(mem_stat.resident_size_peak_));
+        LOG(WARNING) << td::tag("vm_peak", td::format::as_size(mem_stat.virtual_size_peak_));
       }
       LOG(WARNING) << td::tag("buffer_mem", td::format::as_size(td::BufferAllocator::get_buffer_mem()));
       LOG(WARNING) << td::tag("buffer_slice_size", td::format::as_size(td::BufferAllocator::get_buffer_slice_size()));
