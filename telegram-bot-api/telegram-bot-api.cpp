@@ -399,7 +399,8 @@ int main(int argc, char *argv[]) {
         std::_Exit(0);
       }
 
-      LOG(WARNING) << "Stopping engine by a signal";
+      LOG(WARNING) << "Stopping engine with uptime " << (td::Time::now() - start_time) << " seconds by a signal";
+      last_dump_time = td::Time::now() - 1e6;
       close_flag = true;
       auto guard = sched.get_main_guard();
       send_closure(client_manager, &ClientManager::close, td::PromiseCreator::lambda([&can_quit](td::Unit) {
@@ -473,7 +474,7 @@ int main(int argc, char *argv[]) {
           total_size += info.size;
         }
         LOG(WARNING) << td::tag("other", td::format::as_size(other_size));
-        LOG(WARNING) << td::tag("total", td::format::as_size(total_size));
+        LOG(WARNING) << td::tag("total size", td::format::as_size(total_size));
         LOG(WARNING) << td::tag("total traces", get_ht_size());
         LOG(WARNING) << td::tag("fast_backtrace_success_rate", get_fast_backtrace_success_rate());
       }
