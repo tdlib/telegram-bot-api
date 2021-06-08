@@ -121,7 +121,7 @@ function onLoad(initial) {
 function onOsChanged(initial) {
   var os = document.getElementById('osSelect').value;
   if (os.includes('Choose ')) {
-    if (history.state != '') {
+    if (history.state !== '' && history.state !== null) {
       history.pushState('', '', 'build.html');
     }
 
