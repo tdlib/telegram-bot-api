@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.0.2 FATAL_ERROR)
 
+if (POLICY CMP0065)
+  # do not export symbols from executables
+  # affects compiler checks in project(), so must be set before it
+  cmake_policy(SET CMP0065 NEW)
+endif()
+
 project(TelegramBotApi VERSION 5.2 LANGUAGES CXX)
 
 add_subdirectory(td EXCLUDE_FROM_ALL)
