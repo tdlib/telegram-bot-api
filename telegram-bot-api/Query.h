@@ -73,17 +73,6 @@ class Query : public td::ListNode {
     return peer_address_;
   }
 
-  // for stats
-  td::int32 file_count() const {
-    return static_cast<td::int32>(files_.size());
-  }
-
-  td::int64 query_size() const;
-
-  td::int64 files_size() const;
-
-  td::int64 files_max_size() const;
-
   td::BufferSlice &answer() {
     return answer_;
   }
@@ -106,26 +95,14 @@ class Query : public td::ListNode {
     return state_ != State::Query;
   }
 
-  bool is_error() const {
-    return state_ == State::Error;
-  }
-
-  bool is_ok() const {
-    return state_ == State::OK;
-  }
-
   bool is_internal() const {
     return is_internal_;
-  }
-
-  void set_internal(bool is_internal) {
-    is_internal_ = is_internal;
   }
 
   Query(td::vector<td::BufferSlice> &&container, td::Slice token, bool is_test_dc, td::MutableSlice method,
         td::vector<std::pair<td::MutableSlice, td::MutableSlice>> &&args,
         td::vector<std::pair<td::MutableSlice, td::MutableSlice>> &&headers, td::vector<td::HttpFile> &&files,
-        std::shared_ptr<SharedData> shared_data, const td::IPAddress &peer_address);
+        std::shared_ptr<SharedData> shared_data, const td::IPAddress &peer_address, bool is_internal);
   Query(const Query &) = delete;
   Query &operator=(const Query &) = delete;
   Query(Query &&) = delete;
@@ -140,10 +117,7 @@ class Query : public td::ListNode {
     return start_timestamp_;
   }
 
-  void set_stat_actor(td::ActorId<BotStatActor> stat_actor) {
-    stat_actor_ = stat_actor;
-  }
-  void send_response_stat();
+  void set_stat_actor(td::ActorId<BotStatActor> stat_actor);
 
  private:
   State state_;
@@ -166,6 +140,21 @@ class Query : public td::ListNode {
   td::BufferSlice answer_;
   int http_status_code_ = 0;
   int retry_after_ = 0;
+
+  // for stats
+  td::int32 file_count() const {
+    return static_cast<td::int32>(files_.size());
+  }
+
+  td::int64 query_size() const;
+
+  td::int64 files_size() const;
+
+  td::int64 files_max_size() const;
+
+  void send_request_stat() const;
+
+  void send_response_stat() const;
 };
 
 td::StringBuilder &operator<<(td::StringBuilder &sb, const Query &query);

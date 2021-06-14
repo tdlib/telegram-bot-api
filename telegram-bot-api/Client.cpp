@@ -3494,10 +3494,7 @@ void Client::start_up() {
 
 void Client::send(PromisedQueryPtr query) {
   if (!query->is_internal()) {
-    send_closure(
-        stat_actor_, &BotStatActor::add_event<ServerBotStat::Request>,
-        ServerBotStat::Request{query->query_size(), query->file_count(), query->files_size(), query->files_max_size()},
-        td::Time::now());
+    query->set_stat_actor(stat_actor_);
   }
   cmd_queue_.emplace(std::move(query));
   loop();
