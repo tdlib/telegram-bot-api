@@ -339,7 +339,7 @@ int main(int argc, char *argv[]) {
     return 0;
   }
   if (r_non_options.is_error()) {
-    LOG(PLAIN) << argv[0] << ": " << r_non_options.error();
+    LOG(PLAIN) << argv[0] << ": " << r_non_options.error().message();
     LOG(PLAIN) << options;
     return 1;
   }
@@ -370,6 +370,20 @@ int main(int argc, char *argv[]) {
       TRY_STATUS_PREFIX(td::set_temporary_dir(temporary_directory), "Can't set temporary directory: ");
     }
 
+    auto temp_dir = td::get_temporary_dir();
+    if (temp_dir.empty()) {
+      return td::Status::Error("Can't find directory for temporary files. Use --temp-dir option to specify it");
+    }
+
+    auto r_temp_file = td::mkstemp(temp_dir);
+    if (r_temp_file.is_error()) {
+      return td::Status::Error(
+          PSLICE() << "Can't create files in the directory \"" << temp_dir
+                   << "\". Use --temp-dir option to specify another directory for temporary files");
+    }
+    r_temp_file.ok_ref().first.close();
+    td::unlink(r_temp_file.ok().second).ensure();
+
     if (!log_file_path.empty()) {
       TRY_STATUS_PREFIX(file_log.init(log_file_path, log_max_file_size), "Can't open log file: ");
       log.set_first(&ts_log);
@@ -378,7 +392,7 @@ int main(int argc, char *argv[]) {
     return td::Status::OK();
   }();
   if (init_status.is_error()) {
-    LOG(PLAIN) << init_status.error();
+    LOG(PLAIN) << init_status.error().message();
     LOG(PLAIN) << options;
     return 1;
   }
