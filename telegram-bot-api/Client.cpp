@@ -6062,11 +6062,8 @@ td::Result<td::vector<td::string>> Client::get_poll_options(const Query *query) 
 td::int32 Client::get_integer_arg(const Query *query, Slice field_name, int32 default_value, int32 min_value,
                                   int32 max_value) {
   auto s_arg = query->arg(field_name);
-  if (s_arg.empty()) {
-    return default_value;
-  }
-
-  return td::clamp(td::to_integer<int32>(s_arg), min_value, max_value);
+  auto value = s_arg.empty() ? default_value : td::to_integer<int32>(s_arg);
+  return td::clamp(value, min_value, max_value);
 }
 
 td::Result<td::MutableSlice> Client::get_required_string_arg(const Query *query, Slice field_name) {
