@@ -4047,6 +4047,8 @@ void Client::on_update_authorization_state() {
     case td_api::authorizationStateWaitEncryptionKey::ID:
       return send_request(make_object<td_api::checkDatabaseEncryptionKey>(), std::make_unique<TdOnInitCallback>(this));
     case td_api::authorizationStateWaitPhoneNumber::ID:
+      send_request(make_object<td_api::setOption>("online", make_object<td_api::optionValueBoolean>(true)),
+                   std::make_unique<TdOnOkCallback>());
       return send_request(make_object<td_api::checkAuthenticationBotToken>(bot_token_),
                           std::make_unique<TdOnAuthorizationCallback>(this));
     case td_api::authorizationStateReady::ID: {
