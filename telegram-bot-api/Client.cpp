@@ -7579,7 +7579,7 @@ td::Status Client::process_set_webhook_query(PromisedQueryPtr &query) {
   }
 
   auto now = td::Time::now_cached();
-  if (!new_url.empty()) {
+  if (!new_url.empty() && !query->is_internal()) {
     if (now < next_allowed_set_webhook_time_) {
       query->set_retry_after_error(1);
       return Status::OK();
