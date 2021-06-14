@@ -124,11 +124,17 @@ void Query::send_request_stat() const {
 }
 
 void Query::send_response_stat() const {
+  auto now = td::Time::now();
+  if (now - start_timestamp_ >= 100.0) {
+    LOG(WARNING) << "Answer too old query with code " << http_status_code_ << " and answer size " << answer_.size()
+                 << ": " << *this;
+  }
+
   if (stat_actor_.empty()) {
     return;
   }
   send_closure(stat_actor_, &BotStatActor::add_event<ServerBotStat::Response>,
-               ServerBotStat::Response{state_ == State::OK, answer_.size()}, td::Time::now());
+               ServerBotStat::Response{state_ == State::OK, answer_.size()}, now);
 }
 
 }  // namespace telegram_bot_api
