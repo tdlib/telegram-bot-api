@@ -7247,7 +7247,7 @@ td::Status Client::process_get_chat_member_count_query(PromisedQueryPtr &query) 
 td::Status Client::process_leave_chat_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
 
-  check_chat(chat_id, AccessRights::ReadMembers, std::move(query), [this](int64 chat_id, PromisedQueryPtr query) {
+  check_chat(chat_id, AccessRights::Read, std::move(query), [this](int64 chat_id, PromisedQueryPtr query) {
     send_request(make_object<td_api::leaveChat>(chat_id), std::make_unique<TdOnOkQueryCallback>(std::move(query)));
   });
   return Status::OK();
