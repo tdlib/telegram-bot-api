@@ -314,6 +314,9 @@ int main(int argc, char *argv[]) {
 
   options.add_checked_option('\0', "max-batch-operations", PSLICE() << "maximum number of batch operations (default: " << parameters->max_batch_operations << ")",
                              td::OptionParser::parse_integer(parameters->max_batch_operations));
+  options.add_checked_option('\0', "file-expiration-time",
+                             PSLICE() << "downloaded files expire after this amount of seconds of not being used (defaults to " << parameters->file_expiration_timeout_seconds_ << ")",
+                             td::OptionParser::parse_integer(parameters->file_expiration_timeout_seconds_));
 
   options.add_checked_option(
       '\0', "proxy", PSLICE() << "HTTP proxy server for outgoing webhook requests in the format http://host:port",

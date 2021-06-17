@@ -56,7 +56,10 @@ if [ -n "$TELEGRAM_RELATIVE" ]; then
   CUSTOM_ARGS="${CUSTOM_ARGS} --relative"
 fi
 if [ -n "$TELEGRAM_MAX_BATCH" ]; then
-  CUSTOM_ARGS="${CUSTOM_ARGS} ---max-batch-operations=$TELEGRAM_MAX_BATCH"
+  CUSTOM_ARGS="${CUSTOM_ARGS} --max-batch-operations=$TELEGRAM_MAX_BATCH"
+fi
+if [ -n "$TELEGRAM_FILE_EXPIRATION_TIME" ]; then
+  CUSTOM_ARGS="${CUSTOM_ARGS} --file-expiration-time=$TELEGRAM_FILE_EXPIRATION_TIME"
 fi
 if [ -n "$TELEGRAM_LOGS" ]; then
   CUSTOM_ARGS="$CUSTOM_ARGS --log=${TELEGRAM_LOGS}"
