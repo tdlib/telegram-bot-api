@@ -62,54 +62,75 @@ void Client::fail_query_with_error(PromisedQueryPtr query, int32 error_code, Sli
     error_code = 400;
   }
   if (error_code == 400) {
-    if (!default_message.empty()) {
-      error_message = default_message;
-    }
-    if (error_message == "MESSAGE_NOT_MODIFIED") {
-      error_message = Slice(
-          "message is not modified: specified new message content and reply markup are exactly the same as a current "
-          "content and reply markup of the message");
-    } else if (error_message == "WC_CONVERT_URL_INVALID" || error_message == "EXTERNAL_URL_INVALID") {
-      error_message = "Wrong HTTP URL specified";
-    } else if (error_message == "WEBPAGE_CURL_FAILED") {
-      error_message = "Failed to get HTTP URL content";
-    } else if (error_message == "WEBPAGE_MEDIA_EMPTY") {
-      error_message = "Wrong type of the web page content";
-    } else if (error_message == "MEDIA_GROUPED_INVALID") {
-      error_message = "Can't use the media of the specified type in the album";
-    } else if (error_message == "REPLY_MARKUP_TOO_LONG") {
-      error_message = Slice("reply markup is too long");
-    } else if (error_message == "INPUT_USER_DEACTIVATED") {
-      error_code = 403;
-      error_message = Slice("Forbidden: user is deactivated");
-    } else if (error_message == "USER_IS_BLOCKED") {
-      error_code = 403;
-      error_message = Slice("bot was blocked by the user");
-    } else if (error_message == "USER_ADMIN_INVALID") {
-      error_code = 400;
-      error_message = Slice("user is an administrator of the chat");
-    } else if (error_message == "File generation failed") {
-      error_code = 400;
-      error_message = Slice("can't upload file by URL");
-    } else if (error_message == "CHAT_ABOUT_NOT_MODIFIED") {
-      error_code = 400;
-      error_message = Slice("chat description is not modified");
-    } else if (error_message == "PACK_SHORT_NAME_INVALID") {
-      error_code = 400;
-      error_message = Slice("invalid sticker set name is specified");
-    } else if (error_message == "PACK_SHORT_NAME_OCCUPIED") {
-      error_code = 400;
-      error_message = Slice("sticker set name is already occupied");
-    } else if (error_message == "STICKER_EMOJI_INVALID") {
-      error_code = 400;
-      error_message = Slice("invalid sticker emojis");
-    } else if (error_message == "QUERY_ID_INVALID") {
-      error_code = 400;
-      error_message = Slice("query is too old and response timeout expired or query ID is invalid");
-    } else if (error_message == "MESSAGE_DELETE_FORBIDDEN") {
-      error_code = 400;
-      error_message = Slice("message can't be deleted");
-    }
+    switch (error_message):
+        case "WC_CONVERT_URL_INVALID":
+            error_message = "Wrong HTTP URL specified";
+            break;
+        case "EXTERNAL_URL_INVALID":
+            error_message = "Wrong HTTP URL specified";
+            break;
+        case "MESSAGE_NOT_MODIFIED":
+            error_message = Slice(
+            "message is not modified: specified new message content and reply markup are exactly the same as a current "
+            "content and reply markup of the message");
+            break;
+        case "WEBPAGE_CURL_FAILED":
+            error_message = "Failed to get HTTP URL content";
+            break;
+        case "WEBPAGE_MEDIA_EMPTY":
+            error_message = "Wrong type of the web page content";
+            break;
+        case "MEDIA_GROUPED_INVALID":
+            error_message = "Can't use the media of the specified type in the album";
+            break;
+        case "REPLY_MARKUP_TOO_LONG":
+            error_message = Slice("reply markup is too long");
+            break;
+        case "INPUT_USER_DEACTIVATED":
+            error_code = 403;
+            error_message = Slice("Forbidden: user is deactivated");
+            break;
+        case "USER_IS_BLOCKED":
+            error_code = 403;
+            error_message = Slice("bot was blocked by the user");
+            break;
+        case "USER_ADMIN_INVALID":
+            error_code = 400;
+            error_message = Slice("user is an administrator of the chat");
+            break;
+        case "File generation failed":
+            error_code = 400;
+            error_message = Slice("can't upload file by URL");
+            break;
+        case "CHAT_ABOUT_NOT_MODIFIED":
+            error_code = 400;
+            error_message = Slice("chat description is not modified");
+            break;
+        case "PACK_SHORT_NAME_INVALID":
+            error_code = 400;
+            error_message = Slice("invalid sticker set name is specified");
+            break;
+        case "PACK_SHORT_NAME_OCCUPIED":
+            error_code = 400;
+            error_message = Slice("sticker set name is already occupied");
+            break;
+        case "STICKER_EMOJI_INVALID":
+            error_code = 400;
+            error_message = Slice("invalid sticker emojis");
+            break;
+        case "QUERY_ID_INVALID":
+            error_code = 400;
+            error_message = Slice("query is too old and response timeout expired or query ID is invalid");
+            break;
+        case "MESSAGE_DELETE_FORBIDDEN":
+            error_code = 400;
+            error_message = Slice("message can't be deleted");
+            break;
+        default:
+            if (!default_message.empty()) {
+                error_message = default_message;
+            }
+            break;
   }
   Slice prefix;
   switch (error_code) {
