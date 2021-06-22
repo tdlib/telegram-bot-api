@@ -3455,9 +3455,6 @@ void Client::start_up() {
   set_context(context);
   set_tag(bot_token_id_);
 
-  auto r_absolute_dir = td::realpath(td::string(".") + TD_DIR_SLASH, true);
-  CHECK(r_absolute_dir.is_ok());
-  absolute_dir_ = r_absolute_dir.move_as_ok();
   auto suff = bot_token_with_dc_ + TD_DIR_SLASH;
 #if TD_PORT_WINDOWS
   for (auto &c : suff) {
@@ -3466,11 +3463,7 @@ void Client::start_up() {
     }
   }
 #endif
-  dir_ = td::string(".") + TD_DIR_SLASH + suff;
-  if (absolute_dir_.back() != TD_DIR_SLASH) {
-    absolute_dir_ += TD_DIR_SLASH;
-  }
-  absolute_dir_ += suff;
+  dir_ = parameters_->working_directory_ + suff;
 
   class TdCallback : public td::TdCallback {
    public:
@@ -4464,8 +4457,8 @@ void Client::on_closed() {
       td::ActorId<Client> parent_;
 
       void start_up() override {
-        CHECK(!dir_.empty());
-        CHECK(dir_[0] == '.');
+        CHECK(dir_.size() >= 24);
+        CHECK(dir_.back() == TD_DIR_SLASH);
         td::rmrf(dir_).ignore();
         stop();
       }
@@ -7657,7 +7650,7 @@ void Client::do_get_file(object_ptr<td_api::file> file, PromisedQueryPtr query) 
   auto file_id = file->id_;
   file_download_listeners_[file_id].push_back(std::move(query));
   if (file->local_->is_downloading_completed_) {
-    Slice relative_path = td::PathView::relative(file->local_->path_, absolute_dir_, true);
+    Slice relative_path = td::PathView::relative(file->local_->path_, dir_, true);
     if (!relative_path.empty()) {
       auto r_stat = td::stat(file->local_->path_);
       if (r_stat.is_ok() && r_stat.ok().is_reg_ && r_stat.ok().size_ == file->size_) {
@@ -8293,7 +8286,7 @@ void Client::json_store_file(td::JsonObjectScope &object, const td_api::file *fi
         object("file_path", td::JsonRawString(file->local_->path_));
       }
     } else {
-      Slice relative_path = td::PathView::relative(file->local_->path_, absolute_dir_, true);
+      Slice relative_path = td::PathView::relative(file->local_->path_, dir_, true);
       if (!relative_path.empty() && file->local_->downloaded_size_ <= MAX_DOWNLOAD_FILE_SIZE) {
         object("file_path", relative_path);
       }

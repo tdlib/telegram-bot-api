@@ -266,7 +266,7 @@ void ClientManager::start_up() {
     td::vector<td::uint64> failed_to_replay_log_event_ids;
     td::int64 loaded_event_count = 0;
     binlog
-        ->init("tqueue.binlog",
+        ->init(parameters_->working_directory_ + "tqueue.binlog",
                [&](const td::BinlogEvent &event) {
                  if (tqueue_binlog->replay(event, *tqueue).is_error()) {
                    failed_to_replay_log_event_ids.push_back(event.id_);
@@ -295,7 +295,8 @@ void ClientManager::start_up() {
 
   // init webhook_db
   auto concurrent_webhook_db = td::make_unique<td::BinlogKeyValue<td::ConcurrentBinlog>>();
-  auto status = concurrent_webhook_db->init("webhooks_db.binlog", td::DbKey::empty(), scheduler_id);
+  auto status = concurrent_webhook_db->init(parameters_->working_directory_ + "webhooks_db.binlog", td::DbKey::empty(),
+                                            scheduler_id);
   LOG_IF(FATAL, status.is_error()) << "Can't open webhooks_db.binlog " << status.error();
   parameters_->shared_data_->webhook_db_ = std::move(concurrent_webhook_db);
 

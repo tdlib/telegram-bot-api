@@ -54,6 +54,8 @@ struct SharedData {
 };
 
 struct ClientParameters {
+  td::string working_directory_;
+
   bool local_mode_ = false;
 
   td::int32 api_id_ = 0;

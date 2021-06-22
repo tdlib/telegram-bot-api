@@ -902,7 +902,6 @@ class Client : public WebhookActor::Callback {
   int64 current_bot_resolve_query_id_ = 1;
 
   td::string dir_;
-  td::string absolute_dir_;
   td::ActorOwn<td::ClientActor> td_client_;
   td::ActorContext context_;
   std::queue<PromisedQueryPtr> cmd_queue_;

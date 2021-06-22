@@ -36,6 +36,7 @@
 #include "td/utils/MemoryLog.h"
 #include "td/utils/misc.h"
 #include "td/utils/OptionParser.h"
+#include "td/utils/PathView.h"
 #include "td/utils/port/IPAddress.h"
 #include "td/utils/port/path.h"
 #include "td/utils/port/rlimit.h"
@@ -208,7 +209,7 @@ int main(int argc, char *argv[]) {
   int default_verbosity_level = 0;
   int memory_verbosity_level = VERBOSITY_NAME(INFO);
   td::int64 log_max_file_size = 2000000000;
-  td::string working_directory;
+  td::string working_directory = PSTRING() << "." << TD_DIR_SLASH;
   td::string temporary_directory;
   td::string username;
   td::string groupname;
@@ -362,29 +363,54 @@ int main(int argc, char *argv[]) {
       TRY_STATUS_PREFIX(td::change_user(username, groupname), "Can't change effective user: ");
     }
 
-    if (!working_directory.empty()) {
-      TRY_STATUS_PREFIX(td::chdir(working_directory), "Can't set working directory: ");
+    {
+      TRY_RESULT_PREFIX_ASSIGN(working_directory, td::realpath(working_directory, true),
+                               "Invalid working directory specified: ");
+      if (working_directory.empty()) {
+        return td::Status::Error("Working directory can't be empty");
+      }
+      if (working_directory.back() != TD_DIR_SLASH) {
+        working_directory += TD_DIR_SLASH;
+      }
+
+      TRY_STATUS_PREFIX(td::mkpath(working_directory, 0750), "Failed to create working directory: ");
+
+      auto r_temp_file = td::mkstemp(working_directory);
+      if (r_temp_file.is_error()) {
+        return td::Status::Error(PSLICE() << "Can't create files in the directory \"" << working_directory
+                                          << "\". Use --dir option to specify a writable working directory");
+      }
+      r_temp_file.ok_ref().first.close();
+      td::unlink(r_temp_file.ok().second).ensure();
     }
 
     if (!temporary_directory.empty()) {
+      if (td::PathView(temporary_directory).is_relative()) {
+        temporary_directory = working_directory + temporary_directory;
+      }
       TRY_STATUS_PREFIX(td::set_temporary_dir(temporary_directory), "Can't set temporary directory: ");
     }
 
-    auto temp_dir = td::get_temporary_dir();
-    if (temp_dir.empty()) {
-      return td::Status::Error("Can't find directory for temporary files. Use --temp-dir option to specify it");
-    }
+    {  // check temporary directory
+      auto temp_dir = td::get_temporary_dir();
+      if (temp_dir.empty()) {
+        return td::Status::Error("Can't find directory for temporary files. Use --temp-dir option to specify it");
+      }
 
-    auto r_temp_file = td::mkstemp(temp_dir);
-    if (r_temp_file.is_error()) {
-      return td::Status::Error(
-          PSLICE() << "Can't create files in the directory \"" << temp_dir
-                   << "\". Use --temp-dir option to specify another directory for temporary files");
+      auto r_temp_file = td::mkstemp(temp_dir);
+      if (r_temp_file.is_error()) {
+        return td::Status::Error(PSLICE()
+                                 << "Can't create files in the directory \"" << temp_dir
+                                 << "\". Use --temp-dir option to specify another directory for temporary files");
+      }
+      r_temp_file.ok_ref().first.close();
+      td::unlink(r_temp_file.ok().second).ensure();
     }
-    r_temp_file.ok_ref().first.close();
-    td::unlink(r_temp_file.ok().second).ensure();
 
     if (!log_file_path.empty()) {
+      if (td::PathView(log_file_path).is_relative()) {
+        log_file_path = working_directory + log_file_path;
+      }
       TRY_STATUS_PREFIX(file_log.init(log_file_path, log_max_file_size), "Can't open log file: ");
       log.set_first(&ts_log);
     }
@@ -396,6 +422,8 @@ int main(int argc, char *argv[]) {
     LOG(PLAIN) << options;
     return 1;
   }
+
+  parameters->working_directory_ = std::move(working_directory);
 
   if (parameters->default_max_webhook_connections_ <= 0) {
     parameters->default_max_webhook_connections_ = parameters->local_mode_ ? 100 : 40;
