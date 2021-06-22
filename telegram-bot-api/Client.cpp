@@ -3456,13 +3456,13 @@ void Client::start_up() {
   set_tag(bot_token_id_);
 
   auto suff = bot_token_with_dc_ + TD_DIR_SLASH;
-#if TD_PORT_WINDOWS
-  for (auto &c : suff) {
-    if (c == ':') {
-      c = '~';
+  if (!parameters_->allow_colon_in_filenames_) {
+    for (auto &c : suff) {
+      if (c == ':') {
+        c = '~';
+      }
     }
   }
-#endif
   dir_ = parameters_->working_directory_ + suff;
 
   class TdCallback : public td::TdCallback {
