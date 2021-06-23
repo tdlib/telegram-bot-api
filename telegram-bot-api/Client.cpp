@@ -2277,14 +2277,8 @@ class Client::JsonChatMembers : public Jsonable {
         continue;
       }
       auto user_id = static_cast<const td_api::messageSenderUser *>(member->member_id_.get())->user_id_;
-      bool is_member_bot = member->bot_info_ != nullptr;
-      if (!is_member_bot) {
-        // bot info may be unknown
-        auto user_info = client_->get_user_info(user_id);
-        if (user_info != nullptr && user_info->type == UserInfo::Type::Bot) {
-          is_member_bot = true;
-        }
-      }
+      auto user_info = client_->get_user_info(user_id);
+      bool is_member_bot = user_info != nullptr && user_info->type == UserInfo::Type::Bot;
       if (is_member_bot && user_id != client_->my_id_) {
         continue;
       }
@@ -3141,11 +3135,7 @@ class Client::TdOnGetMyCommandsCallback : public TdQueryCallback {
 
     CHECK(result->get_id() == td_api::userFullInfo::ID);
     auto user_full_info = move_object_as<td_api::userFullInfo>(result);
-    td::vector<object_ptr<td_api::botCommand>> commands;
-    if (user_full_info->bot_info_ != nullptr) {
-      commands = std::move(user_full_info->bot_info_->commands_);
-    }
-    answer_query(td::json_array(commands, [](auto &command) { return JsonBotCommand(command.get()); }),
+    answer_query(td::json_array(user_full_info->commands_, [](auto &command) { return JsonBotCommand(command.get()); }),
                  std::move(query_));
   }
 
@@ -4742,13 +4732,13 @@ td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(Jso
 
   object_ptr<td_api::ReplyMarkup> result;
   if (!rows.empty()) {
-    result = make_object<td_api::replyMarkupShowKeyboard>(std::move(rows), resize, one_time, is_personal);
+    result = make_object<td_api::replyMarkupShowKeyboard>(std::move(rows), resize, one_time, is_personal, td::string());
   } else if (!inline_rows.empty()) {
     result = make_object<td_api::replyMarkupInlineKeyboard>(std::move(inline_rows));
   } else if (remove) {
     result = make_object<td_api::replyMarkupRemoveKeyboard>(is_personal);
   } else if (force_reply) {
-    result = make_object<td_api::replyMarkupForceReply>(is_personal);
+    result = make_object<td_api::replyMarkupForceReply>(is_personal, td::string());
   }
   if (result == nullptr || result->get_id() != td_api::replyMarkupInlineKeyboard::ID) {
     unresolved_bot_usernames_.clear();
@@ -6235,7 +6225,7 @@ td::Status Client::process_get_my_commands_query(PromisedQueryPtr &query) {
 
 td::Status Client::process_set_my_commands_query(PromisedQueryPtr &query) {
   TRY_RESULT(bot_commands, get_bot_commands(query.get()));
-  send_request(make_object<td_api::setCommands>(std::move(bot_commands)),
+  send_request(make_object<td_api::setCommands>(nullptr, "", std::move(bot_commands)),
                std::make_unique<TdOnOkQueryCallback>(std::move(query)));
   return Status::OK();
 }
@@ -7439,7 +7429,8 @@ td::Status Client::process_upload_sticker_file_query(PromisedQueryPtr &query) {
 
   check_user(user_id, std::move(query),
              [this, user_id, png_sticker = std::move(png_sticker)](PromisedQueryPtr query) mutable {
-               send_request(make_object<td_api::uploadStickerFile>(user_id, std::move(png_sticker)),
+               send_request(make_object<td_api::uploadStickerFile>(
+                                user_id, make_object<td_api::inputStickerStatic>(std::move(png_sticker), "", nullptr)),
                             std::make_unique<TdOnReturnFileCallback>(this, std::move(query)));
              });
   return Status::OK();
@@ -7455,7 +7446,7 @@ td::Status Client::process_create_new_sticker_set_query(PromisedQueryPtr &query)
   check_user(user_id, std::move(query),
              [this, user_id, title, name, is_masks, stickers = std::move(stickers)](PromisedQueryPtr query) mutable {
                send_request(make_object<td_api::createNewStickerSet>(user_id, title.str(), name.str(), is_masks,
-                                                                     std::move(stickers)),
+                                                                     std::move(stickers), PSTRING() << "bot" << my_id_),
                             std::make_unique<TdOnReturnStickerSetCallback>(this, false, std::move(query)));
              });
   return Status::OK();
