@@ -4652,6 +4652,7 @@ td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(con
 td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(JsonValue &&value) {
   td::vector<td::vector<object_ptr<td_api::keyboardButton>>> rows;
   td::vector<td::vector<object_ptr<td_api::inlineKeyboardButton>>> inline_rows;
+  Slice input_field_placeholder;
   bool resize = false;
   bool one_time = false;
   bool remove = false;
@@ -4727,18 +4728,24 @@ td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(Jso
         return Status::Error(400, "Field \"force_reply\" of the reply markup must be of the type Boolean");
       }
       force_reply = field_value.second.get_boolean();
+    } else if (field_value.first == "input_field_placeholder") {
+      if (field_value.second.type() != JsonValue::Type::String) {
+        return Status::Error(400, "Field \"input_field_placeholder\" of the reply markup must be of the type String");
+      }
+      input_field_placeholder = field_value.second.get_string();
     }
   }
 
   object_ptr<td_api::ReplyMarkup> result;
   if (!rows.empty()) {
-    result = make_object<td_api::replyMarkupShowKeyboard>(std::move(rows), resize, one_time, is_personal, td::string());
+    result = make_object<td_api::replyMarkupShowKeyboard>(std::move(rows), resize, one_time, is_personal,
+                                                          input_field_placeholder.str());
   } else if (!inline_rows.empty()) {
     result = make_object<td_api::replyMarkupInlineKeyboard>(std::move(inline_rows));
   } else if (remove) {
     result = make_object<td_api::replyMarkupRemoveKeyboard>(is_personal);
   } else if (force_reply) {
-    result = make_object<td_api::replyMarkupForceReply>(is_personal, td::string());
+    result = make_object<td_api::replyMarkupForceReply>(is_personal, input_field_placeholder.str());
   }
   if (result == nullptr || result->get_id() != td_api::replyMarkupInlineKeyboard::ID) {
     unresolved_bot_usernames_.clear();
