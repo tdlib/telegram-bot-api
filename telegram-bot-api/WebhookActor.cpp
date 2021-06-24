@@ -166,7 +166,7 @@ td::Status WebhookActor::create_connection() {
       Callback &operator=(Callback &&) = delete;
       ~Callback() {
         if (!actor_.empty()) {
-          send_closure(std::move(actor_), &WebhookActor::on_socket_ready_async, td::Status::Error("Cancelled"), id_);
+          send_closure(std::move(actor_), &WebhookActor::on_socket_ready_async, td::Status::Error("Canceled"), id_);
         }
       }
       void on_connected() override {
