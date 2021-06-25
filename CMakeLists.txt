@@ -6,7 +6,7 @@ if (POLICY CMP0065)
   cmake_policy(SET CMP0065 NEW)
 endif()
 
-project(TelegramBotApi VERSION 5.2 LANGUAGES CXX)
+project(TelegramBotApi VERSION 5.3 LANGUAGES CXX)
 
 add_subdirectory(td EXCLUDE_FROM_ALL)
 
