@@ -14,6 +14,7 @@
 #include "td/utils/JsonBuilder.h"
 #include "td/utils/logging.h"
 #include "td/utils/Parser.h"
+#include "td/utils/SliceBuilder.h"
 
 namespace telegram_bot_api {
 
@@ -60,7 +61,7 @@ void HttpConnection::handle(td::unique_ptr<td::HttpQuery> http_query,
 
   auto query = std::make_unique<Query>(std::move(http_query->container_), token, is_user, is_test_dc, method,
                                        std::move(http_query->args_), std::move(http_query->headers_),
-                                       std::move(http_query->files_), shared_data_, http_query->peer_address_);
+                                       std::move(http_query->files_), shared_data_, http_query->peer_address_, false);
 
   td::PromiseActor<td::unique_ptr<Query>> promise;
   td::FutureActor<td::unique_ptr<Query>> future;

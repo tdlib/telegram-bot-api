@@ -28,6 +28,7 @@
 #include "td/utils/port/SocketFd.h"
 #include "td/utils/Random.h"
 #include "td/utils/ScopeGuard.h"
+#include "td/utils/SliceBuilder.h"
 #include "td/utils/Span.h"
 #include "td/utils/Time.h"
 
@@ -165,7 +166,7 @@ td::Status WebhookActor::create_connection() {
       Callback &operator=(Callback &&) = delete;
       ~Callback() {
         if (!actor_.empty()) {
-          send_closure(std::move(actor_), &WebhookActor::on_socket_ready_async, td::Status::Error("Cancelled"), id_);
+          send_closure(std::move(actor_), &WebhookActor::on_socket_ready_async, td::Status::Error("Canceled"), id_);
         }
       }
       void on_connected() override {
@@ -585,10 +586,10 @@ void WebhookActor::handle(td::unique_ptr<td::HttpQuery> response) {
         if (!method.empty() && method != "deletewebhook" && method != "setwebhook" && method != "close" &&
             method != "logout" && !td::begins_with(method, "get")) {
           VLOG(webhook) << "Receive request " << method << " in response to webhook";
-          auto query =
-              std::make_unique<Query>(std::move(response->container_), td::MutableSlice(), false, false, td::MutableSlice(),
-                                      std::move(response->args_), std::move(response->headers_),
-                                      std::move(response->files_), parameters_->shared_data_, response->peer_address_);
+          auto query = std::make_unique<Query>(std::move(response->container_), td::MutableSlice(), false, false,
+                                               td::MutableSlice(), std::move(response->args_),
+                                               std::move(response->headers_), std::move(response->files_),
+                                               parameters_->shared_data_, response->peer_address_, false);
           auto promised_query =
               PromisedQueryPtr(query.release(), PromiseDeleter(td::PromiseActor<td::unique_ptr<Query>>()));
           send_closure(callback_, &Callback::send, std::move(promised_query));

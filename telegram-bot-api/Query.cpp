@@ -14,6 +14,7 @@
 #include "td/utils/logging.h"
 #include "td/utils/misc.h"
 #include "td/utils/port/IPAddress.h"
+#include "td/utils/SliceBuilder.h"
 #include "td/utils/Time.h"
 
 #include <numeric>
@@ -25,7 +26,7 @@ std::unordered_map<td::string, std::unique_ptr<td::VirtuallyJsonable>> empty_par
 Query::Query(td::vector<td::BufferSlice> &&container, td::Slice token, bool is_user, bool is_test_dc, td::MutableSlice method,
              td::vector<std::pair<td::MutableSlice, td::MutableSlice>> &&args,
              td::vector<std::pair<td::MutableSlice, td::MutableSlice>> &&headers, td::vector<td::HttpFile> &&files,
-             std::shared_ptr<SharedData> shared_data, const td::IPAddress &peer_address)
+             std::shared_ptr<SharedData> shared_data, const td::IPAddress &peer_address, bool is_internal)
     : state_(State::Query)
     , shared_data_(shared_data)
     , peer_address_(peer_address)
@@ -36,7 +37,8 @@ Query::Query(td::vector<td::BufferSlice> &&container, td::Slice token, bool is_u
     , method_(method)
     , args_(std::move(args))
     , headers_(std::move(headers))
-    , files_(std::move(files)) {
+    , files_(std::move(files))
+    , is_internal_(is_internal) {
   if (method_.empty()) {
     method_ = arg("method");
   }
@@ -65,6 +67,11 @@ td::int64 Query::files_size() const {
 td::int64 Query::files_max_size() const {
   return std::accumulate(files_.begin(), files_.end(), td::int64{0},
                          [](td::int64 acc, const td::HttpFile &file) { return td::max(acc, file.size); });
+}
+
+void Query::set_stat_actor(td::ActorId<BotStatActor> stat_actor) {
+  stat_actor_ = stat_actor;
+  send_request_stat();
 }
 
 void Query::set_ok(td::BufferSlice result) {
@@ -109,12 +116,26 @@ td::StringBuilder &operator<<(td::StringBuilder &sb, const Query &query) {
   return sb;
 }
 
-void Query::send_response_stat() {
+void Query::send_request_stat() const {
+  if (stat_actor_.empty()) {
+    return;
+  }
+  send_closure(stat_actor_, &BotStatActor::add_event<ServerBotStat::Request>,
+               ServerBotStat::Request{query_size(), file_count(), files_size(), files_max_size()}, td::Time::now());
+}
+
+void Query::send_response_stat() const {
+  auto now = td::Time::now();
+  if (now - start_timestamp_ >= 100.0) {
+    LOG(WARNING) << "Answer too old query with code " << http_status_code_ << " and answer size " << answer_.size()
+                 << ": " << *this;
+  }
+
   if (stat_actor_.empty()) {
     return;
   }
   send_closure(stat_actor_, &BotStatActor::add_event<ServerBotStat::Response>,
-               ServerBotStat::Response{is_ok(), answer().size()}, td::Time::now());
+               ServerBotStat::Response{state_ == State::OK, answer_.size()}, now);
 }
 
 }  // namespace telegram_bot_api

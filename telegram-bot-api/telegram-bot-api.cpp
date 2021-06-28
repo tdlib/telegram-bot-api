@@ -24,8 +24,8 @@
 #include "td/actor/ConcurrentScheduler.h"
 #include "td/actor/PromiseFuture.h"
 
-#include "td/utils/algorithm.h"
 #include "td/utils/buffer.h"
+#include "td/utils/CombinedLog.h"
 #include "td/utils/common.h"
 #include "td/utils/crypto.h"
 #include "td/utils/ExitGuard.h"
@@ -36,15 +36,19 @@
 #include "td/utils/MemoryLog.h"
 #include "td/utils/misc.h"
 #include "td/utils/OptionParser.h"
+#include "td/utils/PathView.h"
 #include "td/utils/port/IPAddress.h"
 #include "td/utils/port/path.h"
 #include "td/utils/port/rlimit.h"
 #include "td/utils/port/signals.h"
 #include "td/utils/port/stacktrace.h"
+#include "td/utils/port/Stat.h"
 #include "td/utils/port/user.h"
 #include "td/utils/Slice.h"
+#include "td/utils/SliceBuilder.h"
 #include "td/utils/Status.h"
 #include "td/utils/Time.h"
+#include "td/utils/TsLog.h"
 
 #include "memprof/memprof.h"
 
@@ -56,10 +60,10 @@
 
 namespace telegram_bot_api {
 
-static std::atomic_flag need_rotate_log;
+static std::atomic_flag need_reopen_log;
 
-static void rotate_log_signal_handler(int sig) {
-  need_rotate_log.clear();
+static void after_log_rotation_signal_handler(int sig) {
+  need_reopen_log.clear();
 }
 
 static std::atomic_flag need_quit;
@@ -106,11 +110,65 @@ static void sigsegv_signal_handler(int signum, void *addr) {
   fail_signal_handler(signum);
 }
 
+static void dump_statistics(const std::shared_ptr<SharedData> &shared_data,
+                            const std::shared_ptr<td::NetQueryStats> &net_query_stats) {
+  if (is_memprof_on()) {
+    LOG(WARNING) << "Memory dump:";
+    td::vector<AllocInfo> v;
+    dump_alloc([&](const AllocInfo &info) { v.push_back(info); });
+    std::sort(v.begin(), v.end(), [](const AllocInfo &a, const AllocInfo &b) { return a.size > b.size; });
+    size_t total_size = 0;
+    size_t other_size = 0;
+    int count = 0;
+    for (auto &info : v) {
+      if (count++ < 50) {
+        LOG(WARNING) << td::format::as_size(info.size) << td::format::as_array(info.backtrace);
+      } else {
+        other_size += info.size;
+      }
+      total_size += info.size;
+    }
+    LOG(WARNING) << td::tag("other", td::format::as_size(other_size));
+    LOG(WARNING) << td::tag("total size", td::format::as_size(total_size));
+    LOG(WARNING) << td::tag("total traces", get_ht_size());
+    LOG(WARNING) << td::tag("fast_backtrace_success_rate", get_fast_backtrace_success_rate());
+  }
+  auto r_mem_stat = td::mem_stat();
+  if (r_mem_stat.is_ok()) {
+    auto mem_stat = r_mem_stat.move_as_ok();
+    LOG(WARNING) << td::tag("rss", td::format::as_size(mem_stat.resident_size_));
+    LOG(WARNING) << td::tag("vm", td::format::as_size(mem_stat.virtual_size_));
+    LOG(WARNING) << td::tag("rss_peak", td::format::as_size(mem_stat.resident_size_peak_));
+    LOG(WARNING) << td::tag("vm_peak", td::format::as_size(mem_stat.virtual_size_peak_));
+  }
+  LOG(WARNING) << td::tag("buffer_mem", td::format::as_size(td::BufferAllocator::get_buffer_mem()));
+  LOG(WARNING) << td::tag("buffer_slice_size", td::format::as_size(td::BufferAllocator::get_buffer_slice_size()));
+
+  auto query_count = shared_data->query_count_.load();
+  LOG(WARNING) << td::tag("pending queries", query_count);
+
+  td::uint64 i = 0;
+  bool was_gap = false;
+  for (auto end = &shared_data->query_list_, cur = end->prev; cur != end; cur = cur->prev, i++) {
+    if (i < 20 || i > query_count - 20 || i % (query_count / 50 + 1) == 0) {
+      if (was_gap) {
+        LOG(WARNING) << "...";
+        was_gap = false;
+      }
+      LOG(WARNING) << static_cast<const Query &>(*cur);
+    } else {
+      was_gap = true;
+    }
+  }
+
+  td::dump_pending_network_queries(*net_query_stats);
+}
+
 int main(int argc, char *argv[]) {
   SET_VERBOSITY_LEVEL(VERBOSITY_NAME(FATAL));
   td::ExitGuard exit_guard;
 
-  need_rotate_log.test_and_set();
+  need_reopen_log.test_and_set();
   need_quit.test_and_set();
   need_change_verbosity_level.test_and_set();
   need_dump_log.test_and_set();
@@ -118,7 +176,7 @@ int main(int argc, char *argv[]) {
   td::Stacktrace::init();
 
   td::setup_signals_alt_stack().ensure();
-  td::set_signal_handler(td::SignalType::User, rotate_log_signal_handler).ensure();
+  td::set_signal_handler(td::SignalType::User, after_log_rotation_signal_handler).ensure();
   td::ignore_signal(td::SignalType::HangUp).ensure();
   td::ignore_signal(td::SignalType::Pipe).ensure();
   td::set_signal_handler(td::SignalType::Quit, quit_signal_handler).ensure();
@@ -134,7 +192,7 @@ int main(int argc, char *argv[]) {
   auto start_time = td::Time::now();
   auto shared_data = std::make_shared<SharedData>();
   auto parameters = std::make_unique<ClientParameters>();
-  parameters->version_ = "5.2";
+  parameters->version_ = "5.3";
   parameters->shared_data_ = shared_data;
   parameters->start_time_ = start_time;
   auto net_query_stats = td::create_net_query_stats();
@@ -142,6 +200,7 @@ int main(int argc, char *argv[]) {
 
   td::OptionParser options;
   bool need_print_usage = false;
+  bool need_print_version = false;
   int http_port = 8081;
   int http_stat_port = 0;
   td::string http_ip_address = "0.0.0.0";
@@ -150,7 +209,7 @@ int main(int argc, char *argv[]) {
   int default_verbosity_level = 0;
   int memory_verbosity_level = VERBOSITY_NAME(INFO);
   td::int64 log_max_file_size = 2000000000;
-  td::string working_directory;
+  td::string working_directory = PSTRING() << "." << TD_DIR_SLASH;
   td::string temporary_directory;
   td::string username;
   td::string groupname;
@@ -173,7 +232,8 @@ int main(int argc, char *argv[]) {
   options.set_usage(td::Slice(argv[0]), "--api-id=<arg> --api-hash=<arg> [--local] [OPTION]...");
   options.set_description("Telegram Bot API server");
   options.add_option('h', "help", "display this help text and exit", [&] { need_print_usage = true; });
-  options.add_option('\0', "local", "allow the Bot API server to serve local requests and disables the file limits",
+  options.add_option('\0', "version", "display version number and exit", [&] { need_print_version = true; });
+  options.add_option('\0', "local", "allow the Bot API server to serve local requests",
                      [&] { parameters->local_mode_ = true; });
   options.add_option('\0', "no-file-limit", "disable the file limits",
 		             [&] { parameters->no_file_limit_ = true; });
@@ -288,77 +348,17 @@ int main(int argc, char *argv[]) {
     LOG(PLAIN) << options;
     return 0;
   }
+  if (need_print_version) {
+    LOG(PLAIN) << "Bot API " << parameters->version_;
+    return 0;
+  }
   if (r_non_options.is_error()) {
-    LOG(PLAIN) << argv[0] << ": " << r_non_options.error();
+    LOG(PLAIN) << argv[0] << ": " << r_non_options.error().message();
     LOG(PLAIN) << options;
     return 1;
   }
 
-  class CombineLog : public td::LogInterface {
-   public:
-    void append(td::CSlice slice, int log_level) override {
-      if (first_ && log_level <= first_verbosity_level_) {
-        if (log_level == VERBOSITY_NAME(FATAL) && second_ && VERBOSITY_NAME(FATAL) <= second_verbosity_level_) {
-          second_->append(slice, VERBOSITY_NAME(ERROR));
-        }
-        first_->append(slice, log_level);
-      }
-      if (second_ && log_level <= second_verbosity_level_) {
-        second_->append(slice, log_level);
-      }
-    }
-
-    void set_first(LogInterface *first) {
-      first_ = first;
-    }
-
-    void set_second(LogInterface *second) {
-      second_ = second;
-    }
-
-    void set_first_verbosity_level(int verbosity_level) {
-      first_verbosity_level_ = verbosity_level;
-    }
-
-    void set_second_verbosity_level(int verbosity_level) {
-      second_verbosity_level_ = verbosity_level;
-    }
-
-    int get_first_verbosity_level() const {
-      return first_verbosity_level_;
-    }
-
-    int get_second_verbosity_level() const {
-      return second_verbosity_level_;
-    }
-
-    void rotate() override {
-      if (first_) {
-        first_->rotate();
-      }
-      if (second_) {
-        second_->rotate();
-      }
-    }
-
-    td::vector<td::string> get_file_paths() override {
-      td::vector<td::string> result;
-      if (first_) {
-        td::append(result, first_->get_file_paths());
-      }
-      if (second_) {
-        td::append(result, second_->get_file_paths());
-      }
-      return result;
-    }
-
-   private:
-    LogInterface *first_ = nullptr;
-    int first_verbosity_level_ = VERBOSITY_NAME(FATAL);
-    LogInterface *second_ = nullptr;
-    int second_verbosity_level_ = VERBOSITY_NAME(FATAL);
-  };
-  CombineLog log;
+  td::CombinedLog log;
   log.set_first(td::default_log_interface);
   log.set_second(&memory_log);
   td::log_interface = &log;
@@ -376,15 +376,65 @@ int main(int argc, char *argv[]) {
       TRY_STATUS_PREFIX(td::change_user(username, groupname), "Can't change effective user: ");
     }
 
-    if (!working_directory.empty()) {
-      TRY_STATUS_PREFIX(td::chdir(working_directory), "Can't set working directory: ");
+    {
+      TRY_RESULT_PREFIX_ASSIGN(working_directory, td::realpath(working_directory, true),
+                               "Invalid working directory specified: ");
+      if (working_directory.empty()) {
+        return td::Status::Error("Working directory can't be empty");
+      }
+      if (working_directory.back() != TD_DIR_SLASH) {
+        working_directory += TD_DIR_SLASH;
+      }
+
+      TRY_STATUS_PREFIX(td::mkpath(working_directory, 0750), "Failed to create working directory: ");
+
+      auto r_temp_file = td::mkstemp(working_directory);
+      if (r_temp_file.is_error()) {
+        return td::Status::Error(PSLICE() << "Can't create files in the directory \"" << working_directory
+                                          << "\". Use --dir option to specify a writable working directory");
+      }
+      r_temp_file.ok_ref().first.close();
+      td::unlink(r_temp_file.ok().second).ensure();
+
+      auto r_temp_dir = td::mkdtemp(working_directory, "1:a");
+      if (r_temp_dir.is_error()) {
+        parameters->allow_colon_in_filenames_ = false;
+        r_temp_dir = td::mkdtemp(working_directory, "1~a");
+        if (r_temp_dir.is_error()) {
+          return td::Status::Error(PSLICE() << "Can't create directories in the directory \"" << working_directory
+                                            << "\". Use --dir option to specify a writable working directory");
+        }
+      }
+      td::rmdir(r_temp_dir.ok()).ensure();
     }
 
     if (!temporary_directory.empty()) {
+      if (td::PathView(temporary_directory).is_relative()) {
+        temporary_directory = working_directory + temporary_directory;
+      }
       TRY_STATUS_PREFIX(td::set_temporary_dir(temporary_directory), "Can't set temporary directory: ");
     }
 
+    {  // check temporary directory
+      auto temp_dir = td::get_temporary_dir();
+      if (temp_dir.empty()) {
+        return td::Status::Error("Can't find directory for temporary files. Use --temp-dir option to specify it");
+      }
+
+      auto r_temp_file = td::mkstemp(temp_dir);
+      if (r_temp_file.is_error()) {
+        return td::Status::Error(PSLICE()
+                                 << "Can't create files in the directory \"" << temp_dir
+                                 << "\". Use --temp-dir option to specify another directory for temporary files");
+      }
+      r_temp_file.ok_ref().first.close();
+      td::unlink(r_temp_file.ok().second).ensure();
+    }
+
     if (!log_file_path.empty()) {
+      if (td::PathView(log_file_path).is_relative()) {
+        log_file_path = working_directory + log_file_path;
+      }
       TRY_STATUS_PREFIX(file_log.init(log_file_path, log_max_file_size), "Can't open log file: ");
       log.set_first(&ts_log);
     }
@@ -392,10 +442,12 @@ int main(int argc, char *argv[]) {
     return td::Status::OK();
   }();
   if (init_status.is_error()) {
-    LOG(PLAIN) << init_status.error();
+    LOG(PLAIN) << init_status.error().message();
     LOG(PLAIN) << options;
     return 1;
   }
+
+  parameters->working_directory_ = std::move(working_directory);
 
   if (parameters->default_max_webhook_connections_ <= 0) {
     parameters->default_max_webhook_connections_ = parameters->local_mode_ ? 100 : 40;
@@ -458,8 +510,8 @@ int main(int argc, char *argv[]) {
   while (true) {
     sched.run_main(next_cron_time - td::Time::now());
 
-    if (!need_rotate_log.test_and_set()) {
-      td::log_interface->rotate();
+    if (!need_reopen_log.test_and_set()) {
+      td::log_interface->after_rotation();
     }
 
     if (!need_quit.test_and_set()) {
@@ -468,7 +520,8 @@ int main(int argc, char *argv[]) {
         std::_Exit(0);
       }
 
-      LOG(WARNING) << "Stopping engine by a signal";
+      LOG(WARNING) << "Stopping engine with uptime " << (td::Time::now() - start_time) << " seconds by a signal";
+      dump_statistics(shared_data, net_query_stats);
       close_flag = true;
       auto guard = sched.get_main_guard();
       send_closure(client_manager, &ClientManager::close, td::PromiseCreator::lambda([&can_quit](td::Unit) {
@@ -497,6 +550,7 @@ int main(int argc, char *argv[]) {
 
     if (!need_dump_log.test_and_set()) {
       print_log();
+      dump_statistics(shared_data, net_query_stats);
     }
 
     double now = td::Time::now();
@@ -525,48 +579,7 @@ int main(int argc, char *argv[]) {
 
     if (now > last_dump_time + 300.0) {
       last_dump_time = now;
-      if (is_memprof_on()) {
-        LOG(WARNING) << "Memory dump:";
-        td::vector<AllocInfo> v;
-        dump_alloc([&](const AllocInfo &info) { v.push_back(info); });
-        std::sort(v.begin(), v.end(), [](const AllocInfo &a, const AllocInfo &b) { return a.size > b.size; });
-        size_t total_size = 0;
-        size_t other_size = 0;
-        int count = 0;
-        for (auto &info : v) {
-          if (count++ < 50) {
-            LOG(WARNING) << td::format::as_size(info.size) << td::format::as_array(info.backtrace);
-          } else {
-            other_size += info.size;
-          }
-          total_size += info.size;
-        }
-        LOG(WARNING) << td::tag("other", td::format::as_size(other_size));
-        LOG(WARNING) << td::tag("total", td::format::as_size(total_size));
-        LOG(WARNING) << td::tag("total traces", get_ht_size());
-        LOG(WARNING) << td::tag("fast_backtrace_success_rate", get_fast_backtrace_success_rate());
-      }
-      LOG(WARNING) << td::tag("buffer_mem", td::format::as_size(td::BufferAllocator::get_buffer_mem()));
-      LOG(WARNING) << td::tag("buffer_slice_size", td::format::as_size(td::BufferAllocator::get_buffer_slice_size()));
-
-      auto query_count = shared_data->query_count_.load();
-      LOG(WARNING) << td::tag("pending queries", query_count);
-
-      td::uint64 i = 0;
-      bool was_gap = false;
-      for (auto end = &shared_data->query_list_, cur = end->prev; cur != end; cur = cur->prev, i++) {
-        if (i < 20 || i > query_count - 20 || i % (query_count / 50 + 1) == 0) {
-          if (was_gap) {
-            LOG(WARNING) << "...";
-            was_gap = false;
-          }
-          LOG(WARNING) << static_cast<Query &>(*cur);
-        } else {
-          was_gap = true;
-        }
-      }
-
-      td::dump_pending_network_queries(*net_query_stats);
+      dump_statistics(shared_data, net_query_stats);
     }
   }
 
