@@ -2324,9 +2324,11 @@ class Client::JsonChatMember : public Jsonable {
       object("inviter", JsonUser(member_->inviter_user_id_, client_));
     }
 
+    /*
     if (member_->bot_info_ != nullptr) {
       //for the future
     }
+    */
 
     switch (member_->status_->get_id()) {
       case td_api::chatMemberStatusCreator::ID: {
@@ -2403,8 +2405,8 @@ class Client::JsonChatMembers : public Jsonable {
       if (member->member_id_->get_id() != td_api::messageSenderUser::ID) {
         continue;
       }
-      auto user_id = static_cast<const td_api::messageSenderUser *>(member->member_id_.get())->user_id_;
       /*
+      auto user_id = static_cast<const td_api::messageSenderUser *>(member->member_id_.get())->user_id_;
       bool is_member_bot = member->bot_info_ != nullptr;
       if (!is_member_bot) {
         // bot info may be unknown
@@ -3743,10 +3745,11 @@ class Client::TdOnGetMemoryStatisticsCallback : public TdQueryCallback {
     if (result->get_id() == td_api::error::ID) {
       return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
     }
-
+    /*
     auto res = move_object_as<td_api::memoryStatistics>(result);
 
     answer_query(td::JsonRaw(res->statistics_), std::move(query_));
+    */
   }
 
  private:
@@ -3959,9 +3962,7 @@ void Client::start_up() {
   set_context(context);
   set_tag(bot_token_id_);
 
-  auto r_absolute_dir = td::realpath(td::string(".") + TD_DIR_SLASH, true);
-  CHECK(r_absolute_dir.is_ok());
-  absolute_dir_ = r_absolute_dir.move_as_ok();
+
   auto suff = bot_token_with_dc_ + TD_DIR_SLASH;
   if (!parameters_->allow_colon_in_filenames_) {
     for (auto &c : suff) {
@@ -8072,9 +8073,11 @@ td::Status Client::process_get_chat_member_count_query(PromisedQueryPtr &query) 
 }
 
 td::Status Client::process_optimize_memory_query(PromisedQueryPtr &query) {
+  /*
   disable_internet_connection(std::move(query), [this](PromisedQueryPtr query) {
     optimize_memory(std::move(query), [this](PromisedQueryPtr query) { enable_internet_connection(std::move(query)); });
   });
+  */
   return Status::OK();
 }
 
@@ -8092,8 +8095,10 @@ void Client::enable_internet_connection(PromisedQueryPtr query) {
 
 template <class OnSuccess>
 void Client::optimize_memory(PromisedQueryPtr query, OnSuccess on_success) {
+  /*
   send_request(make_object<td_api::optimizeMemory>(),
                std::make_unique<TdOnOptimizeMemoryCallback<OnSuccess>>(this, std::move(query), std::move(on_success)));
+  */
 }
 
 td::Status Client::process_leave_chat_query(PromisedQueryPtr &query) {
@@ -8626,8 +8631,10 @@ td::Status Client::process_ping_query(PromisedQueryPtr &query) {
 }
 
 td::Status Client::process_get_memory_stats_query(PromisedQueryPtr &query) {
+  /*
   send_request(make_object<td_api::getMemoryStatistics>(),
                std::make_unique<TdOnGetMemoryStatisticsCallback>(std::move(query)));
+  */
   return Status::OK();
 }
 //end custom methods impl

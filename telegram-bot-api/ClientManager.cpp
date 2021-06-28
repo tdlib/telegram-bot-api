@@ -105,7 +105,7 @@ void ClientManager::send(PromisedQueryPtr query) {
       auto webhook_info = parameters_->shared_data_->webhook_db_->get(bot_token_with_dc);
       if (!webhook_info.empty()) {
         send_closure(client_info->client_, &Client::send,
-                     get_webhook_restore_query(bot_token_with_dc, query->is_user() webhook_info, parameters_->shared_data_));
+                     get_webhook_restore_query(bot_token_with_dc, query->is_user(), webhook_info, parameters_->shared_data_));
       }
     }
 
