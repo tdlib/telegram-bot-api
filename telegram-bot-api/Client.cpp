@@ -8549,7 +8549,7 @@ td::Status Client::process_get_chat_members_query(PromisedQueryPtr &query) {
         td_api::object_ptr<td_api::SupergroupMembersFilter> filter;
         td::string filter_name = td::to_lower(query->arg("filter"));
         auto query_ = query->arg("query");
-        if (!query->empty()) {
+        if (!query_.empty()) {
           filter = td_api::make_object<td_api::supergroupMembersFilterSearch>(query_.str());
         } else if (filter_name == "members" || filter_name == "participants") {
           filter = td_api::make_object<td_api::supergroupMembersFilterRecent>();
