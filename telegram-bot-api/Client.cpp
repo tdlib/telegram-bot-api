@@ -4581,7 +4581,8 @@ void Client::on_update_authorization_state() {
                                                   make_object<td_api::optionValueInteger>(3600)),
                    std::make_unique<TdOnOkCallback>());
       send_request(make_object<td_api::setOption>("delete_file_reference_after_seconds",
-                                                  make_object<td_api::optionValueInteger>(3600)),
+                                                  make_object<td_api::optionValueInteger>(
+                                                          parameters_->file_expiration_timeout_seconds_)),
                    std::make_unique<TdOnOkCallback>());
 
       auto parameters = make_object<td_api::tdlibParameters>();
