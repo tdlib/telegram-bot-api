@@ -289,6 +289,11 @@ bool Client::init_methods() {
   methods_.emplace("togglegroupinvites", &Client::process_toggle_group_invites_query);
   methods_.emplace("ping", &Client::process_ping_query);
   methods_.emplace("getmemorystats", &Client::process_get_memory_stats_query);
+  methods_.emplace("getproxies", &Client::process_get_proxies_query);
+  methods_.emplace("addproxy", &Client::process_add_proxy_query);
+  methods_.emplace("deleteproxy", &Client::process_delete_proxy_query);
+  methods_.emplace("enableproxy", &Client::process_enable_proxy_query);
+  methods_.emplace("disableproxy", &Client::process_disable_proxy_query);
 
   //custom user methods
   methods_.emplace("getchats", &Client::process_get_chats_query);
@@ -2686,6 +2691,56 @@ class Client::JsonMessagesArray : public Jsonable {
   Client *client_;
 };
 
+class Client::JsonProxy : public Jsonable {
+ public:
+  explicit JsonProxy(object_ptr<td_api::proxy> &proxy) : proxy_(proxy) {
+  }
+
+  void store(JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("id", proxy_->id_);
+    object("last_used_date", proxy_->last_used_date_);
+    object("is_enabled", td::JsonBool(proxy_->is_enabled_));
+    object("server", proxy_->server_);
+    object("port", proxy_->port_);
+    switch (proxy_->type_->get_id()) {
+    case td_api::proxyTypeSocks5::ID:
+      {
+        auto ptype = static_cast<td_api::proxyTypeSocks5 *>(proxy_->type_.get());
+        object("type", "socks5");
+        object("username", ptype->username_);
+        object("password", ptype->password_);
+      }
+      break;
+    case td_api::proxyTypeMtproto::ID:
+      {
+        auto ptype = static_cast<td_api::proxyTypeMtproto *>(proxy_->type_.get());
+        object("type", "mtproto");
+        object("secret", ptype->secret_);
+      }
+      break;
+    };
+  }
+
+ private:
+  object_ptr<td_api::proxy> &proxy_;
+};
+
+class Client::JsonProxiesArray : public Jsonable {
+ public:
+  explicit JsonProxiesArray(object_ptr<td_api::proxies> &proxies) : proxies_(proxies) {
+  }
+  void store(JsonValueScope *scope) const {
+    auto array = scope->enter_array();
+    for (auto &proxy : proxies_->proxies_) {
+      array << JsonProxy(proxy);
+    }
+  }
+
+ private:
+  object_ptr<td_api::proxies> &proxies_;
+};
+
 //end custom Json objects impl
 
 class Client::TdOnOkCallback : public TdQueryCallback {
@@ -3876,6 +3931,46 @@ class Client::TdOnGetCallbackQueryAnswerCallback : public TdQueryCallback {
     answer_query(JsonCallbackQueryAnswer(answer.get()), std::move(query_));
   }
 
+  PromisedQueryPtr query_;
+};
+
+class Client::TdOnGetProxiesQueryCallback : public TdQueryCallback {
+ public:
+  explicit TdOnGetProxiesQueryCallback(PromisedQueryPtr query) : query_(std::move(query)) {
+    CHECK(query_ != nullptr);
+  }
+
+  void on_result(object_ptr<td_api::Object> result) override {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::proxies::ID);
+    auto proxies = move_object_as<td_api::proxies>(result);
+    answer_query(JsonProxiesArray(proxies), std::move(query_));
+  }
+
+ private:
+  PromisedQueryPtr query_;
+};
+
+class Client::TdOnAddProxyQueryCallback : public TdQueryCallback {
+ public:
+  explicit TdOnAddProxyQueryCallback(PromisedQueryPtr query) : query_(std::move(query)) {
+    CHECK(query_ != nullptr);
+  }
+
+  void on_result(object_ptr<td_api::Object> result) override {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::proxy::ID);
+    auto proxy = move_object_as<td_api::proxy>(result);
+    answer_query(JsonProxy(proxy), std::move(query_));
+  }
+
+ private:
   PromisedQueryPtr query_;
 };
 
@@ -8636,6 +8731,66 @@ td::Status Client::process_get_memory_stats_query(PromisedQueryPtr &query) {
   send_request(make_object<td_api::getMemoryStatistics>(),
                std::make_unique<TdOnGetMemoryStatisticsCallback>(std::move(query)));
   */
+  return Status::OK();
+}
+
+td::Status Client::process_get_proxies_query(PromisedQueryPtr &query) {
+  send_request(make_object<td_api::getProxies>(),
+               std::make_unique<TdOnGetProxiesQueryCallback>(std::move(query)));
+  return Status::OK();
+}
+
+td::Status Client::process_add_proxy_query(PromisedQueryPtr &query) {
+  TRY_RESULT(server, get_required_string_arg(query.get(), "server"));
+  TRY_RESULT(proxy_type, get_required_string_arg(query.get(), "type"));
+  td::int32 port = get_integer_arg(query.get(), "port", 0, 0, 65535);
+  if (!port) {
+    return Status::Error(400, PSLICE() << "Parameter port with a value between 1-65535 is required");
+  }
+
+  td_api::object_ptr<td_api::ProxyType> type;
+  td::to_lower_inplace(proxy_type);
+  if (proxy_type == "mtproto") {
+    TRY_RESULT(proxy_secret, get_required_string_arg(query.get(), "secret"));
+    type = td_api::make_object<td_api::proxyTypeMtproto>(proxy_secret.str());
+  } else if (proxy_type == "socks5") {
+    auto proxy_user = query->arg("username");
+    auto proxy_pass = query->arg("password");
+    type = td_api::make_object<td_api::proxyTypeSocks5>(proxy_user.str(), proxy_pass.str());
+  } else {
+    return Status::Error(400, "Unsupported proxy type");
+  }
+
+  send_request(make_object<td_api::addProxy>(server.str(), port, false, std::move(type)),
+               std::make_unique<TdOnAddProxyQueryCallback>(std::move(query)));
+  return Status::OK();
+}
+
+td::Status Client::process_delete_proxy_query(PromisedQueryPtr &query) {
+  int32 pid = get_integer_arg(query.get(), "proxy_id", 0, 0);
+  if (pid == 0) {
+    return Status::Error(400, PSLICE() << "Invalid proxy_id specified");
+  }
+
+  send_request(make_object<td_api::removeProxy>(pid),
+               std::make_unique<TdOnOkQueryCallback>(std::move(query)));
+  return Status::OK();
+}
+
+td::Status Client::process_enable_proxy_query(PromisedQueryPtr &query) {
+  int32 pid = get_integer_arg(query.get(), "proxy_id", 0, 0);
+  if (pid == 0) {
+    return Status::Error(400, PSLICE() << "Invalid proxy_id specified");
+  }
+
+  send_request(make_object<td_api::enableProxy>(pid),
+               std::make_unique<TdOnOkQueryCallback>(std::move(query)));
+  return Status::OK();
+}
+
+td::Status Client::process_disable_proxy_query(PromisedQueryPtr &query) {
+  send_request(make_object<td_api::disableProxy>(),
+               std::make_unique<TdOnOkQueryCallback>(std::move(query)));
   return Status::OK();
 }
 //end custom methods impl
