@@ -2719,6 +2719,15 @@ class Client::JsonProxy : public Jsonable {
         object("secret", ptype->secret_);
       }
       break;
+    case td_api::proxyTypeHttp::ID:
+      {
+        auto ptype = static_cast<td_api::proxyTypeHttp *>(proxy_->type_.get());
+        object("type", "http");
+        object("username", ptype->username_);
+        object("password", ptype->password_);
+        object("http_only", td::JsonBool(ptype->http_only_));
+      }
+      break;
     };
   }
 
@@ -8757,6 +8766,11 @@ td::Status Client::process_add_proxy_query(PromisedQueryPtr &query) {
     auto proxy_user = query->arg("username");
     auto proxy_pass = query->arg("password");
     type = td_api::make_object<td_api::proxyTypeSocks5>(proxy_user.str(), proxy_pass.str());
+  } else if (proxy_type == "http") {
+    auto proxy_user = query->arg("username");
+    auto proxy_pass = query->arg("password");
+    auto proxy_http = query->arg("http_only");
+    type = td_api::make_object<td_api::proxyTypeHttp>(proxy_user.str(), proxy_pass.str(), to_bool(proxy_http));
   } else {
     return Status::Error(400, "Unsupported proxy type");
   }
@@ -8767,23 +8781,23 @@ td::Status Client::process_add_proxy_query(PromisedQueryPtr &query) {
 }
 
 td::Status Client::process_delete_proxy_query(PromisedQueryPtr &query) {
-  int32 pid = get_integer_arg(query.get(), "proxy_id", 0, 0);
-  if (pid == 0) {
-    return Status::Error(400, PSLICE() << "Invalid proxy_id specified");
+  auto arg_pid = query->arg("proxy_id");
+  if (arg_pid.empty()) {
+    return Status::Error(400, PSLICE() << "No proxy_id specified");
   }
 
-  send_request(make_object<td_api::removeProxy>(pid),
+  send_request(make_object<td_api::removeProxy>(td::to_integer<int32>(arg_pid)),
                std::make_unique<TdOnOkQueryCallback>(std::move(query)));
   return Status::OK();
 }
 
 td::Status Client::process_enable_proxy_query(PromisedQueryPtr &query) {
-  int32 pid = get_integer_arg(query.get(), "proxy_id", 0, 0);
-  if (pid == 0) {
-    return Status::Error(400, PSLICE() << "Invalid proxy_id specified");
+  auto arg_pid = query->arg("proxy_id");
+  if (arg_pid.empty()) {
+    return Status::Error(400, PSLICE() << "No proxy_id specified");
   }
 
-  send_request(make_object<td_api::enableProxy>(pid),
+  send_request(make_object<td_api::enableProxy>(td::to_integer<int32>(arg_pid)),
                std::make_unique<TdOnOkQueryCallback>(std::move(query)));
   return Status::OK();
 }

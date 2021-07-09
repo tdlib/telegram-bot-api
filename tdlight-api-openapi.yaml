@@ -2129,17 +2129,20 @@ paths:
                   description: TCP port where the server is listening for incomming connections.
                   type: integer
                 type:
-                  description: Type of proxy to be added. Must be either `mtproto` or `socks5`. MTProto proxies must provide a `secret` and Socks5 proxies can a `username` and `password`.
+                  description: Type of proxy to be added. Must be either `mtproto`, `socks5` or `http`. MTProto proxies must provide a `secret` and Socks5/Http proxies can a `username` and `password`.
                   type: string
                 username:
-                  description: Username used to authenticate against a Socks5 proxy.
+                  description: Username used to authenticate against a Socks5/Http proxy.
                   type: string
                 password:
-                  description: Password used to authenticate against a Socks5 proxy.
+                  description: Password used to authenticate against a Socks5/Http proxy.
                   type: string
                 secret:
                   description: Secret used to authenticate against an MTProto proxy.
                   type: string
+                http_only:
+                  description: Set to true if the proxy only supports HTTP requests (as opposed to transparent TCP connections via HTTP CONNECT).
+                  type: boolean
               required:
                 - server
                 - port
@@ -2155,17 +2158,20 @@ paths:
                   description: TCP port where the server is listening for incomming connections.
                   type: integer
                 type:
-                  description: Type of proxy to be added. Must be either `mtproto` or `socks5`. MTProto proxies must provide a `secret` and Socks5 proxies can a `username` and `password`.
+                  description: Type of proxy to be added. Must be either `mtproto`, `socks5` or `http`. MTProto proxies must provide a `secret` and Socks5/Http proxies can a `username` and `password`.
                   type: string
                 username:
-                  description: Username used to authenticate against a Socks5 proxy.
+                  description: Username used to authenticate against a Socks5/Http proxy.
                   type: string
                 password:
-                  description: Password used to authenticate against a Socks5 proxy.
+                  description: Password used to authenticate against a Socks5/Http proxy.
                   type: string
                 secret:
                   description: Secret used to authenticate against an MTProto proxy.
                   type: string
+                http_only:
+                  description: Set to true if the proxy only supports HTTP requests (as opposed to transparent TCP connections via HTTP CONNECT).
+                  type: boolean
               required:
                 - server
                 - port
@@ -2181,17 +2187,20 @@ paths:
                   description: TCP port where the server is listening for incomming connections.
                   type: integer
                 type:
-                  description: Type of proxy to be added. Must be either `mtproto` or `socks5`. MTProto proxies must provide a `secret` and Socks5 proxies can a `username` and `password`.
+                  description: Type of proxy to be added. Must be either `mtproto`, `socks5` or `http`. MTProto proxies must provide a `secret` and Socks5/Http proxies can a `username` and `password`.
                   type: string
                 username:
-                  description: Username used to authenticate against a Socks5 proxy.
+                  description: Username used to authenticate against a Socks5/Http proxy.
                   type: string
                 password:
-                  description: Password used to authenticate against a Socks5 proxy.
+                  description: Password used to authenticate against a Socks5/Http proxy.
                   type: string
                 secret:
                   description: Secret used to authenticate against an MTProto proxy.
                   type: string
+                http_only:
+                  description: Set to true if the proxy only supports HTTP requests (as opposed to transparent TCP connections via HTTP CONNECT).
+                  type: boolean
               required:
                 - server
                 - port
@@ -12438,7 +12447,7 @@ components:
           description: 'TCP port where the proxy server listens.'
           type: integer
         type:
-          description: 'Type of proxy server, either socks5 or mtproto.'
+          description: 'Type of proxy server, either socks5, mtproto or http.'
           type: string
         username:
           description: 'Username to authenticate to the proxy server.'
@@ -12449,6 +12458,9 @@ components:
         secret:
           description: 'Secret to authenticate to the proxy server.'
           type: string
+        http_only:
+          description: 'Whether an Http proxy can only use Http requests (and does not support HTTP CONNECT method).'
+          type: boolean
       required:
         - id
         - last_used_date
