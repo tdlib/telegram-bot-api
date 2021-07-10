@@ -2080,6 +2080,331 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /getProxies:
+    post:
+      tags:
+        - added
+      description: |-
+        Returns all configured proxies. Requires no parameters.
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    default: true
+                    type: boolean
+                  result:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Proxy'
+                required:
+                  - ok
+                  - result
+        default:
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /addProxy:
+    post:
+      tags:
+        - added
+      description: |-
+        Adds a proxy.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                server:
+                  description: Server hostname or IP address to reach the proxy server.
+                  type: string
+                port:
+                  description: TCP port where the server is listening for incomming connections.
+                  type: integer
+                type:
+                  description: Type of proxy to be added. Must be either `mtproto`, `socks5` or `http`. MTProto proxies must provide a `secret` and Socks5/Http proxies can a `username` and `password`.
+                  type: string
+                username:
+                  description: Username used to authenticate against a Socks5/Http proxy.
+                  type: string
+                password:
+                  description: Password used to authenticate against a Socks5/Http proxy.
+                  type: string
+                secret:
+                  description: Secret used to authenticate against an MTProto proxy.
+                  type: string
+                http_only:
+                  description: Set to true if the proxy only supports HTTP requests (as opposed to transparent TCP connections via HTTP CONNECT).
+                  type: boolean
+              required:
+                - server
+                - port
+                - type
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                server:
+                  description: Server hostname or IP address to reach the proxy server.
+                  type: string
+                port:
+                  description: TCP port where the server is listening for incomming connections.
+                  type: integer
+                type:
+                  description: Type of proxy to be added. Must be either `mtproto`, `socks5` or `http`. MTProto proxies must provide a `secret` and Socks5/Http proxies can a `username` and `password`.
+                  type: string
+                username:
+                  description: Username used to authenticate against a Socks5/Http proxy.
+                  type: string
+                password:
+                  description: Password used to authenticate against a Socks5/Http proxy.
+                  type: string
+                secret:
+                  description: Secret used to authenticate against an MTProto proxy.
+                  type: string
+                http_only:
+                  description: Set to true if the proxy only supports HTTP requests (as opposed to transparent TCP connections via HTTP CONNECT).
+                  type: boolean
+              required:
+                - server
+                - port
+                - type
+          application/json:
+            schema:
+              type: object
+              properties:
+                server:
+                  description: Server hostname or IP address to reach the proxy server.
+                  type: string
+                port:
+                  description: TCP port where the server is listening for incomming connections.
+                  type: integer
+                type:
+                  description: Type of proxy to be added. Must be either `mtproto`, `socks5` or `http`. MTProto proxies must provide a `secret` and Socks5/Http proxies can a `username` and `password`.
+                  type: string
+                username:
+                  description: Username used to authenticate against a Socks5/Http proxy.
+                  type: string
+                password:
+                  description: Password used to authenticate against a Socks5/Http proxy.
+                  type: string
+                secret:
+                  description: Secret used to authenticate against an MTProto proxy.
+                  type: string
+                http_only:
+                  description: Set to true if the proxy only supports HTTP requests (as opposed to transparent TCP connections via HTTP CONNECT).
+                  type: boolean
+              required:
+                - server
+                - port
+                - type
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    default: true
+                    type: boolean
+                  result:
+                    $ref: '#/components/schemas/Proxy'
+                required:
+                  - ok
+                  - result
+        default:
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /deleteProxy:
+    post:
+      tags:
+        - added
+      description: |-
+        Deletes a proxy.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                proxy_id:
+                  description: The id that uniquely identifies that proxy server.
+                  type: integer
+              required:
+                - proxy_id
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                proxy_id:
+                  description: The id that uniquely identifies that proxy server.
+                  type: integer
+              required:
+                - proxy_id
+          application/json:
+            schema:
+              type: object
+              properties:
+                proxy_id:
+                  description: The id that uniquely identifies that proxy server.
+                  type: integer
+              required:
+                - proxy_id
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    default: true
+                    type: boolean
+                  result:
+                    default: true
+                    type: boolean
+                required:
+                  - ok
+                  - result
+        default:
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /enableProxy:
+    post:
+      tags:
+        - added
+      description: |-
+        Enables the specified proxy. Takes immediate effect.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                proxy_id:
+                  description: The id that uniquely identifies that proxy server.
+                  type: integer
+              required:
+                - proxy_id
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                proxy_id:
+                  description: The id that uniquely identifies that proxy server.
+                  type: integer
+              required:
+                - proxy_id
+          application/json:
+            schema:
+              type: object
+              properties:
+                proxy_id:
+                  description: The id that uniquely identifies that proxy server.
+                  type: integer
+              required:
+                - proxy_id
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    default: true
+                    type: boolean
+                  result:
+                    default: true
+                    type: boolean
+                required:
+                  - ok
+                  - result
+        default:
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /disableProxy:
+    post:
+      tags:
+        - added
+      description: |-
+        Disables the specified proxy. Takes immediate effect.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                proxy_id:
+                  description: The id that uniquely identifies that proxy server.
+                  type: integer
+              required:
+                - proxy_id
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                proxy_id:
+                  description: The id that uniquely identifies that proxy server.
+                  type: integer
+              required:
+                - proxy_id
+          application/json:
+            schema:
+              type: object
+              properties:
+                proxy_id:
+                  description: The id that uniquely identifies that proxy server.
+                  type: integer
+              required:
+                - proxy_id
+        required: true
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    default: true
+                    type: boolean
+                  result:
+                    default: true
+                    type: boolean
+                required:
+                  - ok
+                  - result
+        default:
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /getUpdates:
     post:
@@ -12102,6 +12427,47 @@ components:
           type: string
       required:
         - text
+    Proxy:
+      description: Contains a proxy definition.
+      type: object
+      properties:
+        id:
+          description: 'Unique ID of the proxy'
+          type: integer
+        last_used_date:
+          description: 'Unix timestamp indicating when the proxy was used for the last time.'
+          type: integer
+        is_enabled:
+          description: 'Whether the bot is being used at the moment.'
+          type: boolean
+        server:
+          description: 'Hostname or IP of the proxy server.'
+          type: string
+        port:
+          description: 'TCP port where the proxy server listens.'
+          type: integer
+        type:
+          description: 'Type of proxy server, either socks5, mtproto or http.'
+          type: string
+        username:
+          description: 'Username to authenticate to the proxy server.'
+          type: string
+        password:
+          description: 'Password to authenticate to the proxy server.'
+          type: string
+        secret:
+          description: 'Secret to authenticate to the proxy server.'
+          type: string
+        http_only:
+          description: 'Whether an Http proxy can only use Http requests (and does not support HTTP CONNECT method).'
+          type: boolean
+      required:
+        - id
+        - last_used_date
+        - is_enabled
+        - server
+        - port
+        - type
 externalDocs:
   description: The Bot API is an HTTP-based interface created for developers keen on building bots for Telegram.
   url: 'https://core.telegram.org/bots/api'

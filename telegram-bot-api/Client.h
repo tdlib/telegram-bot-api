@@ -167,6 +167,8 @@ class Client : public WebhookActor::Callback {
   class JsonChats;
   class JsonChatsNearby;
   class JsonMessagesArray;
+  class JsonProxy;
+  class JsonProxiesArray;
   //stop custom Json objects
 
   class TdOnOkCallback;
@@ -211,6 +213,8 @@ class Client : public WebhookActor::Callback {
   class TdOnReturnChatCallback;
   class TdOnReturnMessagesCallback;
   class TdOnGetCallbackQueryAnswerCallback;
+  class TdOnGetProxiesQueryCallback;
+  class TdOnAddProxyQueryCallback;
   //end custom callbacks
 
   void on_get_reply_message(int64 chat_id, object_ptr<td_api::message> reply_to_message);
@@ -575,6 +579,11 @@ class Client : public WebhookActor::Callback {
   Status process_toggle_group_invites_query(PromisedQueryPtr &query);
   Status process_ping_query(PromisedQueryPtr &query);
   Status process_get_memory_stats_query(PromisedQueryPtr &query);
+  Status process_get_proxies_query(PromisedQueryPtr &query);
+  Status process_add_proxy_query(PromisedQueryPtr &query);
+  Status process_delete_proxy_query(PromisedQueryPtr &query);
+  Status process_enable_proxy_query(PromisedQueryPtr &query);
+  Status process_disable_proxy_query(PromisedQueryPtr &query);
 
   //custom user methods
   Status process_get_chats_query(PromisedQueryPtr &query);
