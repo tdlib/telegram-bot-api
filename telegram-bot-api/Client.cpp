@@ -65,6 +65,19 @@ void Client::fail_query_with_error(PromisedQueryPtr query, int32 error_code, Sli
     }
 
     error_code = 400;
+  } else if (error_code == 403) {
+    bool is_server_error = true;
+    for (auto c : error_message) {
+      if (c == '_' || ('A' <= c && c <= 'Z') || td::is_digit(c)) {
+        continue;
+      }
+
+      is_server_error = false;
+      break;
+    }
+    if (is_server_error) {
+      error_code = 400;
+    }
   }
   if (error_code == 400) {
     if (!default_message.empty()) {
