@@ -8853,7 +8853,7 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     }
   }
 
-  if (message->ttl_ > 0 && message->ttl_expires_in_ == 0) {
+  if (message->ttl_ > 0 && message->ttl_expires_in_ == message->ttl_) {
     return true;
   }
 
