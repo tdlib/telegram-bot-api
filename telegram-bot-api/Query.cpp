@@ -125,7 +125,7 @@ void Query::send_request_stat() const {
 
 void Query::send_response_stat() const {
   auto now = td::Time::now();
-  if (now - start_timestamp_ >= 100.0) {
+  if (now - start_timestamp_ >= 100.0 && !is_internal_) {
     LOG(WARNING) << "Answer too old query with code " << http_status_code_ << " and answer size " << answer_.size()
                  << ": " << *this;
   }
