@@ -147,15 +147,27 @@ void ClientManager::get_stats(td::PromiseActor<td::BufferSlice> promise,
   td::StringBuilder sb(buf.as_slice());
 
   td::Slice id_filter;
+  int new_verbosity_level = -1;
+  td::string tag;
   for (auto &arg : args) {
     if (arg.first == "id") {
       id_filter = arg.second;
     }
     if (arg.first == "v") {
-      auto r_verbosity = td::to_integer_safe<int>(arg.second);
-      if (r_verbosity.is_ok()) {
-        parameters_->shared_data_->next_verbosity_level_ = r_verbosity.ok();
+      auto r_new_verbosity_level = td::to_integer_safe<int>(arg.second);
+      if (r_new_verbosity_level.is_ok()) {
+        new_verbosity_level = r_new_verbosity_level.ok();
       }
+    }
+    if (arg.first == "tag") {
+      tag = arg.second;
+    }
+  }
+  if (new_verbosity_level > 0) {
+    if (tag.empty()) {
+      parameters_->shared_data_->next_verbosity_level_ = new_verbosity_level;
+    } else {
+      td::ClientActor::execute(td::td_api::make_object<td::td_api::setLogTagVerbosityLevel>(tag, new_verbosity_level));
     }
   }
 
