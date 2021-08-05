@@ -397,6 +397,7 @@ void ClientManager::start_up() {
 
   // init tqueue
   {
+    auto load_start_time = td::Time::now();
     auto tqueue_binlog = td::make_unique<td::TQueueBinlog<td::Binlog>>();
     auto binlog = td::make_unique<td::Binlog>();
     auto tqueue = td::TQueue::create();
@@ -413,7 +414,6 @@ void ClientManager::start_up() {
                })
         .ensure();
     tqueue_binlog.reset();
-    LOG(WARNING) << "Loaded " << loaded_event_count << " TQueue events";
 
     if (!failed_to_replay_log_event_ids.empty()) {
       LOG(ERROR) << "Failed to replay " << failed_to_replay_log_event_ids.size() << " TQueue events";
@@ -428,6 +428,9 @@ void ClientManager::start_up() {
     tqueue->set_callback(std::move(concurrent_tqueue_binlog));
 
     parameters_->shared_data_->tqueue_ = std::move(tqueue);
+
+    LOG(WARNING) << "Loaded " << loaded_event_count << " TQueue events in " << (td::Time::now() - load_start_time)
+                 << " seconds";
   }
 
   // init webhook_db and user_db
