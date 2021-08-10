@@ -47,6 +47,7 @@ Query::Query(td::vector<td::BufferSlice> &&container, td::Slice token, bool is_t
   if (shared_data_) {
     shared_data_->query_count_++;
     if (method_ != "getupdates") {
+      shared_data_->query_list_size_++;
       shared_data_->query_list_.put(this);
     }
   }

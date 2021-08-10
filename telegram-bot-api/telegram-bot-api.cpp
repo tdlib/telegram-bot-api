@@ -144,13 +144,14 @@ static void dump_statistics(const std::shared_ptr<SharedData> &shared_data,
   LOG(WARNING) << td::tag("buffer_mem", td::format::as_size(td::BufferAllocator::get_buffer_mem()));
   LOG(WARNING) << td::tag("buffer_slice_size", td::format::as_size(td::BufferAllocator::get_buffer_slice_size()));
 
+  auto query_list_size = shared_data->query_list_size_;
   auto query_count = shared_data->query_count_.load();
-  LOG(WARNING) << td::tag("pending queries", query_count);
+  LOG(WARNING) << td::tag("pending queries", query_count) << td::tag("pending requests", query_list_size);
 
   td::uint64 i = 0;
   bool was_gap = false;
   for (auto end = &shared_data->query_list_, cur = end->prev; cur != end; cur = cur->prev, i++) {
-    if (i < 20 || i > query_count - 20 || i % (query_count / 50 + 1) == 0) {
+    if (i < 20 || i > query_list_size - 20 || i % (query_list_size / 50 + 1) == 0) {
       if (was_gap) {
         LOG(WARNING) << "...";
         was_gap = false;
