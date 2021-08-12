@@ -334,7 +334,7 @@ function onOptionsChanged() {
           cmake = 'cmake3';
           packages += ' gperf';
         } else {
-          commands.push(sudo + 'dnf --enablerepo=PowerTools install gperf');
+          commands.push(sudo + 'dnf --enablerepo=powertools install gperf');
         }
         packages += ' ' + cmake;
         commands.push(sudo + 'yum install -y ' + packages);
