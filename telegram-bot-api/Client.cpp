@@ -3241,9 +3241,6 @@ class Client::TdOnGetSupergroupMembersCountCallback : public TdQueryCallback {
 
     CHECK(result->get_id() == td_api::supergroupFullInfo::ID);
     auto supergroup_full_info = move_object_as<td_api::supergroupFullInfo>(result);
-    if (supergroup_full_info->member_count_ == 0) {
-      return fail_query(400, "Bad Request: need administrator rights", std::move(query_));
-    }
     return answer_query(td::VirtuallyJsonableInt(supergroup_full_info->member_count_), std::move(query_));
   }
 
