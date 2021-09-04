@@ -8636,10 +8636,11 @@ td::Status Client::process_get_file_query(PromisedQueryPtr &query) {
 td::Status Client::process_get_message_info_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
   auto message_id = get_message_id(query.get(), "message_id");
+  auto send_reply = to_bool(query->arg("send_reply"));
   check_message(chat_id, message_id, false, AccessRights::Read, "message", std::move(query),
-                [this](int64 chat_id, int64 message_id, PromisedQueryPtr query) {
+                [this, send_reply](int64 chat_id, int64 message_id, PromisedQueryPtr query) {
                   auto message = get_message(chat_id, message_id);
-                  answer_query(JsonMessage(message, false, "get message info", this), std::move(query));
+                  answer_query(JsonMessage(message, send_reply, "get message info", this), std::move(query));
                 });
 
   return Status::OK();
