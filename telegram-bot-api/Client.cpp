@@ -1435,15 +1435,9 @@ class Client::JsonVoiceChatScheduled : public Jsonable {
 
 class Client::JsonVoiceChatStarted : public Jsonable {
  public:
-  explicit JsonVoiceChatStarted(const td_api::messageVoiceChatStarted *voice_chat_started)
-      : voice_chat_started_(voice_chat_started) {
-  }
   void store(JsonValueScope *scope) const {
     auto object = scope->enter_object();
   }
-
- private:
-  const td_api::messageVoiceChatStarted *voice_chat_started_;
 };
 
 class Client::JsonVoiceChatEnded : public Jsonable {
@@ -1874,11 +1868,9 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
       object("voice_chat_scheduled", JsonVoiceChatScheduled(content));
       break;
     }
-    case td_api::messageVoiceChatStarted::ID: {
-      auto content = static_cast<const td_api::messageVoiceChatStarted *>(message_->content.get());
-      object("voice_chat_started", JsonVoiceChatStarted(content));
+    case td_api::messageVoiceChatStarted::ID:
+      object("voice_chat_started", JsonVoiceChatStarted());
       break;
-    }
     case td_api::messageVoiceChatEnded::ID: {
       auto content = static_cast<const td_api::messageVoiceChatEnded *>(message_->content.get());
       object("voice_chat_ended", JsonVoiceChatEnded(content));
