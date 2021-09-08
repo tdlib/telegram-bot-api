@@ -458,7 +458,8 @@ class Client::JsonVectorEntities : public Jsonable {
   void store(JsonValueScope *scope) const {
     auto array = scope->enter_array();
     for (auto &entity : entities_) {
-      if (entity->type_->get_id() != td_api::textEntityTypeBankCardNumber::ID) {
+      auto entity_type = entity->type_->get_id();
+      if (entity_type != td_api::textEntityTypeBankCardNumber::ID && entity_type != td_api::textEntityTypeMediaTimestamp::ID) {
         array << JsonEntity(entity.get(), client_);
       }
     }
@@ -1837,6 +1838,8 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
     case td_api::messageExpiredVideo::ID:
       break;
     case td_api::messageCustomServiceAction::ID:
+      break;
+    case td_api::messageChatSetTheme::ID:
       break;
     case td_api::messageWebsiteConnected::ID: {
       auto chat = client_->get_chat(message_->chat_id);
@@ -4401,7 +4404,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       add_update_chat_member(move_object_as<td_api::updateChatMember>(result));
       break;
     default:
-      // we are not interested in this updates
+      // we are not interested in this update
       break;
   }
 }
@@ -8919,6 +8922,8 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageExpiredVideo::ID:
       return true;
     case td_api::messageCustomServiceAction::ID:
+      return true;
+    case td_api::messageChatSetTheme::ID:
       return true;
     default:
       break;
