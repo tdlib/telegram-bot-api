@@ -8,6 +8,11 @@ endif()
 
 project(TelegramBotApi VERSION 5.3.2 LANGUAGES CXX)
 
+if (POLICY CMP0069)
+  option(TELEGRAM_BOT_API_ENABLE_LTO "Use \"ON\" to enable Link Time Optimization.")
+  set(TD_ENABLE_LTO "${TELEGRAM_BOT_API_ENABLE_LTO}" CACHE STRING "Enable LTO" FORCE)
+endif()
+
 add_subdirectory(td EXCLUDE_FROM_ALL)
 
 if (NOT DEFINED CMAKE_MODULE_PATH)
@@ -34,6 +39,19 @@ endif()
 
 include(PreventInSourceBuild)
 prevent_in_source_build()
+
+if (POLICY CMP0069 AND TELEGRAM_BOT_API_ENABLE_LTO)
+  cmake_policy(SET CMP0069 NEW)
+  include(CheckIPOSupported)
+  check_ipo_supported(RESULT IPO_SUPPORTED LANGUAGES CXX)
+  if (IPO_SUPPORTED)
+    string(REPLACE ";" " " CXX_FLAGS_IPO "${CMAKE_CXX_COMPILE_OPTIONS_IPO}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX_FLAGS_IPO}")
+
+    string(REPLACE ";" " " LINK_FLAGS_IPO "${CMAKE_CXX_LINK_OPTIONS_IPO}")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${LINK_FLAGS_IPO}")
+  endif()
+endif()
 
 set(CMAKE_THREAD_PREFER_PTHREAD ON)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
