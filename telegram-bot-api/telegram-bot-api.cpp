@@ -84,6 +84,10 @@ void print_log() {
   td::signal_safe_write("------------------------\n");
 }
 
+static void dump_stacktrace_signal_handler(int sig) {
+  td::Stacktrace::print_to_stderr();
+}
+
 static void fail_signal_handler(int sig) {
   td::signal_safe_write_signal_number(sig);
   td::Stacktrace::PrintOptions options;
@@ -187,6 +191,7 @@ int main(int argc, char *argv[]) {
 
   td::set_runtime_signal_handler(0, change_verbosity_level_signal_handler).ensure();
   td::set_runtime_signal_handler(1, dump_log_signal_handler).ensure();
+  td::set_runtime_signal_handler(2, dump_stacktrace_signal_handler).ensure();
 
   td::init_openssl_threads();
 
