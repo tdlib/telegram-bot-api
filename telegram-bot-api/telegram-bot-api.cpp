@@ -84,6 +84,10 @@ void print_log() {
   td::signal_safe_write("------------------------\n");
 }
 
+static void dump_stacktrace_signal_handler(int sig) {
+  td::Stacktrace::print_to_stderr();
+}
+
 static void fail_signal_handler(int sig) {
   td::signal_safe_write_signal_number(sig);
   td::Stacktrace::PrintOptions options;
@@ -144,13 +148,14 @@ static void dump_statistics(const std::shared_ptr<SharedData> &shared_data,
   LOG(WARNING) << td::tag("buffer_mem", td::format::as_size(td::BufferAllocator::get_buffer_mem()));
   LOG(WARNING) << td::tag("buffer_slice_size", td::format::as_size(td::BufferAllocator::get_buffer_slice_size()));
 
+  auto query_list_size = shared_data->query_list_size_;
   auto query_count = shared_data->query_count_.load();
-  LOG(WARNING) << td::tag("pending queries", query_count);
+  LOG(WARNING) << td::tag("pending queries", query_count) << td::tag("pending requests", query_list_size);
 
   td::uint64 i = 0;
   bool was_gap = false;
   for (auto end = &shared_data->query_list_, cur = end->prev; cur != end; cur = cur->prev, i++) {
-    if (i < 20 || i > query_count - 20 || i % (query_count / 50 + 1) == 0) {
+    if (i < 20 || i > query_list_size - 20 || i % (query_list_size / 50 + 1) == 0) {
       if (was_gap) {
         LOG(WARNING) << "...";
         was_gap = false;
@@ -186,13 +191,14 @@ int main(int argc, char *argv[]) {
 
   td::set_runtime_signal_handler(0, change_verbosity_level_signal_handler).ensure();
   td::set_runtime_signal_handler(1, dump_log_signal_handler).ensure();
+  td::set_runtime_signal_handler(2, dump_stacktrace_signal_handler).ensure();
 
   td::init_openssl_threads();
 
   auto start_time = td::Time::now();
   auto shared_data = std::make_shared<SharedData>();
   auto parameters = std::make_unique<ClientParameters>();
-  parameters->version_ = "5.3.1";
+  parameters->version_ = "5.3.3";
   parameters->shared_data_ = shared_data;
   parameters->start_time_ = start_time;
   auto net_query_stats = td::create_net_query_stats();

@@ -34,9 +34,8 @@ select.large { font-size: large; }
       <option>Alpine</option>
       <option>CentOS 7</option>
       <option>CentOS 8</option>
-      <option>Debian 8</option>
-      <option>Debian 9</option>
-      <option>Debian 10</option>
+      <option>Debian 8/9</option>
+      <option>Debian 10+</option>
       <option>Ubuntu 14</option>
       <option>Ubuntu 16</option>
       <option>Ubuntu 18</option>
@@ -249,7 +248,6 @@ function onOptionsChanged() {
     pre_text.push('Download and install <a href="https://visualstudio.microsoft.com/ru/vs/community/">Microsoft Visual Studio</a>. Enable C++ support while installing.');
     pre_text.push('Download and install <a href="https://cmake.org/download/">CMake</a>; choose "Add CMake to the system PATH" option while installing.');
     pre_text.push('Download and install <a href="https://git-scm.com/download/win">Git</a>.');
-    pre_text.push('Download and install <a href="https://sourceforge.net/projects/gnuwin32/files/gperf/3.0.1/">gperf</a>. Add the path to gperf.exe to the PATH environment variable.');
   }
   if (os_linux && linux_distro === 'Other') {
     var compiler = use_clang ? 'clang >= 3.4' : 'g++ >= 4.9.2';
@@ -334,14 +332,13 @@ function onOptionsChanged() {
           cmake = 'cmake3';
           packages += ' gperf';
         } else {
-          commands.push(sudo + 'dnf --enablerepo=PowerTools install gperf');
+          commands.push(sudo + 'dnf --enablerepo=powertools install gperf');
         }
         packages += ' ' + cmake;
         commands.push(sudo + 'yum install -y ' + packages);
         break;
-      case 'Debian 8':
-      case 'Debian 9':
-      case 'Debian 10':
+      case 'Debian 8/9':
+      case 'Debian 10+':
       case 'Ubuntu 14':
       case 'Ubuntu 16':
       case 'Ubuntu 18':
@@ -362,7 +359,7 @@ function onOptionsChanged() {
         }
         if (use_clang) {
           packages += ' clang' + getClangVersionSuffix() + ' libc++-dev';
-          if (linux_distro === 'Debian 10' || linux_distro === 'Ubuntu 18' || linux_distro === 'Ubuntu 20') {
+          if (linux_distro === 'Debian 10+' || linux_distro === 'Ubuntu 18' || linux_distro === 'Ubuntu 20') {
             packages += ' libc++abi-dev';
           }
         } else {
@@ -410,9 +407,9 @@ function onOptionsChanged() {
     commands.push('cd vcpkg');
     commands.push(local + 'bootstrap-vcpkg.bat');
     if (build_64bit) {
-      commands.push(local + 'vcpkg.exe install openssl:x64-windows zlib:x64-windows');
+      commands.push(local + 'vcpkg.exe install gperf:x64-windows openssl:x64-windows zlib:x64-windows');
     } else {
-      commands.push(local + 'vcpkg.exe install openssl:x86-windows zlib:x86-windows');
+      commands.push(local + 'vcpkg.exe install gperf:x86-windows openssl:x86-windows zlib:x86-windows');
     }
     commands.push('cd ..');
   }

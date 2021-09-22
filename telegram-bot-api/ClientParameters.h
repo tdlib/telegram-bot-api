@@ -32,6 +32,7 @@ struct SharedData {
   std::atomic<int> next_verbosity_level_{-1};
 
   // not thread-safe
+  size_t query_list_size_ = 0;
   td::ListNode query_list_;
   td::unique_ptr<td::KeyValueSyncInterface> webhook_db_;
   td::unique_ptr<td::KeyValueSyncInterface> user_db_;

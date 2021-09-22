@@ -113,6 +113,9 @@ class Query : public td::ListNode {
   ~Query() {
     if (shared_data_) {
       shared_data_->query_count_--;
+      if (!empty()) {
+        shared_data_->query_list_size_--;
+      }
     }
   }
 

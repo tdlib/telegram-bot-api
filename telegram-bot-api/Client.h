@@ -221,9 +221,9 @@ class Client : public WebhookActor::Callback {
 
   void on_get_edited_message(object_ptr<td_api::message> edited_message);
 
-  void on_get_callback_query_message(object_ptr<td_api::message> message, int32 user_id, int state);
+  void on_get_callback_query_message(object_ptr<td_api::message> message, int64 user_id, int state);
 
-  void on_get_sticker_set(int64 set_id, int32 new_callback_query_user_id, int64 new_message_chat_id,
+  void on_get_sticker_set(int64 set_id, int64 new_callback_query_user_id, int64 new_message_chat_id,
                           object_ptr<td_api::stickerSet> sticker_set);
 
   void on_get_sticker_set_name(int64 set_id, const td::string &name);
@@ -270,10 +270,10 @@ class Client : public WebhookActor::Callback {
   class TdOnResolveBotUsernameCallback;
 
   template <class OnSuccess>
-  void check_user(int32 user_id, PromisedQueryPtr query, OnSuccess on_success);
+  void check_user(int64 user_id, PromisedQueryPtr query, OnSuccess on_success);
 
   template <class OnSuccess>
-  void check_user_no_fail(int32 user_id, PromisedQueryPtr query, OnSuccess on_success);
+  void check_user_no_fail(int64 user_id, PromisedQueryPtr query, OnSuccess on_success);
 
   template <class OnSuccess>
   static void check_user_read_access(const UserInfo *user_info, PromisedQueryPtr query, OnSuccess on_success);
@@ -315,7 +315,7 @@ class Client : public WebhookActor::Callback {
                                                   PromisedQueryPtr query, OnSuccess on_success);
 
   template <class OnSuccess>
-  void get_chat_member(int64 chat_id, int32 user_id, PromisedQueryPtr query, OnSuccess on_success);
+  void get_chat_member(int64 chat_id, int64 user_id, PromisedQueryPtr query, OnSuccess on_success);
 
   void send_request(object_ptr<td_api::Function> &&f, std::unique_ptr<TdQueryCallback> handler);
   void do_send_request(object_ptr<td_api::Function> &&f, std::unique_ptr<TdQueryCallback> handler);
@@ -381,10 +381,10 @@ class Client : public WebhookActor::Callback {
   struct BotCommandScope {
     object_ptr<td_api::BotCommandScope> scope_;
     td::string chat_id_;
-    td::int32 user_id_ = 0;
+    td::int64 user_id_ = 0;
 
     explicit BotCommandScope(object_ptr<td_api::BotCommandScope> scope, td::string chat_id = td::string(),
-                             td::int32 user_id = 0)
+                             td::int64 user_id = 0)
         : scope_(std::move(scope)), chat_id_(std::move(chat_id)), user_id_(user_id) {
     }
   };
@@ -465,7 +465,7 @@ class Client : public WebhookActor::Callback {
 
   static td::Result<Slice> get_inline_message_id(const Query *query, Slice field_name = Slice("inline_message_id"));
 
-  static td::Result<int32> get_user_id(const Query *query, Slice field_name = Slice("user_id"));
+  static td::Result<int64> get_user_id(const Query *query, Slice field_name = Slice("user_id"));
 
   int64 extract_yet_unsent_message_query_id(int64 chat_id, int64 message_id, bool *is_reply_to_message_deleted);
 
@@ -636,7 +636,7 @@ class Client : public WebhookActor::Callback {
   void fix_inline_query_results_bot_user_ids(td::vector<object_ptr<td_api::InputInlineQueryResult>> &results) const;
 
   void resolve_bot_usernames(PromisedQueryPtr query, td::Promise<PromisedQueryPtr> on_success);
-  void on_resolve_bot_username(const td::string &username, int32 user_id);
+  void on_resolve_bot_username(const td::string &username, int64 user_id);
 
   void abort_long_poll(bool from_set_webhook);
 
@@ -682,9 +682,9 @@ class Client : public WebhookActor::Callback {
     bool can_read_all_group_messages = false;
     bool is_inline_bot = false;
   };
-  static void add_user(std::unordered_map<int32, UserInfo> &users, object_ptr<td_api::user> &&user);
-  void set_user_bio(int32 user_id, td::string &&bio);
-  const UserInfo *get_user_info(int32 user_id) const;
+  static void add_user(std::unordered_map<int64, UserInfo> &users, object_ptr<td_api::user> &&user);
+  void set_user_bio(int64 user_id, td::string &&bio);
+  const UserInfo *get_user_info(int64 user_id) const;
 
   struct GroupInfo {
     td::string description;
@@ -693,12 +693,12 @@ class Client : public WebhookActor::Callback {
     bool left = false;
     bool kicked = false;
     bool is_active = false;
-    int32 upgraded_to_supergroup_id = 0;
+    int64 upgraded_to_supergroup_id = 0;
   };
-  static void add_group(std::unordered_map<int32, GroupInfo> &groups, object_ptr<td_api::basicGroup> &&group);
-  void set_group_description(int32 group_id, td::string &&descripton);
-  void set_group_invite_link(int32 group_id, td::string &&invite_link);
-  const GroupInfo *get_group_info(int32 group_id) const;
+  static void add_group(std::unordered_map<int64, GroupInfo> &groups, object_ptr<td_api::basicGroup> &&group);
+  void set_group_description(int64 group_id, td::string &&descripton);
+  void set_group_invite_link(int64 group_id, td::string &&invite_link);
+  const GroupInfo *get_group_info(int64 group_id) const;
 
   struct SupergroupInfo {
     td::string username;
@@ -719,16 +719,16 @@ class Client : public WebhookActor::Callback {
     bool is_scam = false;
     // end custom properties
   };
-  static void add_supergroup(std::unordered_map<int32, SupergroupInfo> &supergroups,
+  static void add_supergroup(std::unordered_map<int64, SupergroupInfo> &supergroups,
                              object_ptr<td_api::supergroup> &&supergroup);
-  void set_supergroup_description(int32 supergroup_id, td::string &&descripton);
-  void set_supergroup_invite_link(int32 supergroup_id, td::string &&invite_link);
-  void set_supergroup_sticker_set_id(int32 supergroup_id, int64 sticker_set_id);
-  void set_supergroup_can_set_sticker_set(int32 supergroup_id, bool can_set_sticker_set);
-  void set_supergroup_slow_mode_delay(int32 supergroup_id, int32 slow_mode_delay);
-  void set_supergroup_linked_chat_id(int32 supergroup_id, int64 linked_chat_id);
-  void set_supergroup_location(int32 supergroup_id, object_ptr<td_api::chatLocation> location);
-  const SupergroupInfo *get_supergroup_info(int32 supergroup_id) const;
+  void set_supergroup_description(int64 supergroup_id, td::string &&descripton);
+  void set_supergroup_invite_link(int64 supergroup_id, td::string &&invite_link);
+  void set_supergroup_sticker_set_id(int64 supergroup_id, int64 sticker_set_id);
+  void set_supergroup_can_set_sticker_set(int64 supergroup_id, bool can_set_sticker_set);
+  void set_supergroup_slow_mode_delay(int64 supergroup_id, int32 slow_mode_delay);
+  void set_supergroup_linked_chat_id(int64 supergroup_id, int64 linked_chat_id);
+  void set_supergroup_location(int64 supergroup_id, object_ptr<td_api::chatLocation> location);
+  const SupergroupInfo *get_supergroup_info(int64 supergroup_id) const;
 
   struct ChatInfo {
     enum class Type { Private, Group, Supergroup, Unknown };
@@ -738,9 +738,9 @@ class Client : public WebhookActor::Callback {
     object_ptr<td_api::chatPhotoInfo> photo;
     object_ptr<td_api::chatPermissions> permissions;
     union {
-      int32 user_id;
-      int32 group_id;
-      int32 supergroup_id;
+      int64 user_id;
+      int64 group_id;
+      int64 supergroup_id;
     };
   };
   ChatInfo *add_chat(int64 chat_id);
@@ -758,13 +758,13 @@ class Client : public WebhookActor::Callback {
     mutable const MessageInfo *lru_prev = nullptr;
 
     int64 id = 0;
-    int32 sender_user_id = 0;
+    int64 sender_user_id = 0;
     int64 sender_chat_id = 0;
     int64 chat_id = 0;
     int32 date = 0;
     int32 edit_date = 0;
     int64 initial_chat_id = 0;
-    int32 initial_sender_user_id = 0;
+    int64 initial_sender_user_id = 0;
     int64 initial_sender_chat_id = 0;
     int32 initial_send_date = 0;
     int64 initial_message_id = 0;
@@ -774,7 +774,7 @@ class Client : public WebhookActor::Callback {
     int64 reply_to_message_id = 0;
     int64 message_thread_id = 0;
     int64 media_album_id = 0;
-    int32 via_bot_user_id = 0;
+    int64 via_bot_user_id = 0;
     object_ptr<td_api::MessageContent> content;
     object_ptr<td_api::ReplyMarkup> reply_markup;
 
@@ -810,7 +810,7 @@ class Client : public WebhookActor::Callback {
 
   Slice get_sticker_set_name(int64 sticker_set_id) const;
 
-  int32 choose_added_member_id(const td_api::messageChatAddMembers *message_add_members) const;
+  int64 choose_added_member_id(const td_api::messageChatAddMembers *message_add_members) const;
 
   bool need_skip_update_message(int64 chat_id, const object_ptr<td_api::message> &message, bool is_edited) const;
 
@@ -870,23 +870,23 @@ class Client : public WebhookActor::Callback {
 
   static int32 as_scheduled_message_id(int64 message_id);
 
-  static int64 get_supergroup_chat_id(int32 supergroup_id);
+  static int64 get_supergroup_chat_id(int64 supergroup_id);
 
-  static int64 get_basic_group_chat_id(int32 basic_group_id);
+  static int64 get_basic_group_chat_id(int64 basic_group_id);
 
   void add_update_poll(object_ptr<td_api::updatePoll> &&update);
 
   void add_update_poll_answer(object_ptr<td_api::updatePollAnswer> &&update);
 
-  void add_new_inline_query(int64 inline_query_id, int32 sender_user_id, object_ptr<td_api::location> location,
+  void add_new_inline_query(int64 inline_query_id, int64 sender_user_id, object_ptr<td_api::location> location,
                             object_ptr<td_api::ChatType> chat_type, const td::string &query, const td::string &offset);
 
-  void add_new_chosen_inline_result(int32 sender_user_id, object_ptr<td_api::location> location,
+  void add_new_chosen_inline_result(int64 sender_user_id, object_ptr<td_api::location> location,
                                     const td::string &query, const td::string &result_id,
                                     const td::string &inline_message_id);
 
   void add_new_callback_query(object_ptr<td_api::updateNewCallbackQuery> &&query);
-  void process_new_callback_query_queue(int32 user_id, int state);
+  void process_new_callback_query_queue(int64 user_id, int state);
 
   void add_new_inline_callback_query(object_ptr<td_api::updateNewInlineCallbackQuery> &&query);
 
@@ -966,19 +966,19 @@ class Client : public WebhookActor::Callback {
   int64 tqueue_id_;
   double start_time_ = 0;
 
-  int32 my_id_ = -1;
+  int64 my_id_ = -1;
   int32 authorization_date_ = -1;
 
-  int32 group_anonymous_bot_user_id_ = 0;
-  int32 service_notifications_user_id_ = 0;
+  int64 group_anonymous_bot_user_id_ = 0;
+  int64 service_notifications_user_id_ = 0;
 
   static std::unordered_map<td::string, Status (Client::*)(PromisedQueryPtr &query)> methods_;
 
   MessageInfo messages_lru_root_;
   std::unordered_map<FullMessageId, std::unique_ptr<MessageInfo>, FullMessageIdHash> messages_;  // message cache
-  std::unordered_map<int32, UserInfo> users_;                                                    // user info cache
-  std::unordered_map<int32, GroupInfo> groups_;                                                  // group info cache
-  std::unordered_map<int32, SupergroupInfo> supergroups_;  // supergroup info cache
+  std::unordered_map<int64, UserInfo> users_;                                                    // user info cache
+  std::unordered_map<int64, GroupInfo> groups_;                                                  // group info cache
+  std::unordered_map<int64, SupergroupInfo> supergroups_;  // supergroup info cache
   std::unordered_map<int64, ChatInfo> chats_;              // chat info cache
 
   std::unordered_map<FullMessageId, std::unordered_set<int64>, FullMessageIdHash>
@@ -1001,7 +1001,7 @@ class Client : public WebhookActor::Callback {
   struct PendingSendMessageQuery {
     PromisedQueryPtr query;
     bool is_multisend = false;
-    int32 awaited_messages = 0;
+    int32 awaited_message_count = 0;
     td::vector<td::string> messages;
     object_ptr<td_api::error> error;
   };
@@ -1027,14 +1027,14 @@ class Client : public WebhookActor::Callback {
     std::queue<object_ptr<td_api::updateNewCallbackQuery>> queue_;
     bool has_active_request_ = false;
   };
-  std::unordered_map<int32, NewCallbackQueryQueue> new_callback_query_queues_;  // sender_user_id -> queue
+  std::unordered_map<int64, NewCallbackQueryQueue> new_callback_query_queues_;  // sender_user_id -> queue
 
   std::unordered_map<int64, td::string> sticker_set_names_;
 
-  int32 cur_temp_bot_user_id_ = 1;
-  std::unordered_map<td::string, int32> bot_user_ids_;
+  int64 cur_temp_bot_user_id_ = 1;
+  std::unordered_map<td::string, int64> bot_user_ids_;
   std::unordered_set<td::string> unresolved_bot_usernames_;
-  std::unordered_map<int32, int32> temp_to_real_bot_user_id_;
+  std::unordered_map<int64, int64> temp_to_real_bot_user_id_;
   std::unordered_map<td::string, td::vector<int64>> awaiting_bot_resolve_queries_;
 
   struct PendingBotResolveQuery {
