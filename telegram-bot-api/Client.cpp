@@ -8817,8 +8817,7 @@ td::Status Client::process_disable_proxy_query(PromisedQueryPtr &query) {
 
 td::Status Client::process_get_chats_query(PromisedQueryPtr &query) {
   CHECK_IS_USER();
-  td::int64 offset_chat_id = get_integer_arg(query.get(), "offset_chat_id", 0);
-  send_request(make_object<td_api::getChats>(make_object<td_api::chatListMain>(), LLONG_MAX, offset_chat_id, 100),
+  send_request(make_object<td_api::getChats>(make_object<td_api::chatListMain>(), 100),
                std::make_unique<TdOnGetChatsCallback>(this, std::move(query)));
   return Status::OK();
 }
@@ -8903,7 +8902,7 @@ td::Status Client::process_add_chat_member_query(PromisedQueryPtr &query) {
              [this, user_id](int64 chat_id, PromisedQueryPtr query) mutable {
                auto chat = get_chat(chat_id);
                if (chat->type == ChatInfo::Type::Supergroup) {
-                 std::vector<td::int32> user_ids{user_id};
+                 std::vector<td::int64> user_ids{user_id};
                  send_request(make_object<td_api::addChatMembers>(chat_id, std::move(user_ids)),
                               std::make_unique<TdOnOkQueryCallback>(std::move(query)));
                } else if (chat->type == ChatInfo::Type::Group) {
@@ -8943,7 +8942,7 @@ td::Status Client::process_create_chat_query(PromisedQueryPtr &query) {
     send_request(make_object<td_api::createNewSupergroupChat>(title.str(), true, description.str(), nullptr, false),
                  std::make_unique<TdOnReturnChatCallback>(this, std::move(query)));
   } else if (chat_type == "group") {
-    TRY_RESULT(initial_members, get_int_array_arg<td::int32>(query.get(), "user_ids"))
+    TRY_RESULT(initial_members, get_int_array_arg<td::int64>(query.get(), "user_ids"))
     send_request(make_object<td_api::createNewBasicGroupChat>(std::move(initial_members), title.str()),
                  std::make_unique<TdOnReturnChatCallback>(this, std::move(query)));
   } else {
@@ -10935,7 +10934,7 @@ td::int32 Client::as_scheduled_message_id(int64 message_id) {
   return -static_cast<int32>((message_id >> 3) & ((1 << 18) - 1));
 }
 
-td::int64 Client::get_supergroup_chat_id(int32 supergroup_id) {
+td::int64 Client::get_supergroup_chat_id(int64 supergroup_id) {
   return static_cast<td::int64>(-1000000000000ll) - supergroup_id;
 }
 
