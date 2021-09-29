@@ -59,8 +59,8 @@ void Client::fail_query_with_error(PromisedQueryPtr query, int32 error_code, Sli
   }
   int32 real_error_code = error_code;
   Slice real_error_message = error_message;
-  if (error_code < 300 || error_code == 404) {
-    if (error_code <= 0) {
+  if (error_code < 400 || error_code == 404) {
+    if (error_code < 200) {
       LOG(ERROR) << "Receive error \"" << real_error_message << "\" with code " << error_code << " from " << *query;
     }
 
