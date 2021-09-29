@@ -17,6 +17,7 @@
 #include "td/actor/actor.h"
 #include "td/actor/PromiseFuture.h"
 
+#include "td/utils/BufferedFd.h"
 #include "td/utils/common.h"
 #include "td/utils/Container.h"
 #include "td/utils/FloodControlFast.h"
@@ -159,7 +160,7 @@ class WebhookActor : public td::HttpOutboundConnection::Callback {
     }
   };
   td::Container<td::ActorOwn<>> pending_sockets_;
-  td::vector<td::SocketFd> ready_sockets_;
+  td::vector<td::BufferedFd<td::SocketFd>> ready_sockets_;
 
   td::int32 max_connections_ = 0;
   td::Container<Connection> connections_;
@@ -176,8 +177,8 @@ class WebhookActor : public td::HttpOutboundConnection::Callback {
 
   td::Result<td::SslStream> create_ssl_stream();
   td::Status create_connection() TD_WARN_UNUSED_RESULT;
-  td::Status create_connection(td::SocketFd fd) TD_WARN_UNUSED_RESULT;
-  void on_socket_ready_async(td::Result<td::SocketFd> r_fd, td::int64 id);
+  td::Status create_connection(td::BufferedFd<td::SocketFd> fd) TD_WARN_UNUSED_RESULT;
+  void on_socket_ready_async(td::Result<td::BufferedFd<td::SocketFd>> r_fd, td::int64 id);
 
   void create_new_connections();
 

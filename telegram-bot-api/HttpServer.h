@@ -11,6 +11,7 @@
 #include "td/net/HttpInboundConnection.h"
 #include "td/net/TcpListener.h"
 
+#include "td/utils/BufferedFd.h"
 #include "td/utils/FloodControlFast.h"
 #include "td/utils/format.h"
 #include "td/utils/logging.h"
@@ -64,8 +65,8 @@ class HttpServer : public td::TcpListener::Callback {
     if (scheduler_id > 0) {
       scheduler_id--;
     }
-    td::create_actor<td::HttpInboundConnection>("HttpInboundConnection", std::move(fd), 0, 20, 500, creator_(),
-                                                scheduler_id)
+    td::create_actor<td::HttpInboundConnection>("HttpInboundConnection", td::BufferedFd<td::SocketFd>(std::move(fd)), 0,
+                                                20, 500, creator_(), scheduler_id)
         .release();
   }
 
