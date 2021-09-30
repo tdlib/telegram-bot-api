@@ -3499,7 +3499,7 @@ void Client::raw_event(const td::Event::Raw &event) {
 }
 
 void Client::loop() {
-  if (logging_out_ || closing_ || was_authorized_) {
+  if (was_authorized_ || logging_out_ || closing_) {
     while (!cmd_queue_.empty()) {
       auto query = std::move(cmd_queue_.front());
       cmd_queue_.pop();
@@ -4081,6 +4081,7 @@ void Client::on_update_authorization_state() {
       if (!was_authorized_) {
         LOG(WARNING) << "Logged in as @" << user_info->username;
         was_authorized_ = true;
+        td::send_event(parent_, td::Event::raw(static_cast<void *>(this)));
         update_shared_unix_time_difference();
         if (!pending_updates_.empty()) {
           LOG(INFO) << "Process " << pending_updates_.size() << " pending updates";
@@ -4096,14 +4097,20 @@ void Client::on_update_authorization_state() {
       if (!logging_out_) {
         LOG(WARNING) << "Logging out";
         logging_out_ = true;
+        if (was_authorized_ && !closing_) {
+          td::send_event(parent_, td::Event::raw(nullptr));
+        }
       }
-      break;
+      return loop();
     case td_api::authorizationStateClosing::ID:
       if (!closing_) {
         LOG(WARNING) << "Closing";
         closing_ = true;
+        if (was_authorized_ && !logging_out_) {
+          td::send_event(parent_, td::Event::raw(nullptr));
+        }
       }
-      break;
+      return loop();
     case td_api::authorizationStateClosed::ID:
       return on_closed();
     default:
