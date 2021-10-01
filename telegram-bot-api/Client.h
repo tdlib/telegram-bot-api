@@ -63,6 +63,8 @@ class Client : public WebhookActor::Callback {
   static constexpr int32 MAX_CERTIFICATE_FILE_SIZE = 3 << 20;
   static constexpr int32 MAX_DOWNLOAD_FILE_SIZE = 20 << 20;
 
+  static constexpr int32 MAX_CONCURRENTLY_SENT_CHAT_MESSAGES = 1000;  // some unreasonably big value
+
   static constexpr int32 MESSAGES_CACHE_TIME = 3600;
 
   static constexpr std::size_t MIN_PENDING_UPDATES_WARNING = 200;
@@ -873,6 +875,8 @@ class Client : public WebhookActor::Callback {
     int64 send_message_query_id = 0;
   };
   std::unordered_map<FullMessageId, YetUnsentMessage, FullMessageIdHash> yet_unsent_messages_;
+
+  std::unordered_map<int64, int32> yet_unsent_message_count_;
 
   struct PendingSendMessageQuery {
     PromisedQueryPtr query;

@@ -4466,6 +4466,7 @@ void Client::on_closed() {
     }
     on_message_send_failed(chat_id, message_id, 0, Status::Error(http_status_code, description));
   }
+  CHECK(yet_unsent_message_count_.empty());
 
   while (!pending_bot_resolve_queries_.empty()) {
     auto it = pending_bot_resolve_queries_.begin();
@@ -6213,6 +6214,13 @@ td::int64 Client::extract_yet_unsent_message_query_id(int64 chat_id, int64 messa
 
   yet_unsent_messages_.erase(yet_unsent_message_it);
 
+  auto count_it = yet_unsent_message_count_.find(chat_id);
+  CHECK(count_it != yet_unsent_message_count_.end());
+  CHECK(count_it->second > 0);
+  if (--count_it->second == 0) {
+    yet_unsent_message_count_.erase(count_it);
+  }
+
   if (reply_to_message_id > 0) {
     auto it = yet_unsent_reply_message_ids_.find({chat_id, reply_to_message_id});
     CHECK(it != yet_unsent_reply_message_ids_.end());
@@ -6736,6 +6744,11 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
         auto on_success = [this, disable_notification, input_message_contents = std::move(input_message_contents),
                            reply_markup = std::move(reply_markup)](int64 chat_id, int64 reply_to_message_id,
                                                                    PromisedQueryPtr query) mutable {
+          auto it = yet_unsent_message_count_.find(chat_id);
+          if (it != yet_unsent_message_count_.end() && it->second > MAX_CONCURRENTLY_SENT_CHAT_MESSAGES) {
+            return query->set_retry_after_error(60);
+          }
+
           send_request(make_object<td_api::sendMessageAlbum>(chat_id, 0, reply_to_message_id,
                                                              get_message_send_options(disable_notification),
                                                              std::move(input_message_contents)),
@@ -8001,6 +8014,11 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
         auto on_success = [this, disable_notification, input_message_content = std::move(input_message_content),
                            reply_markup = std::move(reply_markup)](int64 chat_id, int64 reply_to_message_id,
                                                                    PromisedQueryPtr query) mutable {
+          auto it = yet_unsent_message_count_.find(chat_id);
+          if (it != yet_unsent_message_count_.end() && it->second > MAX_CONCURRENTLY_SENT_CHAT_MESSAGES) {
+            return query->set_retry_after_error(60);
+          }
+
           send_request(make_object<td_api::sendMessage>(chat_id, 0, reply_to_message_id,
                                                         get_message_send_options(disable_notification),
                                                         std::move(reply_markup), std::move(input_message_content)),
@@ -8036,6 +8054,7 @@ void Client::on_sent_message(object_ptr<td_api::message> &&message, int64 query_
   yet_unsent_message.send_message_query_id = query_id;
   auto emplace_result = yet_unsent_messages_.emplace(yet_unsent_message_id, yet_unsent_message);
   CHECK(emplace_result.second);
+  yet_unsent_message_count_[chat_id]++;
   pending_send_message_queries_[query_id].awaited_message_count++;
 }
 
