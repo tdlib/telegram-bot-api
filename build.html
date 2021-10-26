@@ -250,7 +250,7 @@ function onOptionsChanged() {
     pre_text.push('Download and install <a href="https://git-scm.com/download/win">Git</a>.');
   }
   if (os_linux && linux_distro === 'Other') {
-    var compiler = use_clang ? 'clang >= 3.4' : 'g++ >= 4.9.2';
+    var compiler = use_clang ? 'clang >= 3.4, libc++' : 'g++ >= 4.9.2';
     pre_text.push('Install Git, ' + compiler + ', make, CMake >= 3.0.2, OpenSSL-dev, zlib-dev, gperf using your package manager.');
   }
   if (os_freebsd) {
