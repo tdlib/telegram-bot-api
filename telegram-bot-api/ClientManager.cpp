@@ -417,12 +417,15 @@ void ClientManager::hangup_shared() {
 
 void ClientManager::close_db() {
   LOG(WARNING) << "Closing databases";
-  td::MultiPromiseActorSafe mpromise("close binlogs");
-  mpromise.add_promise(td::PromiseCreator::lambda(
+  td::MultiPromiseActorSafe mpas("close binlogs");
+  mpas.add_promise(td::PromiseCreator::lambda(
       [actor_id = actor_id(this)](td::Unit) { send_closure(actor_id, &ClientManager::finish_close); }));
+  mpas.set_ignore_errors(true);
 
-  parameters_->shared_data_->tqueue_->close(mpromise.get_promise());
-  parameters_->shared_data_->webhook_db_->close(mpromise.get_promise());
+  auto lock = mpas.get_promise();
+  parameters_->shared_data_->tqueue_->close(mpas.get_promise());
+  parameters_->shared_data_->webhook_db_->close(mpas.get_promise());
+  lock.set_value(td::Unit());
 }
 
 void ClientManager::finish_close() {
