@@ -200,18 +200,18 @@ void ClientManager::get_stats(td::PromiseActor<td::BufferSlice> promise,
     top_bot_ids.emplace(static_cast<td::int64>(score * 1e9), id);
   }
 
-  sb << stat_.get_description() << "\n";
+  sb << stat_.get_description() << '\n';
   if (id_filter.empty()) {
-    sb << "uptime\t" << now - parameters_->start_time_ << "\n";
-    sb << "bot_count\t" << clients_.size() << "\n";
-    sb << "active_bot_count\t" << active_bot_count << "\n";
+    sb << "uptime\t" << now - parameters_->start_time_ << '\n';
+    sb << "bot_count\t" << clients_.size() << '\n';
+    sb << "active_bot_count\t" << active_bot_count << '\n';
     auto r_mem_stat = td::mem_stat();
     if (r_mem_stat.is_ok()) {
       auto mem_stat = r_mem_stat.move_as_ok();
-      sb << "rss\t" << td::format::as_size(mem_stat.resident_size_) << "\n";
-      sb << "vm\t" << td::format::as_size(mem_stat.virtual_size_) << "\n";
-      sb << "rss_peak\t" << td::format::as_size(mem_stat.resident_size_peak_) << "\n";
-      sb << "vm_peak\t" << td::format::as_size(mem_stat.virtual_size_peak_) << "\n";
+      sb << "rss\t" << td::format::as_size(mem_stat.resident_size_) << '\n';
+      sb << "vm\t" << td::format::as_size(mem_stat.virtual_size_) << '\n';
+      sb << "rss_peak\t" << td::format::as_size(mem_stat.resident_size_peak_) << '\n';
+      sb << "vm_peak\t" << td::format::as_size(mem_stat.virtual_size_peak_) << '\n';
     } else {
       LOG(INFO) << "Failed to get memory statistics: " << r_mem_stat.error();
     }
@@ -219,16 +219,16 @@ void ClientManager::get_stats(td::PromiseActor<td::BufferSlice> promise,
     ServerCpuStat::update(td::Time::now());
     auto cpu_stats = ServerCpuStat::instance().as_vector(td::Time::now());
     for (auto &stat : cpu_stats) {
-      sb << stat.key_ << "\t" << stat.value_ << "\n";
+      sb << stat.key_ << "\t" << stat.value_ << '\n';
     }
 
-    sb << "buffer_memory\t" << td::format::as_size(td::BufferAllocator::get_buffer_mem()) << "\n";
-    sb << "active_webhook_connections\t" << WebhookActor::get_total_connections_count() << "\n";
-    sb << "active_requests\t" << parameters_->shared_data_->query_count_.load() << "\n";
-    sb << "active_network_queries\t" << td::get_pending_network_query_count(*parameters_->net_query_stats_) << "\n";
+    sb << "buffer_memory\t" << td::format::as_size(td::BufferAllocator::get_buffer_mem()) << '\n';
+    sb << "active_webhook_connections\t" << WebhookActor::get_total_connections_count() << '\n';
+    sb << "active_requests\t" << parameters_->shared_data_->query_count_.load() << '\n';
+    sb << "active_network_queries\t" << td::get_pending_network_query_count(*parameters_->net_query_stats_) << '\n';
     auto stats = stat_.as_vector(now);
     for (auto &stat : stats) {
-      sb << stat.key_ << "\t" << stat.value_ << "\n";
+      sb << stat.key_ << "\t" << stat.value_ << '\n';
     }
   }
 
@@ -237,22 +237,23 @@ void ClientManager::get_stats(td::PromiseActor<td::BufferSlice> promise,
     CHECK(client_info);
 
     auto bot_info = client_info->client_->get_actor_unsafe()->get_bot_info();
-    sb << "\n";
-    sb << "id\t" << bot_info.id_ << "\n";
-    sb << "uptime\t" << now - bot_info.start_time_ << "\n";
-    sb << "token\t" << bot_info.token_ << "\n";
-    sb << "username\t" << bot_info.username_ << "\n";
-    sb << "webhook\t" << bot_info.webhook_ << "\n";
-    sb << "has_custom_certificate\t" << bot_info.has_webhook_certificate_ << "\n";
-    sb << "head_update_id\t" << bot_info.head_update_id_ << "\n";
-    sb << "tail_update_id\t" << bot_info.tail_update_id_ << "\n";
-    sb << "pending_update_count\t" << bot_info.pending_update_count_ << "\n";
-    sb << "webhook_max_connections\t" << bot_info.webhook_max_connections_ << "\n";
+    sb << '\n';
+    sb << "id\t" << bot_info.id_ << '\n';
+    sb << "uptime\t" << now - bot_info.start_time_ << '\n';
+    sb << "token\t" << bot_info.token_ << '\n';
+    sb << "username\t" << bot_info.username_ << '\n';
+    sb << "is_active\t" << client_info->stat_.is_active(now) << '\n';
+    sb << "webhook\t" << bot_info.webhook_ << '\n';
+    sb << "has_custom_certificate\t" << bot_info.has_webhook_certificate_ << '\n';
+    sb << "head_update_id\t" << bot_info.head_update_id_ << '\n';
+    sb << "tail_update_id\t" << bot_info.tail_update_id_ << '\n';
+    sb << "pending_update_count\t" << bot_info.pending_update_count_ << '\n';
+    sb << "webhook_max_connections\t" << bot_info.webhook_max_connections_ << '\n';
 
     auto stats = client_info->stat_.as_vector(now);
     for (auto &stat : stats) {
       if (stat.key_ == "update_count" || stat.key_ == "request_count") {
-        sb << stat.key_ << "/sec\t" << stat.value_ << "\n";
+        sb << stat.key_ << "/sec\t" << stat.value_ << '\n';
       }
     }
 
