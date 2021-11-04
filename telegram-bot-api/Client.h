@@ -497,6 +497,8 @@ class Client : public WebhookActor::Callback {
   Status process_ban_chat_member_query(PromisedQueryPtr &query);
   Status process_restrict_chat_member_query(PromisedQueryPtr &query);
   Status process_unban_chat_member_query(PromisedQueryPtr &query);
+  Status process_approve_chat_join_request_query(PromisedQueryPtr &query);
+  Status process_decline_chat_join_request_query(PromisedQueryPtr &query);
   Status process_get_sticker_set_query(PromisedQueryPtr &query);
   Status process_upload_sticker_file_query(PromisedQueryPtr &query);
   Status process_create_new_sticker_set_query(PromisedQueryPtr &query);

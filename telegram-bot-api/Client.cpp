@@ -257,6 +257,8 @@ bool Client::init_methods() {
   methods_.emplace("kickchatmember", &Client::process_ban_chat_member_query);
   methods_.emplace("restrictchatmember", &Client::process_restrict_chat_member_query);
   methods_.emplace("unbanchatmember", &Client::process_unban_chat_member_query);
+  methods_.emplace("approvechatjoinrequest", &Client::process_approve_chat_join_request_query);
+  methods_.emplace("declinechatjoinrequest", &Client::process_decline_chat_join_request_query);
   methods_.emplace("getstickerset", &Client::process_get_sticker_set_query);
   methods_.emplace("uploadstickerfile", &Client::process_upload_sticker_file_query);
   methods_.emplace("createnewstickerset", &Client::process_create_new_sticker_set_query);
@@ -7618,6 +7620,32 @@ td::Status Client::process_unban_chat_member_query(PromisedQueryPtr &query) {
                  });
                }
              });
+  return Status::OK();
+}
+
+td::Status Client::process_approve_chat_join_request_query(PromisedQueryPtr &query) {
+  auto chat_id = query->arg("chat_id");
+  TRY_RESULT(user_id, get_user_id(query.get()));
+
+  check_chat(chat_id, AccessRights::Write, std::move(query), [this, user_id](int64 chat_id, PromisedQueryPtr query) {
+    check_user_no_fail(user_id, std::move(query), [this, chat_id, user_id](PromisedQueryPtr query) {
+      send_request(make_object<td_api::approveChatJoinRequest>(chat_id, user_id),
+                   std::make_unique<TdOnOkQueryCallback>(std::move(query)));
+    });
+  });
+  return Status::OK();
+}
+
+td::Status Client::process_decline_chat_join_request_query(PromisedQueryPtr &query) {
+  auto chat_id = query->arg("chat_id");
+  TRY_RESULT(user_id, get_user_id(query.get()));
+
+  check_chat(chat_id, AccessRights::Write, std::move(query), [this, user_id](int64 chat_id, PromisedQueryPtr query) {
+    check_user_no_fail(user_id, std::move(query), [this, chat_id, user_id](PromisedQueryPtr query) {
+      send_request(make_object<td_api::declineChatJoinRequest>(chat_id, user_id),
+                   std::make_unique<TdOnOkQueryCallback>(std::move(query)));
+    });
+  });
   return Status::OK();
 }
 
