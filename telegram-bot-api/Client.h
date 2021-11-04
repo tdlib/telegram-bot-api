@@ -139,6 +139,7 @@ class Client : public WebhookActor::Callback {
   class JsonChatMember;
   class JsonChatMembers;
   class JsonChatMemberUpdated;
+  class JsonChatJoinRequest;
   class JsonGameHighScore;
   class JsonAddress;
   class JsonOrderInfo;
@@ -780,6 +781,8 @@ class Client : public WebhookActor::Callback {
 
   void add_update_chat_member(object_ptr<td_api::updateChatMember> &&update);
 
+  void add_update_chat_join_request(object_ptr<td_api::updateNewChatJoinRequest> &&update);
+
   // append only before Size
   enum class UpdateType : int32 {
     Message,
@@ -797,6 +800,7 @@ class Client : public WebhookActor::Callback {
     PollAnswer,
     MyChatMember,
     ChatMember,
+    ChatJoinRequest,
     Size
   };
 

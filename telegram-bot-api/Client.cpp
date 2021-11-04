@@ -2354,6 +2354,29 @@ class Client::JsonChatMemberUpdated : public Jsonable {
   const Client *client_;
 };
 
+class Client::JsonChatJoinRequest : public Jsonable {
+ public:
+  JsonChatJoinRequest(const td_api::updateNewChatJoinRequest *update, const Client *client)
+      : update_(update), client_(client) {
+  }
+  void store(JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("chat", JsonChat(update_->chat_id_, false, client_));
+    object("from", JsonUser(update_->request_->user_id_, client_));
+    object("date", update_->request_->date_);
+    if (!update_->request_->bio_.empty()) {
+      object("bio", update_->request_->bio_);
+    }
+    if (update_->invite_link_ != nullptr) {
+      object("invite_link", JsonChatInviteLink(update_->invite_link_.get(), client_));
+    }
+  }
+
+ private:
+  const td_api::updateNewChatJoinRequest *update_;
+  const Client *client_;
+};
+
 class Client::JsonGameHighScore : public Jsonable {
  public:
   JsonGameHighScore(const td_api::gameHighScore *score, const Client *client) : score_(score), client_(client) {
@@ -4426,6 +4449,9 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       break;
     case td_api::updateChatMember::ID:
       add_update_chat_member(move_object_as<td_api::updateChatMember>(result));
+      break;
+    case td_api::updateNewChatJoinRequest::ID:
+      add_update_chat_join_request(move_object_as<td_api::updateNewChatJoinRequest>(result));
       break;
     default:
       // we are not interested in this update
@@ -7134,8 +7160,10 @@ td::Status Client::process_create_chat_invite_link_query(PromisedQueryPtr &query
   auto creates_join_request = to_bool(query->arg("creates_join_request"));
 
   check_chat(chat_id, AccessRights::Write, std::move(query),
-             [this, name = name.str(), expire_date, member_limit, creates_join_request](int64 chat_id, PromisedQueryPtr query) {
-               send_request(make_object<td_api::createChatInviteLink>(chat_id, name, expire_date, member_limit, creates_join_request),
+             [this, name = name.str(), expire_date, member_limit, creates_join_request](int64 chat_id,
+                                                                                        PromisedQueryPtr query) {
+               send_request(make_object<td_api::createChatInviteLink>(chat_id, name, expire_date, member_limit,
+                                                                      creates_join_request),
                             std::make_unique<TdOnGetChatInviteLinkCallback>(this, std::move(query)));
              });
   return Status::OK();
@@ -7150,8 +7178,10 @@ td::Status Client::process_edit_chat_invite_link_query(PromisedQueryPtr &query) 
   auto creates_join_request = to_bool(query->arg("creates_join_request"));
 
   check_chat(chat_id, AccessRights::Write, std::move(query),
-             [this, invite_link = invite_link.str(), name = name.str(), expire_date, member_limit, creates_join_request](int64 chat_id, PromisedQueryPtr query) {
-               send_request(make_object<td_api::editChatInviteLink>(chat_id, invite_link, name, expire_date, member_limit, creates_join_request),
+             [this, invite_link = invite_link.str(), name = name.str(), expire_date, member_limit,
+              creates_join_request](int64 chat_id, PromisedQueryPtr query) {
+               send_request(make_object<td_api::editChatInviteLink>(chat_id, invite_link, name, expire_date,
+                                                                    member_limit, creates_join_request),
                             std::make_unique<TdOnGetChatInviteLinkCallback>(this, std::move(query)));
              });
   return Status::OK();
@@ -8548,6 +8578,8 @@ Client::Slice Client::get_update_type_name(UpdateType update_type) {
       return Slice("my_chat_member");
     case UpdateType::ChatMember:
       return Slice("chat_member");
+    case UpdateType::ChatJoinRequest:
+      return Slice("chat_join_request");
     default:
       UNREACHABLE();
       return Slice();
@@ -8833,6 +8865,16 @@ void Client::add_update_chat_member(object_ptr<td_api::updateChatMember> &&updat
     auto webhook_queue_id = update->chat_id_ + (static_cast<int64>(is_my ? 5 : 6) << 33);
     auto update_type = is_my ? UpdateType::MyChatMember : UpdateType::ChatMember;
     add_update(update_type, JsonChatMemberUpdated(update.get(), this), left_time, webhook_queue_id);
+  }
+}
+
+void Client::add_update_chat_join_request(object_ptr<td_api::updateNewChatJoinRequest> &&update) {
+  CHECK(update != nullptr);
+  CHECK(update->request_ != nullptr);
+  auto left_time = update->request_->date_ + 86400 - get_unix_time();
+  if (left_time > 0) {
+    auto webhook_queue_id = update->chat_id_ + (static_cast<int64>(6) << 33);
+    add_update(UpdateType::ChatJoinRequest, JsonChatJoinRequest(update.get(), this), left_time, webhook_queue_id);
   }
 }
 
