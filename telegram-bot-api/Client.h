@@ -147,10 +147,10 @@ class Client : public WebhookActor::Callback {
   class JsonEncryptedCredentials;
   class JsonPassportData;
   class JsonProximityAlertTriggered;
-  class JsonVoiceChatScheduled;
-  class JsonVoiceChatStarted;
-  class JsonVoiceChatEnded;
-  class JsonInviteVoiceChatParticipants;
+  class JsonVideoChatScheduled;
+  class JsonVideoChatStarted;
+  class JsonVideoChatEnded;
+  class JsonInviteVideoChatParticipants;
   class JsonChatSetTtl;
   class JsonUpdateTypes;
   class JsonWebhookInfo;
