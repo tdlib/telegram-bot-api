@@ -156,7 +156,7 @@ td::Status WebhookActor::create_connection() {
      public:
       Callback(td::ActorId<WebhookActor> actor, td::int64 id) : actor_(actor), id_(id) {
       }
-      void set_result(td::Result<td::SocketFd> result) override {
+      void set_result(td::Result<td::BufferedFd<td::SocketFd>> result) override {
         send_closure(std::move(actor_), &WebhookActor::on_socket_ready_async, std::move(result), id_);
         CHECK(actor_.empty());
       }
@@ -195,7 +195,7 @@ td::Status WebhookActor::create_connection() {
     on_error(r_fd.move_as_error());
     return error;
   }
-  return create_connection(r_fd.move_as_ok());
+  return create_connection(td::BufferedFd<td::SocketFd>(r_fd.move_as_ok()));
 }
 
 td::Result<td::SslStream> WebhookActor::create_ssl_stream() {
@@ -215,7 +215,7 @@ td::Result<td::SslStream> WebhookActor::create_ssl_stream() {
   return r_ssl_stream.move_as_ok();
 }
 
-td::Status WebhookActor::create_connection(td::SocketFd fd) {
+td::Status WebhookActor::create_connection(td::BufferedFd<td::SocketFd> fd) {
   TRY_RESULT(ssl_stream, create_ssl_stream());
 
   auto id = connections_.create(Connection());
@@ -237,7 +237,7 @@ td::Status WebhookActor::create_connection(td::SocketFd fd) {
   return td::Status::OK();
 }
 
-void WebhookActor::on_socket_ready_async(td::Result<td::SocketFd> r_fd, td::int64 id) {
+void WebhookActor::on_socket_ready_async(td::Result<td::BufferedFd<td::SocketFd>> r_fd, td::int64 id) {
   pending_sockets_.erase(id);
   if (r_fd.is_ok()) {
     VLOG(webhook) << "Socket " << id << " is ready";

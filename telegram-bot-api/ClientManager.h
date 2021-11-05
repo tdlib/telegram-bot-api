@@ -55,6 +55,7 @@ class ClientManager final : public td::Actor {
    public:
     BotStatActor stat_;
     td::string token_;
+    td::int64 tqueue_id_;
     td::ActorOwn<Client> client_;
   };
   td::Container<ClientInfo> clients_;
@@ -65,6 +66,7 @@ class ClientManager final : public td::Actor {
 
   std::unordered_map<td::string, td::uint64> token_to_id_;
   std::unordered_map<td::string, td::FloodControlFast> flood_controls_;
+  std::unordered_map<td::int64, td::uint64> active_client_count_;
 
   bool close_flag_ = false;
   td::vector<td::Promise<td::Unit>> close_promises_;
@@ -75,6 +77,7 @@ class ClientManager final : public td::Actor {
                                                     std::shared_ptr<SharedData> shared_data);
 
   void start_up() override;
+  void raw_event(const td::Event::Raw &event) override;
   void hangup_shared() override;
   void close_db();
   void finish_close();
