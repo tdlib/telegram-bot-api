@@ -580,9 +580,11 @@ class Client : public WebhookActor::Callback {
     bool can_join_groups = false;
     bool can_read_all_group_messages = false;
     bool is_inline_bot = false;
+    bool has_private_forwards = false;
   };
   static void add_user(std::unordered_map<int64, UserInfo> &users, object_ptr<td_api::user> &&user);
   void set_user_bio(int64 user_id, td::string &&bio);
+  void set_user_has_private_forwards(int64 user_id, bool has_private_forwards);
   const UserInfo *get_user_info(int64 user_id) const;
 
   struct GroupInfo {

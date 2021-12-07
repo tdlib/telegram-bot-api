@@ -634,6 +634,9 @@ class Client::JsonChat : public Jsonable {
           if (!user_info->bio.empty()) {
             object("bio", user_info->bio);
           }
+          if (user_info->has_private_forwards) {
+            object("has_private_forwards", td::JsonTrue());
+          }
         }
         break;
       }
@@ -4353,6 +4356,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       auto update = move_object_as<td_api::updateUserFullInfo>(result);
       auto user_id = update->user_id_;
       set_user_bio(user_id, std::move(update->user_full_info_->bio_));
+      set_user_has_private_forwards(user_id, update->user_full_info_->has_private_forwards_);
       break;
     }
     case td_api::updateBasicGroup::ID: {
@@ -8367,6 +8371,11 @@ const Client::UserInfo *Client::get_user_info(int64 user_id) const {
 void Client::set_user_bio(int64 user_id, td::string &&bio) {
   auto user_info = &users_[user_id];
   user_info->bio = std::move(bio);
+}
+
+void Client::set_user_has_private_forwards(int64 user_id, bool has_private_forwards) {
+  auto user_info = &users_[user_id];
+  user_info->has_private_forwards = has_private_forwards;
 }
 
 void Client::add_group(std::unordered_map<int64, GroupInfo> &groups, object_ptr<td_api::basicGroup> &&group) {
