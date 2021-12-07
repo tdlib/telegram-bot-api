@@ -3822,12 +3822,12 @@ void Client::check_chat(Slice chat_id_str, AccessRights access_rights, PromisedQ
 template <class OnSuccess>
 void Client::check_chat_no_fail(Slice chat_id_str, PromisedQueryPtr query, OnSuccess on_success) {
   if (chat_id_str.empty()) {
-    return fail_query(400, "Bad Request: sedner_chat_id is empty", std::move(query));
+    return fail_query(400, "Bad Request: sender_chat_id is empty", std::move(query));
   }
 
   auto r_chat_id = td::to_integer_safe<int64>(chat_id_str);
   if (r_chat_id.is_error()) {
-    return fail_query(400, "Bad Request: sedner_chat_id is not a valid Integer", std::move(query));
+    return fail_query(400, "Bad Request: sender_chat_id is not a valid Integer", std::move(query));
   }
   auto chat_id = r_chat_id.move_as_ok();
 
