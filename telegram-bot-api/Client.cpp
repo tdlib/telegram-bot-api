@@ -1629,7 +1629,7 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
       object("forward_sender_name", message_->initial_sender_name);
     }
     if (message_->is_automatic_forward) {
-      object("is_automatic_forward", td::JsonBool(message_->is_automatic_forward));
+      object("is_automatic_forward", td::JsonTrue());
     }
     object("forward_date", message_->initial_send_date);
   }
@@ -1922,6 +1922,9 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
   }
   if (message_->via_bot_user_id > 0) {
     object("via_bot", JsonUser(message_->via_bot_user_id, client_));
+  }
+  if (!message_->can_be_saved) {
+    object("has_protected_content", td::JsonTrue());
   }
 }
 
@@ -9512,6 +9515,7 @@ Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message,
                                          message_info->initial_message_id == message->forward_info_->from_message_id_;
   }
 
+  message_info->can_be_saved = message->can_be_saved_;
   message_info->author_signature = std::move(message->author_signature_);
 
   if (message->reply_in_chat_id_ != chat_id && message->reply_to_message_id_ != 0) {
