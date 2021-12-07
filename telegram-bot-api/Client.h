@@ -225,6 +225,8 @@ class Client : public WebhookActor::Callback {
   template <class OnSuccess>
   class TdOnCheckChatCallback;
   template <class OnSuccess>
+  class TdOnCheckChatNoFailCallback;
+  template <class OnSuccess>
   class TdOnCheckMessageCallback;
   template <class OnSuccess>
   class TdOnCheckRemoteFileIdCallback;
@@ -251,6 +253,9 @@ class Client : public WebhookActor::Callback {
 
   template <class OnSuccess>
   void check_chat(Slice chat_id_str, AccessRights access_rights, PromisedQueryPtr query, OnSuccess on_success);
+
+  template <class OnSuccess>
+  void check_chat_no_fail(Slice chat_id_str, PromisedQueryPtr query, OnSuccess on_success);
 
   template <class OnSuccess>
   void check_bot_command_scope(BotCommandScope &&scope, PromisedQueryPtr query, OnSuccess on_success);
@@ -497,6 +502,8 @@ class Client : public WebhookActor::Callback {
   Status process_ban_chat_member_query(PromisedQueryPtr &query);
   Status process_restrict_chat_member_query(PromisedQueryPtr &query);
   Status process_unban_chat_member_query(PromisedQueryPtr &query);
+  Status process_ban_chat_sender_chat_query(PromisedQueryPtr &query);
+  Status process_unban_chat_sender_chat_query(PromisedQueryPtr &query);
   Status process_approve_chat_join_request_query(PromisedQueryPtr &query);
   Status process_decline_chat_join_request_query(PromisedQueryPtr &query);
   Status process_get_sticker_set_query(PromisedQueryPtr &query);

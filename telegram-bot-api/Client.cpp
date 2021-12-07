@@ -257,6 +257,8 @@ bool Client::init_methods() {
   methods_.emplace("kickchatmember", &Client::process_ban_chat_member_query);
   methods_.emplace("restrictchatmember", &Client::process_restrict_chat_member_query);
   methods_.emplace("unbanchatmember", &Client::process_unban_chat_member_query);
+  methods_.emplace("banchatsenderchat", &Client::process_ban_chat_sender_chat_query);
+  methods_.emplace("unbanchatsenderchat", &Client::process_unban_chat_sender_chat_query);
   methods_.emplace("approvechatjoinrequest", &Client::process_approve_chat_join_request_query);
   methods_.emplace("declinechatjoinrequest", &Client::process_decline_chat_join_request_query);
   methods_.emplace("getstickerset", &Client::process_get_sticker_set_query);
@@ -2825,6 +2827,23 @@ class Client::TdOnCheckChatCallback : public TdQueryCallback {
 };
 
 template <class OnSuccess>
+class Client::TdOnCheckChatNoFailCallback : public TdQueryCallback {
+ public:
+  TdOnCheckChatNoFailCallback(int64 chat_id, PromisedQueryPtr query, OnSuccess on_success)
+      : chat_id_(chat_id), query_(std::move(query)), on_success_(std::move(on_success)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) override {
+    on_success_(chat_id_, std::move(query_));
+  }
+
+ private:
+  int64 chat_id_;
+  PromisedQueryPtr query_;
+  OnSuccess on_success_;
+};
+
+template <class OnSuccess>
 class Client::TdOnSearchStickerSetCallback : public TdQueryCallback {
  public:
   TdOnSearchStickerSetCallback(PromisedQueryPtr query, OnSuccess on_success)
@@ -3798,6 +3817,26 @@ void Client::check_chat(Slice chat_id_str, AccessRights access_rights, PromisedQ
   send_request(make_object<td_api::getChat>(chat_id),
                std::make_unique<TdOnCheckChatCallback<OnSuccess>>(this, false, access_rights, std::move(query),
                                                                   std::move(on_success)));
+}
+
+template <class OnSuccess>
+void Client::check_chat_no_fail(Slice chat_id_str, PromisedQueryPtr query, OnSuccess on_success) {
+  if (chat_id_str.empty()) {
+    return fail_query(400, "Bad Request: sedner_chat_id is empty", std::move(query));
+  }
+
+  auto r_chat_id = td::to_integer_safe<int64>(chat_id_str);
+  if (r_chat_id.is_error()) {
+    return fail_query(400, "Bad Request: sedner_chat_id is not a valid Integer", std::move(query));
+  }
+  auto chat_id = r_chat_id.move_as_ok();
+
+  auto chat_info = get_chat(chat_id);
+  if (chat_info != nullptr) {
+    return on_success(chat_id, std::move(query));
+  }
+  send_request(make_object<td_api::getChat>(chat_id), std::make_unique<TdOnCheckChatNoFailCallback<OnSuccess>>(
+                                                          chat_id, std::move(query), std::move(on_success)));
 }
 
 template <class OnSuccess>
@@ -7646,6 +7685,42 @@ td::Status Client::process_unban_chat_member_query(PromisedQueryPtr &query) {
                                 std::make_unique<TdOnOkQueryCallback>(std::move(query)));
                  });
                }
+             });
+  return Status::OK();
+}
+
+td::Status Client::process_ban_chat_sender_chat_query(PromisedQueryPtr &query) {
+  auto chat_id = query->arg("chat_id");
+  auto sender_chat_id = query->arg("sender_chat_id");
+  int32 until_date = get_integer_arg(query.get(), "until_date", 0);
+
+  check_chat(chat_id, AccessRights::Write, std::move(query),
+             [this, sender_chat_id = sender_chat_id.str(), until_date](int64 chat_id, PromisedQueryPtr query) {
+               check_chat_no_fail(sender_chat_id, std::move(query),
+                                  [this, chat_id, until_date](int64 sender_chat_id, PromisedQueryPtr query) {
+                                    send_request(
+                                        make_object<td_api::banChatMember>(
+                                            chat_id, td_api::make_object<td_api::messageSenderChat>(sender_chat_id),
+                                            until_date, false),
+                                        std::make_unique<TdOnOkQueryCallback>(std::move(query)));
+                                  });
+             });
+  return Status::OK();
+}
+
+td::Status Client::process_unban_chat_sender_chat_query(PromisedQueryPtr &query) {
+  auto chat_id = query->arg("chat_id");
+  auto sender_chat_id = query->arg("sender_chat_id");
+
+  check_chat(chat_id, AccessRights::Write, std::move(query),
+             [this, sender_chat_id = sender_chat_id.str()](int64 chat_id, PromisedQueryPtr query) {
+               check_chat_no_fail(
+                   sender_chat_id, std::move(query), [this, chat_id](int64 sender_chat_id, PromisedQueryPtr query) {
+                     send_request(make_object<td_api::setChatMemberStatus>(
+                                      chat_id, td_api::make_object<td_api::messageSenderChat>(sender_chat_id),
+                                      make_object<td_api::chatMemberStatusLeft>()),
+                                  std::make_unique<TdOnOkQueryCallback>(std::move(query)));
+                   });
              });
   return Status::OK();
 }
