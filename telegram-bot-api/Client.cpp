@@ -740,18 +740,19 @@ class Client::JsonChat : public Jsonable {
 
 class Client::JsonMessageSender : public Jsonable {
  public:
-  JsonMessageSender(const td_api::MessageSender *sender, const Client *client) : sender_(sender), client_(client) {
+  JsonMessageSender(const td_api::MessageSender *sender_id, const Client *client)
+      : sender_id_(sender_id), client_(client) {
   }
   void store(JsonValueScope *scope) const {
-    CHECK(sender_ != nullptr);
-    switch (sender_->get_id()) {
+    CHECK(sender_id_ != nullptr);
+    switch (sender_id_->get_id()) {
       case td_api::messageSenderUser::ID: {
-        auto sender_user_id = static_cast<const td_api::messageSenderUser *>(sender_)->user_id_;
+        auto sender_user_id = static_cast<const td_api::messageSenderUser *>(sender_id_)->user_id_;
         JsonUser(sender_user_id, client_).store(scope);
         break;
       }
       case td_api::messageSenderChat::ID: {
-        auto sender_chat_id = static_cast<const td_api::messageSenderChat *>(sender_)->chat_id_;
+        auto sender_chat_id = static_cast<const td_api::messageSenderChat *>(sender_id_)->chat_id_;
         JsonChat(sender_chat_id, false, client_).store(scope);
         break;
       }
@@ -761,7 +762,7 @@ class Client::JsonMessageSender : public Jsonable {
   }
 
  private:
-  const td_api::MessageSender *sender_;
+  const td_api::MessageSender *sender_id_;
   const Client *client_;
 };
 
@@ -1420,8 +1421,8 @@ class Client::JsonProximityAlertTriggered : public Jsonable {
   }
   void store(JsonValueScope *scope) const {
     auto object = scope->enter_object();
-    object("traveler", JsonMessageSender(proximity_alert_triggered_->traveler_.get(), client_));
-    object("watcher", JsonMessageSender(proximity_alert_triggered_->watcher_.get(), client_));
+    object("traveler", JsonMessageSender(proximity_alert_triggered_->traveler_id_.get(), client_));
+    object("watcher", JsonMessageSender(proximity_alert_triggered_->watcher_id_.get(), client_));
     object("distance", proximity_alert_triggered_->distance_);
   }
 
@@ -1544,6 +1545,11 @@ class Client::JsonInlineKeyboardButton : public Jsonable {
       case td_api::inlineKeyboardButtonTypeBuy::ID:
         object("pay", td::JsonTrue());
         break;
+      case td_api::inlineKeyboardButtonTypeUser::ID: {
+        auto type = static_cast<const td_api::inlineKeyboardButtonTypeUser *>(button_->type_.get());
+        object("url", PSLICE() << "tg://user?id=" << type->user_id_);
+        break;
+      }
       default:
         UNREACHABLE();
         break;
@@ -7632,7 +7638,7 @@ td::Status Client::process_approve_chat_join_request_query(PromisedQueryPtr &que
 
   check_chat(chat_id, AccessRights::Write, std::move(query), [this, user_id](int64 chat_id, PromisedQueryPtr query) {
     check_user_no_fail(user_id, std::move(query), [this, chat_id, user_id](PromisedQueryPtr query) {
-      send_request(make_object<td_api::approveChatJoinRequest>(chat_id, user_id),
+      send_request(make_object<td_api::processChatJoinRequest>(chat_id, user_id, true),
                    std::make_unique<TdOnOkQueryCallback>(std::move(query)));
     });
   });
@@ -7645,7 +7651,7 @@ td::Status Client::process_decline_chat_join_request_query(PromisedQueryPtr &que
 
   check_chat(chat_id, AccessRights::Write, std::move(query), [this, user_id](int64 chat_id, PromisedQueryPtr query) {
     check_user_no_fail(user_id, std::move(query), [this, chat_id, user_id](PromisedQueryPtr query) {
-      send_request(make_object<td_api::declineChatJoinRequest>(chat_id, user_id),
+      send_request(make_object<td_api::processChatJoinRequest>(chat_id, user_id, false),
                    std::make_unique<TdOnOkQueryCallback>(std::move(query)));
     });
   });
@@ -9026,8 +9032,8 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageProximityAlertTriggered::ID: {
       auto proximity_alert_triggered =
           static_cast<const td_api::messageProximityAlertTriggered *>(message->content_.get());
-      return proximity_alert_triggered->traveler_->get_id() != td_api::messageSenderUser::ID ||
-             proximity_alert_triggered->watcher_->get_id() != td_api::messageSenderUser::ID;
+      return proximity_alert_triggered->traveler_id_->get_id() != td_api::messageSenderUser::ID ||
+             proximity_alert_triggered->watcher_id_->get_id() != td_api::messageSenderUser::ID;
     }
     case td_api::messageGameScore::ID:
       return true;
@@ -9147,6 +9153,11 @@ bool Client::are_equal_inline_keyboard_buttons(const td_api::inlineKeyboardButto
     }
     case td_api::inlineKeyboardButtonTypeBuy::ID:
       return true;
+    case td_api::inlineKeyboardButtonTypeUser::ID: {
+      auto lhs_type = static_cast<const td_api::inlineKeyboardButtonTypeUser *>(lhs->type_.get());
+      auto rhs_type = static_cast<const td_api::inlineKeyboardButtonTypeUser *>(rhs->type_.get());
+      return lhs_type->user_id_ == rhs_type->user_id_;
+    }
     default:
       UNREACHABLE();
       return false;
@@ -9427,17 +9438,17 @@ Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message,
   message_info->media_album_id = message->media_album_id_;
   message_info->via_bot_user_id = message->via_bot_user_id_;
 
-  CHECK(message->sender_ != nullptr);
-  switch (message->sender_->get_id()) {
+  CHECK(message->sender_id_ != nullptr);
+  switch (message->sender_id_->get_id()) {
     case td_api::messageSenderUser::ID: {
-      auto sender = move_object_as<td_api::messageSenderUser>(message->sender_);
-      message_info->sender_user_id = sender->user_id_;
+      auto sender_id = move_object_as<td_api::messageSenderUser>(message->sender_id_);
+      message_info->sender_user_id = sender_id->user_id_;
       CHECK(message_info->sender_user_id > 0);
       break;
     }
     case td_api::messageSenderChat::ID: {
-      auto sender = move_object_as<td_api::messageSenderChat>(message->sender_);
-      message_info->sender_chat_id = sender->chat_id_;
+      auto sender_id = move_object_as<td_api::messageSenderChat>(message->sender_id_);
+      message_info->sender_chat_id = sender_id->chat_id_;
 
       auto chat_type = get_chat_type(chat_id);
       if (chat_type != ChatType::Channel) {
