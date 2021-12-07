@@ -37,6 +37,7 @@
 #include "td/utils/misc.h"
 #include "td/utils/OptionParser.h"
 #include "td/utils/PathView.h"
+#include "td/utils/port/detail/ThreadIdGuard.h"
 #include "td/utils/port/IPAddress.h"
 #include "td/utils/port/path.h"
 #include "td/utils/port/rlimit.h"
@@ -172,6 +173,7 @@ static void dump_statistics(const std::shared_ptr<SharedData> &shared_data,
 int main(int argc, char *argv[]) {
   SET_VERBOSITY_LEVEL(VERBOSITY_NAME(FATAL));
   td::ExitGuard exit_guard;
+  td::detail::ThreadIdGuard thread_id_guard;
 
   need_reopen_log.test_and_set();
   need_quit.test_and_set();
@@ -198,7 +200,7 @@ int main(int argc, char *argv[]) {
   auto start_time = td::Time::now();
   auto shared_data = std::make_shared<SharedData>();
   auto parameters = std::make_unique<ClientParameters>();
-  parameters->version_ = "5.4.1";
+  parameters->version_ = "5.5";
   parameters->shared_data_ = shared_data;
   parameters->start_time_ = start_time;
   auto net_query_stats = td::create_net_query_stats();
