@@ -1622,6 +1622,9 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
     if (!message_->initial_sender_name.empty()) {
       object("forward_sender_name", message_->initial_sender_name);
     }
+    if (message_->is_automatic_forward) {
+      object("is_automatic_forward", td::JsonBool(message_->is_automatic_forward));
+    }
     object("forward_date", message_->initial_send_date);
   }
   if (message_->reply_to_message_id > 0 && need_reply_ && !message_->is_reply_to_message_deleted) {
@@ -9493,6 +9496,9 @@ Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message,
       default:
         UNREACHABLE();
     }
+    message_info->is_automatic_forward = message_info->initial_chat_id != 0 && message_info->initial_message_id != 0 &&
+                                         message_info->initial_chat_id == message->forward_info_->from_chat_id_ &&
+                                         message_info->initial_message_id == message->forward_info_->from_message_id_;
   }
 
   message_info->author_signature = std::move(message->author_signature_);

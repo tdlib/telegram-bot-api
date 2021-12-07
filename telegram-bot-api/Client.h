@@ -671,6 +671,7 @@ class Client : public WebhookActor::Callback {
     object_ptr<td_api::MessageContent> content;
     object_ptr<td_api::ReplyMarkup> reply_markup;
 
+    bool is_automatic_forward = false;
     mutable bool is_reply_to_message_deleted = false;
     mutable bool is_content_changed = false;
   };
