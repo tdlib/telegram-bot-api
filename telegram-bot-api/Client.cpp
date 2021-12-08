@@ -9605,9 +9605,10 @@ Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message,
       default:
         UNREACHABLE();
     }
-    message_info->is_automatic_forward = message_info->initial_chat_id != 0 && message_info->initial_message_id != 0 &&
-                                         message_info->initial_chat_id == message->forward_info_->from_chat_id_ &&
-                                         message_info->initial_message_id == message->forward_info_->from_message_id_;
+    auto from_chat_id = message->forward_info_->from_chat_id_;
+    message_info->is_automatic_forward =
+        from_chat_id != 0 && from_chat_id != chat_id && message->forward_info_->from_message_id_ != 0 &&
+        get_chat_type(chat_id) == ChatType::Supergroup && get_chat_type(from_chat_id) == ChatType::Channel;
   }
 
   message_info->can_be_saved = message->can_be_saved_;
