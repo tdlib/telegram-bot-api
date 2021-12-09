@@ -7103,8 +7103,8 @@ td::Result<td_api::object_ptr<td_api::SearchMessagesFilter>> Client::get_search_
     result = make_object<td_api::searchMessagesFilterAnimation>();
   } else if (filter == "audio") {
     result = make_object<td_api::searchMessagesFilterAudio>();
-  } else if (filter == "call") {
-    result = make_object<td_api::searchMessagesFilterCall>();
+//} else if (filter == "call") {
+//  result = make_object<td_api::searchMessagesFilterCall>();
   } else if (filter == "chat_photo") {
     result = make_object<td_api::searchMessagesFilterChatPhoto>();
   } else if (filter == "document") {
@@ -7113,8 +7113,8 @@ td::Result<td_api::object_ptr<td_api::SearchMessagesFilter>> Client::get_search_
     result = make_object<td_api::searchMessagesFilterFailedToSend>();
   } else if (filter == "mention") {
     result = make_object<td_api::searchMessagesFilterMention>();
-  } else if (filter == "missed_call") {
-    result = make_object<td_api::searchMessagesFilterMissedCall>();
+//} else if (filter == "missed_call") {
+//  result = make_object<td_api::searchMessagesFilterMissedCall>();
   } else if (filter == "photo") {
     result = make_object<td_api::searchMessagesFilterPhoto>();
   } else if (filter == "photo_and_video") {
