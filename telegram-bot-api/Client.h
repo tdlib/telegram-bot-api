@@ -866,6 +866,7 @@ class Client : public WebhookActor::Callback {
   int32 authorization_date_ = -1;
 
   int64 group_anonymous_bot_user_id_ = 0;
+  int64 channel_bot_user_id_ = 0;
   int64 service_notifications_user_id_ = 0;
 
   static std::unordered_map<td::string, Status (Client::*)(PromisedQueryPtr &query)> methods_;

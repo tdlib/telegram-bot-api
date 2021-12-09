@@ -4448,6 +4448,9 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       if (name == "group_anonymous_bot_user_id" && update->value_->get_id() == td_api::optionValueInteger::ID) {
         group_anonymous_bot_user_id_ = move_object_as<td_api::optionValueInteger>(update->value_)->value_;
       }
+      if (name == "channel_bot_user_id" && update->value_->get_id() == td_api::optionValueInteger::ID) {
+        channel_bot_user_id_ = move_object_as<td_api::optionValueInteger>(update->value_)->value_;
+      }
       if (name == "telegram_service_notifications_chat_id" &&
           update->value_->get_id() == td_api::optionValueInteger::ID) {
         service_notifications_user_id_ = move_object_as<td_api::optionValueInteger>(update->value_)->value_;
@@ -9536,33 +9539,6 @@ Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message,
   message_info->media_album_id = message->media_album_id_;
   message_info->via_bot_user_id = message->via_bot_user_id_;
 
-  CHECK(message->sender_id_ != nullptr);
-  switch (message->sender_id_->get_id()) {
-    case td_api::messageSenderUser::ID: {
-      auto sender_id = move_object_as<td_api::messageSenderUser>(message->sender_id_);
-      message_info->sender_user_id = sender_id->user_id_;
-      CHECK(message_info->sender_user_id > 0);
-      break;
-    }
-    case td_api::messageSenderChat::ID: {
-      auto sender_id = move_object_as<td_api::messageSenderChat>(message->sender_id_);
-      message_info->sender_chat_id = sender_id->chat_id_;
-
-      auto chat_type = get_chat_type(chat_id);
-      if (chat_type != ChatType::Channel) {
-        if (message_info->sender_chat_id == chat_id) {
-          message_info->sender_user_id = group_anonymous_bot_user_id_;
-        } else {
-          message_info->sender_user_id = service_notifications_user_id_;
-        }
-        CHECK(message_info->sender_user_id > 0);
-      }
-      break;
-    }
-    default:
-      UNREACHABLE();
-  }
-
   message_info->initial_chat_id = 0;
   message_info->initial_sender_user_id = 0;
   message_info->initial_sender_chat_id = 0;
@@ -9609,6 +9585,35 @@ Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message,
     message_info->is_automatic_forward =
         from_chat_id != 0 && from_chat_id != chat_id && message->forward_info_->from_message_id_ != 0 &&
         get_chat_type(chat_id) == ChatType::Supergroup && get_chat_type(from_chat_id) == ChatType::Channel;
+  }
+
+  CHECK(message->sender_id_ != nullptr);
+  switch (message->sender_id_->get_id()) {
+    case td_api::messageSenderUser::ID: {
+      auto sender_id = move_object_as<td_api::messageSenderUser>(message->sender_id_);
+      message_info->sender_user_id = sender_id->user_id_;
+      CHECK(message_info->sender_user_id > 0);
+      break;
+    }
+    case td_api::messageSenderChat::ID: {
+      auto sender_id = move_object_as<td_api::messageSenderChat>(message->sender_id_);
+      message_info->sender_chat_id = sender_id->chat_id_;
+
+      auto chat_type = get_chat_type(chat_id);
+      if (chat_type != ChatType::Channel) {
+        if (message_info->sender_chat_id == chat_id) {
+          message_info->sender_user_id = group_anonymous_bot_user_id_;
+        } else if (message_info->is_automatic_forward) {
+          message_info->sender_user_id = service_notifications_user_id_;
+        } else {
+          message_info->sender_user_id = channel_bot_user_id_;
+        }
+        CHECK(message_info->sender_user_id > 0);
+      }
+      break;
+    }
+    default:
+      UNREACHABLE();
   }
 
   message_info->can_be_saved = message->can_be_saved_;
