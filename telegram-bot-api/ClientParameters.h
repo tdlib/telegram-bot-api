@@ -23,7 +23,7 @@
 
 namespace td {
 class NetQueryStats;
-}
+}  // namespace td
 
 namespace telegram_bot_api {
 
