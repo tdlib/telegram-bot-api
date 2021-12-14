@@ -265,6 +265,9 @@
   <div id="buildCommandsDiv" class="hide">
     <p id="buildPre">Hidden text</p>
     <code id="buildCommands">Empty commands</code>
+    <button id="copyBuildCommandsButton" onclick="copyBuildInstructions()">
+        <span id="copyBuildCommandsText">Copy</span>
+    </button>
   </div>
 </div>
 
@@ -652,6 +655,26 @@ function onOptionsChanged() {
   }
   commands.push((use_powershell ? 'dir ' : 'ls -l ') + install_dir + '/bin/telegram-bot-api*');
   document.getElementById('buildCommands').innerHTML = '<ul><li>' + commands.join('</li><li>') + '</li></ul>';
+  document.getElementById('copyBuildCommandsButton').style.display = commands.includes('exit') ? 'none' : 'block';
+}
+  
+function copyBuildInstructions() {
+  var text = document.getElementById('buildCommands').innerText;
+
+  function resetButtonState (state) {
+    document.getElementById('copyBuildCommandsButton').classList.remove(state);
+    document.getElementById('copyBuildCommandsText').innerText = "Copy";
+  }
+
+  navigator.clipboard.writeText(text).then(result => {
+    document.getElementById('copyBuildCommandsButton').classList.add('success');
+    document.getElementById('copyBuildCommandsText').innerText = "Copied!";
+    setTimeout(() => resetButtonState('success'), 5000);
+  }, error => {
+    document.getElementById('copyBuildCommandsButton').classList.add('fail');
+    document.getElementById('copyBuildCommandsText').innerText = "Couldn't copy :(";
+    setTimeout(() => resetButtonState('fail'), 5000);
+  })
 }
 
 </script>
