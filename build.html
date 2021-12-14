@@ -180,7 +180,7 @@
 <body onload="onLoad(true)" onpopstate="onLoad(false)">
 
 <div class="main">
-  <div id="osSelectDiv" class="large" style="text-align:center;">
+  <div id="osSelectDiv" class="large">
     <p>Choose an operating system, on which you want to use the Telegram Bot API server:</p>
     <select id="osSelect" onchange="onOsChanged(false)" autofocus class="large">
       <option>Choose an operating system:</option>
@@ -194,7 +194,7 @@
     <p></p>
   </div>
 
-  <div id="linuxSelectDiv" class="hide" style="text-align:center;">
+  <div id="linuxSelectDiv" class="hide">
     <p>Choose a Linux distro, on which you want to use the Telegram Bot API server:</p>
     <select id="linuxSelect" onchange="onOsChanged(false)" class="large">
       <option>Choose a Linux distro:</option>
@@ -212,7 +212,7 @@
     <p></p>
   </div>
 
-  <div id="buildOptionsDiv" class="hide" style="text-align:center;">
+  <div id="buildOptionsDiv" class="hide">
     <div id="buildDebugDiv" class="hide">
       <label><input type="checkbox" id="buildDebugCheckbox" onchange="onOptionsChanged()"/>Build the debug binary. Debug binaries are much larger and slower than the release one.</label>
     </div>
@@ -258,11 +258,11 @@
     <p></p>
   </div>
 
-  <div id="buildTextDiv" class="hide" style="text-align:center;">
+  <div id="buildTextDiv" class="hide">
     <p id="buildText">Hidden text</p>
   </div>
 
-  <div id="buildCommandsDiv" class="hide" style="text-align:left;">
+  <div id="buildCommandsDiv" class="hide">
     <p id="buildPre">Hidden text</p>
     <code id="buildCommands">Empty commands</code>
   </div>
