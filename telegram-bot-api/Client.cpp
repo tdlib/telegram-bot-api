@@ -184,9 +184,6 @@ Client::Client(td::ActorShared<> parent, const td::string &bot_token, bool is_te
     , tqueue_id_(tqueue_id)
     , parameters_(std::move(parameters))
     , stat_actor_(std::move(stat_actor)) {
-  messages_lru_root_.lru_next = &messages_lru_root_;
-  messages_lru_root_.lru_prev = &messages_lru_root_;
-
   static auto is_inited = init_methods();
   CHECK(is_inited);
 }
@@ -3505,7 +3502,6 @@ ServerBotInfo Client::get_bot_info() const {
 void Client::start_up() {
   start_time_ = td::Time::now();
   next_bot_updates_warning_time_ = start_time_ + 600;
-  schedule_next_delete_messages_lru();
   webhook_set_time_ = start_time_;
   next_allowed_set_webhook_time_ = start_time_;
   next_set_webhook_logging_time_ = start_time_;
@@ -9462,56 +9458,10 @@ void Client::delete_message(int64 chat_id, int64 message_id, bool only_from_cach
   }
 
   auto message_info = it->second.get();
-  CHECK(message_info->lru_next != nullptr);
-  message_info->lru_next->lru_prev = message_info->lru_prev;
-  message_info->lru_prev->lru_next = message_info->lru_next;
 
   set_message_reply_to_message_id(message_info, 0);
 
   messages_.erase(it);
-}
-
-void Client::schedule_next_delete_messages_lru() {
-  CHECK(!next_delete_messages_lru_timeout_.has_timeout());
-  next_delete_messages_lru_timeout_.set_callback(Client::delete_messages_lru);
-  next_delete_messages_lru_timeout_.set_callback_data(static_cast<void *>(this));
-  next_delete_messages_lru_timeout_.set_timeout_in(td::Random::fast(MESSAGES_CACHE_TIME, 2 * MESSAGES_CACHE_TIME));
-}
-
-void Client::delete_messages_lru(void *client_void) {
-  CHECK(client_void != nullptr);
-  auto client = static_cast<Client *>(client_void);
-
-  auto now = td::Time::now();
-  int32 deleted_message_count = 0;
-  while (client->messages_lru_root_.lru_next->access_time < now - MESSAGES_CACHE_TIME) {
-    auto message = client->messages_lru_root_.lru_next;
-    if (client->yet_unsent_reply_message_ids_.count({message->chat_id, message->id})) {
-      LOG(DEBUG) << "Force usage of message " << message->id << " in " << message->chat_id;
-      client->update_message_lru(message);
-    } else {
-      client->delete_message(message->chat_id, message->id, true);
-      deleted_message_count++;
-    }
-  }
-
-  if (deleted_message_count != 0) {
-    LOG(DEBUG) << "Delete " << deleted_message_count << " messages from cache";
-  }
-  client->schedule_next_delete_messages_lru();
-}
-
-void Client::update_message_lru(const MessageInfo *message_info) const {
-  message_info->access_time = td::Time::now();
-  if (message_info->lru_next != nullptr) {
-    message_info->lru_next->lru_prev = message_info->lru_prev;
-    message_info->lru_prev->lru_next = message_info->lru_next;
-  }
-  auto prev = messages_lru_root_.lru_prev;
-  message_info->lru_prev = prev;
-  prev->lru_next = message_info;
-  message_info->lru_next = &messages_lru_root_;
-  messages_lru_root_.lru_prev = message_info;
 }
 
 Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message, bool force_update_content) {
@@ -9529,8 +9479,6 @@ Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message,
   } else {
     message_info = std::move(it->second);
   }
-
-  update_message_lru(message_info.get());
 
   message_info->id = message_id;
   message_info->chat_id = chat_id;
@@ -9673,9 +9621,7 @@ const Client::MessageInfo *Client::get_message(int64 chat_id, int64 message_id) 
   }
   LOG(DEBUG) << "Found message " << message_id << " from chat " << chat_id;
 
-  auto result = it->second.get();
-  update_message_lru(result);
-  return result;
+  return it->second.get();
 }
 
 Client::MessageInfo *Client::get_message_editable(int64 chat_id, int64 message_id) {
@@ -9686,9 +9632,7 @@ Client::MessageInfo *Client::get_message_editable(int64 chat_id, int64 message_i
   }
   LOG(DEBUG) << "Found message " << message_id << " from chat " << chat_id;
 
-  auto result = it->second.get();
-  update_message_lru(result);
-  return result;
+  return it->second.get();
 }
 
 td::string Client::get_chat_member_status(const object_ptr<td_api::ChatMemberStatus> &status) {

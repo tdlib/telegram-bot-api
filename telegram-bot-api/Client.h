@@ -15,7 +15,6 @@
 #include "td/actor/actor.h"
 #include "td/actor/PromiseFuture.h"
 #include "td/actor/SignalSlot.h"
-#include "td/actor/Timeout.h"
 
 #include "td/utils/common.h"
 #include "td/utils/Container.h"
@@ -64,8 +63,6 @@ class Client : public WebhookActor::Callback {
   static constexpr int32 MAX_DOWNLOAD_FILE_SIZE = 20 << 20;
 
   static constexpr int32 MAX_CONCURRENTLY_SENT_CHAT_MESSAGES = 1000;  // some unreasonably big value
-
-  static constexpr int32 MESSAGES_CACHE_TIME = 3600;
 
   static constexpr std::size_t MIN_PENDING_UPDATES_WARNING = 200;
 
@@ -657,10 +654,6 @@ class Client : public WebhookActor::Callback {
   td::string get_chat_description(int64 chat_id) const;
 
   struct MessageInfo {
-    mutable double access_time = 1e20;
-    mutable const MessageInfo *lru_next = nullptr;
-    mutable const MessageInfo *lru_prev = nullptr;
-
     int64 id = 0;
     int64 sender_user_id = 0;
     int64 sender_chat_id = 0;
@@ -722,9 +715,6 @@ class Client : public WebhookActor::Callback {
 
   void remove_replies_to_message(int64 chat_id, int64 reply_to_message_id, bool only_from_cache);
   void delete_message(int64 chat_id, int64 message_id, bool only_from_cache);
-  static void delete_messages_lru(void *client_void);
-  void schedule_next_delete_messages_lru();
-  void update_message_lru(const MessageInfo *message_info) const;
 
   void add_new_message(object_ptr<td_api::message> &&message, bool is_edited);
   void process_new_message_queue(int64 chat_id);
@@ -871,7 +861,6 @@ class Client : public WebhookActor::Callback {
 
   static std::unordered_map<td::string, Status (Client::*)(PromisedQueryPtr &query)> methods_;
 
-  MessageInfo messages_lru_root_;
   std::unordered_map<FullMessageId, std::unique_ptr<MessageInfo>, FullMessageIdHash> messages_;  // message cache
   std::unordered_map<int64, UserInfo> users_;                                                    // user info cache
   std::unordered_map<int64, GroupInfo> groups_;                                                  // group info cache
@@ -882,8 +871,6 @@ class Client : public WebhookActor::Callback {
       reply_message_ids_;  // message -> replies to it
   std::unordered_map<FullMessageId, std::unordered_set<int64>, FullMessageIdHash>
       yet_unsent_reply_message_ids_;  // message -> replies to it
-
-  td::Timeout next_delete_messages_lru_timeout_;
 
   std::unordered_map<int32, td::vector<PromisedQueryPtr>> file_download_listeners_;
   std::unordered_set<int32> download_started_file_ids_;
