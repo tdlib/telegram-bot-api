@@ -23,7 +23,7 @@ If you do that, you'll only need to choose the target operating system to receiv
 
 In general, you need to install all `Telegram Bot API server` [dependencies](#dependencies) and compile the source code using CMake:
 
-```
+```sh
 git clone --recursive https://github.com/tdlib/telegram-bot-api.git
 cd telegram-bot-api
 mkdir build
