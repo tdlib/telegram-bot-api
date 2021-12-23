@@ -244,6 +244,13 @@
       <p></p>
     </div>
 
+    <div id="buildMacOsHostDiv" class="hide">
+      <span>Choose host architecture:</span><br>
+      <label><input type="radio" id="buildMacOsHostRadioAppleSilicon" name="buildMacOsHostRadio" onchange="onOptionsChanged()" checked/>Apple silicon</label>
+      <label><input type="radio" id="buildMacOsHostRadioIntel" name="buildMacOsHostRadio" onchange="onOptionsChanged()"/>Intel</label>
+      <p></p>
+    </div>
+
     <div id="buildBitnessDiv" class="hide">
       <span>Choose for which bitness you want to build the Telegram Bot API server:</span><br>
       <label><input type="radio" id="buildBitnessRadio64" name="buildBitnessRadio" onchange="onOptionsChanged()" checked/>64</label>
@@ -363,6 +370,8 @@ function onOptionsChanged() {
   var use_powershell = false;
   var use_cmd = false;
   var use_csh = false;
+  var homebrew_install_dir = '';
+  var os_mac_host_name = '';
   if (os_windows) {
     document.getElementById('buildShellDiv').style.display = 'block';
     use_powershell = document.getElementById('buildShellRadioPowerShell').checked;
@@ -374,6 +383,18 @@ function onOptionsChanged() {
     use_csh = document.getElementById('buildShellBsdRadioCsh').checked;
   } else {
     document.getElementById('buildShellBsdDiv').style.display = 'none';
+  }
+  if (os_mac) {
+    document.getElementById('buildMacOsHostDiv').style.display = 'block';
+    if (document.getElementById('buildMacOsHostRadioAppleSilicon').checked) {
+      homebrew_install_dir = '/opt/homebrew';
+      os_mac_host_name = 'Apple silicon';
+    } else {
+      homebrew_install_dir = '/usr/local';
+      os_mac_host_name = 'Intel';
+    }
+  } else {
+    document.getElementById('buildMacOsHostDiv').style.display = 'none';
   }
 
   var use_msvc = os_windows;
@@ -482,7 +503,7 @@ function onOptionsChanged() {
   var cmake = 'cmake';
   if (os_mac) {
     commands.push('xcode-select --install');
-    commands.push('/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"');
+    commands.push('/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"');
     commands.push('brew install gperf cmake openssl');
   } else if (os_linux && linux_distro !== 'Other') {
     switch (linux_distro) {
@@ -605,7 +626,7 @@ function onOptionsChanged() {
 
   cmake_init_options = getBacicCmakeInitOptions();
   if (os_mac) {
-    cmake_init_options.push('-DOPENSSL_ROOT_DIR=/usr/local/opt/openssl/');
+    cmake_init_options.push('-DOPENSSL_ROOT_DIR=' + homebrew_install_dir + '/opt/openssl/');
   }
   cmake_init_options.push('-DCMAKE_INSTALL_PREFIX:PATH=' + install_dir);
   if (use_vcpkg) {
