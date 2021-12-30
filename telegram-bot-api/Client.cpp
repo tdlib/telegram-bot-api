@@ -4231,7 +4231,7 @@ bool Client::allow_update_before_authorization(const td_api::Object *update) con
     return name == "my_id" || name == "unix_time";
   }
   if (update_id == td_api::updateUser::ID) {
-    return static_cast<const td_api::updateUser *>(update)->user_->id_ == my_id_;
+    return true;
   }
   return false;
 }
