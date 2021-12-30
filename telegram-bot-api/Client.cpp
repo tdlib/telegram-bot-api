@@ -2900,10 +2900,11 @@ class Client::TdOnResolveBotUsernameCallback : public TdQueryCallback {
 template <class OnSuccess>
 class Client::TdOnCheckMessageCallback : public TdQueryCallback {
  public:
-  TdOnCheckMessageCallback(Client *client, int64 chat_id, bool allow_empty, Slice message_type, PromisedQueryPtr query,
-                           OnSuccess on_success)
+  TdOnCheckMessageCallback(Client *client, int64 chat_id, int64 message_id, bool allow_empty, Slice message_type,
+                           PromisedQueryPtr query, OnSuccess on_success)
       : client_(client)
       , chat_id_(chat_id)
+      , message_id_(message_id)
       , allow_empty_(allow_empty)
       , message_type_(message_type)
       , query_(std::move(query))
@@ -2914,7 +2915,7 @@ class Client::TdOnCheckMessageCallback : public TdQueryCallback {
     if (result->get_id() == td_api::error::ID) {
       auto error = move_object_as<td_api::error>(result);
       if (error->code_ == 429) {
-        LOG(WARNING) << "Failed to get " << message_type_;
+        LOG(WARNING) << "Failed to get message " << message_id_ << " in " << chat_id_ << ": " << message_type_;
       }
       if (allow_empty_) {
         return on_success_(chat_id_, 0, std::move(query_));
@@ -2925,12 +2926,14 @@ class Client::TdOnCheckMessageCallback : public TdQueryCallback {
     CHECK(result->get_id() == td_api::message::ID);
     auto full_message_id = client_->add_message(move_object_as<td_api::message>(result));
     CHECK(full_message_id.chat_id == chat_id_);
+    CHECK(full_message_id.message_id == message_id_);
     on_success_(full_message_id.chat_id, full_message_id.message_id, std::move(query_));
   }
 
  private:
   Client *client_;
   int64 chat_id_;
+  int64 message_id_;
   bool allow_empty_;
   Slice message_type_;
   PromisedQueryPtr query_;
@@ -3926,9 +3929,10 @@ void Client::check_message(Slice chat_id_str, int64 message_id, bool allow_empty
                  return on_success(chat_id, 0, std::move(query));
                }
 
-               send_request(make_object<td_api::getMessage>(chat_id, message_id),
-                            std::make_unique<TdOnCheckMessageCallback<OnSuccess>>(
-                                this, chat_id, allow_empty, message_type, std::move(query), std::move(on_success)));
+               send_request(
+                   make_object<td_api::getMessage>(chat_id, message_id),
+                   std::make_unique<TdOnCheckMessageCallback<OnSuccess>>(
+                       this, chat_id, message_id, allow_empty, message_type, std::move(query), std::move(on_success)));
              });
 }
 
