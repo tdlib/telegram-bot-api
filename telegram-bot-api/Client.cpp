@@ -417,6 +417,9 @@ class Client::JsonEntity : public Jsonable {
       case td_api::textEntityTypeStrikethrough::ID:
         object("type", "strikethrough");
         break;
+      case td_api::textEntityTypeSpoiler::ID:
+        object("type", "spoiler");
+        break;
       case td_api::textEntityTypeCode::ID:
         object("type", "code");
         break;
@@ -5933,6 +5936,9 @@ td::Result<td_api::object_ptr<td_api::TextEntityType>> Client::get_text_entity_t
   }
   if (type == "strikethrough") {
     return make_object<td_api::textEntityTypeStrikethrough>();
+  }
+  if (type == "spoiler") {
+    return make_object<td_api::textEntityTypeSpoiler>();
   }
   if (type == "code") {
     return make_object<td_api::textEntityTypeCode>();
