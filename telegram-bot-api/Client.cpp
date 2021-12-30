@@ -563,8 +563,8 @@ class Client::JsonChatInviteLink : public Jsonable {
       object("name", chat_invite_link_->name_);
     }
     object("creator", JsonUser(chat_invite_link_->creator_user_id_, client_));
-    if (chat_invite_link_->expire_date_ != 0) {
-      object("expire_date", chat_invite_link_->expire_date_);
+    if (chat_invite_link_->expiration_date_ != 0) {
+      object("expire_date", chat_invite_link_->expiration_date_);
     }
     if (chat_invite_link_->member_limit_ != 0) {
       object("member_limit", chat_invite_link_->member_limit_);
@@ -4343,7 +4343,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       chat_info->title = std::move(chat->title_);
       chat_info->photo = std::move(chat->photo_);
       chat_info->permissions = std::move(chat->permissions_);
-      chat_info->message_auto_delete_time = chat->message_ttl_setting_;
+      chat_info->message_auto_delete_time = chat->message_ttl_;
       chat_info->has_protected_content = chat->has_protected_content_;
       break;
     }
@@ -4368,11 +4368,11 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       chat_info->permissions = std::move(update->permissions_);
       break;
     }
-    case td_api::updateChatMessageTtlSetting::ID: {
-      auto update = move_object_as<td_api::updateChatMessageTtlSetting>(result);
+    case td_api::updateChatMessageTtl::ID: {
+      auto update = move_object_as<td_api::updateChatMessageTtl>(result);
       auto chat_info = add_chat(update->chat_id_);
       CHECK(chat_info->type != ChatInfo::Type::Unknown);
-      chat_info->message_auto_delete_time = update->message_ttl_setting_;
+      chat_info->message_auto_delete_time = update->message_ttl_;
       break;
     }
     case td_api::updateChatHasProtectedContent::ID: {
@@ -5250,7 +5250,7 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
 }
 
 td_api::object_ptr<td_api::messageSendOptions> Client::get_message_send_options(bool disable_notification) {
-  return make_object<td_api::messageSendOptions>(disable_notification, false, nullptr);
+  return make_object<td_api::messageSendOptions>(disable_notification, false, false, nullptr);
 }
 
 td::Result<td::vector<td_api::object_ptr<td_api::InputInlineQueryResult>>> Client::get_inline_query_results(
