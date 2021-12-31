@@ -2629,7 +2629,7 @@ class Client::TdOnDeleteFailedToSendMessageCallback : public TdQueryCallback {
   void on_result(object_ptr<td_api::Object> result) override {
     if (result->get_id() == td_api::error::ID) {
       auto error = move_object_as<td_api::error>(result);
-      if (error->code_ != 401) {
+      if (error->code_ != 401 && !client_->need_close_ && !client_->closing_ && !client_->logging_out_) {
         LOG(ERROR) << "Can't delete failed to send message " << message_id_ << " because of "
                    << td::oneline(to_string(error)) << " in " << client_->get_chat_description(chat_id_)
                    << ". Old chat description: " << old_chat_description_;
@@ -4178,6 +4178,7 @@ void Client::on_update_authorization_state() {
     case td_api::authorizationStateReady::ID: {
       auto user_info = get_user_info(my_id_);
       if (my_id_ <= 0 || user_info == nullptr) {
+        LOG(INFO) << "Send getMe request for " << my_id_;
         return send_request(make_object<td_api::getMe>(), std::make_unique<TdOnAuthorizationCallback>(this));
       }
 
