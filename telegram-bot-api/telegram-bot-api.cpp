@@ -310,16 +310,16 @@ int main(int argc, char *argv[]) {
   options.add_checked_option('c', "max-connections", "maximum number of open file descriptors",
                              td::OptionParser::parse_integer(max_connections));
 
-  options.add_checked_option(
-      '\0', "proxy", PSLICE() << "HTTP proxy server for outgoing webhook requests in the format http://host:port",
-      [&](td::Slice address) {
-        if (td::begins_with(address, "http://")) {
-          address.remove_prefix(7);
-        } else if (td::begins_with(address, "https://")) {
-          address.remove_prefix(8);
-        }
-        return parameters->webhook_proxy_ip_address_.init_host_port(address.str());
-      });
+  options.add_checked_option('\0', "proxy",
+                             "HTTP proxy server for outgoing webhook requests in the format http://host:port",
+                             [&](td::Slice address) {
+                               if (td::begins_with(address, "http://")) {
+                                 address.remove_prefix(7);
+                               } else if (td::begins_with(address, "https://")) {
+                                 address.remove_prefix(8);
+                               }
+                               return parameters->webhook_proxy_ip_address_.init_host_port(address.str());
+                             });
   options.add_check([&] {
     if (parameters->api_id_ <= 0 || parameters->api_hash_.empty()) {
       return td::Status::Error("You must provide valid api-id and api-hash obtained at https://my.telegram.org");

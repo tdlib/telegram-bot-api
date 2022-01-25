@@ -11,6 +11,7 @@
 #include "telegram-bot-api/WebhookActor.h"
 
 #include "td/telegram/ClientActor.h"
+#include "td/telegram/td_api.h"
 
 #include "td/db/binlog/Binlog.h"
 #include "td/db/binlog/ConcurrentBinlog.h"
@@ -104,7 +105,7 @@ void ClientManager::send(PromisedQueryPtr query) {
         flood_control.add_limit(60, 20);        // 20 in a minute
         flood_control.add_limit(60 * 60, 600);  // 600 in an hour
       }
-      td::uint32 now = static_cast<td::uint32>(td::Time::now());
+      auto now = static_cast<td::uint32>(td::Time::now());
       td::uint32 wakeup_at = flood_control.get_wakeup_at();
       if (wakeup_at > now) {
         LOG(INFO) << "Failed to create Client from IP address " << ip_address;

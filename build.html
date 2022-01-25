@@ -678,7 +678,7 @@ function onOptionsChanged() {
   document.getElementById('buildCommands').innerHTML = '<ul><li>' + commands.join('</li><li>') + '</li></ul>';
   document.getElementById('copyBuildCommandsButton').style.display = commands.includes('exit') ? 'none' : 'block';
 }
-  
+
 function copyBuildInstructions() {
   var text = document.getElementById('buildCommands').innerText;
 

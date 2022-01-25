@@ -41,7 +41,7 @@ namespace telegram_bot_api {
 
 struct ClientParameters;
 
-class WebhookActor : public td::HttpOutboundConnection::Callback {
+class WebhookActor final : public td::HttpOutboundConnection::Callback {
  public:
   class Callback : public td::Actor {
    public:
@@ -139,7 +139,7 @@ class WebhookActor : public td::HttpOutboundConnection::Callback {
   double next_ip_address_resolve_time_ = 0;
   td::FutureActor<td::IPAddress> future_ip_address_;
 
-  class Connection : public td::ListNode {
+  class Connection final : public td::ListNode {
    public:
     Connection() = default;
     Connection(const Connection &) = delete;
@@ -190,26 +190,26 @@ class WebhookActor : public td::HttpOutboundConnection::Callback {
   td::Status send_update() TD_WARN_UNUSED_RESULT;
   void send_updates();
 
-  void loop() override;
-  void handle(td::unique_ptr<td::HttpQuery> response) override;
+  void loop() final;
+  void handle(td::unique_ptr<td::HttpQuery> response) final;
 
-  void hangup_shared() override;
+  void hangup_shared() final;
 
-  void hangup() override;
+  void hangup() final;
 
-  void tear_down() override;
+  void tear_down() final;
 
-  void start_up() override;
+  void start_up() final;
 
   bool check_ip_address(const td::IPAddress &addr) const;
 
   void on_error(td::Status status);
-  void on_connection_error(td::Status error) override;
+  void on_connection_error(td::Status error) final;
   void on_webhook_error(td::Slice error);
   void on_webhook_verified();
 };
 
-class JsonUpdate : public td::Jsonable {
+class JsonUpdate final : public td::Jsonable {
  public:
   JsonUpdate(td::int32 id, td::Slice update) : id_(id), update_(update) {
   }
