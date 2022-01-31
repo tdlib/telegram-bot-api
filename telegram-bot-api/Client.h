@@ -367,7 +367,7 @@ class Client final : public WebhookActor::Callback {
 
   static object_ptr<td_api::MaskPoint> mask_index_to_point(int32 index);
 
-  td::Result<td::vector<object_ptr<td_api::InputSticker>>> get_input_stickers(const Query *query) const;
+  td::Result<td::vector<object_ptr<td_api::inputSticker>>> get_input_stickers(const Query *query, bool is_masks) const;
 
   static td::Result<td::string> get_passport_element_hash(Slice encoded_hash);
 

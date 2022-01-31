@@ -356,7 +356,7 @@ void WebhookActor::load_updates() {
 
   auto offset = tqueue_offset_;
   auto limit = td::min(SharedData::TQUEUE_EVENT_BUFFER_SIZE, max_loaded_updates_ - queue_updates_.size());
-  auto updates = mutable_span(parameters_->shared_data_->event_buffer_, limit);
+  td::MutableSpan<td::TQueue::Event> updates(parameters_->shared_data_->event_buffer_, limit);
 
   auto now = td::Time::now();
   auto unix_time_now = parameters_->shared_data_->get_unix_time(now);
