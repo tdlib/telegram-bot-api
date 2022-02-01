@@ -157,7 +157,7 @@ class BotStatActor final : public td::Actor {
   BotStatActor(const BotStatActor &) = delete;
   BotStatActor &operator=(const BotStatActor &other) = delete;
   BotStatActor(BotStatActor &&) = default;
-  BotStatActor &operator=(BotStatActor &&other) {
+  BotStatActor &operator=(BotStatActor &&other) noexcept {
     if (!empty()) {
       do_stop();
     }
@@ -166,7 +166,7 @@ class BotStatActor final : public td::Actor {
     parent_ = other.parent_;
     return *this;
   }
-  ~BotStatActor() override = default;
+  ~BotStatActor() final = default;
 
   template <class EventT>
   void add_event(const EventT &event, double now) {

@@ -12,6 +12,7 @@
 #include "telegram-bot-api/StatsJson.h"
 
 #include "td/telegram/ClientActor.h"
+#include "td/telegram/td_api.h"
 
 #include "td/db/binlog/Binlog.h"
 #include "td/db/binlog/ConcurrentBinlog.h"

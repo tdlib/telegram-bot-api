@@ -72,7 +72,7 @@ The maximum number of messages to be deleted in a single batch is determined by 
 ###### Returns `true`
 
 ##### Command `ping`
-Send an MTProto ping message to the telegram servers. 
+Send an MTProto ping message to the telegram servers.
 Useful to detect the delay of the bot api server.
 
 ###### Parameters
@@ -149,7 +149,7 @@ The bot will now receive Updates for all received media, even if a destruction t
 <a name="user-mode"></a>
 ### User Mode
 
-You can allow user accounts to access the bot api with the command-line option `--allow-users` or set the env variable 
+You can allow user accounts to access the bot api with the command-line option `--allow-users` or set the env variable
 `TELEGRAM_ALLOW_USERS` to `1` when using docker. User Mode is disabled by default, so only bots can access the api.
 
 You can now log into the bot api with user accounts to create userbots running on your account.
@@ -161,37 +161,37 @@ Note: Never send your 2fa password over a plain http connection. Make sure https
 
    Parameters:
    - `phone_number`: `string`. The phone number of your Telegram Account.
-   
+
    Returns your `user_token` as `string`. You can use this just like a normal bot token on the `/user` endpoint
-   
+
 2. Send the received code to `{api_url}/user{user_token}/authcode`
 
    Parameters:
    - `code`: `int`. The code send to you by Telegram In-App or by SMS
-   
-   Will send `{"ok": true, "result": true}` on success. 
-   
+
+   Will send `{"ok": true, "result": true}` on success.
+
 3. Optional: Send your 2fa password to `{api_url}/user{user_token}/2fapassword`
-   
+
    Parameters:
    - `password`: `string`. Password for 2fa authentication
-   
-   Will send `{"ok": true, "result": true}` on success. 
-   
-4. Optional: Register the user by calling `{api_url}/user{user_token}/registerUser`. 
-   
+
+   Will send `{"ok": true, "result": true}` on success.
+
+4. Optional: Register the user by calling `{api_url}/user{user_token}/registerUser`.
+
    User registration is disabled by default. You can enable it with the `--allow-users-registration` command line
    option or the env variable `TELEGRAM_ALLOW_USERS_REGISTRATION` set to `1` when using docker.
-   
+
    Parameters:
    - `first_name`: `string`. First name for the new account.
    - `last_name`: `string`, optional. Last name for the new account.
-   
-   Will send `{"ok": true, "result": true}` on success. 
-   
-You are now logged in and can use all methods like in the bot api, just replace the 
-`/bot{bot_token}/` in your urls with `/user{token}/`. 
-   
+
+   Will send `{"ok": true, "result": true}` on success.
+
+You are now logged in and can use all methods like in the bot api, just replace the
+`/bot{bot_token}/` in your urls with `/user{token}/`.
+
 You only need to authenticate once, the account will stay logged in. You can use the `logOut` method to log out
 or simply close the session in your account settings.
 
@@ -226,7 +226,7 @@ It is possible to have multiple user-tokens to multiple client instances on the 
 
 The simplest way to use it is with this docker command:
 ```bash
-docker run -p 8081:8081 --env TELEGRAM_API_ID=API_ID --env TELEGRAM_API_HASH=API_HASH tdlight/tdlightbotapi 
+docker run -p 8081:8081 --env TELEGRAM_API_ID=API_ID --env TELEGRAM_API_HASH=API_HASH tdlight/tdlightbotapi
 ```
 
 The simplest way to build `Telegram Bot API server` is to use our [Telegram Bot API server build instructions generator](https://tdlight-team.github.io/tdlight-telegram-bot-api/build.html).

@@ -9,11 +9,11 @@
 #include "telegram-bot-api/ClientManager.h"
 #include "telegram-bot-api/Query.h"
 
-#include "td/actor/actor.h"
-#include "td/actor/PromiseFuture.h"
-
 #include "td/net/HttpInboundConnection.h"
 #include "td/net/HttpQuery.h"
+
+#include "td/actor/actor.h"
+#include "td/actor/PromiseFuture.h"
 
 #include "td/utils/buffer.h"
 #include "td/utils/Slice.h"
@@ -24,15 +24,15 @@ namespace telegram_bot_api {
 
 struct SharedData;
 
-class HttpConnection : public td::HttpInboundConnection::Callback {
+class HttpConnection final : public td::HttpInboundConnection::Callback {
  public:
   explicit HttpConnection(td::ActorId<ClientManager> client_manager, std::shared_ptr<SharedData> shared_data)
       : client_manager_(client_manager), shared_data_(std::move(shared_data)) {
   }
 
-  void handle(td::unique_ptr<td::HttpQuery> http_query, td::ActorOwn<td::HttpInboundConnection> connection) override;
+  void handle(td::unique_ptr<td::HttpQuery> http_query, td::ActorOwn<td::HttpInboundConnection> connection) final;
 
-  void wakeup() override;
+  void wakeup() final;
 
  private:
   td::FutureActor<td::unique_ptr<Query>> result_;
@@ -40,7 +40,7 @@ class HttpConnection : public td::HttpInboundConnection::Callback {
   td::ActorOwn<td::HttpInboundConnection> connection_;
   std::shared_ptr<SharedData> shared_data_;
 
-  void hangup() override {
+  void hangup() final {
     connection_.release();
     stop();
   }

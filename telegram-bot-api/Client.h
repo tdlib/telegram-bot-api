@@ -11,11 +11,11 @@
 #include "telegram-bot-api/WebhookActor.h"
 
 #include "td/telegram/ClientActor.h"
+#include "td/telegram/td_api.h"
 
 #include "td/actor/actor.h"
 #include "td/actor/PromiseFuture.h"
 #include "td/actor/SignalSlot.h"
-#include "td/actor/Timeout.h"
 
 #include "td/utils/common.h"
 #include "td/utils/Container.h"
@@ -36,12 +36,12 @@ struct ClientParameters;
 
 namespace td_api = td::td_api;
 
-class Client : public WebhookActor::Callback {
+class Client final : public WebhookActor::Callback {
  public:
   Client(td::ActorShared<> parent, const td::string &bot_token, bool is_user, bool is_test_dc, td::int64 tqueue_id,
          std::shared_ptr<const ClientParameters> parameters, td::ActorId<BotStatActor> stat_actor);
 
-  void send(PromisedQueryPtr query) override;
+  void send(PromisedQueryPtr query) final;
 
   void close();
 
@@ -64,8 +64,6 @@ class Client : public WebhookActor::Callback {
   static constexpr int32 MAX_DOWNLOAD_FILE_SIZE = 20 << 20;
 
   static constexpr int32 MAX_CONCURRENTLY_SENT_CHAT_MESSAGES = 1000;  // some unreasonably big value
-
-  static constexpr int32 MESSAGES_CACHE_TIME = 3600;
 
   static constexpr std::size_t MIN_PENDING_UPDATES_WARNING = 200;
 
@@ -413,7 +411,7 @@ class Client : public WebhookActor::Callback {
 
   static object_ptr<td_api::MaskPoint> mask_index_to_point(int32 index);
 
-  td::Result<td::vector<object_ptr<td_api::InputSticker>>> get_input_stickers(const Query *query) const;
+  td::Result<td::vector<object_ptr<td_api::inputSticker>>> get_input_stickers(const Query *query, bool is_masks) const;
 
   static td::Result<td::string> get_passport_element_hash(Slice encoded_hash);
 
@@ -459,7 +457,9 @@ class Client : public WebhookActor::Callback {
   td::Result<td::vector<object_ptr<td_api::InputMessageContent>>> get_input_message_contents(
       const Query *query, td::JsonValue &&value) const;
 
-  static object_ptr<td_api::messageSendOptions> get_message_send_options(bool disable_notification, object_ptr<td_api::MessageSchedulingState> &&scheduling_state);
+  static object_ptr<td_api::messageSendOptions> get_message_send_options(bool disable_notification,
+                                                                         bool protect_content,
+                                                                         object_ptr<td_api::MessageSchedulingState> &&scheduling_state);
 
   static td::Result<td::vector<td::string>> get_poll_options(const Query *query);
 
@@ -622,11 +622,11 @@ class Client : public WebhookActor::Callback {
   void process_register_user_query(PromisedQueryPtr &query);
 
 
-  void webhook_verified(td::string cached_ip_address) override;
-  void webhook_success() override;
-  void webhook_error(Status status) override;
-  void webhook_closed(Status status) override;
-  void hangup_shared() override;
+  void webhook_verified(td::string cached_ip_address) final;
+  void webhook_success() final;
+  void webhook_error(Status status) final;
+  void webhook_closed(Status status) final;
+  void hangup_shared() final;
   int32 get_webhook_max_connections(const Query *query) const;
   static bool get_webhook_fix_ip_address(const Query *query);
   void do_set_webhook(PromisedQueryPtr query, bool was_deleted);
@@ -665,13 +665,13 @@ class Client : public WebhookActor::Callback {
 
   void long_poll_wakeup(bool force_flag);
 
-  void start_up() override;
+  void start_up() final;
 
-  void raw_event(const td::Event::Raw &event) override;
+  void raw_event(const td::Event::Raw &event) final;
 
-  void loop() override;
+  void loop() final;
 
-  void timeout_expired() override;
+  void timeout_expired() final;
 
   struct UserInfo {
     enum class Type { Regular, Deleted, Bot, Unknown };
@@ -768,10 +768,6 @@ class Client : public WebhookActor::Callback {
   td::string get_chat_description(int64 chat_id) const;
 
   struct MessageInfo {
-    mutable double access_time = 1e20;
-    mutable const MessageInfo *lru_next = nullptr;
-    mutable const MessageInfo *lru_prev = nullptr;
-
     int64 id = 0;
     int64 sender_user_id = 0;
     int64 sender_chat_id = 0;
@@ -842,9 +838,6 @@ class Client : public WebhookActor::Callback {
 
   void remove_replies_to_message(int64 chat_id, int64 reply_to_message_id, bool only_from_cache);
   void delete_message(int64 chat_id, int64 message_id, bool only_from_cache);
-  static void delete_messages_lru(void *client_void);
-  void schedule_next_delete_messages_lru();
-  void update_message_lru(const MessageInfo *message_info) const;
 
   void add_new_message(object_ptr<td_api::message> &&message, bool is_edited);
   void process_new_message_queue(int64 chat_id);
@@ -995,7 +988,6 @@ class Client : public WebhookActor::Callback {
 
   static std::unordered_map<td::string, Status (Client::*)(PromisedQueryPtr &query)> methods_;
 
-  MessageInfo messages_lru_root_;
   std::unordered_map<FullMessageId, std::unique_ptr<MessageInfo>, FullMessageIdHash> messages_;  // message cache
   std::unordered_map<int64, UserInfo> users_;                                                    // user info cache
   std::unordered_map<int64, GroupInfo> groups_;                                                  // group info cache
@@ -1006,8 +998,6 @@ class Client : public WebhookActor::Callback {
       reply_message_ids_;  // message -> replies to it
   std::unordered_map<FullMessageId, std::unordered_set<int64>, FullMessageIdHash>
       yet_unsent_reply_message_ids_;  // message -> replies to it
-
-  td::Timeout next_delete_messages_lru_timeout_;
 
   std::unordered_map<int32, td::vector<PromisedQueryPtr>> file_download_listeners_;
   std::unordered_set<int32> download_started_file_ids_;

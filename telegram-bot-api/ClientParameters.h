@@ -6,12 +6,12 @@
 //
 #pragma once
 
-#include "td/actor/actor.h"
-
 #include "td/db/KeyValueSyncInterface.h"
 #include "td/db/TQueue.h"
 
 #include "td/net/GetHostByNameActor.h"
+
+#include "td/actor/actor.h"
 
 #include "td/utils/common.h"
 #include "td/utils/List.h"
@@ -23,7 +23,7 @@
 
 namespace td {
 class NetQueryStats;
-}
+}  // namespace td
 
 namespace telegram_bot_api {
 

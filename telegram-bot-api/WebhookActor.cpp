@@ -152,11 +152,11 @@ td::Status WebhookActor::create_connection() {
     }
 
     VLOG(webhook) << "Create connection through proxy " << parameters_->webhook_proxy_ip_address_;
-    class Callback : public td::TransparentProxy::Callback {
+    class Callback final : public td::TransparentProxy::Callback {
      public:
       Callback(td::ActorId<WebhookActor> actor, td::int64 id) : actor_(actor), id_(id) {
       }
-      void set_result(td::Result<td::BufferedFd<td::SocketFd>> result) override {
+      void set_result(td::Result<td::BufferedFd<td::SocketFd>> result) final {
         send_closure(std::move(actor_), &WebhookActor::on_socket_ready_async, std::move(result), id_);
         CHECK(actor_.empty());
       }
@@ -169,7 +169,7 @@ td::Status WebhookActor::create_connection() {
           send_closure(std::move(actor_), &WebhookActor::on_socket_ready_async, td::Status::Error("Canceled"), id_);
         }
       }
-      void on_connected() override {
+      void on_connected() final {
         // nothing to do
       }
 
@@ -356,7 +356,7 @@ void WebhookActor::load_updates() {
 
   auto offset = tqueue_offset_;
   auto limit = td::min(SharedData::TQUEUE_EVENT_BUFFER_SIZE, max_loaded_updates_ - queue_updates_.size());
-  auto updates = mutable_span(parameters_->shared_data_->event_buffer_, limit);
+  td::MutableSpan<td::TQueue::Event> updates(parameters_->shared_data_->event_buffer_, limit);
 
   auto now = td::Time::now();
   auto unix_time_now = parameters_->shared_data_->get_unix_time(now);

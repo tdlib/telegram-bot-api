@@ -8,10 +8,10 @@
 
 #include "telegram-bot-api/ClientParameters.h"
 
+#include "td/net/HttpFile.h"
+
 #include "td/actor/actor.h"
 #include "td/actor/PromiseFuture.h"
-
-#include "td/net/HttpFile.h"
 
 #include "td/utils/buffer.h"
 #include "td/utils/common.h"
@@ -30,7 +30,7 @@ namespace telegram_bot_api {
 
 class BotStatActor;
 
-class Query : public td::ListNode {
+class Query final : public td::ListNode {
  public:
   enum class State : td::int8 { Query, OK, Error };
 
@@ -170,7 +170,7 @@ td::StringBuilder &operator<<(td::StringBuilder &sb, const Query &query);
 // https://stackoverflow.com/questions/26947704/implicit-conversion-failure-from-initializer-list
 extern std::unordered_map<td::string, std::unique_ptr<td::VirtuallyJsonable>> empty_parameters;
 
-class JsonParameters : public td::Jsonable {
+class JsonParameters final : public td::Jsonable {
  public:
   explicit JsonParameters(const std::unordered_map<td::string, std::unique_ptr<td::VirtuallyJsonable>> &parameters)
       : parameters_(parameters) {
@@ -188,7 +188,7 @@ class JsonParameters : public td::Jsonable {
 };
 
 template <class T>
-class JsonQueryOk : public td::Jsonable {
+class JsonQueryOk final : public td::Jsonable {
  public:
   JsonQueryOk(const T &result, td::Slice description) : result_(result), description_(description) {
   }
@@ -206,7 +206,7 @@ class JsonQueryOk : public td::Jsonable {
   td::Slice description_;
 };
 
-class JsonQueryError : public td::Jsonable {
+class JsonQueryError final : public td::Jsonable {
  public:
   JsonQueryError(
       int error_code, td::Slice description,

@@ -76,9 +76,9 @@ class ClientManager final : public td::Actor {
   static PromisedQueryPtr get_webhook_restore_query(td::Slice token, bool is_user, td::Slice webhook_info,
                                                     std::shared_ptr<SharedData> shared_data);
 
-  void start_up() override;
-  void raw_event(const td::Event::Raw &event) override;
-  void hangup_shared() override;
+  void start_up() final;
+  void raw_event(const td::Event::Raw &event) final;
+  void hangup_shared() final;
   void close_db();
   void finish_close();
 };
