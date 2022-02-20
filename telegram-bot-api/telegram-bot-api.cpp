@@ -211,6 +211,7 @@ int main(int argc, char *argv[]) {
   bool need_print_version = false;
   int http_port = 8081;
   int http_stat_port = 0;
+  td::string instance_id = "";
   td::string http_ip_address = "0.0.0.0";
   td::string http_stat_ip_address = "0.0.0.0";
   td::string log_file_path;
@@ -256,6 +257,7 @@ int main(int argc, char *argv[]) {
                              td::OptionParser::parse_integer(http_port));
   options.add_checked_option('s', "http-stat-port", "HTTP statistics port",
                              td::OptionParser::parse_integer(http_stat_port));
+  options.add_option('id', "instance-id", "The bot instance id, so that all bot data can be stored in the same folder", td::OptionParser::parse_string(instance_id));
   options.add_option('d', "dir", "server working directory", td::OptionParser::parse_string(working_directory));
   options.add_option('t', "temp-dir", "directory for storing HTTP server temporary files",
                      td::OptionParser::parse_string(temporary_directory));
@@ -442,6 +444,7 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
+  parameters->instance_id_ = std::move(instance_id);
   parameters->working_directory_ = std::move(working_directory);
 
   if (parameters->default_max_webhook_connections_ <= 0) {
