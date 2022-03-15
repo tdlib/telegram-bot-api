@@ -6899,7 +6899,7 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
           send_request(
               make_object<td_api::sendMessageAlbum>(chat_id, 0, reply_to_message_id,
                                                     get_message_send_options(disable_notification, protect_content),
-                                                    std::move(input_message_contents)),
+                                                    std::move(input_message_contents), false),
               std::make_unique<TdOnSendMessageAlbumCallback>(this, std::move(query)));
         };
         check_message(chat_id, reply_to_message_id, reply_to_message_id <= 0 || allow_sending_without_reply,
