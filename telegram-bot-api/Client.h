@@ -580,6 +580,7 @@ class Client final : public WebhookActor::Callback {
     td::string username;
     td::string language_code;
 
+    object_ptr<td_api::chatPhoto> photo;
     td::string bio;
 
     bool have_access = false;
@@ -589,12 +590,14 @@ class Client final : public WebhookActor::Callback {
     bool has_private_forwards = false;
   };
   static void add_user(UserInfo *user_info, object_ptr<td_api::user> &&user);
+  void set_user_photo(int64 user_id, object_ptr<td_api::chatPhoto> &&photo);
   void set_user_bio(int64 user_id, td::string &&bio);
   void set_user_has_private_forwards(int64 user_id, bool has_private_forwards);
   UserInfo *add_user_info(int64 user_id);
   const UserInfo *get_user_info(int64 user_id) const;
 
   struct GroupInfo {
+    object_ptr<td_api::chatPhoto> photo;
     td::string description;
     td::string invite_link;
     int32 member_count = 0;
@@ -604,6 +607,7 @@ class Client final : public WebhookActor::Callback {
     int64 upgraded_to_supergroup_id = 0;
   };
   static void add_group(GroupInfo *group_info, object_ptr<td_api::basicGroup> &&group);
+  void set_group_photo(int64 group_id, object_ptr<td_api::chatPhoto> &&photo);
   void set_group_description(int64 group_id, td::string &&descripton);
   void set_group_invite_link(int64 group_id, td::string &&invite_link);
   GroupInfo *add_group_info(int64 group_id);
@@ -611,6 +615,7 @@ class Client final : public WebhookActor::Callback {
 
   struct SupergroupInfo {
     td::string username;
+    object_ptr<td_api::chatPhoto> photo;
     td::string description;
     td::string invite_link;
     int64 sticker_set_id = 0;
@@ -624,6 +629,7 @@ class Client final : public WebhookActor::Callback {
     bool has_location = false;
   };
   static void add_supergroup(SupergroupInfo *supergroup_info, object_ptr<td_api::supergroup> &&supergroup);
+  void set_supergroup_photo(int64 supergroup_id, object_ptr<td_api::chatPhoto> &&photo);
   void set_supergroup_description(int64 supergroup_id, td::string &&descripton);
   void set_supergroup_invite_link(int64 supergroup_id, td::string &&invite_link);
   void set_supergroup_sticker_set_id(int64 supergroup_id, int64 sticker_set_id);
@@ -640,7 +646,7 @@ class Client final : public WebhookActor::Callback {
     td::string title;
     int32 message_auto_delete_time = 0;
     bool has_protected_content = false;
-    object_ptr<td_api::chatPhotoInfo> photo;
+    object_ptr<td_api::chatPhotoInfo> photo_info;
     object_ptr<td_api::chatPermissions> permissions;
     union {
       int64 user_id;

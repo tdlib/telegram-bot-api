@@ -619,6 +619,7 @@ class Client::JsonChat final : public Jsonable {
     CHECK(chat_info != nullptr);
     auto object = scope->enter_object();
     object("id", chat_id_);
+    const td_api::chatPhoto *photo = nullptr;
     switch (chat_info->type) {
       case ChatInfo::Type::Private: {
         auto user_info = client_->get_user_info(chat_info->user_id);
@@ -639,6 +640,7 @@ class Client::JsonChat final : public Jsonable {
             object("has_private_forwards", td::JsonTrue());
           }
         }
+        photo = user_info->photo.get();
         break;
       }
       case ChatInfo::Type::Group: {
@@ -663,6 +665,7 @@ class Client::JsonChat final : public Jsonable {
                                          permissions->can_add_web_page_previews_ && permissions->can_change_info_ &&
                                          permissions->can_invite_users_ && permissions->can_pin_messages_;
         object("all_members_are_administrators", td::JsonBool(everyone_is_administrator));
+        photo = group_info->photo.get();
         break;
       }
       case ChatInfo::Type::Supergroup: {
@@ -710,6 +713,7 @@ class Client::JsonChat final : public Jsonable {
             object("location", JsonChatLocation(supergroup_info->location.get()));
           }
         }
+        photo = supergroup_info->photo.get();
         break;
       }
       case ChatInfo::Type::Unknown:
@@ -717,8 +721,34 @@ class Client::JsonChat final : public Jsonable {
         UNREACHABLE();
     }
     if (is_full_) {
-      if (chat_info->photo != nullptr) {
-        object("photo", JsonChatPhotoInfo(chat_info->photo.get()));
+      if (photo != nullptr) {
+        const td_api::file *small_file = nullptr;
+        const td_api::file *big_file = nullptr;
+        for (auto &size : photo->sizes_) {
+          if (size->type_ == "a") {
+            small_file = size->photo_.get();
+          } else if (size->type_ == "c") {
+            big_file = size->photo_.get();
+          }
+        }
+        if (small_file == nullptr || big_file == nullptr) {
+          LOG(ERROR) << "Failed to convert chatPhoto to chatPhotoInfo for " << chat_id_ << ": " << to_string(*photo);
+        } else {
+          if (chat_info->photo_info == nullptr) {
+            LOG(ERROR) << "Have chatPhoto without chatPhotoInfo for " << chat_id_;
+          } else {
+            if (small_file->remote_->unique_id_ != chat_info->photo_info->small_->remote_->unique_id_ ||
+                big_file->remote_->unique_id_ != chat_info->photo_info->big_->remote_->unique_id_) {
+              LOG(ERROR) << "Have different chatPhoto and chatPhotoInfo for " << chat_id_ << ": " << to_string(*photo)
+                         << ' ' << to_string(chat_info->photo_info);
+            }
+          }
+        }
+      } else if (chat_info->photo_info != nullptr) {
+        LOG(ERROR) << "Have chatPhotoInfo without chatPhoto for " << chat_id_;
+      }
+      if (chat_info->photo_info != nullptr) {
+        object("photo", JsonChatPhotoInfo(chat_info->photo_info.get()));
       }
       if (pinned_message_id_ != 0) {
         CHECK(pinned_message_id_ != -1);
@@ -1687,10 +1717,7 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
     }
     case td_api::messagePhoto::ID: {
       auto message_photo = static_cast<const td_api::messagePhoto *>(message_->content.get());
-      if (message_photo->photo_ == nullptr) {
-        LOG(ERROR) << "Got empty messagePhoto";
-        break;
-      }
+      CHECK(message_photo->photo_ != nullptr);
       object("photo", JsonPhoto(message_photo->photo_.get(), client_));
       add_caption(object, message_photo->caption_);
       break;
@@ -4355,7 +4382,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       }
 
       chat_info->title = std::move(chat->title_);
-      chat_info->photo = std::move(chat->photo_);
+      chat_info->photo_info = std::move(chat->photo_);
       chat_info->permissions = std::move(chat->permissions_);
       chat_info->message_auto_delete_time = chat->message_ttl_;
       chat_info->has_protected_content = chat->has_protected_content_;
@@ -4372,7 +4399,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       auto update = move_object_as<td_api::updateChatPhoto>(result);
       auto chat_info = add_chat(update->chat_id_);
       CHECK(chat_info->type != ChatInfo::Type::Unknown);
-      chat_info->photo = std::move(update->photo_);
+      chat_info->photo_info = std::move(update->photo_);
       break;
     }
     case td_api::updateChatPermissions::ID: {
@@ -4405,8 +4432,10 @@ void Client::on_update(object_ptr<td_api::Object> result) {
     case td_api::updateUserFullInfo::ID: {
       auto update = move_object_as<td_api::updateUserFullInfo>(result);
       auto user_id = update->user_id_;
-      set_user_bio(user_id, std::move(update->user_full_info_->bio_));
-      set_user_has_private_forwards(user_id, update->user_full_info_->has_private_forwards_);
+      auto full_info = update->user_full_info_.get();
+      set_user_photo(user_id, std::move(full_info->photo_));
+      set_user_bio(user_id, std::move(full_info->bio_));
+      set_user_has_private_forwards(user_id, full_info->has_private_forwards_);
       break;
     }
     case td_api::updateBasicGroup::ID: {
@@ -4418,7 +4447,8 @@ void Client::on_update(object_ptr<td_api::Object> result) {
     case td_api::updateBasicGroupFullInfo::ID: {
       auto update = move_object_as<td_api::updateBasicGroupFullInfo>(result);
       auto group_id = update->basic_group_id_;
-      auto full_info = std::move(update->basic_group_full_info_);
+      auto full_info = update->basic_group_full_info_.get();
+      set_group_photo(group_id, std::move(full_info->photo_));
       set_group_description(group_id, std::move(full_info->description_));
       set_group_invite_link(group_id, full_info->invite_link_ != nullptr
                                           ? std::move(full_info->invite_link_->invite_link_)
@@ -4434,7 +4464,8 @@ void Client::on_update(object_ptr<td_api::Object> result) {
     case td_api::updateSupergroupFullInfo::ID: {
       auto update = move_object_as<td_api::updateSupergroupFullInfo>(result);
       auto supergroup_id = update->supergroup_id_;
-      auto full_info = std::move(update->supergroup_full_info_);
+      auto full_info = update->supergroup_full_info_.get();
+      set_supergroup_photo(supergroup_id, std::move(full_info->photo_));
       set_supergroup_description(supergroup_id, std::move(full_info->description_));
       set_supergroup_invite_link(supergroup_id, full_info->invite_link_ != nullptr
                                                     ? std::move(full_info->invite_link_->invite_link_)
@@ -8495,6 +8526,10 @@ const Client::UserInfo *Client::get_user_info(int64 user_id) const {
   return it == users_.end() ? nullptr : it->second.get();
 }
 
+void Client::set_user_photo(int64 user_id, object_ptr<td_api::chatPhoto> &&photo) {
+  add_user_info(user_id)->photo = std::move(photo);
+}
+
 void Client::set_user_bio(int64 user_id, td::string &&bio) {
   add_user_info(user_id)->bio = std::move(bio);
 }
@@ -8530,6 +8565,10 @@ const Client::GroupInfo *Client::get_group_info(int64 group_id) const {
   return it == groups_.end() ? nullptr : it->second.get();
 }
 
+void Client::set_group_photo(int64 group_id, object_ptr<td_api::chatPhoto> &&photo) {
+  add_group_info(group_id)->photo = std::move(photo);
+}
+
 void Client::set_group_description(int64 group_id, td::string &&descripton) {
   add_group_info(group_id)->description = std::move(descripton);
 }
@@ -8544,6 +8583,10 @@ void Client::add_supergroup(SupergroupInfo *supergroup_info, object_ptr<td_api::
   supergroup_info->status = std::move(supergroup->status_);
   supergroup_info->is_supergroup = !supergroup->is_channel_;
   supergroup_info->has_location = supergroup->has_location_;
+}
+
+void Client::set_supergroup_photo(int64 supergroup_id, object_ptr<td_api::chatPhoto> &&photo) {
+  add_supergroup_info(supergroup_id)->photo = std::move(photo);
 }
 
 void Client::set_supergroup_description(int64 supergroup_id, td::string &&descripton) {
