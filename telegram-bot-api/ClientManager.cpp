@@ -71,8 +71,12 @@ void ClientManager::send(PromisedQueryPtr query) {
     return fail_query(401, "Unauthorized: invalid token specified", std::move(query));
   }
   auto r_user_id = td::to_integer_safe<td::int64>(query->token().substr(0, token.find(':')));
-  if (r_user_id.is_error() || r_user_id.ok() < 0 || !token_range_(r_user_id.ok())) {
+  if (r_user_id.is_error() || !token_range_(r_user_id.ok())) {
     return fail_query(421, "Misdirected Request: unallowed token specified", std::move(query));
+  }
+  auto user_id = r_user_id.ok();
+  if (user_id <= 0 || user_id >= (static_cast<td::int64>(1) << 54)) {
+    return fail_query(401, "Unauthorized: invalid token specified", std::move(query));
   }
 
   if (query->is_test_dc()) {
@@ -113,7 +117,7 @@ void ClientManager::send(PromisedQueryPtr query) {
       }
       flood_control.add_event(static_cast<td::int32>(now));
     }
-    auto tqueue_id = get_tqueue_id(r_user_id.ok(), query->is_test_dc());
+    auto tqueue_id = get_tqueue_id(user_id, query->is_test_dc());
     if (active_client_count_.find(tqueue_id) != active_client_count_.end()) {
       // return query->set_retry_after_error(1);
     }
@@ -392,6 +396,7 @@ void ClientManager::raw_event(const td::Event::Raw &event) {
   auto id = get_link_token();
   auto *info = clients_.get(id);
   CHECK(info != nullptr);
+  CHECK(info->tqueue_id_ != 0);
   auto &value = active_client_count_[info->tqueue_id_];
   if (event.ptr != nullptr) {
     value++;

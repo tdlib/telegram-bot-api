@@ -16,11 +16,11 @@
 #include "td/utils/buffer.h"
 #include "td/utils/common.h"
 #include "td/utils/Container.h"
+#include "td/utils/FlatHashMap.h"
 #include "td/utils/FloodControlFast.h"
 #include "td/utils/Slice.h"
 
 #include <memory>
-#include <unordered_map>
 #include <utility>
 
 namespace telegram_bot_api {
@@ -61,9 +61,9 @@ class ClientManager final : public td::Actor {
   std::shared_ptr<const ClientParameters> parameters_;
   TokenRange token_range_;
 
-  std::unordered_map<td::string, td::uint64> token_to_id_;
-  std::unordered_map<td::string, td::FloodControlFast> flood_controls_;
-  std::unordered_map<td::int64, td::uint64> active_client_count_;
+  td::FlatHashMap<td::string, td::uint64> token_to_id_;
+  td::FlatHashMap<td::string, td::FloodControlFast> flood_controls_;
+  td::FlatHashMap<td::int64, td::uint64> active_client_count_;
 
   bool close_flag_ = false;
   td::vector<td::Promise<td::Unit>> close_promises_;

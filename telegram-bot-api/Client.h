@@ -19,6 +19,8 @@
 
 #include "td/utils/common.h"
 #include "td/utils/Container.h"
+#include "td/utils/FlatHashMap.h"
+#include "td/utils/FlatHashSet.h"
 #include "td/utils/JsonBuilder.h"
 #include "td/utils/Slice.h"
 #include "td/utils/Status.h"
@@ -27,8 +29,6 @@
 #include <limits>
 #include <memory>
 #include <queue>
-#include <unordered_map>
-#include <unordered_set>
 
 namespace telegram_bot_api {
 
@@ -588,9 +588,10 @@ class Client final : public WebhookActor::Callback {
     bool is_inline_bot = false;
     bool has_private_forwards = false;
   };
-  static void add_user(std::unordered_map<int64, UserInfo> &users, object_ptr<td_api::user> &&user);
+  static void add_user(UserInfo *user_info, object_ptr<td_api::user> &&user);
   void set_user_bio(int64 user_id, td::string &&bio);
   void set_user_has_private_forwards(int64 user_id, bool has_private_forwards);
+  UserInfo *add_user_info(int64 user_id);
   const UserInfo *get_user_info(int64 user_id) const;
 
   struct GroupInfo {
@@ -602,9 +603,10 @@ class Client final : public WebhookActor::Callback {
     bool is_active = false;
     int64 upgraded_to_supergroup_id = 0;
   };
-  static void add_group(std::unordered_map<int64, GroupInfo> &groups, object_ptr<td_api::basicGroup> &&group);
+  static void add_group(GroupInfo *group_info, object_ptr<td_api::basicGroup> &&group);
   void set_group_description(int64 group_id, td::string &&descripton);
   void set_group_invite_link(int64 group_id, td::string &&invite_link);
+  GroupInfo *add_group_info(int64 group_id);
   const GroupInfo *get_group_info(int64 group_id) const;
 
   struct SupergroupInfo {
@@ -621,8 +623,7 @@ class Client final : public WebhookActor::Callback {
     bool can_set_sticker_set = false;
     bool has_location = false;
   };
-  static void add_supergroup(std::unordered_map<int64, SupergroupInfo> &supergroups,
-                             object_ptr<td_api::supergroup> &&supergroup);
+  static void add_supergroup(SupergroupInfo *supergroup_info, object_ptr<td_api::supergroup> &&supergroup);
   void set_supergroup_description(int64 supergroup_id, td::string &&descripton);
   void set_supergroup_invite_link(int64 supergroup_id, td::string &&invite_link);
   void set_supergroup_sticker_set_id(int64 supergroup_id, int64 sticker_set_id);
@@ -630,6 +631,7 @@ class Client final : public WebhookActor::Callback {
   void set_supergroup_slow_mode_delay(int64 supergroup_id, int32 slow_mode_delay);
   void set_supergroup_linked_chat_id(int64 supergroup_id, int64 linked_chat_id);
   void set_supergroup_location(int64 supergroup_id, object_ptr<td_api::chatLocation> location);
+  SupergroupInfo *add_supergroup_info(int64 supergroup_id);
   const SupergroupInfo *get_supergroup_info(int64 supergroup_id) const;
 
   struct ChatInfo {
@@ -861,30 +863,30 @@ class Client final : public WebhookActor::Callback {
   int64 channel_bot_user_id_ = 0;
   int64 service_notifications_user_id_ = 0;
 
-  static std::unordered_map<td::string, Status (Client::*)(PromisedQueryPtr &query)> methods_;
+  static td::FlatHashMap<td::string, Status (Client::*)(PromisedQueryPtr &query)> methods_;
 
-  std::unordered_map<FullMessageId, std::unique_ptr<MessageInfo>, FullMessageIdHash> messages_;  // message cache
-  std::unordered_map<int64, UserInfo> users_;                                                    // user info cache
-  std::unordered_map<int64, GroupInfo> groups_;                                                  // group info cache
-  std::unordered_map<int64, SupergroupInfo> supergroups_;  // supergroup info cache
-  std::unordered_map<int64, ChatInfo> chats_;              // chat info cache
+  td::FlatHashMap<FullMessageId, std::unique_ptr<MessageInfo>, FullMessageIdHash> messages_;  // message cache
+  td::FlatHashMap<int64, td::unique_ptr<UserInfo>> users_;                                    // user info cache
+  td::FlatHashMap<int64, td::unique_ptr<GroupInfo>> groups_;                                  // group info cache
+  td::FlatHashMap<int64, td::unique_ptr<SupergroupInfo>> supergroups_;                        // supergroup info cache
+  td::FlatHashMap<int64, td::unique_ptr<ChatInfo>> chats_;                                    // chat info cache
 
-  std::unordered_map<FullMessageId, std::unordered_set<int64>, FullMessageIdHash>
+  td::FlatHashMap<FullMessageId, td::FlatHashSet<int64>, FullMessageIdHash>
       reply_message_ids_;  // message -> replies to it
-  std::unordered_map<FullMessageId, std::unordered_set<int64>, FullMessageIdHash>
+  td::FlatHashMap<FullMessageId, td::FlatHashSet<int64>, FullMessageIdHash>
       yet_unsent_reply_message_ids_;  // message -> replies to it
 
-  std::unordered_map<int32, td::vector<PromisedQueryPtr>> file_download_listeners_;
-  std::unordered_set<int32> download_started_file_ids_;
+  td::FlatHashMap<int32, td::vector<PromisedQueryPtr>> file_download_listeners_;
+  td::FlatHashSet<int32> download_started_file_ids_;
 
   struct YetUnsentMessage {
     int64 reply_to_message_id = 0;
     bool is_reply_to_message_deleted = false;
     int64 send_message_query_id = 0;
   };
-  std::unordered_map<FullMessageId, YetUnsentMessage, FullMessageIdHash> yet_unsent_messages_;
+  td::FlatHashMap<FullMessageId, YetUnsentMessage, FullMessageIdHash> yet_unsent_messages_;
 
-  std::unordered_map<int64, int32> yet_unsent_message_count_;
+  td::FlatHashMap<int64, int32> yet_unsent_message_count_;  // chat_id -> count
 
   struct PendingSendMessageQuery {
     PromisedQueryPtr query;
@@ -893,7 +895,7 @@ class Client final : public WebhookActor::Callback {
     td::vector<td::string> messages;
     object_ptr<td_api::error> error;
   };
-  std::unordered_map<int64, PendingSendMessageQuery>
+  td::FlatHashMap<int64, td::unique_ptr<PendingSendMessageQuery>>
       pending_send_message_queries_;  // query_id -> PendingSendMessageQuery
   int64 current_send_message_query_id_ = 1;
 
@@ -909,28 +911,28 @@ class Client final : public WebhookActor::Callback {
     std::queue<NewMessage> queue_;
     bool has_active_request_ = false;
   };
-  std::unordered_map<int64, NewMessageQueue> new_message_queues_;  // chat_id -> queue
+  td::FlatHashMap<int64, NewMessageQueue> new_message_queues_;  // chat_id -> queue
 
   struct NewCallbackQueryQueue {
     std::queue<object_ptr<td_api::updateNewCallbackQuery>> queue_;
     bool has_active_request_ = false;
   };
-  std::unordered_map<int64, NewCallbackQueryQueue> new_callback_query_queues_;  // sender_user_id -> queue
+  td::FlatHashMap<int64, NewCallbackQueryQueue> new_callback_query_queues_;  // sender_user_id -> queue
 
-  std::unordered_map<int64, td::string> sticker_set_names_;
+  td::FlatHashMap<int64, td::string> sticker_set_names_;
 
   int64 cur_temp_bot_user_id_ = 1;
-  std::unordered_map<td::string, int64> bot_user_ids_;
-  std::unordered_set<td::string> unresolved_bot_usernames_;
-  std::unordered_map<int64, int64> temp_to_real_bot_user_id_;
-  std::unordered_map<td::string, td::vector<int64>> awaiting_bot_resolve_queries_;
+  td::FlatHashMap<td::string, int64> bot_user_ids_;
+  td::FlatHashSet<td::string> unresolved_bot_usernames_;
+  td::FlatHashMap<int64, int64> temp_to_real_bot_user_id_;
+  td::FlatHashMap<td::string, td::vector<int64>> awaiting_bot_resolve_queries_;
 
   struct PendingBotResolveQuery {
     std::size_t pending_resolve_count = 0;
     PromisedQueryPtr query;
     td::Promise<PromisedQueryPtr> on_success;
   };
-  std::unordered_map<int64, PendingBotResolveQuery> pending_bot_resolve_queries_;
+  td::FlatHashMap<int64, PendingBotResolveQuery> pending_bot_resolve_queries_;
   int64 current_bot_resolve_query_id_ = 1;
 
   td::string dir_;

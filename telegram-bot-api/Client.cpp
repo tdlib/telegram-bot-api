@@ -3760,7 +3760,7 @@ void Client::check_chat_access(int64 chat_id, AccessRights access_rights, const 
       CHECK(group_info != nullptr);
       if (!group_info->is_active && need_write_access) {
         if (group_info->upgraded_to_supergroup_id != 0) {
-          std::unordered_map<td::string, std::unique_ptr<td::VirtuallyJsonable>> parameters;
+          td::FlatHashMap<td::string, std::unique_ptr<td::VirtuallyJsonable>> parameters;
           auto updagraded_to_chat_id = get_supergroup_chat_id(group_info->upgraded_to_supergroup_id);
           parameters.emplace("migrate_to_chat_id", std::make_unique<td::VirtuallyJsonableLong>(updagraded_to_chat_id));
           return fail_query(400, "Bad Request: group chat was upgraded to a supergroup chat", std::move(query),
@@ -4398,7 +4398,8 @@ void Client::on_update(object_ptr<td_api::Object> result) {
     }
     case td_api::updateUser::ID: {
       auto update = move_object_as<td_api::updateUser>(result);
-      add_user(users_, std::move(update->user_));
+      auto *user_info = add_user_info(update->user_->id_);
+      add_user(user_info, std::move(update->user_));
       break;
     }
     case td_api::updateUserFullInfo::ID: {
@@ -4410,7 +4411,8 @@ void Client::on_update(object_ptr<td_api::Object> result) {
     }
     case td_api::updateBasicGroup::ID: {
       auto update = move_object_as<td_api::updateBasicGroup>(result);
-      add_group(groups_, std::move(update->basic_group_));
+      auto *group_info = add_group_info(update->basic_group_->id_);
+      add_group(group_info, std::move(update->basic_group_));
       break;
     }
     case td_api::updateBasicGroupFullInfo::ID: {
@@ -4425,7 +4427,8 @@ void Client::on_update(object_ptr<td_api::Object> result) {
     }
     case td_api::updateSupergroup::ID: {
       auto update = move_object_as<td_api::updateSupergroup>(result);
-      add_supergroup(supergroups_, std::move(update->supergroup_));
+      auto *supergroup_info = add_supergroup_info(update->supergroup_->id_);
+      add_supergroup(supergroup_info, std::move(update->supergroup_));
       break;
     }
     case td_api::updateSupergroupFullInfo::ID: {
@@ -6392,7 +6395,7 @@ void Client::on_message_send_succeeded(object_ptr<td_api::message> &&message, in
 
   auto query_id =
       extract_yet_unsent_message_query_id(chat_id, old_message_id, &message_info->is_reply_to_message_deleted);
-  auto &query = pending_send_message_queries_[query_id];
+  auto &query = *pending_send_message_queries_[query_id];
   if (query.is_multisend) {
     query.messages.push_back(td::json_encode<td::string>(JsonMessage(message_info, true, "sent message", this)));
     query.awaited_message_count--;
@@ -6420,7 +6423,7 @@ void Client::on_message_send_failed(int64 chat_id, int64 old_message_id, int64 n
   auto error = make_object<td_api::error>(result.code(), result.message().str());
 
   auto query_id = extract_yet_unsent_message_query_id(chat_id, old_message_id, nullptr);
-  auto &query = pending_send_message_queries_[query_id];
+  auto &query = *pending_send_message_queries_[query_id];
   if (query.is_multisend) {
     if (query.error == nullptr) {
       query.error = std::move(error);
@@ -8253,8 +8256,10 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
 td::int64 Client::get_send_message_query_id(PromisedQueryPtr query, bool is_multisend) {
   auto query_id = current_send_message_query_id_++;
   auto &pending_query = pending_send_message_queries_[query_id];
-  pending_query.query = std::move(query);
-  pending_query.is_multisend = is_multisend;
+  CHECK(pending_query == nullptr);
+  pending_query = td::make_unique<PendingSendMessageQuery>();
+  pending_query->query = std::move(query);
+  pending_query->is_multisend = is_multisend;
   return query_id;
 }
 
@@ -8276,7 +8281,7 @@ void Client::on_sent_message(object_ptr<td_api::message> &&message, int64 query_
   auto emplace_result = yet_unsent_messages_.emplace(yet_unsent_message_id, yet_unsent_message);
   CHECK(emplace_result.second);
   yet_unsent_message_count_[chat_id]++;
-  pending_send_message_queries_[query_id].awaited_message_count++;
+  pending_send_message_queries_[query_id]->awaited_message_count++;
 }
 
 void Client::abort_long_poll(bool from_set_webhook) {
@@ -8442,8 +8447,7 @@ void Client::long_poll_wakeup(bool force_flag) {
   }
 }
 
-void Client::add_user(std::unordered_map<int64, UserInfo> &users, object_ptr<td_api::user> &&user) {
-  auto user_info = &users[user->id_];
+void Client::add_user(UserInfo *user_info, object_ptr<td_api::user> &&user) {
   user_info->first_name = std::move(user->first_name_);
   user_info->last_name = std::move(user->last_name_);
   user_info->username = std::move(user->username_);
@@ -8475,23 +8479,31 @@ void Client::add_user(std::unordered_map<int64, UserInfo> &users, object_ptr<td_
   }
 }
 
+Client::UserInfo *Client::add_user_info(int64 user_id) {
+  auto emplace_result = users_.emplace(user_id, nullptr);
+  auto &user_info = emplace_result.first->second;
+  if (emplace_result.second) {
+    user_info = td::make_unique<UserInfo>();
+  } else {
+    CHECK(user_info != nullptr);
+  }
+  return user_info.get();
+}
+
 const Client::UserInfo *Client::get_user_info(int64 user_id) const {
   auto it = users_.find(user_id);
-  return it == users_.end() ? nullptr : &it->second;
+  return it == users_.end() ? nullptr : it->second.get();
 }
 
 void Client::set_user_bio(int64 user_id, td::string &&bio) {
-  auto user_info = &users_[user_id];
-  user_info->bio = std::move(bio);
+  add_user_info(user_id)->bio = std::move(bio);
 }
 
 void Client::set_user_has_private_forwards(int64 user_id, bool has_private_forwards) {
-  auto user_info = &users_[user_id];
-  user_info->has_private_forwards = has_private_forwards;
+  add_user_info(user_id)->has_private_forwards = has_private_forwards;
 }
 
-void Client::add_group(std::unordered_map<int64, GroupInfo> &groups, object_ptr<td_api::basicGroup> &&group) {
-  auto group_info = &groups[group->id_];
+void Client::add_group(GroupInfo *group_info, object_ptr<td_api::basicGroup> &&group) {
   group_info->member_count = group->member_count_;
   group_info->left = group->status_->get_id() == td_api::chatMemberStatusLeft::ID;
   group_info->kicked = group->status_->get_id() == td_api::chatMemberStatusBanned::ID;
@@ -8502,24 +8514,31 @@ void Client::add_group(std::unordered_map<int64, GroupInfo> &groups, object_ptr<
   }
 }
 
+Client::GroupInfo *Client::add_group_info(int64 group_id) {
+  auto emplace_result = groups_.emplace(group_id, nullptr);
+  auto &group_info = emplace_result.first->second;
+  if (emplace_result.second) {
+    group_info = td::make_unique<GroupInfo>();
+  } else {
+    CHECK(group_info != nullptr);
+  }
+  return group_info.get();
+}
+
 const Client::GroupInfo *Client::get_group_info(int64 group_id) const {
   auto it = groups_.find(group_id);
-  return it == groups_.end() ? nullptr : &it->second;
+  return it == groups_.end() ? nullptr : it->second.get();
 }
 
 void Client::set_group_description(int64 group_id, td::string &&descripton) {
-  auto group_info = &groups_[group_id];
-  group_info->description = std::move(descripton);
+  add_group_info(group_id)->description = std::move(descripton);
 }
 
 void Client::set_group_invite_link(int64 group_id, td::string &&invite_link) {
-  auto group_info = &groups_[group_id];
-  group_info->invite_link = std::move(invite_link);
+  add_group_info(group_id)->invite_link = std::move(invite_link);
 }
 
-void Client::add_supergroup(std::unordered_map<int64, SupergroupInfo> &supergroups,
-                            object_ptr<td_api::supergroup> &&supergroup) {
-  auto supergroup_info = &supergroups[supergroup->id_];
+void Client::add_supergroup(SupergroupInfo *supergroup_info, object_ptr<td_api::supergroup> &&supergroup) {
   supergroup_info->username = std::move(supergroup->username_);
   supergroup_info->date = supergroup->date_;
   supergroup_info->status = std::move(supergroup->status_);
@@ -8528,48 +8547,59 @@ void Client::add_supergroup(std::unordered_map<int64, SupergroupInfo> &supergrou
 }
 
 void Client::set_supergroup_description(int64 supergroup_id, td::string &&descripton) {
-  auto supergroup_info = &supergroups_[supergroup_id];
-  supergroup_info->description = std::move(descripton);
+  add_supergroup_info(supergroup_id)->description = std::move(descripton);
 }
 
 void Client::set_supergroup_invite_link(int64 supergroup_id, td::string &&invite_link) {
-  auto supergroup_info = &supergroups_[supergroup_id];
-  supergroup_info->invite_link = std::move(invite_link);
+  add_supergroup_info(supergroup_id)->invite_link = std::move(invite_link);
 }
 
 void Client::set_supergroup_sticker_set_id(int64 supergroup_id, int64 sticker_set_id) {
-  auto supergroup_info = &supergroups_[supergroup_id];
-  supergroup_info->sticker_set_id = sticker_set_id;
+  add_supergroup_info(supergroup_id)->sticker_set_id = sticker_set_id;
 }
 
 void Client::set_supergroup_can_set_sticker_set(int64 supergroup_id, bool can_set_sticker_set) {
-  auto supergroup_info = &supergroups_[supergroup_id];
-  supergroup_info->can_set_sticker_set = can_set_sticker_set;
+  add_supergroup_info(supergroup_id)->can_set_sticker_set = can_set_sticker_set;
 }
 
 void Client::set_supergroup_slow_mode_delay(int64 supergroup_id, int32 slow_mode_delay) {
-  auto supergroup_info = &supergroups_[supergroup_id];
-  supergroup_info->slow_mode_delay = slow_mode_delay;
+  add_supergroup_info(supergroup_id)->slow_mode_delay = slow_mode_delay;
 }
 
 void Client::set_supergroup_linked_chat_id(int64 supergroup_id, int64 linked_chat_id) {
-  auto supergroup_info = &supergroups_[supergroup_id];
-  supergroup_info->linked_chat_id = linked_chat_id;
+  add_supergroup_info(supergroup_id)->linked_chat_id = linked_chat_id;
 }
 
 void Client::set_supergroup_location(int64 supergroup_id, object_ptr<td_api::chatLocation> location) {
-  auto supergroup_info = &supergroups_[supergroup_id];
-  supergroup_info->location = std::move(location);
+  add_supergroup_info(supergroup_id)->location = std::move(location);
+}
+
+Client::SupergroupInfo *Client::add_supergroup_info(int64 supergroup_id) {
+  auto emplace_result = supergroups_.emplace(supergroup_id, nullptr);
+  auto &supergroup_info = emplace_result.first->second;
+  if (emplace_result.second) {
+    supergroup_info = td::make_unique<SupergroupInfo>();
+  } else {
+    CHECK(supergroup_info != nullptr);
+  }
+  return supergroup_info.get();
 }
 
 const Client::SupergroupInfo *Client::get_supergroup_info(int64 supergroup_id) const {
   auto it = supergroups_.find(supergroup_id);
-  return it == supergroups_.end() ? nullptr : &it->second;
+  return it == supergroups_.end() ? nullptr : it->second.get();
 }
 
 Client::ChatInfo *Client::add_chat(int64 chat_id) {
   LOG(DEBUG) << "Update chat " << chat_id;
-  return &chats_[chat_id];
+  auto emplace_result = chats_.emplace(chat_id, nullptr);
+  auto &chat_info = emplace_result.first->second;
+  if (emplace_result.second) {
+    chat_info = td::make_unique<ChatInfo>();
+  } else {
+    CHECK(chat_info != nullptr);
+  }
+  return chat_info.get();
 }
 
 const Client::ChatInfo *Client::get_chat(int64 chat_id) const {
@@ -8577,7 +8607,7 @@ const Client::ChatInfo *Client::get_chat(int64 chat_id) const {
   if (it == chats_.end()) {
     return nullptr;
   }
-  return &it->second;
+  return it->second.get();
 }
 
 Client::ChatType Client::get_chat_type(int64 chat_id) const {
@@ -8879,10 +8909,7 @@ void Client::add_new_message(object_ptr<td_api::message> &&message, bool is_edit
   }
 
   auto chat_id = message->chat_id_;
-  if (chat_id == 0) {
-    LOG(ERROR) << "Receive invalid chat in " << to_string(message);
-    return;
-  }
+  CHECK(chat_id != 0);
   new_message_queues_[chat_id].queue_.emplace(std::move(message), is_edited);
   process_new_message_queue(chat_id);
 }
@@ -8916,10 +8943,7 @@ void Client::add_new_chosen_inline_result(int64 sender_user_id, object_ptr<td_ap
 void Client::add_new_callback_query(object_ptr<td_api::updateNewCallbackQuery> &&query) {
   CHECK(query != nullptr);
   auto user_id = query->sender_user_id_;
-  if (user_id == 0) {
-    LOG(ERROR) << "Receive invalid sender in " << to_string(query);
-    return;
-  }
+  CHECK(user_id != 0);
   new_callback_query_queues_[user_id].queue_.push(std::move(query));
   process_new_callback_query_queue(user_id, 0);
 }
@@ -9806,6 +9830,6 @@ constexpr Client::Slice Client::API_ID_INVALID_ERROR_DESCRIPTION;
 constexpr int Client::CLOSING_ERROR_CODE;
 constexpr Client::Slice Client::CLOSING_ERROR_DESCRIPTION;
 
-std::unordered_map<td::string, td::Status (Client::*)(PromisedQueryPtr &query)> Client::methods_;
+td::FlatHashMap<td::string, td::Status (Client::*)(PromisedQueryPtr &query)> Client::methods_;
 
 }  // namespace telegram_bot_api

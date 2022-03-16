@@ -20,6 +20,7 @@
 #include "td/utils/BufferedFd.h"
 #include "td/utils/common.h"
 #include "td/utils/Container.h"
+#include "td/utils/FlatHashMap.h"
 #include "td/utils/FloodControlFast.h"
 #include "td/utils/HttpUrl.h"
 #include "td/utils/JsonBuilder.h"
@@ -35,7 +36,6 @@
 #include <memory>
 #include <set>
 #include <tuple>
-#include <unordered_map>
 
 namespace telegram_bot_api {
 
@@ -127,8 +127,8 @@ class WebhookActor final : public td::HttpOutboundConnection::Callback {
       return std::hash<td::int32>()(event_id.value());
     }
   };
-  std::unordered_map<td::TQueue::EventId, Update, EventIdHash> update_map_;
-  std::unordered_map<td::int64, QueueUpdates> queue_updates_;
+  td::FlatHashMap<td::TQueue::EventId, td::unique_ptr<Update>, EventIdHash> update_map_;
+  td::FlatHashMap<td::int64, QueueUpdates> queue_updates_;
   std::set<Queue> queues_;
   td::int64 unique_queue_id_ = static_cast<td::int64>(1) << 60;
 
