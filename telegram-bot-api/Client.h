@@ -279,8 +279,8 @@ class Client final : public WebhookActor::Callback {
   template <class OnSuccess>
   void get_chat_member(int64 chat_id, int64 user_id, PromisedQueryPtr query, OnSuccess on_success);
 
-  void send_request(object_ptr<td_api::Function> &&f, std::unique_ptr<TdQueryCallback> handler);
-  void do_send_request(object_ptr<td_api::Function> &&f, std::unique_ptr<TdQueryCallback> handler);
+  void send_request(object_ptr<td_api::Function> &&f, td::unique_ptr<TdQueryCallback> handler);
+  void do_send_request(object_ptr<td_api::Function> &&f, td::unique_ptr<TdQueryCallback> handler);
   static object_ptr<td_api::Object> execute(object_ptr<td_api::Function> &&f);
   void on_update(object_ptr<td_api::Object> result);
   void on_result(td::uint64 id, object_ptr<td_api::Object> result);
@@ -865,11 +865,11 @@ class Client final : public WebhookActor::Callback {
 
   static td::FlatHashMap<td::string, Status (Client::*)(PromisedQueryPtr &query)> methods_;
 
-  td::FlatHashMap<FullMessageId, std::unique_ptr<MessageInfo>, FullMessageIdHash> messages_;  // message cache
-  td::FlatHashMap<int64, td::unique_ptr<UserInfo>> users_;                                    // user info cache
-  td::FlatHashMap<int64, td::unique_ptr<GroupInfo>> groups_;                                  // group info cache
-  td::FlatHashMap<int64, td::unique_ptr<SupergroupInfo>> supergroups_;                        // supergroup info cache
-  td::FlatHashMap<int64, td::unique_ptr<ChatInfo>> chats_;                                    // chat info cache
+  td::FlatHashMap<FullMessageId, td::unique_ptr<MessageInfo>, FullMessageIdHash> messages_;  // message cache
+  td::FlatHashMap<int64, td::unique_ptr<UserInfo>> users_;                                   // user info cache
+  td::FlatHashMap<int64, td::unique_ptr<GroupInfo>> groups_;                                 // group info cache
+  td::FlatHashMap<int64, td::unique_ptr<SupergroupInfo>> supergroups_;                       // supergroup info cache
+  td::FlatHashMap<int64, td::unique_ptr<ChatInfo>> chats_;                                   // chat info cache
 
   td::FlatHashMap<FullMessageId, td::FlatHashSet<int64>, FullMessageIdHash>
       reply_message_ids_;  // message -> replies to it
@@ -940,7 +940,7 @@ class Client final : public WebhookActor::Callback {
   td::ActorContext context_;
   std::queue<PromisedQueryPtr> cmd_queue_;
   td::vector<object_ptr<td_api::Object>> pending_updates_;
-  td::Container<std::unique_ptr<TdQueryCallback>> handlers_;
+  td::Container<td::unique_ptr<TdQueryCallback>> handlers_;
 
   static constexpr int32 LONG_POLL_MAX_TIMEOUT = 50;
   static constexpr double LONG_POLL_MAX_DELAY = 0.01;

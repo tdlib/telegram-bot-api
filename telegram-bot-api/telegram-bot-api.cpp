@@ -230,11 +230,11 @@ int main(int argc, char *argv[]) {
     }
     return 0;
   }(std::getenv("TELEGRAM_API_ID"));
-  parameters->api_hash_ = [](auto x) -> std::string {
+  parameters->api_hash_ = [](auto x) -> td::string {
     if (x) {
       return x;
     }
-    return std::string();
+    return td::string();
   }(std::getenv("TELEGRAM_API_HASH"));
 
   options.set_usage(td::Slice(argv[0]), "--api-id=<arg> --api-hash=<arg> [--local] [OPTION]...");

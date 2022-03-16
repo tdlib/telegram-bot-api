@@ -164,11 +164,11 @@ td::StringBuilder &operator<<(td::StringBuilder &sb, const Query &query);
 
 // fix for outdated C++14 libraries
 // https://stackoverflow.com/questions/26947704/implicit-conversion-failure-from-initializer-list
-extern td::FlatHashMap<td::string, std::unique_ptr<td::VirtuallyJsonable>> empty_parameters;
+extern td::FlatHashMap<td::string, td::unique_ptr<td::VirtuallyJsonable>> empty_parameters;
 
 class JsonParameters final : public td::Jsonable {
  public:
-  explicit JsonParameters(const td::FlatHashMap<td::string, std::unique_ptr<td::VirtuallyJsonable>> &parameters)
+  explicit JsonParameters(const td::FlatHashMap<td::string, td::unique_ptr<td::VirtuallyJsonable>> &parameters)
       : parameters_(parameters) {
   }
   void store(td::JsonValueScope *scope) const {
@@ -180,7 +180,7 @@ class JsonParameters final : public td::Jsonable {
   }
 
  private:
-  const td::FlatHashMap<td::string, std::unique_ptr<td::VirtuallyJsonable>> &parameters_;
+  const td::FlatHashMap<td::string, td::unique_ptr<td::VirtuallyJsonable>> &parameters_;
 };
 
 template <class T>
@@ -206,7 +206,7 @@ class JsonQueryError final : public td::Jsonable {
  public:
   JsonQueryError(
       int error_code, td::Slice description,
-      const td::FlatHashMap<td::string, std::unique_ptr<td::VirtuallyJsonable>> &parameters = empty_parameters)
+      const td::FlatHashMap<td::string, td::unique_ptr<td::VirtuallyJsonable>> &parameters = empty_parameters)
       : error_code_(error_code), description_(description), parameters_(parameters) {
   }
   void store(td::JsonValueScope *scope) const {
@@ -222,7 +222,7 @@ class JsonQueryError final : public td::Jsonable {
  private:
   int error_code_;
   td::Slice description_;
-  const td::FlatHashMap<td::string, std::unique_ptr<td::VirtuallyJsonable>> &parameters_;
+  const td::FlatHashMap<td::string, td::unique_ptr<td::VirtuallyJsonable>> &parameters_;
 };
 
 class PromiseDeleter {
@@ -261,7 +261,7 @@ void answer_query(const Jsonable &result, PromisedQueryPtr query, td::Slice desc
 
 inline void fail_query(
     int http_status_code, td::Slice description, PromisedQueryPtr query,
-    const td::FlatHashMap<td::string, std::unique_ptr<td::VirtuallyJsonable>> &parameters = empty_parameters) {
+    const td::FlatHashMap<td::string, td::unique_ptr<td::VirtuallyJsonable>> &parameters = empty_parameters) {
   query->set_error(http_status_code,
                    td::json_encode<td::BufferSlice>(JsonQueryError(http_status_code, description, parameters)));
   query.reset();  // send query into promise explicitly

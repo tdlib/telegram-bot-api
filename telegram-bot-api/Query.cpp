@@ -21,7 +21,7 @@
 
 namespace telegram_bot_api {
 
-td::FlatHashMap<td::string, std::unique_ptr<td::VirtuallyJsonable>> empty_parameters;
+td::FlatHashMap<td::string, td::unique_ptr<td::VirtuallyJsonable>> empty_parameters;
 
 Query::Query(td::vector<td::BufferSlice> &&container, td::Slice token, bool is_test_dc, td::MutableSlice method,
              td::vector<std::pair<td::MutableSlice, td::MutableSlice>> &&args,
@@ -96,8 +96,8 @@ void Query::set_error(int http_status_code, td::BufferSlice result) {
 void Query::set_retry_after_error(int retry_after) {
   retry_after_ = retry_after;
 
-  td::FlatHashMap<td::string, std::unique_ptr<td::VirtuallyJsonable>> parameters;
-  parameters.emplace("retry_after", std::make_unique<td::VirtuallyJsonableLong>(retry_after));
+  td::FlatHashMap<td::string, td::unique_ptr<td::VirtuallyJsonable>> parameters;
+  parameters.emplace("retry_after", td::make_unique<td::VirtuallyJsonableLong>(retry_after));
   set_error(429, td::json_encode<td::BufferSlice>(
                      JsonQueryError(429, PSLICE() << "Too Many Requests: retry after " << retry_after, parameters)));
 }

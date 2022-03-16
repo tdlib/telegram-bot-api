@@ -85,7 +85,7 @@ void ClientManager::send(PromisedQueryPtr query) {
 
   auto id_it = token_to_id_.find(token);
   if (id_it == token_to_id_.end()) {
-    std::string ip_address;
+    td::string ip_address;
     if (query->peer_address().is_valid() && !query->peer_address().is_reserved()) {  // external connection
       ip_address = query->peer_address().get_ip_str().str();
     } else {
@@ -386,9 +386,9 @@ PromisedQueryPtr ClientManager::get_webhook_restore_query(td::Slice token, td::S
   args.emplace_back(add_string("url"), add_string(parser.read_all()));
 
   const auto method = add_string("setwebhook");
-  auto query = std::make_unique<Query>(std::move(containers), token, is_test_dc, method, std::move(args),
-                                       td::vector<std::pair<td::MutableSlice, td::MutableSlice>>(),
-                                       td::vector<td::HttpFile>(), std::move(shared_data), td::IPAddress(), true);
+  auto query = td::make_unique<Query>(std::move(containers), token, is_test_dc, method, std::move(args),
+                                      td::vector<std::pair<td::MutableSlice, td::MutableSlice>>(),
+                                      td::vector<td::HttpFile>(), std::move(shared_data), td::IPAddress(), true);
   return PromisedQueryPtr(query.release(), PromiseDeleter(td::PromiseActor<td::unique_ptr<Query>>()));
 }
 
