@@ -832,6 +832,8 @@ class Client final : public WebhookActor::Callback {
 
   std::size_t get_pending_update_count() const;
 
+  void update_last_synchronization_error_date();
+
   static bool is_chat_member(const object_ptr<td_api::ChatMemberStatus> &status);
 
   static td::string get_chat_member_status(const object_ptr<td_api::ChatMemberStatus> &status);
@@ -982,6 +984,10 @@ class Client final : public WebhookActor::Callback {
   std::size_t last_pending_update_count_ = MIN_PENDING_UPDATES_WARNING;
 
   double local_unix_time_difference_ = 0;  // Unix time - now()
+
+  double disconnection_time_ = 0;         // the time when Connection state changed from "Ready", or 0 if it is "Ready"
+  double last_update_creation_time_ = 0;  // the time when the last update was added
+  int32 last_synchronization_error_date_ = 0;  // the date of the last connection error
 
   int32 previous_get_updates_offset_ = -1;
   double previous_get_updates_start_time_ = 0;

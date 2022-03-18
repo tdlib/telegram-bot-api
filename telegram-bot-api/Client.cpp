@@ -2499,6 +2499,9 @@ class Client::JsonWebhookInfo final : public Jsonable {
     if (client_->allowed_update_types_ != DEFAULT_ALLOWED_UPDATE_TYPES) {
       object("allowed_updates", JsonUpdateTypes(client_->allowed_update_types_));
     }
+    if (client_->last_synchronization_error_date_ > 0) {
+      object("last_synchronization_error_date", client_->last_synchronization_error_date_);
+    }
   }
 
  private:
@@ -3515,6 +3518,18 @@ std::size_t Client::get_pending_update_count() const {
   return parameters_->shared_data_->tqueue_->get_size(tqueue_id_);
 }
 
+void Client::update_last_synchronization_error_date() {
+  if (disconnection_time_ == 0 || !was_authorized_ || logging_out_ || closing_) {
+    return;
+  }
+  auto now = td::Time::now();
+  if (last_update_creation_time_ > now - 10 || disconnection_time_ > now - 180) {
+    return;
+  }
+
+  last_synchronization_error_date_ = get_unix_time();
+}
+
 ServerBotInfo Client::get_bot_info() const {
   ServerBotInfo res;
   res.id_ = bot_token_id_;
@@ -4227,12 +4242,14 @@ void Client::on_update_authorization_state() {
           }
           td::reset_to_empty(pending_updates_);
         }
+        last_update_creation_time_ = td::Time::now();
       }
       return loop();
     }
     case td_api::authorizationStateLoggingOut::ID:
       if (!logging_out_) {
         LOG(WARNING) << "Logging out";
+        update_last_synchronization_error_date();
         logging_out_ = true;
         if (was_authorized_ && !closing_) {
           td::send_event(parent_, td::Event::raw(nullptr));
@@ -4242,6 +4259,7 @@ void Client::on_update_authorization_state() {
     case td_api::authorizationStateClosing::ID:
       if (!closing_) {
         LOG(WARNING) << "Closing";
+        update_last_synchronization_error_date();
         closing_ = true;
         if (was_authorized_ && !logging_out_) {
           td::send_event(parent_, td::Event::raw(nullptr));
@@ -4568,6 +4586,16 @@ void Client::on_update(object_ptr<td_api::Object> result) {
     case td_api::updateNewChatJoinRequest::ID:
       add_update_chat_join_request(move_object_as<td_api::updateNewChatJoinRequest>(result));
       break;
+    case td_api::updateConnectionState::ID: {
+      auto update = move_object_as<td_api::updateConnectionState>(result);
+      if (update->state_->get_id() == td_api::connectionStateReady::ID) {
+        update_last_synchronization_error_date();
+        disconnection_time_ = 0;
+      } else if (disconnection_time_ == 0) {
+        disconnection_time_ = td::Time::now();
+      }
+      break;
+    }
     default:
       // we are not interested in this update
       break;
@@ -8028,6 +8056,7 @@ td::Status Client::process_set_webhook_query(PromisedQueryPtr &query) {
 }
 
 td::Status Client::process_get_webhook_info_query(PromisedQueryPtr &query) {
+  update_last_synchronization_error_date();
   answer_query(JsonWebhookInfo(this), std::move(query));
   return Status::OK();
 }
@@ -8910,6 +8939,9 @@ void Client::add_update(UpdateType update_type, const T &update, int32 timeout, 
 
 void Client::add_update_impl(UpdateType update_type, const td::VirtuallyJsonable &update, int32 timeout,
                              int64 webhook_queue_id) {
+  update_last_synchronization_error_date();
+  last_update_creation_time_ = td::Time::now();
+
   if (((allowed_update_types_ >> static_cast<int32>(update_type)) & 1) == 0) {
     return;
   }
