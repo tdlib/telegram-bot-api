@@ -1937,19 +1937,23 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
     }
     case td_api::messageVideoChatScheduled::ID: {
       auto content = static_cast<const td_api::messageVideoChatScheduled *>(message_->content.get());
+      object("video_chat_scheduled", JsonVideoChatScheduled(content));
       object("voice_chat_scheduled", JsonVideoChatScheduled(content));
       break;
     }
     case td_api::messageVideoChatStarted::ID:
+      object("video_chat_started", JsonVideoChatStarted());
       object("voice_chat_started", JsonVideoChatStarted());
       break;
     case td_api::messageVideoChatEnded::ID: {
       auto content = static_cast<const td_api::messageVideoChatEnded *>(message_->content.get());
+      object("video_chat_ended", JsonVideoChatEnded(content));
       object("voice_chat_ended", JsonVideoChatEnded(content));
       break;
     }
     case td_api::messageInviteVideoChatParticipants::ID: {
       auto content = static_cast<const td_api::messageInviteVideoChatParticipants *>(message_->content.get());
+      object("video_chat_participants_invited", JsonInviteVideoChatParticipants(content, client_));
       object("voice_chat_participants_invited", JsonInviteVideoChatParticipants(content, client_));
       break;
     }
@@ -2313,6 +2317,7 @@ class Client::JsonChatMember final : public Jsonable {
         }
         object("can_promote_members", td::JsonBool(administrator->can_promote_members_));
         object("can_manage_voice_chats", td::JsonBool(administrator->can_manage_video_chats_));
+        object("can_manage_video_chats", td::JsonBool(administrator->can_manage_video_chats_));
         if (!administrator->custom_title_.empty()) {
           object("custom_title", administrator->custom_title_);
         }
@@ -7621,7 +7626,8 @@ td::Status Client::process_promote_chat_member_query(PromisedQueryPtr &query) {
   auto can_restrict_members = to_bool(query->arg("can_restrict_members"));
   auto can_pin_messages = to_bool(query->arg("can_pin_messages"));
   auto can_promote_members = to_bool(query->arg("can_promote_members"));
-  auto can_manage_video_chats = to_bool(query->arg("can_manage_voice_chats"));
+  auto can_manage_video_chats =
+      to_bool(query->arg("can_manage_voice_chats")) || to_bool(query->arg("can_manage_video_chats"));
   auto is_anonymous = to_bool(query->arg("is_anonymous"));
   auto status = make_object<td_api::chatMemberStatusAdministrator>(
       td::string(), true, can_manage_chat, can_change_info, can_post_messages, can_edit_messages, can_delete_messages,
