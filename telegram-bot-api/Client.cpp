@@ -1545,6 +1545,19 @@ class Client::JsonCallbackGame final : public Jsonable {
   }
 };
 
+class Client::JsonWebAppInfo final : public Jsonable {
+ public:
+  explicit JsonWebAppInfo(const td::string &url) : url_(url) {
+  }
+  void store(JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("url", url_);
+  }
+
+ private:
+  const td::string &url_;
+};
+
 class Client::JsonInlineKeyboardButton final : public Jsonable {
  public:
   explicit JsonInlineKeyboardButton(const td_api::inlineKeyboardButton *button) : button_(button) {
@@ -1591,6 +1604,11 @@ class Client::JsonInlineKeyboardButton final : public Jsonable {
       case td_api::inlineKeyboardButtonTypeUser::ID: {
         auto type = static_cast<const td_api::inlineKeyboardButtonTypeUser *>(button_->type_.get());
         object("url", PSLICE() << "tg://user?id=" << type->user_id_);
+        break;
+      }
+      case td_api::inlineKeyboardButtonTypeWebApp::ID: {
+        auto type = static_cast<const td_api::inlineKeyboardButtonTypeWebApp *>(button_->type_.get());
+        object("web_app", JsonWebAppInfo(type->url_));
         break;
       }
       default:
@@ -4808,6 +4826,13 @@ td::Result<td_api::object_ptr<td_api::keyboardButton>> Client::get_keyboard_butt
           text, make_object<td_api::keyboardButtonTypeRequestPoll>(force_regular, force_quiz));
     }
 
+    if (has_json_object_field(object, "web_app")) {
+      TRY_RESULT(web_app, get_json_object_field(object, "web_app", JsonValue::Type::Object, false));
+      auto &web_app_object = web_app.get_object();
+      TRY_RESULT(url, get_json_object_string_field(web_app_object, "url"));
+      return make_object<td_api::keyboardButton>(text, make_object<td_api::keyboardButtonTypeWebApp>(url));
+    }
+
     return make_object<td_api::keyboardButton>(text, nullptr);
   }
   if (button.type() == JsonValue::Type::String) {
@@ -4902,6 +4927,13 @@ td::Result<td_api::object_ptr<td_api::inlineKeyboardButton>> Client::get_inline_
     }
     return make_object<td_api::inlineKeyboardButton>(
         text, make_object<td_api::inlineKeyboardButtonTypeLoginUrl>(url, bot_user_id, forward_text));
+  }
+
+  if (has_json_object_field(object, "web_app")) {
+    TRY_RESULT(web_app, get_json_object_field(object, "web_app", JsonValue::Type::Object, false));
+    auto &web_app_object = web_app.get_object();
+    TRY_RESULT(url, get_json_object_string_field(web_app_object, "url"));
+    return make_object<td_api::inlineKeyboardButton>(text, make_object<td_api::inlineKeyboardButtonTypeWebApp>(url));
   }
 
   return Status::Error(400, "Text buttons are unallowed in the inline keyboard");
@@ -9466,6 +9498,11 @@ bool Client::are_equal_inline_keyboard_buttons(const td_api::inlineKeyboardButto
       auto lhs_type = static_cast<const td_api::inlineKeyboardButtonTypeUser *>(lhs->type_.get());
       auto rhs_type = static_cast<const td_api::inlineKeyboardButtonTypeUser *>(rhs->type_.get());
       return lhs_type->user_id_ == rhs_type->user_id_;
+    }
+    case td_api::inlineKeyboardButtonTypeWebApp::ID: {
+      auto lhs_type = static_cast<const td_api::inlineKeyboardButtonTypeWebApp *>(lhs->type_.get());
+      auto rhs_type = static_cast<const td_api::inlineKeyboardButtonTypeWebApp *>(rhs->type_.get());
+      return lhs_type->url_ == rhs_type->url_;
     }
     default:
       UNREACHABLE();
