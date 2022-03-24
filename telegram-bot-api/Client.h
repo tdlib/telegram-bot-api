@@ -154,6 +154,7 @@ class Client final : public WebhookActor::Callback {
   class JsonUpdateTypes;
   class JsonWebhookInfo;
   class JsonStickerSet;
+  class JsonSentWebAppMessage;
   class JsonCustomJson;
 
   class TdOnOkCallback;
@@ -182,6 +183,7 @@ class Client final : public WebhookActor::Callback {
   class TdOnReplacePrimaryChatInviteLinkCallback;
   class TdOnGetChatInviteLinkCallback;
   class TdOnGetGameHighScoresCallback;
+  class TdOnAnswerWebAppQueryCallback;
   class TdOnReturnFileCallback;
   class TdOnReturnStickerSetCallback;
   class TdOnDownloadFileCallback;
@@ -334,6 +336,8 @@ class Client final : public WebhookActor::Callback {
 
   object_ptr<td_api::inputThumbnail> get_input_thumbnail(const Query *query, Slice field_name) const;
 
+  td::Result<object_ptr<td_api::InputInlineQueryResult>> get_inline_query_result(const Query *query);
+
   td::Result<object_ptr<td_api::InputInlineQueryResult>> get_inline_query_result(td::JsonValue &&value);
 
   td::Result<td::vector<object_ptr<td_api::InputInlineQueryResult>>> get_inline_query_results(const Query *query);
@@ -473,6 +477,7 @@ class Client final : public WebhookActor::Callback {
   Status process_delete_message_query(PromisedQueryPtr &query);
   Status process_set_game_score_query(PromisedQueryPtr &query);
   Status process_get_game_high_scores_query(PromisedQueryPtr &query);
+  Status process_answer_web_app_query_query(PromisedQueryPtr &query);
   Status process_answer_inline_query_query(PromisedQueryPtr &query);
   Status process_answer_callback_query_query(PromisedQueryPtr &query);
   Status process_answer_shipping_query_query(PromisedQueryPtr &query);

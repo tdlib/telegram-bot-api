@@ -223,6 +223,7 @@ bool Client::init_methods() {
   methods_.emplace("deletemessage", &Client::process_delete_message_query);
   methods_.emplace("setgamescore", &Client::process_set_game_score_query);
   methods_.emplace("getgamehighscores", &Client::process_get_game_high_scores_query);
+  methods_.emplace("answerwebappquery", &Client::process_answer_web_app_query_query);
   methods_.emplace("answerinlinequery", &Client::process_answer_inline_query_query);
   methods_.emplace("answercallbackquery", &Client::process_answer_callback_query_query);
   methods_.emplace("answershippingquery", &Client::process_answer_shipping_query_query);
@@ -2541,6 +2542,21 @@ class Client::JsonStickerSet final : public Jsonable {
   const Client *client_;
 };
 
+class Client::JsonSentWebAppMessage final : public Jsonable {
+ public:
+  explicit JsonSentWebAppMessage(const td_api::sentWebAppMessage *message) : message_(message) {
+  }
+  void store(JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    if (!message_->inline_message_id_.empty()) {
+      object("inline_message_id", message_->inline_message_id_);
+    }
+  }
+
+ private:
+  const td_api::sentWebAppMessage *message_;
+};
+
 class Client::TdOnOkCallback final : public TdQueryCallback {
  public:
   void on_result(object_ptr<td_api::Object> result) final {
@@ -3434,6 +3450,25 @@ class Client::TdOnGetGameHighScoresCallback final : public TdQueryCallback {
 
  private:
   const Client *client_;
+  PromisedQueryPtr query_;
+};
+
+class Client::TdOnAnswerWebAppQueryCallback final : public TdQueryCallback {
+ public:
+  explicit TdOnAnswerWebAppQueryCallback(PromisedQueryPtr query) : query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::sentWebAppMessage::ID);
+    auto message = move_object_as<td_api::sentWebAppMessage>(result);
+    answer_query(JsonSentWebAppMessage(message.get()), std::move(query_));
+  }
+
+ private:
   PromisedQueryPtr query_;
 };
 
@@ -5374,6 +5409,22 @@ td::Result<td::vector<td_api::object_ptr<td_api::InputInlineQueryResult>>> Clien
   return std::move(inline_query_results);
 }
 
+td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inline_query_result(const Query *query) {
+  auto result_encoded = query->arg("result");
+  if (result_encoded.empty()) {
+    return Status::Error(400, "Result isn't specified");
+  }
+
+  LOG(INFO) << "Parsing JSON object: " << result_encoded;
+  auto r_value = json_decode(result_encoded);
+  if (r_value.is_error()) {
+    return Status::Error(400,
+                         PSLICE() << "Can't parse JSON encoded web view query results " << r_value.error().message());
+  }
+
+  return get_inline_query_result(r_value.move_as_ok());
+}
+
 td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inline_query_result(td::JsonValue &&value) {
   if (value.type() != JsonValue::Type::Object) {
     return Status::Error(400, "Inline query result must be an object");
@@ -7243,6 +7294,23 @@ td::Status Client::process_get_game_high_scores_query(PromisedQueryPtr &query) {
                         });
                   });
   }
+  return Status::OK();
+}
+
+td::Status Client::process_answer_web_app_query_query(PromisedQueryPtr &query) {
+  auto web_app_query_id = query->arg("web_app_query_id");
+
+  TRY_RESULT(result, get_inline_query_result(query.get()));
+  td::vector<object_ptr<td_api::InputInlineQueryResult>> results;
+  results.push_back(std::move(result));
+
+  resolve_inline_query_results_bot_usernames(
+      std::move(results), std::move(query),
+      [this, web_app_query_id = web_app_query_id.str()](td::vector<object_ptr<td_api::InputInlineQueryResult>> results, PromisedQueryPtr query) {
+        CHECK(results.size() == 1);
+        send_request(make_object<td_api::answerWebAppQuery>(web_app_query_id, std::move(results[0])),
+                     td::make_unique<TdOnAnswerWebAppQueryCallback>(std::move(query)));
+      });
   return Status::OK();
 }
 
