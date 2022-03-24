@@ -2303,25 +2303,25 @@ class Client::JsonChatMember final : public Jsonable {
       case td_api::chatMemberStatusAdministrator::ID: {
         auto administrator = static_cast<const td_api::chatMemberStatusAdministrator *>(member_->status_.get());
         object("can_be_edited", td::JsonBool(administrator->can_be_edited_));
-        object("can_manage_chat", td::JsonBool(administrator->can_manage_chat_));
-        object("can_change_info", td::JsonBool(administrator->can_change_info_));
+        object("can_manage_chat", td::JsonBool(administrator->rights_->can_manage_chat_));
+        object("can_change_info", td::JsonBool(administrator->rights_->can_change_info_));
         if (chat_type_ == Client::ChatType::Channel) {
-          object("can_post_messages", td::JsonBool(administrator->can_post_messages_));
-          object("can_edit_messages", td::JsonBool(administrator->can_edit_messages_));
+          object("can_post_messages", td::JsonBool(administrator->rights_->can_post_messages_));
+          object("can_edit_messages", td::JsonBool(administrator->rights_->can_edit_messages_));
         }
-        object("can_delete_messages", td::JsonBool(administrator->can_delete_messages_));
-        object("can_invite_users", td::JsonBool(administrator->can_invite_users_));
-        object("can_restrict_members", td::JsonBool(administrator->can_restrict_members_));
+        object("can_delete_messages", td::JsonBool(administrator->rights_->can_delete_messages_));
+        object("can_invite_users", td::JsonBool(administrator->rights_->can_invite_users_));
+        object("can_restrict_members", td::JsonBool(administrator->rights_->can_restrict_members_));
         if (chat_type_ == Client::ChatType::Group || chat_type_ == Client::ChatType::Supergroup) {
-          object("can_pin_messages", td::JsonBool(administrator->can_pin_messages_));
+          object("can_pin_messages", td::JsonBool(administrator->rights_->can_pin_messages_));
         }
-        object("can_promote_members", td::JsonBool(administrator->can_promote_members_));
-        object("can_manage_voice_chats", td::JsonBool(administrator->can_manage_video_chats_));
-        object("can_manage_video_chats", td::JsonBool(administrator->can_manage_video_chats_));
+        object("can_promote_members", td::JsonBool(administrator->rights_->can_promote_members_));
+        object("can_manage_voice_chats", td::JsonBool(administrator->rights_->can_manage_video_chats_));
+        object("can_manage_video_chats", td::JsonBool(administrator->rights_->can_manage_video_chats_));
         if (!administrator->custom_title_.empty()) {
           object("custom_title", administrator->custom_title_);
         }
-        object("is_anonymous", td::JsonBool(administrator->is_anonymous_));
+        object("is_anonymous", td::JsonBool(administrator->rights_->is_anonymous_));
         break;
       }
       case td_api::chatMemberStatusMember::ID:
@@ -7630,9 +7630,10 @@ td::Status Client::process_promote_chat_member_query(PromisedQueryPtr &query) {
       to_bool(query->arg("can_manage_voice_chats")) || to_bool(query->arg("can_manage_video_chats"));
   auto is_anonymous = to_bool(query->arg("is_anonymous"));
   auto status = make_object<td_api::chatMemberStatusAdministrator>(
-      td::string(), true, can_manage_chat, can_change_info, can_post_messages, can_edit_messages, can_delete_messages,
-      can_invite_users, can_restrict_members, can_pin_messages, can_promote_members, can_manage_video_chats,
-      is_anonymous);
+      td::string(), true,
+      td_api::make_object<td_api::chatAdministratorRights>(
+          can_manage_chat, can_change_info, can_post_messages, can_edit_messages, can_delete_messages, can_invite_users,
+          can_restrict_members, can_pin_messages, can_promote_members, can_manage_video_chats, is_anonymous));
   check_chat(chat_id, AccessRights::Write, std::move(query),
              [this, user_id, status = std::move(status)](int64 chat_id, PromisedQueryPtr query) mutable {
                auto chat_info = get_chat(chat_id);

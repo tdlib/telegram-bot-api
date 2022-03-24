@@ -951,8 +951,8 @@ class Client final : public WebhookActor::Callback {
   td::Container<td::unique_ptr<TdQueryCallback>> handlers_;
 
   static constexpr int32 LONG_POLL_MAX_TIMEOUT = 50;
-  static constexpr double LONG_POLL_MAX_DELAY = 0.01;
-  static constexpr double LONG_POLL_WAIT_AFTER = 0.002;
+  static constexpr double LONG_POLL_MAX_DELAY = 0.002;
+  static constexpr double LONG_POLL_WAIT_AFTER = 0.001;
   int32 long_poll_limit_ = 0;
   int32 long_poll_offset_ = 0;
   bool long_poll_was_wakeup_ = false;
