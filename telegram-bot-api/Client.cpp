@@ -1708,106 +1708,105 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
   }
   switch (message_->content->get_id()) {
     case td_api::messageText::ID: {
-      auto message_text = static_cast<const td_api::messageText *>(message_->content.get());
-      object("text", message_text->text_->text_);
-      if (!message_text->text_->entities_.empty()) {
-        object("entities", JsonVectorEntities(message_text->text_->entities_, client_));
+      auto content = static_cast<const td_api::messageText *>(message_->content.get());
+      object("text", content->text_->text_);
+      if (!content->text_->entities_.empty()) {
+        object("entities", JsonVectorEntities(content->text_->entities_, client_));
       }
       break;
     }
     case td_api::messageAnimation::ID: {
-      auto message_animation = static_cast<const td_api::messageAnimation *>(message_->content.get());
-      object("animation", JsonAnimation(message_animation->animation_.get(), false, client_));
-      object("document", JsonAnimation(message_animation->animation_.get(), true, client_));
-      add_caption(object, message_animation->caption_);
+      auto content = static_cast<const td_api::messageAnimation *>(message_->content.get());
+      object("animation", JsonAnimation(content->animation_.get(), false, client_));
+      object("document", JsonAnimation(content->animation_.get(), true, client_));
+      add_caption(object, content->caption_);
       break;
     }
     case td_api::messageAudio::ID: {
-      auto message_audio = static_cast<const td_api::messageAudio *>(message_->content.get());
-      object("audio", JsonAudio(message_audio->audio_.get(), client_));
-      add_caption(object, message_audio->caption_);
+      auto content = static_cast<const td_api::messageAudio *>(message_->content.get());
+      object("audio", JsonAudio(content->audio_.get(), client_));
+      add_caption(object, content->caption_);
       break;
     }
     case td_api::messageDocument::ID: {
-      auto message_document = static_cast<const td_api::messageDocument *>(message_->content.get());
-      object("document", JsonDocument(message_document->document_.get(), client_));
-      add_caption(object, message_document->caption_);
+      auto content = static_cast<const td_api::messageDocument *>(message_->content.get());
+      object("document", JsonDocument(content->document_.get(), client_));
+      add_caption(object, content->caption_);
       break;
     }
     case td_api::messagePhoto::ID: {
-      auto message_photo = static_cast<const td_api::messagePhoto *>(message_->content.get());
-      CHECK(message_photo->photo_ != nullptr);
-      object("photo", JsonPhoto(message_photo->photo_.get(), client_));
-      add_caption(object, message_photo->caption_);
+      auto content = static_cast<const td_api::messagePhoto *>(message_->content.get());
+      CHECK(content->photo_ != nullptr);
+      object("photo", JsonPhoto(content->photo_.get(), client_));
+      add_caption(object, content->caption_);
       break;
     }
     case td_api::messageSticker::ID: {
-      auto message_sticker = static_cast<const td_api::messageSticker *>(message_->content.get());
-      object("sticker", JsonSticker(message_sticker->sticker_.get(), client_));
+      auto content = static_cast<const td_api::messageSticker *>(message_->content.get());
+      object("sticker", JsonSticker(content->sticker_.get(), client_));
       break;
     }
     case td_api::messageVideo::ID: {
-      auto message_video = static_cast<const td_api::messageVideo *>(message_->content.get());
-      object("video", JsonVideo(message_video->video_.get(), client_));
-      add_caption(object, message_video->caption_);
+      auto content = static_cast<const td_api::messageVideo *>(message_->content.get());
+      object("video", JsonVideo(content->video_.get(), client_));
+      add_caption(object, content->caption_);
       break;
     }
     case td_api::messageVideoNote::ID: {
-      auto message_video_note = static_cast<const td_api::messageVideoNote *>(message_->content.get());
-      object("video_note", JsonVideoNote(message_video_note->video_note_.get(), client_));
+      auto content = static_cast<const td_api::messageVideoNote *>(message_->content.get());
+      object("video_note", JsonVideoNote(content->video_note_.get(), client_));
       break;
     }
     case td_api::messageVoiceNote::ID: {
-      auto message_voice_note = static_cast<const td_api::messageVoiceNote *>(message_->content.get());
-      object("voice", JsonVoiceNote(message_voice_note->voice_note_.get(), client_));
-      add_caption(object, message_voice_note->caption_);
+      auto content = static_cast<const td_api::messageVoiceNote *>(message_->content.get());
+      object("voice", JsonVoiceNote(content->voice_note_.get(), client_));
+      add_caption(object, content->caption_);
       break;
     }
     case td_api::messageContact::ID: {
-      auto message_contact = static_cast<const td_api::messageContact *>(message_->content.get());
-      object("contact", JsonContact(message_contact->contact_.get()));
+      auto content = static_cast<const td_api::messageContact *>(message_->content.get());
+      object("contact", JsonContact(content->contact_.get()));
       break;
     }
     case td_api::messageDice::ID: {
-      auto message_dice = static_cast<const td_api::messageDice *>(message_->content.get());
-      object("dice", JsonDice(message_dice->emoji_, message_dice->value_));
+      auto content = static_cast<const td_api::messageDice *>(message_->content.get());
+      object("dice", JsonDice(content->emoji_, content->value_));
       break;
     }
     case td_api::messageGame::ID: {
-      auto message_game = static_cast<const td_api::messageGame *>(message_->content.get());
-      object("game", JsonGame(message_game->game_.get(), client_));
+      auto content = static_cast<const td_api::messageGame *>(message_->content.get());
+      object("game", JsonGame(content->game_.get(), client_));
       break;
     }
     case td_api::messageInvoice::ID: {
-      auto message_invoice = static_cast<const td_api::messageInvoice *>(message_->content.get());
-      object("invoice", JsonInvoice(message_invoice));
+      auto content = static_cast<const td_api::messageInvoice *>(message_->content.get());
+      object("invoice", JsonInvoice(content));
       break;
     }
     case td_api::messageLocation::ID: {
-      auto message_location = static_cast<const td_api::messageLocation *>(message_->content.get());
-      object("location", JsonLocation(message_location->location_.get(), message_location->expires_in_,
-                                      message_location->live_period_, message_location->heading_,
-                                      message_location->proximity_alert_radius_));
+      auto content = static_cast<const td_api::messageLocation *>(message_->content.get());
+      object("location", JsonLocation(content->location_.get(), content->expires_in_, content->live_period_,
+                                      content->heading_, content->proximity_alert_radius_));
       break;
     }
     case td_api::messageVenue::ID: {
-      auto message_venue = static_cast<const td_api::messageVenue *>(message_->content.get());
-      object("location", JsonLocation(message_venue->venue_->location_.get()));
-      object("venue", JsonVenue(message_venue->venue_.get()));
+      auto content = static_cast<const td_api::messageVenue *>(message_->content.get());
+      object("location", JsonLocation(content->venue_->location_.get()));
+      object("venue", JsonVenue(content->venue_.get()));
       break;
     }
     case td_api::messagePoll::ID: {
-      auto message_poll = static_cast<const td_api::messagePoll *>(message_->content.get());
-      object("poll", JsonPoll(message_poll->poll_.get(), client_));
+      auto content = static_cast<const td_api::messagePoll *>(message_->content.get());
+      object("poll", JsonPoll(content->poll_.get(), client_));
       break;
     }
     case td_api::messageChatAddMembers::ID: {
-      auto message_add_members = static_cast<const td_api::messageChatAddMembers *>(message_->content.get());
-      int64 user_id = client_->choose_added_member_id(message_add_members);
+      auto content = static_cast<const td_api::messageChatAddMembers *>(message_->content.get());
+      int64 user_id = client_->choose_added_member_id(content);
       if (user_id > 0) {
         object("new_chat_participant", JsonUser(user_id, client_));
         object("new_chat_member", JsonUser(user_id, client_));
-        object("new_chat_members", JsonUsers(message_add_members->member_user_ids_, client_));
+        object("new_chat_members", JsonUsers(content->member_user_ids_, client_));
       } else {
         LOG(ERROR) << "Can't choose added member for new_chat_member field";
       }
@@ -1830,24 +1829,24 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
       break;
     }
     case td_api::messageChatDeleteMember::ID: {
-      auto message_delete_member = static_cast<const td_api::messageChatDeleteMember *>(message_->content.get());
-      int64 user_id = message_delete_member->user_id_;
+      auto content = static_cast<const td_api::messageChatDeleteMember *>(message_->content.get());
+      int64 user_id = content->user_id_;
       object("left_chat_participant", JsonUser(user_id, client_));
       object("left_chat_member", JsonUser(user_id, client_));
       break;
     }
     case td_api::messageChatChangeTitle::ID: {
-      auto message_change_title = static_cast<const td_api::messageChatChangeTitle *>(message_->content.get());
-      object("new_chat_title", message_change_title->title_);
+      auto content = static_cast<const td_api::messageChatChangeTitle *>(message_->content.get());
+      object("new_chat_title", content->title_);
       break;
     }
     case td_api::messageChatChangePhoto::ID: {
-      auto message_change_photo = static_cast<const td_api::messageChatChangePhoto *>(message_->content.get());
-      if (message_change_photo->photo_ == nullptr) {
+      auto content = static_cast<const td_api::messageChatChangePhoto *>(message_->content.get());
+      if (content->photo_ == nullptr) {
         LOG(ERROR) << "Got empty messageChatChangePhoto";
         break;
       }
-      object("new_chat_photo", JsonChatPhoto(message_change_photo->photo_.get(), client_));
+      object("new_chat_photo", JsonChatPhoto(content->photo_.get(), client_));
       break;
     }
     case td_api::messageChatDeletePhoto::ID:
@@ -1872,20 +1871,20 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
       break;
     }
     case td_api::messageChatUpgradeTo::ID: {
-      auto message_chat_upgrade_to = static_cast<const td_api::messageChatUpgradeTo *>(message_->content.get());
-      auto chat_id = get_supergroup_chat_id(message_chat_upgrade_to->supergroup_id_);
+      auto content = static_cast<const td_api::messageChatUpgradeTo *>(message_->content.get());
+      auto chat_id = get_supergroup_chat_id(content->supergroup_id_);
       object("migrate_to_chat_id", td::JsonLong(chat_id));
       break;
     }
     case td_api::messageChatUpgradeFrom::ID: {
-      auto message_chat_upgrade_from = static_cast<const td_api::messageChatUpgradeFrom *>(message_->content.get());
-      auto chat_id = get_basic_group_chat_id(message_chat_upgrade_from->basic_group_id_);
+      auto content = static_cast<const td_api::messageChatUpgradeFrom *>(message_->content.get());
+      auto chat_id = get_basic_group_chat_id(content->basic_group_id_);
       object("migrate_from_chat_id", td::JsonLong(chat_id));
       break;
     }
     case td_api::messagePinMessage::ID: {
-      auto message_pin_message = static_cast<const td_api::messagePinMessage *>(message_->content.get());
-      auto message_id = message_pin_message->message_id_;
+      auto content = static_cast<const td_api::messagePinMessage *>(message_->content.get());
+      auto message_id = content->message_id_;
       if (message_id > 0) {
         const MessageInfo *pinned_message = client_->get_message(message_->chat_id, message_id);
         if (pinned_message != nullptr) {
@@ -1901,8 +1900,8 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
     case td_api::messagePaymentSuccessful::ID:
       break;
     case td_api::messagePaymentSuccessfulBot::ID: {
-      auto message_payment_sent_bot = static_cast<const td_api::messagePaymentSuccessfulBot *>(message_->content.get());
-      object("successful_payment", JsonSuccessfulPaymentBot(message_payment_sent_bot));
+      auto content = static_cast<const td_api::messagePaymentSuccessfulBot *>(message_->content.get());
+      object("successful_payment", JsonSuccessfulPaymentBot(content));
       break;
     }
     case td_api::messageCall::ID:
@@ -1935,18 +1934,17 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
         break;
       }
 
-      auto message_website_connected = static_cast<const td_api::messageWebsiteConnected *>(message_->content.get());
-      if (!message_website_connected->domain_name_.empty()) {
-        object("connected_website", message_website_connected->domain_name_);
+      auto content = static_cast<const td_api::messageWebsiteConnected *>(message_->content.get());
+      if (!content->domain_name_.empty()) {
+        object("connected_website", content->domain_name_);
       }
       break;
     }
     case td_api::messagePassportDataSent::ID:
       break;
     case td_api::messagePassportDataReceived::ID: {
-      auto message_passport_data_received =
-          static_cast<const td_api::messagePassportDataReceived *>(message_->content.get());
-      object("passport_data", JsonPassportData(message_passport_data_received, client_));
+      auto content = static_cast<const td_api::messagePassportDataReceived *>(message_->content.get());
+      object("passport_data", JsonPassportData(content, client_));
       break;
     }
     case td_api::messageProximityAlertTriggered::ID: {
@@ -7338,7 +7336,8 @@ td::Status Client::process_answer_web_app_query_query(PromisedQueryPtr &query) {
 
   resolve_inline_query_results_bot_usernames(
       std::move(results), std::move(query),
-      [this, web_app_query_id = web_app_query_id.str()](td::vector<object_ptr<td_api::InputInlineQueryResult>> results, PromisedQueryPtr query) {
+      [this, web_app_query_id = web_app_query_id.str()](td::vector<object_ptr<td_api::InputInlineQueryResult>> results,
+                                                        PromisedQueryPtr query) {
         CHECK(results.size() == 1);
         send_request(make_object<td_api::answerWebAppQuery>(web_app_query_id, std::move(results[0])),
                      td::make_unique<TdOnAnswerWebAppQueryCallback>(std::move(query)));
@@ -9327,24 +9326,24 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
 
   switch (message->content_->get_id()) {
     case td_api::messagePhoto::ID: {
-      auto message_photo = static_cast<const td_api::messagePhoto *>(message->content_.get());
-      if (message_photo->photo_ == nullptr) {
+      auto content = static_cast<const td_api::messagePhoto *>(message->content_.get());
+      if (content->photo_ == nullptr) {
         LOG(ERROR) << "Got empty messagePhoto";
         return true;
       }
       break;
     }
     case td_api::messageChatAddMembers::ID: {
-      auto message_add_members = static_cast<const td_api::messageChatAddMembers *>(message->content_.get());
-      if (message_add_members->member_user_ids_.empty()) {
+      auto content = static_cast<const td_api::messageChatAddMembers *>(message->content_.get());
+      if (content->member_user_ids_.empty()) {
         LOG(ERROR) << "Got empty messageChatAddMembers";
         return true;
       }
       break;
     }
     case td_api::messageChatChangePhoto::ID: {
-      auto message_change_photo = static_cast<const td_api::messageChatChangePhoto *>(message->content_.get());
-      if (message_change_photo->photo_ == nullptr) {
+      auto content = static_cast<const td_api::messageChatChangePhoto *>(message->content_.get());
+      if (content->photo_ == nullptr) {
         LOG(ERROR) << "Got empty messageChatChangePhoto";
         return true;
       }
@@ -9358,8 +9357,8 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       break;
     }
     case td_api::messagePinMessage::ID: {
-      auto message_pin_message = static_cast<const td_api::messagePinMessage *>(message->content_.get());
-      auto pinned_message_id = message_pin_message->message_id_;
+      auto content = static_cast<const td_api::messagePinMessage *>(message->content_.get());
+      auto pinned_message_id = content->message_id_;
       if (pinned_message_id <= 0) {
         return true;
       }
@@ -9371,10 +9370,9 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       break;
     }
     case td_api::messageProximityAlertTriggered::ID: {
-      auto proximity_alert_triggered =
-          static_cast<const td_api::messageProximityAlertTriggered *>(message->content_.get());
-      return proximity_alert_triggered->traveler_id_->get_id() != td_api::messageSenderUser::ID ||
-             proximity_alert_triggered->watcher_id_->get_id() != td_api::messageSenderUser::ID;
+      auto content = static_cast<const td_api::messageProximityAlertTriggered *>(message->content_.get());
+      return content->traveler_id_->get_id() != td_api::messageSenderUser::ID ||
+             content->watcher_id_->get_id() != td_api::messageSenderUser::ID;
     }
     case td_api::messageGameScore::ID:
       return true;
