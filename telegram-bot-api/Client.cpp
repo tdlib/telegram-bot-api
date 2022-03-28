@@ -1456,6 +1456,20 @@ class Client::JsonPassportData final : public Jsonable {
   const Client *client_;
 };
 
+class Client::JsonWebAppData final : public Jsonable {
+ public:
+  explicit JsonWebAppData(const td_api::messageWebAppDataReceived *web_app_data) : web_app_data_(web_app_data) {
+  }
+  void store(JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("button_text", web_app_data_->button_text_);
+    object("data", web_app_data_->data_);
+  }
+
+ private:
+  const td_api::messageWebAppDataReceived *web_app_data_;
+};
+
 class Client::JsonProximityAlertTriggered final : public Jsonable {
  public:
   JsonProximityAlertTriggered(const td_api::messageProximityAlertTriggered *proximity_alert_triggered,
@@ -1972,6 +1986,13 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
       auto content = static_cast<const td_api::messageInviteVideoChatParticipants *>(message_->content.get());
       object("video_chat_participants_invited", JsonInviteVideoChatParticipants(content, client_));
       object("voice_chat_participants_invited", JsonInviteVideoChatParticipants(content, client_));
+      break;
+    }
+    case td_api::messageWebAppDataSent::ID:
+      break;
+    case td_api::messageWebAppDataReceived::ID: {
+      auto content = static_cast<const td_api::messageWebAppDataReceived *>(message_->content.get());
+      object("web_app_data", JsonWebAppData(content));
       break;
     }
     default:
@@ -9393,6 +9414,8 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageCustomServiceAction::ID:
       return true;
     case td_api::messageChatSetTheme::ID:
+      return true;
+    case td_api::messageWebAppDataSent::ID:
       return true;
     default:
       break;

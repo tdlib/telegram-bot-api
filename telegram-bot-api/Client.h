@@ -146,6 +146,7 @@ class Client final : public WebhookActor::Callback {
   class JsonEncryptedPassportElement;
   class JsonEncryptedCredentials;
   class JsonPassportData;
+  class JsonWebAppData;
   class JsonProximityAlertTriggered;
   class JsonVideoChatScheduled;
   class JsonVideoChatStarted;
