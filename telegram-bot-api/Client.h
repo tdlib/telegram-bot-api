@@ -365,6 +365,10 @@ class Client final : public WebhookActor::Callback {
 
   static td::Result<td::vector<object_ptr<td_api::botCommand>>> get_bot_commands(const Query *query);
 
+  static td::Result<object_ptr<td_api::chatAdministratorRights>> get_chat_administrator_rights(td::JsonValue &&value);
+
+  static td::Result<object_ptr<td_api::chatAdministratorRights>> get_chat_administrator_rights(const Query *query);
+
   static td::Result<object_ptr<td_api::maskPosition>> get_mask_position(const Query *query, Slice field_name);
 
   static td::Result<object_ptr<td_api::maskPosition>> get_mask_position(td::JsonValue &&value);
@@ -448,6 +452,7 @@ class Client final : public WebhookActor::Callback {
   Status process_get_me_query(PromisedQueryPtr &query);
   Status process_get_my_commands_query(PromisedQueryPtr &query);
   Status process_set_my_commands_query(PromisedQueryPtr &query);
+  Status process_set_my_default_administrator_rights_query(PromisedQueryPtr &query);
   Status process_delete_my_commands_query(PromisedQueryPtr &query);
   Status process_get_user_profile_photos_query(PromisedQueryPtr &query);
   Status process_send_message_query(PromisedQueryPtr &query);
