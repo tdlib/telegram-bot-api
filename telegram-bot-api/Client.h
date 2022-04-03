@@ -134,6 +134,7 @@ class Client final : public WebhookActor::Callback {
   class JsonShippingQuery;
   class JsonPreCheckoutQuery;
   class JsonBotCommand;
+  class JsonChatAdministratorRights;
   class JsonChatPhotos;
   class JsonChatMember;
   class JsonChatMembers;
@@ -175,6 +176,7 @@ class Client final : public WebhookActor::Callback {
   class TdOnGetCallbackQueryMessageCallback;
   class TdOnGetStickerSetCallback;
   class TdOnGetMyCommandsCallback;
+  class TdOnGetMyDefaultAdministratorRightsCallback;
   class TdOnGetChatFullInfoCallback;
   class TdOnGetChatStickerSetCallback;
   class TdOnGetChatPinnedMessageCallback;
@@ -452,6 +454,7 @@ class Client final : public WebhookActor::Callback {
   Status process_get_me_query(PromisedQueryPtr &query);
   Status process_get_my_commands_query(PromisedQueryPtr &query);
   Status process_set_my_commands_query(PromisedQueryPtr &query);
+  Status process_get_my_default_administrator_rights_query(PromisedQueryPtr &query);
   Status process_set_my_default_administrator_rights_query(PromisedQueryPtr &query);
   Status process_delete_my_commands_query(PromisedQueryPtr &query);
   Status process_get_user_profile_photos_query(PromisedQueryPtr &query);
@@ -732,6 +735,9 @@ class Client final : public WebhookActor::Callback {
 
   static void json_store_callback_query_payload(td::JsonObjectScope &object,
                                                 const td_api::CallbackQueryPayload *payload);
+
+  static void json_store_administrator_rights(td::JsonObjectScope &object,
+                                              const td_api::chatAdministratorRights *rights, ChatType chat_type);
 
   static void json_store_permissions(td::JsonObjectScope &object, const td_api::chatPermissions *permissions);
 

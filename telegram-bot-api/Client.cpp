@@ -192,6 +192,7 @@ bool Client::init_methods() {
   methods_.emplace("getmycommands", &Client::process_get_my_commands_query);
   methods_.emplace("setmycommands", &Client::process_set_my_commands_query);
   methods_.emplace("deletemycommands", &Client::process_delete_my_commands_query);
+  methods_.emplace("getmydefaultadministratorrights", &Client::process_get_my_default_administrator_rights_query);
   methods_.emplace("setmydefaultadministratorrights", &Client::process_set_my_default_administrator_rights_query);
   methods_.emplace("getuserprofilephotos", &Client::process_get_user_profile_photos_query);
   methods_.emplace("sendmessage", &Client::process_send_message_query);
@@ -2292,6 +2293,23 @@ class Client::JsonBotCommand final : public Jsonable {
   const td_api::botCommand *command_;
 };
 
+class Client::JsonChatAdministratorRights final : public Jsonable {
+ public:
+  JsonChatAdministratorRights(const td_api::chatAdministratorRights *rights, Client::ChatType chat_type)
+      : rights_(rights), chat_type_(chat_type) {
+  }
+
+  void store(JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    td_api::chatAdministratorRights empty_rights;
+    Client::json_store_administrator_rights(object, rights_ == nullptr ? &empty_rights : rights_, chat_type_);
+  }
+
+ private:
+  const td_api::chatAdministratorRights *rights_;
+  Client::ChatType chat_type_;
+};
+
 class Client::JsonChatPhotos final : public Jsonable {
  public:
   JsonChatPhotos(const td_api::chatPhotos *photos, const Client *client) : photos_(photos), client_(client) {
@@ -2342,25 +2360,11 @@ class Client::JsonChatMember final : public Jsonable {
       case td_api::chatMemberStatusAdministrator::ID: {
         auto administrator = static_cast<const td_api::chatMemberStatusAdministrator *>(member_->status_.get());
         object("can_be_edited", td::JsonBool(administrator->can_be_edited_));
-        object("can_manage_chat", td::JsonBool(administrator->rights_->can_manage_chat_));
-        object("can_change_info", td::JsonBool(administrator->rights_->can_change_info_));
-        if (chat_type_ == Client::ChatType::Channel) {
-          object("can_post_messages", td::JsonBool(administrator->rights_->can_post_messages_));
-          object("can_edit_messages", td::JsonBool(administrator->rights_->can_edit_messages_));
-        }
-        object("can_delete_messages", td::JsonBool(administrator->rights_->can_delete_messages_));
-        object("can_invite_users", td::JsonBool(administrator->rights_->can_invite_users_));
-        object("can_restrict_members", td::JsonBool(administrator->rights_->can_restrict_members_));
-        if (chat_type_ == Client::ChatType::Group || chat_type_ == Client::ChatType::Supergroup) {
-          object("can_pin_messages", td::JsonBool(administrator->rights_->can_pin_messages_));
-        }
-        object("can_promote_members", td::JsonBool(administrator->rights_->can_promote_members_));
+        Client::json_store_administrator_rights(object, administrator->rights_.get(), chat_type_);
         object("can_manage_voice_chats", td::JsonBool(administrator->rights_->can_manage_video_chats_));
-        object("can_manage_video_chats", td::JsonBool(administrator->rights_->can_manage_video_chats_));
         if (!administrator->custom_title_.empty()) {
           object("custom_title", administrator->custom_title_);
         }
-        object("is_anonymous", td::JsonBool(administrator->rights_->is_anonymous_));
         break;
       }
       case td_api::chatMemberStatusMember::ID:
@@ -3332,6 +3336,36 @@ class Client::TdOnGetMyCommandsCallback final : public TdQueryCallback {
   }
 
  private:
+  PromisedQueryPtr query_;
+};
+
+class Client::TdOnGetMyDefaultAdministratorRightsCallback final : public TdQueryCallback {
+ public:
+  TdOnGetMyDefaultAdministratorRightsCallback(bool for_channels, PromisedQueryPtr query)
+      : for_channels_(for_channels), query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::userFullInfo::ID);
+    auto full_info = move_object_as<td_api::userFullInfo>(result);
+    if (full_info->bot_info_ == nullptr) {
+      LOG(ERROR) << "Have no bot info for self";
+      return fail_query_with_error(std::move(query_),
+                                   make_object<td_api::error>(500, "Requested data is inaccessible"));
+    }
+    auto bot_info = std::move(full_info->bot_info_);
+    const auto *rights = for_channels_ ? bot_info->default_channel_administrator_rights_.get()
+                                       : bot_info->default_group_administrator_rights_.get();
+    answer_query(JsonChatAdministratorRights(rights, for_channels_ ? ChatType::Channel : ChatType::Supergroup),
+                 std::move(query_));
+  }
+
+ private:
+  bool for_channels_;
   PromisedQueryPtr query_;
 };
 
@@ -6738,6 +6772,13 @@ td::Status Client::process_delete_my_commands_query(PromisedQueryPtr &query) {
   return Status::OK();
 }
 
+td::Status Client::process_get_my_default_administrator_rights_query(PromisedQueryPtr &query) {
+  bool for_channels = to_bool(query->arg("for_channels"));
+  send_request(make_object<td_api::getUserFullInfo>(my_id_),
+               td::make_unique<TdOnGetMyDefaultAdministratorRightsCallback>(for_channels, std::move(query)));
+  return Status::OK();
+}
+
 td::Status Client::process_set_my_default_administrator_rights_query(PromisedQueryPtr &query) {
   bool for_channels = to_bool(query->arg("for_channels"));
   TRY_RESULT(rights, get_chat_administrator_rights(query.get()));
@@ -8990,6 +9031,25 @@ void Client::json_store_callback_query_payload(td::JsonObjectScope &object,
     default:
       UNREACHABLE();
   }
+}
+
+void Client::json_store_administrator_rights(td::JsonObjectScope &object, const td_api::chatAdministratorRights *rights,
+                                             ChatType chat_type) {
+  object("can_manage_chat", td::JsonBool(rights->can_manage_chat_));
+  object("can_change_info", td::JsonBool(rights->can_change_info_));
+  if (chat_type == ChatType::Channel) {
+    object("can_post_messages", td::JsonBool(rights->can_post_messages_));
+    object("can_edit_messages", td::JsonBool(rights->can_edit_messages_));
+  }
+  object("can_delete_messages", td::JsonBool(rights->can_delete_messages_));
+  object("can_invite_users", td::JsonBool(rights->can_invite_users_));
+  object("can_restrict_members", td::JsonBool(rights->can_restrict_members_));
+  if (chat_type == ChatType::Group || chat_type == ChatType::Supergroup) {
+    object("can_pin_messages", td::JsonBool(rights->can_pin_messages_));
+  }
+  object("can_promote_members", td::JsonBool(rights->can_promote_members_));
+  object("can_manage_video_chats", td::JsonBool(rights->can_manage_video_chats_));
+  object("is_anonymous", td::JsonBool(rights->is_anonymous_));
 }
 
 void Client::json_store_permissions(td::JsonObjectScope &object, const td_api::chatPermissions *permissions) {
