@@ -195,6 +195,7 @@ bool Client::init_methods() {
   methods_.emplace("getmydefaultadministratorrights", &Client::process_get_my_default_administrator_rights_query);
   methods_.emplace("setmydefaultadministratorrights", &Client::process_set_my_default_administrator_rights_query);
   methods_.emplace("getchatmenubutton", &Client::process_get_chat_menu_button_query);
+  methods_.emplace("setchatmenubutton", &Client::process_set_chat_menu_button_query);
   methods_.emplace("getuserprofilephotos", &Client::process_get_user_profile_photos_query);
   methods_.emplace("sendmessage", &Client::process_send_message_query);
   methods_.emplace("sendanimation", &Client::process_send_animation_query);
@@ -4921,7 +4922,7 @@ td::Result<td_api::object_ptr<td_api::keyboardButton>> Client::get_keyboard_butt
     if (has_json_object_field(object, "web_app")) {
       TRY_RESULT(web_app, get_json_object_field(object, "web_app", JsonValue::Type::Object, false));
       auto &web_app_object = web_app.get_object();
-      TRY_RESULT(url, get_json_object_string_field(web_app_object, "url"));
+      TRY_RESULT(url, get_json_object_string_field(web_app_object, "url", false));
       return make_object<td_api::keyboardButton>(text, make_object<td_api::keyboardButtonTypeWebApp>(url));
     }
 
@@ -5024,7 +5025,7 @@ td::Result<td_api::object_ptr<td_api::inlineKeyboardButton>> Client::get_inline_
   if (has_json_object_field(object, "web_app")) {
     TRY_RESULT(web_app, get_json_object_field(object, "web_app", JsonValue::Type::Object, false));
     auto &web_app_object = web_app.get_object();
-    TRY_RESULT(url, get_json_object_string_field(web_app_object, "url"));
+    TRY_RESULT(url, get_json_object_string_field(web_app_object, "url", false));
     return make_object<td_api::inlineKeyboardButton>(text, make_object<td_api::inlineKeyboardButtonTypeWebApp>(url));
   }
 
@@ -5937,6 +5938,51 @@ td::Result<td::vector<td_api::object_ptr<td_api::botCommand>>> Client::get_bot_c
   return std::move(bot_commands);
 }
 
+td::Result<td_api::object_ptr<td_api::botMenuButton>> Client::get_bot_menu_button(JsonValue &&value) {
+  if (value.type() != JsonValue::Type::Object) {
+    return Status::Error(400, "MenuButton must be an Object");
+  }
+
+  auto &object = value.get_object();
+
+  TRY_RESULT(type, get_json_object_string_field(object, "type", false));
+  if (type == "default") {
+    return td_api::make_object<td_api::botMenuButton>("", "default");
+  }
+  if (type == "commands") {
+    return nullptr;
+  }
+  if (type == "web_app") {
+    TRY_RESULT(text, get_json_object_string_field(object, "text", false));
+    TRY_RESULT(web_app, get_json_object_field(object, "web_app", JsonValue::Type::Object, false));
+    auto &web_app_object = web_app.get_object();
+    TRY_RESULT(url, get_json_object_string_field(web_app_object, "url", false));
+    return td_api::make_object<td_api::botMenuButton>(text, url);
+  }
+
+  return Status::Error(400, "MenuButton has unsupported type");
+}
+
+td::Result<td_api::object_ptr<td_api::botMenuButton>> Client::get_bot_menu_button(const Query *query) {
+  auto menu_button = query->arg("menu_button");
+  if (menu_button.empty()) {
+    return td_api::make_object<td_api::botMenuButton>("", "default");
+  }
+
+  LOG(INFO) << "Parsing JSON object: " << menu_button;
+  auto r_value = json_decode(menu_button);
+  if (r_value.is_error()) {
+    LOG(INFO) << "Can't parse JSON object: " << r_value.error();
+    return Status::Error(400, "Can't parse menu button JSON object");
+  }
+
+  auto r_menu_button = get_bot_menu_button(r_value.move_as_ok());
+  if (r_menu_button.is_error()) {
+    return Status::Error(400, PSLICE() << "Can't parse menu button: " << r_menu_button.error().message());
+  }
+  return r_menu_button.move_as_ok();
+}
+
 td::Result<td_api::object_ptr<td_api::chatAdministratorRights>> Client::get_chat_administrator_rights(
     JsonValue &&value) {
   if (value.type() != JsonValue::Type::Object) {
@@ -6841,6 +6887,22 @@ td::Status Client::process_get_chat_menu_button_query(PromisedQueryPtr &query) {
     });
   } else {
     send_request(make_object<td_api::getMenuButton>(0), td::make_unique<TdOnGetMenuButtonCallback>(std::move(query)));
+  }
+  return Status::OK();
+}
+
+td::Status Client::process_set_chat_menu_button_query(PromisedQueryPtr &query) {
+  TRY_RESULT(menu_button, get_bot_menu_button(query.get()));
+  if (query->has_arg("chat_id")) {
+    TRY_RESULT(user_id, get_user_id(query.get(), "chat_id"));
+    check_user(user_id, std::move(query),
+               [this, user_id, menu_button = std::move(menu_button)](PromisedQueryPtr query) mutable {
+                 send_request(make_object<td_api::setMenuButton>(user_id, std::move(menu_button)),
+                              td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+               });
+  } else {
+    send_request(make_object<td_api::setMenuButton>(0, std::move(menu_button)),
+                 td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   }
   return Status::OK();
 }

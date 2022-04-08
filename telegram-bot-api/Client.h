@@ -369,6 +369,10 @@ class Client final : public WebhookActor::Callback {
 
   static td::Result<td::vector<object_ptr<td_api::botCommand>>> get_bot_commands(const Query *query);
 
+  static td::Result<object_ptr<td_api::botMenuButton>> get_bot_menu_button(const Query *query);
+
+  static td::Result<object_ptr<td_api::botMenuButton>> get_bot_menu_button(td::JsonValue &&value);
+
   static td::Result<object_ptr<td_api::chatAdministratorRights>> get_chat_administrator_rights(td::JsonValue &&value);
 
   static td::Result<object_ptr<td_api::chatAdministratorRights>> get_chat_administrator_rights(const Query *query);
@@ -460,6 +464,7 @@ class Client final : public WebhookActor::Callback {
   Status process_get_my_default_administrator_rights_query(PromisedQueryPtr &query);
   Status process_set_my_default_administrator_rights_query(PromisedQueryPtr &query);
   Status process_get_chat_menu_button_query(PromisedQueryPtr &query);
+  Status process_set_chat_menu_button_query(PromisedQueryPtr &query);
   Status process_get_user_profile_photos_query(PromisedQueryPtr &query);
   Status process_send_message_query(PromisedQueryPtr &query);
   Status process_send_animation_query(PromisedQueryPtr &query);
