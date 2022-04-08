@@ -194,6 +194,7 @@ bool Client::init_methods() {
   methods_.emplace("deletemycommands", &Client::process_delete_my_commands_query);
   methods_.emplace("getmydefaultadministratorrights", &Client::process_get_my_default_administrator_rights_query);
   methods_.emplace("setmydefaultadministratorrights", &Client::process_set_my_default_administrator_rights_query);
+  methods_.emplace("getchatmenubutton", &Client::process_get_chat_menu_button_query);
   methods_.emplace("getuserprofilephotos", &Client::process_get_user_profile_photos_query);
   methods_.emplace("sendmessage", &Client::process_send_message_query);
   methods_.emplace("sendanimation", &Client::process_send_animation_query);
@@ -2293,6 +2294,25 @@ class Client::JsonBotCommand final : public Jsonable {
   const td_api::botCommand *command_;
 };
 
+class Client::JsonBotMenuButton final : public Jsonable {
+ public:
+  explicit JsonBotMenuButton(const td_api::botMenuButton *menu_button) : menu_button_(menu_button) {
+  }
+  void store(JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    if (menu_button_->text_.empty()) {
+      object("type", menu_button_->url_.empty() ? "commands" : "default");
+    } else {
+      object("type", "web_app");
+      object("text", menu_button_->text_);
+      object("web_app", JsonWebAppInfo(menu_button_->url_));
+    }
+  }
+
+ private:
+  const td_api::botMenuButton *menu_button_;
+};
+
 class Client::JsonChatAdministratorRights final : public Jsonable {
  public:
   JsonChatAdministratorRights(const td_api::chatAdministratorRights *rights, Client::ChatType chat_type)
@@ -3369,6 +3389,25 @@ class Client::TdOnGetMyDefaultAdministratorRightsCallback final : public TdQuery
   PromisedQueryPtr query_;
 };
 
+class Client::TdOnGetMenuButtonCallback final : public TdQueryCallback {
+ public:
+  explicit TdOnGetMenuButtonCallback(PromisedQueryPtr query) : query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::botMenuButton::ID);
+    auto menu_button = move_object_as<td_api::botMenuButton>(result);
+    answer_query(JsonBotMenuButton(menu_button.get()), std::move(query_));
+  }
+
+ private:
+  PromisedQueryPtr query_;
+};
+
 class Client::TdOnGetChatFullInfoCallback final : public TdQueryCallback {
  public:
   TdOnGetChatFullInfoCallback(Client *client, int64 chat_id, PromisedQueryPtr query)
@@ -3860,7 +3899,7 @@ template <class OnSuccess>
 void Client::check_user_read_access(const UserInfo *user_info, PromisedQueryPtr query, OnSuccess on_success) {
   CHECK(user_info != nullptr);
   if (!user_info->have_access) {
-    return fail_query(400, "Bad Request: have no access to the user", std::move(query));
+    // return fail_query(400, "Bad Request: have no access to the user", std::move(query));
   }
   on_success(std::move(query));
 }
@@ -6789,6 +6828,19 @@ td::Status Client::process_set_my_default_administrator_rights_query(PromisedQue
   } else {
     send_request(make_object<td_api::setDefaultGroupAdministratorRights>(std::move(rights)),
                  td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+  }
+  return Status::OK();
+}
+
+td::Status Client::process_get_chat_menu_button_query(PromisedQueryPtr &query) {
+  if (query->has_arg("chat_id")) {
+    TRY_RESULT(user_id, get_user_id(query.get(), "chat_id"));
+    check_user(user_id, std::move(query), [this, user_id](PromisedQueryPtr query) {
+      send_request(make_object<td_api::getMenuButton>(user_id),
+                   td::make_unique<TdOnGetMenuButtonCallback>(std::move(query)));
+    });
+  } else {
+    send_request(make_object<td_api::getMenuButton>(0), td::make_unique<TdOnGetMenuButtonCallback>(std::move(query)));
   }
   return Status::OK();
 }
