@@ -225,6 +225,7 @@ bool Client::init_methods() {
   methods_.emplace("editmessagecaption", &Client::process_edit_message_caption_query);
   methods_.emplace("editmessagereplymarkup", &Client::process_edit_message_reply_markup_query);
   methods_.emplace("deletemessage", &Client::process_delete_message_query);
+  methods_.emplace("createinvoicelink", &Client::process_create_invoice_link_query);
   methods_.emplace("setgamescore", &Client::process_set_game_score_query);
   methods_.emplace("getgamehighscores", &Client::process_get_game_high_scores_query);
   methods_.emplace("answerwebappquery", &Client::process_answer_web_app_query_query);
@@ -3493,6 +3494,25 @@ class Client::TdOnGetSupergroupMembersCountCallback final : public TdQueryCallba
   PromisedQueryPtr query_;
 };
 
+class Client::TdOnCreateInvoiceLinkCallback final : public TdQueryCallback {
+ public:
+  explicit TdOnCreateInvoiceLinkCallback(PromisedQueryPtr query) : query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::httpUrl::ID);
+    auto http_url = move_object_as<td_api::httpUrl>(result);
+    return answer_query(td::VirtuallyJsonableString(http_url->url_), std::move(query_));
+  }
+
+ private:
+  PromisedQueryPtr query_;
+};
+
 class Client::TdOnReplacePrimaryChatInviteLinkCallback final : public TdQueryCallback {
  public:
   explicit TdOnReplacePrimaryChatInviteLinkCallback(PromisedQueryPtr query) : query_(std::move(query)) {
@@ -6609,6 +6629,71 @@ td::Result<td::vector<td_api::object_ptr<td_api::InputMessageContent>>> Client::
   return std::move(contents);
 }
 
+td::Result<td_api::object_ptr<td_api::inputMessageInvoice>> Client::get_input_message_invoice(const Query *query) {
+  TRY_RESULT(title, get_required_string_arg(query, "title"));
+  TRY_RESULT(description, get_required_string_arg(query, "description"));
+  TRY_RESULT(payload, get_required_string_arg(query, "payload"));
+  if (!td::check_utf8(payload.str())) {
+    return Status::Error(400, "The payload must be encoded in UTF-8");
+  }
+  TRY_RESULT(provider_token, get_required_string_arg(query, "provider_token"));
+  auto provider_data = query->arg("provider_data");
+  auto start_parameter = query->arg("start_parameter");
+  TRY_RESULT(currency, get_required_string_arg(query, "currency"));
+
+  TRY_RESULT(labeled_price_parts, get_required_string_arg(query, "prices"));
+  auto r_labeled_price_parts_value = json_decode(labeled_price_parts);
+  if (r_labeled_price_parts_value.is_error()) {
+    return Status::Error(400, "Can't parse prices JSON object");
+  }
+
+  TRY_RESULT(prices, get_labeled_price_parts(r_labeled_price_parts_value.ok_ref()));
+
+  int64 max_tip_amount = 0;
+  td::vector<int64> suggested_tip_amounts;
+  {
+    auto max_tip_amount_str = query->arg("max_tip_amount");
+    if (!max_tip_amount_str.empty()) {
+      auto r_max_tip_amount = td::to_integer_safe<int64>(max_tip_amount_str);
+      if (r_max_tip_amount.is_error()) {
+        return Status::Error(400, "Can't parse \"max_tip_amount\" as Number");
+      }
+      max_tip_amount = r_max_tip_amount.ok();
+    }
+
+    auto suggested_tip_amounts_str = query->arg("suggested_tip_amounts");
+    if (!suggested_tip_amounts_str.empty()) {
+      auto r_suggested_tip_amounts_value = json_decode(suggested_tip_amounts_str);
+      if (r_suggested_tip_amounts_value.is_error()) {
+        return Status::Error(400, "Can't parse suggested_tip_amounts JSON object");
+      }
+
+      TRY_RESULT_ASSIGN(suggested_tip_amounts, get_suggested_tip_amounts(r_suggested_tip_amounts_value.ok_ref()));
+    }
+  }
+
+  auto photo_url = query->arg("photo_url");
+  int32 photo_size = get_integer_arg(query, "photo_size", 0, 0, 1000000000);
+  int32 photo_width = get_integer_arg(query, "photo_width", 0, 0, MAX_LENGTH);
+  int32 photo_height = get_integer_arg(query, "photo_height", 0, 0, MAX_LENGTH);
+
+  auto need_name = to_bool(query->arg("need_name"));
+  auto need_phone_number = to_bool(query->arg("need_phone_number"));
+  auto need_email_address = to_bool(query->arg("need_email"));
+  auto need_shipping_address = to_bool(query->arg("need_shipping_address"));
+  auto send_phone_number_to_provider = to_bool(query->arg("send_phone_number_to_provider"));
+  auto send_email_address_to_provider = to_bool(query->arg("send_email_to_provider"));
+  auto is_flexible = to_bool(query->arg("is_flexible"));
+
+  return make_object<td_api::inputMessageInvoice>(
+      make_object<td_api::invoice>(currency.str(), std::move(prices), max_tip_amount, std::move(suggested_tip_amounts),
+                                   td::string(), false, need_name, need_phone_number, need_email_address,
+                                   need_shipping_address, send_phone_number_to_provider, send_email_address_to_provider,
+                                   is_flexible),
+      title.str(), description.str(), photo_url.str(), photo_size, photo_width, photo_height, payload.str(),
+      provider_token.str(), provider_data.str(), start_parameter.str());
+}
+
 td::Result<td::vector<td::string>> Client::get_poll_options(const Query *query) {
   auto input_options = query->arg("options");
   LOG(INFO) << "Parsing JSON object: " << input_options;
@@ -7053,69 +7138,8 @@ td::Status Client::process_send_game_query(PromisedQueryPtr &query) {
 }
 
 td::Status Client::process_send_invoice_query(PromisedQueryPtr &query) {
-  TRY_RESULT(title, get_required_string_arg(query.get(), "title"));
-  TRY_RESULT(description, get_required_string_arg(query.get(), "description"));
-  TRY_RESULT(payload, get_required_string_arg(query.get(), "payload"));
-  if (!td::check_utf8(payload.str())) {
-    return Status::Error(400, "The payload must be encoded in UTF-8");
-  }
-  TRY_RESULT(provider_token, get_required_string_arg(query.get(), "provider_token"));
-  auto provider_data = query->arg("provider_data");
-  auto start_parameter = query->arg("start_parameter");
-  TRY_RESULT(currency, get_required_string_arg(query.get(), "currency"));
-
-  TRY_RESULT(labeled_price_parts, get_required_string_arg(query.get(), "prices"));
-  auto r_labeled_price_parts_value = json_decode(labeled_price_parts);
-  if (r_labeled_price_parts_value.is_error()) {
-    return Status::Error(400, "Can't parse prices JSON object");
-  }
-
-  TRY_RESULT(prices, get_labeled_price_parts(r_labeled_price_parts_value.ok_ref()));
-
-  int64 max_tip_amount = 0;
-  td::vector<int64> suggested_tip_amounts;
-  {
-    auto max_tip_amount_str = query->arg("max_tip_amount");
-    if (!max_tip_amount_str.empty()) {
-      auto r_max_tip_amount = td::to_integer_safe<int64>(max_tip_amount_str);
-      if (r_max_tip_amount.is_error()) {
-        return Status::Error(400, "Can't parse \"max_tip_amount\" as Number");
-      }
-      max_tip_amount = r_max_tip_amount.ok();
-    }
-
-    auto suggested_tip_amounts_str = query->arg("suggested_tip_amounts");
-    if (!suggested_tip_amounts_str.empty()) {
-      auto r_suggested_tip_amounts_value = json_decode(suggested_tip_amounts_str);
-      if (r_suggested_tip_amounts_value.is_error()) {
-        return Status::Error(400, "Can't parse suggested_tip_amounts JSON object");
-      }
-
-      TRY_RESULT_ASSIGN(suggested_tip_amounts, get_suggested_tip_amounts(r_suggested_tip_amounts_value.ok_ref()));
-    }
-  }
-
-  auto photo_url = query->arg("photo_url");
-  int32 photo_size = get_integer_arg(query.get(), "photo_size", 0, 0, 1000000000);
-  int32 photo_width = get_integer_arg(query.get(), "photo_width", 0, 0, MAX_LENGTH);
-  int32 photo_height = get_integer_arg(query.get(), "photo_height", 0, 0, MAX_LENGTH);
-
-  auto need_name = to_bool(query->arg("need_name"));
-  auto need_phone_number = to_bool(query->arg("need_phone_number"));
-  auto need_email_address = to_bool(query->arg("need_email"));
-  auto need_shipping_address = to_bool(query->arg("need_shipping_address"));
-  auto send_phone_number_to_provider = to_bool(query->arg("send_phone_number_to_provider"));
-  auto send_email_address_to_provider = to_bool(query->arg("send_email_to_provider"));
-  auto is_flexible = to_bool(query->arg("is_flexible"));
-
-  do_send_message(make_object<td_api::inputMessageInvoice>(
-                      make_object<td_api::invoice>(
-                          currency.str(), std::move(prices), max_tip_amount, std::move(suggested_tip_amounts), false,
-                          td::string(), need_name, need_phone_number, need_email_address, need_shipping_address,
-                          send_phone_number_to_provider, send_email_address_to_provider, is_flexible),
-                      title.str(), description.str(), photo_url.str(), photo_size, photo_width, photo_height,
-                      payload.str(), provider_token.str(), provider_data.str(), start_parameter.str()),
-                  std::move(query));
+  TRY_RESULT(input_message_invoice, get_input_message_invoice(query.get()));
+  do_send_message(std::move(input_message_invoice), std::move(query));
   return Status::OK();
 }
 
@@ -7496,6 +7520,13 @@ td::Status Client::process_delete_message_query(PromisedQueryPtr &query) {
                   send_request(make_object<td_api::deleteMessages>(chat_id, td::vector<int64>{message_id}, true),
                                td::make_unique<TdOnOkQueryCallback>(std::move(query)));
                 });
+  return Status::OK();
+}
+
+td::Status Client::process_create_invoice_link_query(PromisedQueryPtr &query) {
+  TRY_RESULT(input_message_invoice, get_input_message_invoice(query.get()));
+  send_request(make_object<td_api::createInvoiceLink>(std::move(input_message_invoice)),
+               td::make_unique<TdOnCreateInvoiceLinkCallback>(std::move(query)));
   return Status::OK();
 }
 

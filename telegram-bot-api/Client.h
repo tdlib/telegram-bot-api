@@ -186,6 +186,7 @@ class Client final : public WebhookActor::Callback {
   class TdOnGetGroupMembersCallback;
   class TdOnGetSupergroupMembersCallback;
   class TdOnGetSupergroupMembersCountCallback;
+  class TdOnCreateInvoiceLinkCallback;
   class TdOnReplacePrimaryChatInviteLinkCallback;
   class TdOnGetChatInviteLinkCallback;
   class TdOnGetGameHighScoresCallback;
@@ -431,6 +432,8 @@ class Client final : public WebhookActor::Callback {
   td::Result<td::vector<object_ptr<td_api::InputMessageContent>>> get_input_message_contents(
       const Query *query, td::JsonValue &&value) const;
 
+  static td::Result<object_ptr<td_api::inputMessageInvoice>> get_input_message_invoice(const Query *query);
+
   static object_ptr<td_api::messageSendOptions> get_message_send_options(bool disable_notification,
                                                                          bool protect_content);
 
@@ -493,6 +496,7 @@ class Client final : public WebhookActor::Callback {
   Status process_edit_message_caption_query(PromisedQueryPtr &query);
   Status process_edit_message_reply_markup_query(PromisedQueryPtr &query);
   Status process_delete_message_query(PromisedQueryPtr &query);
+  Status process_create_invoice_link_query(PromisedQueryPtr &query);
   Status process_set_game_score_query(PromisedQueryPtr &query);
   Status process_get_game_high_scores_query(PromisedQueryPtr &query);
   Status process_answer_web_app_query_query(PromisedQueryPtr &query);
