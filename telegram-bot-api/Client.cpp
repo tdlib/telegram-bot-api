@@ -1195,7 +1195,7 @@ class Client::JsonInvoice final : public Jsonable {
   void store(JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("title", invoice_->title_);
-    object("description", invoice_->description_);
+    object("description", invoice_->description_->text_);
     object("start_parameter", invoice_->start_parameter_);
     object("currency", invoice_->currency_);
     object("total_amount", invoice_->total_amount_);
@@ -1860,10 +1860,7 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
     }
     case td_api::messageChatChangePhoto::ID: {
       auto content = static_cast<const td_api::messageChatChangePhoto *>(message_->content.get());
-      if (content->photo_ == nullptr) {
-        LOG(ERROR) << "Got empty messageChatChangePhoto";
-        break;
-      }
+      CHECK(content->photo_ != nullptr);
       object("new_chat_photo", JsonChatPhoto(content->photo_.get(), client_));
       break;
     }
@@ -4603,7 +4600,9 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       auto user_id = update->user_id_;
       auto full_info = update->user_full_info_.get();
       set_user_photo(user_id, std::move(full_info->photo_));
-      set_user_bio(user_id, std::move(full_info->bio_));
+      if (full_info->bio_ != nullptr) {
+        set_user_bio(user_id, std::move(full_info->bio_->text_));
+      }
       set_user_has_private_forwards(user_id, full_info->has_private_forwards_);
       break;
     }
@@ -5478,8 +5477,9 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
 
     return make_object<td_api::inputMessageInvoice>(
         make_object<td_api::invoice>(currency, std::move(prices), max_tip_amount, std::move(suggested_tip_amounts),
-                                     false, need_name, need_phone_number, need_email_address, need_shipping_address,
-                                     send_phone_number_to_provider, send_email_address_to_provider, is_flexible),
+                                     td::string(), false, need_name, need_phone_number, need_email_address,
+                                     need_shipping_address, send_phone_number_to_provider,
+                                     send_email_address_to_provider, is_flexible),
         title, description, photo_url, photo_size, photo_width, photo_height, payload, provider_token, provider_data,
         td::string());
   }
@@ -7111,7 +7111,7 @@ td::Status Client::process_send_invoice_query(PromisedQueryPtr &query) {
   do_send_message(make_object<td_api::inputMessageInvoice>(
                       make_object<td_api::invoice>(
                           currency.str(), std::move(prices), max_tip_amount, std::move(suggested_tip_amounts), false,
-                          need_name, need_phone_number, need_email_address, need_shipping_address,
+                          td::string(), need_name, need_phone_number, need_email_address, need_shipping_address,
                           send_phone_number_to_provider, send_email_address_to_provider, is_flexible),
                       title.str(), description.str(), photo_url.str(), photo_size, photo_width, photo_height,
                       payload.str(), provider_token.str(), provider_data.str(), start_parameter.str()),
@@ -9576,26 +9576,10 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
   }
 
   switch (message->content_->get_id()) {
-    case td_api::messagePhoto::ID: {
-      auto content = static_cast<const td_api::messagePhoto *>(message->content_.get());
-      if (content->photo_ == nullptr) {
-        LOG(ERROR) << "Got empty messagePhoto";
-        return true;
-      }
-      break;
-    }
     case td_api::messageChatAddMembers::ID: {
       auto content = static_cast<const td_api::messageChatAddMembers *>(message->content_.get());
       if (content->member_user_ids_.empty()) {
         LOG(ERROR) << "Got empty messageChatAddMembers";
-        return true;
-      }
-      break;
-    }
-    case td_api::messageChatChangePhoto::ID: {
-      auto content = static_cast<const td_api::messageChatChangePhoto *>(message->content_.get());
-      if (content->photo_ == nullptr) {
-        LOG(ERROR) << "Got empty messageChatChangePhoto";
         return true;
       }
       break;
@@ -9615,7 +9599,7 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       }
       const MessageInfo *pinned_message = get_message(chat_id, pinned_message_id);
       if (pinned_message == nullptr) {
-        LOG(WARNING) << "Pinned unknown, inaccessible or deleted message " << pinned_message_id;
+        LOG(WARNING) << "Pinned unknown, inaccessible or deleted message " << pinned_message_id << " in " << chat_id;
         return true;
       }
       break;
