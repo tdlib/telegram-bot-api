@@ -348,6 +348,9 @@ class Client::JsonUser final : public Jsonable {
     if (user_info != nullptr && !user_info->language_code.empty()) {
       object("language_code", user_info->language_code);
     }
+    if (user_info != nullptr && user_info->added_to_attachment_menu) {
+      object("added_to_attachment_menu", td::JsonTrue());
+    }
     if (is_bot && full_bot_info_) {
       object("can_join_groups", td::JsonBool(user_info->can_join_groups));
       object("can_read_all_group_messages", td::JsonBool(user_info->can_read_all_group_messages));
@@ -8883,6 +8886,7 @@ void Client::add_user(UserInfo *user_info, object_ptr<td_api::user> &&user) {
   user_info->language_code = std::move(user->language_code_);
 
   user_info->have_access = user->have_access_;
+  user_info->added_to_attachment_menu = user->added_to_attachment_menu_;
 
   switch (user->type_->get_id()) {
     case td_api::userTypeRegular::ID:
