@@ -712,6 +712,12 @@ class Client::JsonChat final : public Jsonable {
           if (supergroup_info->is_supergroup) {
             object("permissions", JsonChatPermissions(chat_info->permissions.get()));
           }
+          if (supergroup_info->is_supergroup && supergroup_info->join_to_send_messages) {
+            object("join_to_send_messages", td::JsonTrue());
+          }
+          if (supergroup_info->is_supergroup && supergroup_info->join_by_request) {
+            object("join_by_request", td::JsonTrue());
+          }
           if (supergroup_info->slow_mode_delay != 0) {
             object("slow_mode_delay", supergroup_info->slow_mode_delay);
           }
@@ -8998,6 +9004,8 @@ void Client::add_supergroup(SupergroupInfo *supergroup_info, object_ptr<td_api::
   supergroup_info->status = std::move(supergroup->status_);
   supergroup_info->is_supergroup = !supergroup->is_channel_;
   supergroup_info->has_location = supergroup->has_location_;
+  supergroup_info->join_to_send_messages = supergroup->join_to_send_messages_;
+  supergroup_info->join_by_request = supergroup->join_by_request_;
 }
 
 void Client::set_supergroup_photo(int64 supergroup_id, object_ptr<td_api::chatPhoto> &&photo) {

@@ -655,6 +655,8 @@ class Client final : public WebhookActor::Callback {
     bool is_supergroup = false;
     bool can_set_sticker_set = false;
     bool has_location = false;
+    bool join_to_send_messages = false;
+    bool join_by_request = false;
   };
   static void add_supergroup(SupergroupInfo *supergroup_info, object_ptr<td_api::supergroup> &&supergroup);
   void set_supergroup_photo(int64 supergroup_id, object_ptr<td_api::chatPhoto> &&photo);
