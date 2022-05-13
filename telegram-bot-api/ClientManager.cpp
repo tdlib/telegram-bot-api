@@ -378,6 +378,11 @@ PromisedQueryPtr ClientManager::get_webhook_restore_query(td::Slice token, td::S
     parser.skip('/');
   }
 
+  if (parser.try_skip("#secret")) {
+    args.emplace_back(add_string("secret_token"), add_string(parser.read_till('/')));
+    parser.skip('/');
+  }
+
   if (parser.try_skip("#allow")) {
     args.emplace_back(add_string("allowed_updates"), add_string(parser.read_till('/')));
     parser.skip('/');

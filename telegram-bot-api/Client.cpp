@@ -8382,13 +8382,14 @@ td::Status Client::process_set_webhook_query(PromisedQueryPtr &query) {
   int32 new_max_connections = new_url.empty() ? 0 : get_webhook_max_connections(query.get());
   Slice new_ip_address = new_url.empty() ? Slice() : query->arg("ip_address");
   bool new_fix_ip_address = new_url.empty() ? false : get_webhook_fix_ip_address(query.get());
+  Slice new_secret_token = new_url.empty() ? Slice() : query->arg("secret_token");
   bool drop_pending_updates = to_bool(query->arg("drop_pending_updates"));
   if (webhook_set_query_) {
     // already updating webhook. Cancel previous request
     fail_query_conflict("Conflict: terminated by other setWebhook", std::move(webhook_set_query_));
   } else if (webhook_url_ == new_url && !has_webhook_certificate_ && query->file("certificate") == nullptr &&
              query->arg("certificate").empty() && new_max_connections == webhook_max_connections_ &&
-             new_fix_ip_address == webhook_fix_ip_address_ &&
+             new_fix_ip_address == webhook_fix_ip_address_ && new_secret_token == webhook_secret_token_ &&
              (!new_fix_ip_address || new_ip_address == webhook_ip_address_) && !drop_pending_updates) {
     if (update_allowed_update_types(query.get())) {
       save_webhook();
@@ -8512,6 +8513,9 @@ void Client::save_webhook() const {
   if (webhook_fix_ip_address_) {
     value += "#fix_ip/";
   }
+  if (!webhook_secret_token_.empty()) {
+    value += PSTRING() << "#secret" << webhook_secret_token_ << '/';
+  }
   if (allowed_update_types_ != DEFAULT_ALLOWED_UPDATE_TYPES) {
     value += PSTRING() << "#allow" << allowed_update_types_ << '/';
   }
@@ -8555,6 +8559,7 @@ void Client::webhook_closed(Status status) {
   webhook_max_connections_ = 0;
   webhook_ip_address_ = td::string();
   webhook_fix_ip_address_ = false;
+  webhook_secret_token_ = td::string();
   webhook_set_time_ = td::Time::now();
   last_webhook_error_date_ = 0;
   last_webhook_error_ = Status::OK();
@@ -8604,6 +8609,13 @@ void Client::do_set_webhook(PromisedQueryPtr query, bool was_deleted) {
     if (url.is_error()) {
       return fail_query(400, "Bad Request: invalid webhook URL specified", std::move(query));
     }
+    auto secret_token = query->arg("secret_token");
+    if (secret_token.size() > 256) {
+      return fail_query(400, "Bad Request: secret token is too long", std::move(query));
+    }
+    if (!td::is_base64url_characters(secret_token)) {
+      return fail_query(400, "Bad Request: secret token contains unallowed characters", std::move(query));
+    }
     auto *cert_file_ptr = query->file("certificate");
     has_webhook_certificate_ = false;
     if (cert_file_ptr != nullptr) {
@@ -8627,6 +8639,7 @@ void Client::do_set_webhook(PromisedQueryPtr query, bool was_deleted) {
     webhook_url_ = new_url.str();
     webhook_set_time_ = td::Time::now();
     webhook_max_connections_ = get_webhook_max_connections(query.get());
+    webhook_secret_token_ = secret_token.str();
     webhook_ip_address_ = query->arg("ip_address").str();
     webhook_fix_ip_address_ = get_webhook_fix_ip_address(query.get());
     last_webhook_error_date_ = 0;
@@ -8639,7 +8652,7 @@ void Client::do_set_webhook(PromisedQueryPtr query, bool was_deleted) {
     webhook_id_ = td::create_actor<WebhookActor>(
         webhook_actor_name, actor_shared(this, webhook_generation_), tqueue_id_, url.move_as_ok(),
         has_webhook_certificate_ ? get_webhook_certificate_path() : "", webhook_max_connections_, query->is_internal(),
-        webhook_ip_address_, webhook_fix_ip_address_, parameters_);
+        webhook_ip_address_, webhook_fix_ip_address_, webhook_secret_token_, parameters_);
     // wait for webhook verified or webhook callback
     webhook_query_type_ = WebhookQueryType::Verify;
     webhook_set_query_ = std::move(query);

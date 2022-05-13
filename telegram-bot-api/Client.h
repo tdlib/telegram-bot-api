@@ -1007,6 +1007,7 @@ class Client final : public WebhookActor::Callback {
   int32 webhook_max_connections_ = 0;
   td::string webhook_ip_address_;
   bool webhook_fix_ip_address_ = false;
+  td::string webhook_secret_token_;
   int32 last_webhook_error_date_ = 0;
   Status last_webhook_error_;
   double next_allowed_set_webhook_time_ = 0;

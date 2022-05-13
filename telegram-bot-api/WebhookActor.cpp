@@ -42,7 +42,7 @@ std::atomic<td::uint64> WebhookActor::total_connections_count_{0};
 
 WebhookActor::WebhookActor(td::ActorShared<Callback> callback, td::int64 tqueue_id, td::HttpUrl url,
                            td::string cert_path, td::int32 max_connections, bool from_db_flag,
-                           td::string cached_ip_address, bool fix_ip_address,
+                           td::string cached_ip_address, bool fix_ip_address, td::string secret_token,
                            std::shared_ptr<const ClientParameters> parameters)
     : callback_(std::move(callback))
     , tqueue_id_(tqueue_id)
@@ -51,7 +51,8 @@ WebhookActor::WebhookActor(td::ActorShared<Callback> callback, td::int64 tqueue_
     , parameters_(std::move(parameters))
     , fix_ip_address_(fix_ip_address)
     , from_db_flag_(from_db_flag)
-    , max_connections_(max_connections) {
+    , max_connections_(max_connections)
+    , secret_token_(std::move(secret_token)) {
   CHECK(max_connections_ > 0);
 
   if (!cached_ip_address.empty()) {
@@ -538,6 +539,9 @@ td::Status WebhookActor::send_update() {
   hc.add_header("Host", url_.host_);
   if (!url_.userinfo_.empty()) {
     hc.add_header("Authorization", PSLICE() << "Basic " << td::base64_encode(url_.userinfo_));
+  }
+  if (!secret_token_.empty()) {
+    hc.add_header("X-Telegram-Bot-Api-Secret-Token", secret_token_);
   }
   hc.set_content_type("application/json");
   hc.set_content_size(body.size());

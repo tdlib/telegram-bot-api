@@ -54,7 +54,7 @@ class WebhookActor final : public td::HttpOutboundConnection::Callback {
 
   WebhookActor(td::ActorShared<Callback> callback, td::int64 tqueue_id, td::HttpUrl url, td::string cert_path,
                td::int32 max_connections, bool from_db_flag, td::string cached_ip_address, bool fix_ip_address,
-               std::shared_ptr<const ClientParameters> parameters);
+               td::string secret_token, std::shared_ptr<const ClientParameters> parameters);
 
   void update();
 
@@ -163,6 +163,7 @@ class WebhookActor final : public td::HttpOutboundConnection::Callback {
   td::vector<td::BufferedFd<td::SocketFd>> ready_sockets_;
 
   td::int32 max_connections_ = 0;
+  td::string secret_token_;
   td::Container<Connection> connections_;
   td::ListNode ready_connections_;
   td::FloodControlFast active_new_connection_flood_;
