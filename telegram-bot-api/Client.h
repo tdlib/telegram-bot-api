@@ -13,6 +13,8 @@
 #include "td/telegram/ClientActor.h"
 #include "td/telegram/td_api.h"
 
+#include "td/net/HttpFile.h"
+
 #include "td/actor/actor.h"
 #include "td/actor/PromiseFuture.h"
 #include "td/actor/SignalSlot.h"
@@ -552,6 +554,7 @@ class Client final : public WebhookActor::Callback {
   void webhook_error(Status status) final;
   void webhook_closed(Status status) final;
   void hangup_shared() final;
+  const td::HttpFile *get_webhook_certificate(const Query *query) const;
   int32 get_webhook_max_connections(const Query *query) const;
   static bool get_webhook_fix_ip_address(const Query *query);
   void do_set_webhook(PromisedQueryPtr query, bool was_deleted);

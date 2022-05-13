@@ -8385,6 +8385,9 @@ td::Status Client::process_set_webhook_query(PromisedQueryPtr &query) {
   // do not send warning just after webhook was deleted or set
   next_bot_updates_warning_time_ = td::max(next_bot_updates_warning_time_, now + BOT_UPDATES_WARNING_DELAY);
 
+  bool new_has_certificate = new_url.empty() ? false
+                                             : (get_webhook_certificate(query.get()) != nullptr ||
+                                                (query->is_internal() && query->arg("certificate") == "previous"));
   int32 new_max_connections = new_url.empty() ? 0 : get_webhook_max_connections(query.get());
   Slice new_ip_address = new_url.empty() ? Slice() : query->arg("ip_address");
   bool new_fix_ip_address = new_url.empty() ? false : get_webhook_fix_ip_address(query.get());
@@ -8393,9 +8396,9 @@ td::Status Client::process_set_webhook_query(PromisedQueryPtr &query) {
   if (webhook_set_query_) {
     // already updating webhook. Cancel previous request
     fail_query_conflict("Conflict: terminated by other setWebhook", std::move(webhook_set_query_));
-  } else if (webhook_url_ == new_url && !has_webhook_certificate_ && query->file("certificate") == nullptr &&
-             query->arg("certificate").empty() && new_max_connections == webhook_max_connections_ &&
-             new_fix_ip_address == webhook_fix_ip_address_ && new_secret_token == webhook_secret_token_ &&
+  } else if (webhook_url_ == new_url && !has_webhook_certificate_ && !new_has_certificate &&
+             new_max_connections == webhook_max_connections_ && new_fix_ip_address == webhook_fix_ip_address_ &&
+             new_secret_token == webhook_secret_token_ &&
              (!new_fix_ip_address || new_ip_address == webhook_ip_address_) && !drop_pending_updates) {
     if (update_allowed_update_types(query.get())) {
       save_webhook();
@@ -8588,6 +8591,18 @@ td::string Client::get_webhook_certificate_path() const {
   return dir_ + "cert.pem";
 }
 
+const td::HttpFile *Client::get_webhook_certificate(const Query *query) const {
+  auto file = query->file("certificate");
+  if (file == nullptr) {
+    auto attach_name = query->arg("certificate");
+    Slice attach_protocol{"attach://"};
+    if (td::begins_with(attach_name, attach_protocol)) {
+      file = query->file(attach_name.substr(attach_protocol.size()));
+    }
+  }
+  return file;
+}
+
 td::int32 Client::get_webhook_max_connections(const Query *query) const {
   auto default_value = parameters_->default_max_webhook_connections_;
   auto max_value = parameters_->local_mode_ ? 100000 : 100;
@@ -8622,8 +8637,9 @@ void Client::do_set_webhook(PromisedQueryPtr query, bool was_deleted) {
     if (!td::is_base64url_characters(secret_token)) {
       return fail_query(400, "Bad Request: secret token contains unallowed characters", std::move(query));
     }
-    auto *cert_file_ptr = query->file("certificate");
+
     has_webhook_certificate_ = false;
+    auto *cert_file_ptr = get_webhook_certificate(query.get());
     if (cert_file_ptr != nullptr) {
       auto size = cert_file_ptr->size;
       if (size > MAX_CERTIFICATE_FILE_SIZE) {
@@ -8637,11 +8653,10 @@ void Client::do_set_webhook(PromisedQueryPtr query, bool was_deleted) {
         return fail_query(500, "Internal Server Error: failed to save certificate", std::move(query));
       }
       has_webhook_certificate_ = true;
-    }
-
-    if (query->is_internal() && query->arg("certificate") == "previous") {
+    } else if (query->is_internal() && query->arg("certificate") == "previous") {
       has_webhook_certificate_ = true;
     }
+
     webhook_url_ = new_url.str();
     webhook_set_time_ = td::Time::now();
     webhook_max_connections_ = get_webhook_max_connections(query.get());
