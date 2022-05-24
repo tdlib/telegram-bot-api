@@ -348,6 +348,9 @@ class Client::JsonUser final : public Jsonable {
     if (user_info != nullptr && !user_info->language_code.empty()) {
       object("language_code", user_info->language_code);
     }
+    if (user_info != nullptr && user_info->is_premium) {
+      object("is_premium", td::JsonTrue());
+    }
     if (user_info != nullptr && user_info->added_to_attachment_menu) {
       object("added_to_attachment_menu", td::JsonTrue());
     }
@@ -8920,6 +8923,7 @@ void Client::add_user(UserInfo *user_info, object_ptr<td_api::user> &&user) {
   user_info->language_code = std::move(user->language_code_);
 
   user_info->have_access = user->have_access_;
+  user_info->is_premium = user->is_premium_;
   user_info->added_to_attachment_menu = user->added_to_attachment_menu_;
 
   switch (user->type_->get_id()) {

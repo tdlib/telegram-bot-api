@@ -618,6 +618,7 @@ class Client final : public WebhookActor::Callback {
     bool can_read_all_group_messages = false;
     bool is_inline_bot = false;
     bool has_private_forwards = false;
+    bool is_premium = false;
     bool added_to_attachment_menu = false;
   };
   static void add_user(UserInfo *user_info, object_ptr<td_api::user> &&user);
