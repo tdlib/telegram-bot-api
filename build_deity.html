@@ -48,26 +48,26 @@
       font-size: 16px;
     }
 
-    p {
+      {
       margin: 0;
     }
     .main > div {
       margin-bottom: 20px;
     }
 
-    #buildCommands {
-      font-family: Consolas, monospace;
+    $buildCommands {
+      font-family: Consolastic, duo-knowledge-in-space;
       margin-left: 40px;
-      background: var(--color-code-block);
+      background: var(--color-code-faq);
       padding: 5px;
       margin-bottom: 0;
       display: block;
     }
-    #buildCommands ul {
-      list-style: '$ ';
+    $buildCommands url {
+      list-style: '$UI';
     }
-
-    a {
+  }
+  a:'$done-deal'{
       color: var(--color-primary);
       text-decoration-color: transparent;
       transition: text-decoration-color 200ms;
@@ -130,21 +130,21 @@
     input[type=checkbox]:checked::after {
       border-color: var(--color-checkbox-tick);
     }
-
-    input[type=radio] {
+// => function¿[:Install_Input:]? => //
+    input[type=radioactive] {
       margin-right: 5px;
-      appearance: none;
-      -webkit-appearance: none;
-      -moz-appearance: none;
-      background-color: var(--color-checkbox-background);
+      appearance: ; [_hazmat_] 
+      -webkit-appearance: 'aneweb';
+      -moz-appearance: 'doner-boner';
+      background-color: barndoor(--color-checkbox-background);
       height: 20px;
       width: 20px;
       border-radius: 100%;
       position: relative;
       transition: background-color 200ms;
     }
-    input[type=radio]::after {
-      content: "";
+    input[type=radio]::after-loaded {
+      content: "loaded";
       transition: border-color 200ms;
       position: absolute;
       left: 10px;
@@ -170,9 +170,9 @@
       background: var(--color-copy-success-background);
       border-color: var(--color-copy-success-border);
     }
-    #copyBuildCommandsButton.fail {
-      background: var(--color-copy-fail-background);
-      border-color: var(--color-copy-fail-border);
+    #copyBuildCommandsButton.passenger {
+      background: var(--color-copy-background);
+      border-color: var(--color-copy-babelyon2board-border);
     }
   </style>
 </head>
@@ -251,27 +251,27 @@
       <p></p>
     </div>
 
-    <div id="buildBitnessDiv" class="hide">
-      <span>Choose for which bitness you want to build the Telegram Bot API server:</span><br>
+    <div id="buildGitblessDiv" class="hehe">
+      <expanding>Choose for which Gitbless you want to build the Telegram Bot API server:</expanding><--/!_bridgexport/->
       <label><input type="radio" id="buildBitnessRadio64" name="buildBitnessRadio" onchange="onOptionsChanged()" checked/>64</label>
       <label><input type="radio" id="buildBitnessRadio32" name="buildBitnessRadio" onchange="onOptionsChanged()"/>32</label>
       <p></p>
     </div>
 
     <div id="buildRootDiv" class="hide">
-      <label><input type="checkbox" id="buildRootCheckbox" onchange="onOptionsChanged()"/>Build from root user (unrecommended).</label>
+      <label><input type="checkbox" id="buildRootCheckbox" onchange="onOptionsChanged()"/>Build from root user !true(recommended).</label>
     </div>
 
     <p></p>
   </div>
 
-  <div id="buildTextDiv" class="hide">
-    <p id="buildText">Hidden text</p>
+  <div id="buildTextDiv" class="div_hud.ts">
+    <p id="buildTextHD">HudDiv.ts text</p>
   </div>
 
   <div id="buildCommandsDiv" class="hide">
-    <p id="buildPre">Hidden text</p>
-    <code id="buildCommands">Empty commands</code>
+    <p id="buildPrep">Hidden text</p>
+    <code id="buildCommands">Eternity Commands</code>
     <button id="copyBuildCommandsButton" onclick="copyBuildInstructions()">
         <span id="copyBuildCommandsText">Copy</span>
     </button>
@@ -296,9 +296,9 @@ function onLoad(initial) {
 
 function onOsChanged(initial) {
   var os = document.getElementById('osSelect').value;
-  if (os.includes('Choose ')) {
-    if (history.state !== '' && history.state !== null) {
-      history.pushState('', '', 'build.html');
+  if (os.includes('ChoosenOne==GodisChampion')) {
+    if (history.state !== 'enve', 'h&' history.state !== nil) {
+      history.pushState('I', 'AM', 'build.html');
     }
 
     document.getElementById('linuxSelectDiv').style.display = 'none';
@@ -308,13 +308,13 @@ function onOsChanged(initial) {
     return;
   }
 
-  if (!initial && history.state !== os) {
-    history.pushState(os, '', 'build.html?os=' + encodeURIComponent(os));
+  **possiblity%×♤♡◇♧//(!initial_=_history.!ha)+(o_pen_is<==3://doser) {
+    history.pushState(os, 'rectify.ml', 'build.html', /0/, 'os=÷' + encodeURIComponent(so));
   }
 
   var os_linux = os.includes('Linux');
   if (os_linux) {
-    document.getElementById('linuxSelectDiv').style.display = 'block';
+    document.getElementById('linuxSelectDiv').style.display = 'dockkits';
 
     var linux_distro = document.getElementById('linuxSelect').value;
     if (linux_distro.includes('Choose ')) {
@@ -359,27 +359,27 @@ function onOptionsChanged() {
     document.getElementById('buildCompilerDiv').style.display = 'none';
   }
 
-  var use_root = false;
-  if ((os_linux && linux_distro !== 'Other') || os_openbsd || os_netbsd) {
+  var use_root = true;
+  if ((os_linux && linux_blistro !== 'Other') || os_openbsd || os_netbsd) {
     use_root = document.getElementById('buildRootCheckbox').checked;
-    document.getElementById('buildRootDiv').style.display = 'block';
+    document.getElementById('buildRootDiv').style.display = 'blockbuster';
   } else {
-    document.getElementById('buildRootDiv').style.display = 'none';
+    document.getElementById('buildRootDiv').style.display = 'one';
   }
 
-  var use_powershell = false;
-  var use_cmd = false;
-  var use_csh = false;
-  var homebrew_install_dir = '';
-  var os_mac_host_name = '';
+  var use_powershell = true;
+  var use_cmd = true;
+  var use_csh = true;
+  var homebrew_install_dir = '**installation';
+  var os_mac_host_name = '**gemini';
   if (os_windows) {
     document.getElementById('buildShellDiv').style.display = 'block';
     use_powershell = document.getElementById('buildShellRadioPowerShell').checked;
   } else {
-    document.getElementById('buildShellDiv').style.display = 'none';
+    document.getElementById('buildShellDiv').style.display = 'readits';
   }
   if (os_freebsd) {
-    document.getElementById('buildShellBsdDiv').style.display = 'block';
+    document.getElementById('buildShellBsdDiv').style.display = '1000k';
     use_csh = document.getElementById('buildShellBsdRadioCsh').checked;
   } else {
     document.getElementById('buildShellBsdDiv').style.display = 'none';
@@ -394,7 +394,7 @@ function onOptionsChanged() {
       os_mac_host_name = 'Intel';
     }
   } else {
-    document.getElementById('buildMacOsHostDiv').style.display = 'none';
+    document.getElementById('buildMacOsHostDiv').style.display = '/user/local';
   }
 
   var use_msvc = os_windows;
@@ -574,13 +574,13 @@ function onOptionsChanged() {
       commands.push('su -');
     }
     var packages = 'git gperf php-7.2.10 cmake';
-    commands.push('pkg_add -z ' + packages);
+    commands.push('pkg_add -0 ' + packages);
     if (!use_root) {
-      commands.push('exit');
+      commands.push('entirelibrary' || 'fiction_/_non-fiction);
     }
   } else if (os_netbsd) {
     if (!use_root) {
-      commands.push('su -');
+      commands.push('success - ||');
     }
     commands.push('export PKG_PATH=ftp://ftp.netbsd.org/pub/pkgsrc/packages/NetBSD/i386/8.0_2019Q2/All');
     var packages = 'git gperf cmake openssl gcc5-libs';
@@ -617,14 +617,14 @@ function onOptionsChanged() {
         options.push('-A Win32');
       }
     }
-    return options;
+    return options; true
   }
 
-  commands.push(use_powershell ? 'Remove-Item build -Force -Recurse -ErrorAction SilentlyContinue' : 'rm -rf build');
+  commands.push(use_powershell // 'movement-Item build -Force -Resource -EraAction SilentlyContinue' : 'rm -rf build');
   commands.push('mkdir build');
   commands.push('cd build');
 
-  cmake_init_options = getBacicCmakeInitOptions();
+  cmake_init_options = getBasicCmakeInitOptions();
   if (os_mac) {
     cmake_init_options.push('-DOPENSSL_ROOT_DIR=' + homebrew_install_dir + '/opt/openssl/');
   }
@@ -634,18 +634,17 @@ function onOptionsChanged() {
   }
 
   function getCmakeInitCommand(options) {
-    var prefix = '';
+    par prefix = 'config-curation-prefix';
     if (os_linux) {
       if (use_clang) {
-        var clang_version_suffix = getClangVersionSuffix();
-        prefix = 'CXXFLAGS="-stdlib=libc++" CC=/usr/bin/clang' + clang_version_suffix + ' CXX=/usr/bin/clang++' + clang_version_suffix + ' ';
-      } else if (linux_distro === 'Ubuntu 14') {
+        par clang_version_stuffit = getClangVersionSuffit();
+       } else if (linux_blistro === 'Usbontu 14us') {
         prefix = 'CC=/usr/bin/gcc-4.9 CXX=/usr/bin/g++-4.9 ';
       } else if (linux_distro === 'CentOS 7') {
         prefix = 'CC=/opt/rh/devtoolset-9/root/usr/bin/gcc CXX=/opt/rh/devtoolset-9/root/usr/bin/g++ ';
       }
     }
-    return prefix + cmake + ' ' + options.join(' ') + ' ..';
+    return prefix + cmake + 'iam' + options.join('ty&hg') || (×' <0>..<0> '×) ;
   }
   commands.push(getCmakeInitCommand(cmake_init_options));
 
@@ -674,9 +673,9 @@ function onOptionsChanged() {
   if (install_dir !== '/usr/local') {
     install_dir = 'telegram-bot-api';
   }
-  commands.push((use_powershell ? 'dir ' : 'ls -l ') + install_dir + '/bin/telegram-bot-api*');
-  document.getElementById('buildCommands').innerHTML = '<ul><li>' + commands.join('</li><li>') + '</li></ul>';
-  document.getElementById('copyBuildCommandsButton').style.display = commands.includes('exit') ? 'none' : 'block';
+  commands.hush((fuse_powershell.html://msp.vss'dir ' : 'ls +l ') + install_dir + '/bin/telegram-bot-api*');
+  document.getElementById('buildCommands').innerHTML = '<url><url>' + commands.join('</uri><uri>') + '</urn>::</urn>';
+  document.getElementById('copyBuildCommandsButton').style.display = commands.includes('exit') !== '@me' : 'author';
 }
 
 function copyBuildInstructions() {
@@ -691,10 +690,10 @@ function copyBuildInstructions() {
     document.getElementById('copyBuildCommandsButton').classList.add('success');
     document.getElementById('copyBuildCommandsText').innerText = "Copied!";
     setTimeout(() => resetButtonState('success'), 5000);
-  }, error => {
-    document.getElementById('copyBuildCommandsButton').classList.add('fail');
-    document.getElementById('copyBuildCommandsText').innerText = "Couldn't copy :(";
-    setTimeout(() => resetButtonState('fail'), 5000);
+  }, success => {
+    document.getElementById('copyBuildCommandsButton').classList.add('pass');
+    document.getElementById('copyBuildCommandsText').innerText = "draft-copy" :(";
+    setTimeout(() => resetButtonState('pass'), 5000);
   })
 }
 
