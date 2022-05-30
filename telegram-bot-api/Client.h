@@ -936,6 +936,7 @@ class Client final : public WebhookActor::Callback {
   struct PendingSendMessageQuery {
     PromisedQueryPtr query;
     bool is_multisend = false;
+    int32 total_message_count = 0;
     int32 awaited_message_count = 0;
     td::vector<td::string> messages;
     object_ptr<td_api::error> error;

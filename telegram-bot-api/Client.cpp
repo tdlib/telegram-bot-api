@@ -6851,8 +6851,15 @@ void Client::on_message_send_failed(int64 chat_id, int64 old_message_id, int64 n
   auto query_id = extract_yet_unsent_message_query_id(chat_id, old_message_id, nullptr);
   auto &query = *pending_send_message_queries_[query_id];
   if (query.is_multisend) {
-    if (query.error == nullptr) {
-      query.error = std::move(error);
+    if (query.error == nullptr || query.error->message_ == "Group send failed") {
+      if (error->code_ == 429 || error->message_ == "Group send failed") {
+        query.error = std::move(error);
+      } else {
+        auto pos = (query.total_message_count - query.awaited_message_count + 1);
+        query.error = make_object<td_api::error>(error->code_, PSTRING() << "Failed to send message #" << pos
+                                                                         << " with the error message \""
+                                                                         << error->message_ << '"');
+      }
     }
     query.awaited_message_count--;
 
@@ -8750,7 +8757,10 @@ void Client::on_sent_message(object_ptr<td_api::message> &&message, int64 query_
   auto emplace_result = yet_unsent_messages_.emplace(yet_unsent_message_id, yet_unsent_message);
   CHECK(emplace_result.second);
   yet_unsent_message_count_[chat_id]++;
-  pending_send_message_queries_[query_id]->awaited_message_count++;
+
+  auto &query = *pending_send_message_queries_[query_id];
+  query.awaited_message_count++;
+  query.total_message_count++;
 }
 
 void Client::abort_long_poll(bool from_set_webhook) {
