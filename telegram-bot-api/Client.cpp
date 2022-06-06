@@ -283,16 +283,18 @@ bool Client::init_methods() {
 
 class Client::JsonFile final : public Jsonable {
  public:
-  JsonFile(const td_api::file *file, const Client *client) : file_(file), client_(client) {
+  JsonFile(const td_api::file *file, const Client *client, bool with_path)
+      : file_(file), client_(client), with_path_(with_path) {
   }
   void store(JsonValueScope *scope) const {
     auto object = scope->enter_object();
-    client_->json_store_file(object, file_, true);
+    client_->json_store_file(object, file_, with_path_);
   }
 
  private:
   const td_api::file *file_;
   const Client *client_;
+  bool with_path_;
 };
 
 class Client::JsonDatedFile final : public Jsonable {
@@ -1020,6 +1022,9 @@ class Client::JsonSticker final : public Jsonable {
       if (mask_position != nullptr) {
         object("mask_position", JsonMaskPosition(mask_position.get()));
       }
+    }
+    if (sticker_->premium_animation_ != nullptr) {
+      object("premium_animation", JsonFile(sticker_->premium_animation_.get(), client_, false));
     }
     client_->json_store_thumbnail(object, sticker_->thumbnail_.get());
     client_->json_store_file(object, sticker_->sticker_.get());
@@ -3625,7 +3630,7 @@ class Client::TdOnReturnFileCallback final : public TdQueryCallback {
 
     CHECK(result->get_id() == td_api::file::ID);
     auto file = move_object_as<td_api::file>(result);
-    answer_query(JsonFile(file.get(), client_), std::move(query_));
+    answer_query(JsonFile(file.get(), client_, false), std::move(query_));
   }
 
  private:
@@ -8500,7 +8505,7 @@ void Client::on_file_download(int32 file_id, td::Result<object_ptr<td_api::file>
       const auto &error = r_file.error();
       fail_query_with_error(std::move(query), error.code(), error.public_message());
     } else {
-      answer_query(JsonFile(r_file.ok().get(), this), std::move(query));
+      answer_query(JsonFile(r_file.ok().get(), this, true), std::move(query));
     }
   }
 }
