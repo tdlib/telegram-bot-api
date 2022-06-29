@@ -8474,16 +8474,6 @@ void Client::do_get_file(object_ptr<td_api::file> file, PromisedQueryPtr query) 
 
   auto file_id = file->id_;
   file_download_listeners_[file_id].push_back(std::move(query));
-  if (file->local_->is_downloading_completed_) {
-    Slice relative_path = td::PathView::relative(file->local_->path_, dir_, true);
-    if (!relative_path.empty()) {
-      auto r_stat = td::stat(file->local_->path_);
-      if (r_stat.is_ok() && r_stat.ok().is_reg_ && r_stat.ok().size_ == file->size_) {
-        return on_file_download(file_id, std::move(file));
-      }
-    }
-  }
-
   send_request(make_object<td_api::downloadFile>(file_id, 1, 0, 0, false),
                td::make_unique<TdOnDownloadFileCallback>(this, file_id));
 }
