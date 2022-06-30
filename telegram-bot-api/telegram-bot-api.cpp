@@ -22,7 +22,6 @@
 
 #include "td/actor/actor.h"
 #include "td/actor/ConcurrentScheduler.h"
-#include "td/actor/PromiseFuture.h"
 
 #include "td/utils/buffer.h"
 #include "td/utils/CombinedLog.h"
@@ -45,6 +44,7 @@
 #include "td/utils/port/stacktrace.h"
 #include "td/utils/port/Stat.h"
 #include "td/utils/port/user.h"
+#include "td/utils/Promise.h"
 #include "td/utils/Slice.h"
 #include "td/utils/SliceBuilder.h"
 #include "td/utils/Status.h"

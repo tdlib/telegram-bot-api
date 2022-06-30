@@ -118,7 +118,7 @@ void ClientManager::send(PromisedQueryPtr query) {
       flood_control.add_event(static_cast<td::int32>(now));
     }
     auto tqueue_id = get_tqueue_id(user_id, query->is_test_dc());
-    if (active_client_count_.find(tqueue_id) != active_client_count_.end()) {
+    if (active_client_count_.count(tqueue_id) != 0) {
       // return query->set_retry_after_error(1);
     }
 

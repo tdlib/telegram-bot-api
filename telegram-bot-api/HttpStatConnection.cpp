@@ -9,7 +9,7 @@
 #include "td/net/HttpHeaderCreator.h"
 
 #include "td/utils/common.h"
-#include "td/utils/logging.h"
+#include "td/utils/Promise.h"
 
 namespace telegram_bot_api {
 
