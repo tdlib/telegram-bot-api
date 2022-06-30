@@ -4856,30 +4856,13 @@ void Client::on_closed() {
   if (logging_out_) {
     parameters_->shared_data_->webhook_db_->erase(bot_token_with_dc_);
 
-    class RmWorker final : public td::Actor {
-     public:
-      RmWorker(td::string dir, td::ActorId<Client> parent) : dir_(std::move(dir)), parent_(std::move(parent)) {
-      }
-
-     private:
-      td::string dir_;
-      td::ActorId<Client> parent_;
-
-      void start_up() final {
-        CHECK(dir_.size() >= 24);
-        CHECK(dir_.back() == TD_DIR_SLASH);
-        td::rmrf(dir_).ignore();
-        stop();
-      }
-      void tear_down() final {
-        send_closure(parent_, &Client::finish_closing);
-      }
-    };
-    // NB: the same scheduler as for database in Td
-    auto current_scheduler_id = td::Scheduler::instance()->sched_id();
-    auto scheduler_count = td::Scheduler::instance()->sched_count();
-    auto scheduler_id = td::min(current_scheduler_id + 1, scheduler_count - 1);
-    td::create_actor_on_scheduler<RmWorker>("RmWorker", scheduler_id, dir_, actor_id(this)).release();
+    td::Scheduler::instance()->run_on_scheduler(get_database_scheduler_id(),
+                                                [actor_id = actor_id(this), dir = dir_](td::Unit) {
+                                                  CHECK(dir.size() >= 24);
+                                                  CHECK(dir.back() == TD_DIR_SLASH);
+                                                  td::rmrf(dir).ignore();
+                                                  send_closure(actor_id, &Client::finish_closing);
+                                                });
     return;
   }
 
@@ -4897,6 +4880,13 @@ void Client::finish_closing() {
 void Client::timeout_expired() {
   LOG(WARNING) << "Stop client";
   stop();
+}
+
+td::int32 Client::get_database_scheduler_id() {
+  // NB: the same scheduler as for database in Td
+  auto current_scheduler_id = td::Scheduler::instance()->sched_id();
+  auto scheduler_count = td::Scheduler::instance()->sched_count();
+  return td::min(current_scheduler_id + 1, scheduler_count - 1);
 }
 
 void Client::clear_tqueue() {

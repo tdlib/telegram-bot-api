@@ -302,6 +302,8 @@ class Client final : public WebhookActor::Callback {
   void on_closed();
   void finish_closing();
 
+  static int32 get_database_scheduler_id();
+
   void clear_tqueue();
 
   bool allow_update_before_authorization(const td_api::Object *update) const;
