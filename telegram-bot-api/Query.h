@@ -227,7 +227,7 @@ class JsonQueryError final : public td::Jsonable {
 
 class PromiseDeleter {
  public:
-  explicit PromiseDeleter(td::PromiseActor<td::unique_ptr<Query>> &&promise) : promise_(std::move(promise)) {
+  explicit PromiseDeleter(td::Promise<td::unique_ptr<Query>> &&promise) : promise_(std::move(promise)) {
   }
   PromiseDeleter() = default;
   PromiseDeleter(const PromiseDeleter &) = delete;
@@ -236,7 +236,7 @@ class PromiseDeleter {
   PromiseDeleter &operator=(PromiseDeleter &&) = default;
   void operator()(Query *raw_ptr) {
     td::unique_ptr<Query> query(raw_ptr);  // now I cannot forget to delete this pointer
-    if (!promise_.empty_promise()) {
+    if (promise_) {
       if (!query->is_ready()) {
         query->set_retry_after_error(5);
       }
@@ -245,11 +245,11 @@ class PromiseDeleter {
     }
   }
   ~PromiseDeleter() {
-    CHECK(promise_.empty());
+    CHECK(!promise_);
   }
 
  private:
-  td::PromiseActor<td::unique_ptr<Query>> promise_;
+  td::Promise<td::unique_ptr<Query>> promise_;
 };
 using PromisedQueryPtr = std::unique_ptr<Query, PromiseDeleter>;
 

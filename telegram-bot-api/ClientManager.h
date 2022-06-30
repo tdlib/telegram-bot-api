@@ -43,7 +43,7 @@ class ClientManager final : public td::Actor {
 
   void send(PromisedQueryPtr query);
 
-  void get_stats(td::PromiseActor<td::BufferSlice> promise, td::vector<std::pair<td::string, td::string>> args);
+  void get_stats(td::Promise<td::BufferSlice> promise, td::vector<std::pair<td::string, td::string>> args);
 
   void close(td::Promise<td::Unit> &&promise);
 

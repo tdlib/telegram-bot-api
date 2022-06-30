@@ -18,22 +18,20 @@ void HttpStatConnection::handle(td::unique_ptr<td::HttpQuery> http_query,
   CHECK(connection_->empty());
   connection_ = std::move(connection);
 
-  td::PromiseActor<td::BufferSlice> promise;
-  td::FutureActor<td::BufferSlice> future;
-  init_promise_future(&promise, &future);
-  future.set_event(td::EventCreator::yield(actor_id()));
-  LOG(DEBUG) << "SEND";
+  auto promise = td::PromiseCreator::lambda([actor_id = actor_id(this)](td::Result<td::BufferSlice> result) {
+    send_closure(actor_id, &HttpStatConnection::on_result, std::move(result));
+  });
   send_closure(client_manager_, &ClientManager::get_stats, std::move(promise), http_query->get_args());
-  result_ = std::move(future);
 }
 
-void HttpStatConnection::wakeup() {
-  if (result_.empty()) {
+void HttpStatConnection::on_result(td::Result<td::BufferSlice> result) {
+  if (result.is_error()) {
+    send_closure(connection_.release(), &td::HttpInboundConnection::write_error,
+                 td::Status::Error(500, "Internal Server Error: closing"));
     return;
   }
-  LOG_CHECK(result_.is_ok()) << result_.move_as_error();
 
-  auto content = result_.move_as_ok();
+  auto content = result.move_as_ok();
   td::HttpHeaderCreator hc;
   hc.init_status_line(200);
   hc.set_keep_alive();

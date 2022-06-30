@@ -12,9 +12,9 @@
 #include "td/net/HttpQuery.h"
 
 #include "td/actor/actor.h"
-#include "td/actor/PromiseFuture.h"
 
 #include "td/utils/buffer.h"
+#include "td/utils/Status.h"
 
 namespace telegram_bot_api {
 
@@ -22,14 +22,14 @@ class HttpStatConnection final : public td::HttpInboundConnection::Callback {
  public:
   explicit HttpStatConnection(td::ActorId<ClientManager> client_manager) : client_manager_(client_manager) {
   }
+
   void handle(td::unique_ptr<td::HttpQuery> http_query, td::ActorOwn<td::HttpInboundConnection> connection) final;
 
-  void wakeup() final;
-
  private:
-  td::FutureActor<td::BufferSlice> result_;
   td::ActorId<ClientManager> client_manager_;
   td::ActorOwn<td::HttpInboundConnection> connection_;
+
+  void on_result(td::Result<td::BufferSlice> result);
 
   void hangup() final {
     connection_.release();

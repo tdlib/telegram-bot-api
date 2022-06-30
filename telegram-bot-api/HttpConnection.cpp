@@ -48,22 +48,17 @@ void HttpConnection::handle(td::unique_ptr<td::HttpQuery> http_query,
                                       std::move(http_query->args_), std::move(http_query->headers_),
                                       std::move(http_query->files_), shared_data_, http_query->peer_address_, false);
 
-  td::PromiseActor<td::unique_ptr<Query>> promise;
-  td::FutureActor<td::unique_ptr<Query>> future;
-  td::init_promise_future(&promise, &future);
-  future.set_event(td::EventCreator::yield(actor_id()));
+  auto promise = td::PromiseCreator::lambda([actor_id = actor_id(this)](td::Result<td::unique_ptr<Query>> r_query) {
+    send_closure(actor_id, &HttpConnection::on_query_finished, std::move(r_query));
+  });
   auto promised_query = PromisedQueryPtr(query.release(), PromiseDeleter(std::move(promise)));
   send_closure(client_manager_, &ClientManager::send, std::move(promised_query));
-  result_ = std::move(future);
 }
 
-void HttpConnection::wakeup() {
-  if (result_.empty()) {
-    return;
-  }
-  LOG_CHECK(result_.is_ok()) << result_.move_as_error();
+void HttpConnection::on_query_finished(td::Result<td::unique_ptr<Query>> r_query) {
+  LOG_CHECK(r_query.is_ok()) << r_query.error();
 
-  auto query = result_.move_as_ok();
+  auto query = r_query.move_as_ok();
   send_response(query->http_status_code(), std::move(query->answer()), query->retry_after());
 }
 
