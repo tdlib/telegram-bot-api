@@ -8550,14 +8550,25 @@ void Client::webhook_error(Status status) {
 }
 
 void Client::webhook_closed(Status status) {
+  if (has_webhook_certificate_) {
+    td::Scheduler::instance()->run_on_scheduler(get_database_scheduler_id(),
+                                                [actor_id = actor_id(this), path = get_webhook_certificate_path(),
+                                                 status = std::move(status)](td::Unit) mutable {
+                                                  LOG(INFO) << "Unlink certificate " << path;
+                                                  td::unlink(path).ignore();
+                                                  send_closure(actor_id, &Client::on_webhook_closed, std::move(status));
+                                                });
+    return;
+  }
+  on_webhook_closed(std::move(status));
+}
+
+void Client::on_webhook_closed(Status status) {
   LOG(WARNING) << "Webhook closed: " << status
                << ", webhook_query_type = " << (webhook_query_type_ == WebhookQueryType::Verify ? "verify" : "change");
   webhook_id_.release();
   webhook_url_ = td::string();
-  if (has_webhook_certificate_) {
-    td::unlink(get_webhook_certificate_path()).ignore();
-    has_webhook_certificate_ = false;
-  }
+  has_webhook_certificate_ = false;
   webhook_max_connections_ = 0;
   webhook_ip_address_ = td::string();
   webhook_fix_ip_address_ = false;

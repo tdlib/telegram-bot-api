@@ -563,6 +563,8 @@ class Client final : public WebhookActor::Callback {
   void save_webhook() const;
   td::string get_webhook_certificate_path() const;
 
+  void on_webhook_closed(Status status);
+
   void do_send_message(object_ptr<td_api::InputMessageContent> input_message_content, PromisedQueryPtr query);
 
   int64 get_send_message_query_id(PromisedQueryPtr query, bool is_multisend);
