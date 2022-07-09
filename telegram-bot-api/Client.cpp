@@ -8853,7 +8853,7 @@ void Client::do_get_updates(int32 offset, int32 limit, int32 timeout, PromisedQu
   CHECK(total_size >= updates.size());
   total_size -= updates.size();
 
-  bool need_warning = false;
+  bool need_warning = total_size > 0 && (query->start_timestamp() - previous_get_updates_finish_time_ > 10.0);
   if (total_size <= MIN_PENDING_UPDATES_WARNING / 2) {
     if (last_pending_update_count_ > MIN_PENDING_UPDATES_WARNING) {
       need_warning = true;
@@ -8865,7 +8865,7 @@ void Client::do_get_updates(int32 offset, int32 limit, int32 timeout, PromisedQu
       last_pending_update_count_ *= 2;
     }
   }
-  if (need_warning) {
+  if (need_warning && previous_get_updates_finish_time_ > 0) {
     LOG(WARNING) << "Found " << updates.size() << " updates out of " << (total_size + updates.size())
                  << " after last getUpdates call " << (query->start_timestamp() - previous_get_updates_finish_time_)
                  << " seconds ago in " << (td::Time::now() - query->start_timestamp()) << " seconds";
