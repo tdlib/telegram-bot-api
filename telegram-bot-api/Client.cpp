@@ -481,7 +481,8 @@ class Client::JsonVectorEntities final : public Jsonable {
     for (auto &entity : entities_) {
       auto entity_type = entity->type_->get_id();
       if (entity_type != td_api::textEntityTypeBankCardNumber::ID &&
-          entity_type != td_api::textEntityTypeMediaTimestamp::ID) {
+          entity_type != td_api::textEntityTypeMediaTimestamp::ID &&
+          entity_type != td_api::textEntityTypeCustomEmoji::ID) {
         array << JsonEntity(entity.get(), client_);
       }
     }
@@ -1018,14 +1019,12 @@ class Client::JsonSticker final : public Jsonable {
     if (!set_name.empty()) {
       object("set_name", set_name);
     }
-    auto type = sticker_->type_->get_id();
-    object("is_animated", td::JsonBool(type == td_api::stickerTypeAnimated::ID));
-    object("is_video", td::JsonBool(type == td_api::stickerTypeVideo::ID));
-    if (type == td_api::stickerTypeMask::ID) {
-      const auto &mask_position = static_cast<const td_api::stickerTypeMask *>(sticker_->type_.get())->mask_position_;
-      if (mask_position != nullptr) {
-        object("mask_position", JsonMaskPosition(mask_position.get()));
-      }
+    auto format = sticker_->format_->get_id();
+    object("is_animated", td::JsonBool(format == td_api::stickerFormatTgs::ID));
+    object("is_video", td::JsonBool(format == td_api::stickerFormatWebm::ID));
+    const auto &mask_position = sticker_->mask_position_;
+    if (mask_position != nullptr) {
+      object("mask_position", JsonMaskPosition(mask_position.get()));
     }
     if (sticker_->premium_animation_ != nullptr) {
       object("premium_animation", JsonFile(sticker_->premium_animation_.get(), client_, false));
@@ -2018,6 +2017,8 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
       object("web_app_data", JsonWebAppData(content));
       break;
     }
+    case td_api::messageGiftedPremium::ID:
+      break;
     default:
       UNREACHABLE();
   }
@@ -2612,9 +2613,10 @@ class Client::JsonStickerSet final : public Jsonable {
     if (sticker_set_->thumbnail_ != nullptr) {
       client_->json_store_thumbnail(object, sticker_set_->thumbnail_.get());
     }
+    auto format = sticker_set_->sticker_format_->get_id();
+    object("is_animated", td::JsonBool(format == td_api::stickerFormatTgs::ID));
+    object("is_video", td::JsonBool(format == td_api::stickerFormatWebm::ID));
     auto type = sticker_set_->sticker_type_->get_id();
-    object("is_animated", td::JsonBool(type == td_api::stickerTypeAnimated::ID));
-    object("is_video", td::JsonBool(type == td_api::stickerTypeVideo::ID));
     object("contains_masks", td::JsonBool(type == td_api::stickerTypeMask::ID));
     object("stickers", JsonStickers(sticker_set_->stickers_, client_));
   }
@@ -6144,27 +6146,23 @@ td::Result<td_api::object_ptr<td_api::maskPosition>> Client::get_mask_position(c
   return r_mask_position.move_as_ok();
 }
 
-td::Result<td::vector<td_api::object_ptr<td_api::inputSticker>>> Client::get_input_stickers(const Query *query,
-                                                                                            bool is_masks) const {
+td::Result<td::vector<td_api::object_ptr<td_api::inputSticker>>> Client::get_input_stickers(const Query *query) const {
   auto emojis = query->arg("emojis");
 
   auto sticker = get_input_file(query, "png_sticker");
-  object_ptr<td_api::StickerType> sticker_type;
+  object_ptr<td_api::StickerFormat> sticker_format;
+  object_ptr<td_api::maskPosition> mask_position;
   if (sticker != nullptr) {
-    if (is_masks) {
-      TRY_RESULT(mask_position, get_mask_position(query, "mask_position"));
-      sticker_type = make_object<td_api::stickerTypeMask>(std::move(mask_position));
-    } else {
-      sticker_type = make_object<td_api::stickerTypeStatic>();
-    }
+    sticker_format = make_object<td_api::stickerFormatWebp>();
+    TRY_RESULT_ASSIGN(mask_position, get_mask_position(query, "mask_position"));
   } else {
     sticker = get_input_file(query, "tgs_sticker", true);
     if (sticker != nullptr) {
-      sticker_type = make_object<td_api::stickerTypeAnimated>();
+      sticker_format = make_object<td_api::stickerFormatTgs>();
     } else {
       sticker = get_input_file(query, "webm_sticker", true);
       if (sticker != nullptr) {
-        sticker_type = make_object<td_api::stickerTypeVideo>();
+        sticker_format = make_object<td_api::stickerFormatWebm>();
       } else {
         if (!query->arg("tgs_sticker").empty()) {
           return Status::Error(400, "Bad Request: animated sticker must be uploaded as an InputFile");
@@ -6178,7 +6176,8 @@ td::Result<td::vector<td_api::object_ptr<td_api::inputSticker>>> Client::get_inp
   }
 
   td::vector<object_ptr<td_api::inputSticker>> stickers;
-  stickers.push_back(make_object<td_api::inputSticker>(std::move(sticker), emojis.str(), std::move(sticker_type)));
+  stickers.push_back(make_object<td_api::inputSticker>(std::move(sticker), emojis.str(), std::move(sticker_format),
+                                                       std::move(mask_position)));
   return std::move(stickers);
 }
 
@@ -8256,13 +8255,13 @@ td::Status Client::process_upload_sticker_file_query(PromisedQueryPtr &query) {
   TRY_RESULT(user_id, get_user_id(query.get()));
   auto png_sticker = get_input_file(query.get(), "png_sticker");
 
-  check_user(user_id, std::move(query),
-             [this, user_id, png_sticker = std::move(png_sticker)](PromisedQueryPtr query) mutable {
-               send_request(make_object<td_api::uploadStickerFile>(
-                                user_id, make_object<td_api::inputSticker>(std::move(png_sticker), "",
-                                                                           make_object<td_api::stickerTypeStatic>())),
-                            td::make_unique<TdOnReturnFileCallback>(this, std::move(query)));
-             });
+  check_user(
+      user_id, std::move(query), [this, user_id, png_sticker = std::move(png_sticker)](PromisedQueryPtr query) mutable {
+        send_request(make_object<td_api::uploadStickerFile>(
+                         user_id, make_object<td_api::inputSticker>(std::move(png_sticker), "",
+                                                                    make_object<td_api::stickerFormatWebp>(), nullptr)),
+                     td::make_unique<TdOnReturnFileCallback>(this, std::move(query)));
+      });
   return Status::OK();
 }
 
@@ -8270,14 +8269,22 @@ td::Status Client::process_create_new_sticker_set_query(PromisedQueryPtr &query)
   TRY_RESULT(user_id, get_user_id(query.get()));
   auto name = query->arg("name");
   auto title = query->arg("title");
-  auto is_masks = to_bool(query->arg("contains_masks"));
-  TRY_RESULT(stickers, get_input_stickers(query.get(), is_masks));
+  TRY_RESULT(stickers, get_input_stickers(query.get()));
+
+  object_ptr<td_api::StickerType> sticker_type;
+  if (to_bool(query->arg("contains_masks"))) {
+    sticker_type = make_object<td_api::stickerTypeMask>();
+  } else {
+    sticker_type = make_object<td_api::stickerTypeRegular>();
+  }
 
   check_user(user_id, std::move(query),
-             [this, user_id, title, name, stickers = std::move(stickers)](PromisedQueryPtr query) mutable {
-               send_request(make_object<td_api::createNewStickerSet>(user_id, title.str(), name.str(),
-                                                                     std::move(stickers), PSTRING() << "bot" << my_id_),
-                            td::make_unique<TdOnReturnStickerSetCallback>(this, false, std::move(query)));
+             [this, user_id, title, name, sticker_type = std::move(sticker_type),
+              stickers = std::move(stickers)](PromisedQueryPtr query) mutable {
+               send_request(
+                   make_object<td_api::createNewStickerSet>(user_id, title.str(), name.str(), std::move(sticker_type),
+                                                            std::move(stickers), PSTRING() << "bot" << my_id_),
+                   td::make_unique<TdOnReturnStickerSetCallback>(this, false, std::move(query)));
              });
   return Status::OK();
 }
@@ -8285,7 +8292,7 @@ td::Status Client::process_create_new_sticker_set_query(PromisedQueryPtr &query)
 td::Status Client::process_add_sticker_to_set_query(PromisedQueryPtr &query) {
   TRY_RESULT(user_id, get_user_id(query.get()));
   auto name = query->arg("name");
-  TRY_RESULT(stickers, get_input_stickers(query.get(), true));
+  TRY_RESULT(stickers, get_input_stickers(query.get()));
   CHECK(!stickers.empty());
 
   check_user(user_id, std::move(query),
@@ -9722,6 +9729,8 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageChatSetTheme::ID:
       return true;
     case td_api::messageWebAppDataSent::ID:
+      return true;
+    case td_api::messageGiftedPremium::ID:
       return true;
     default:
       break;
