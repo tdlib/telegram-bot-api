@@ -185,6 +185,12 @@ Client::Client(td::ActorShared<> parent, const td::string &bot_token, bool is_te
   CHECK(is_inited);
 }
 
+Client::~Client() {
+  td::Scheduler::instance()->destroy_on_scheduler(get_file_gc_scheduler_id(), messages_, users_, groups_, supergroups_,
+                                                  chats_, reply_message_ids_, yet_unsent_reply_message_ids_,
+                                                  sticker_set_names_);
+}
+
 bool Client::init_methods() {
   methods_.emplace("getme", &Client::process_get_me_query);
   methods_.emplace("getmycommands", &Client::process_get_my_commands_query);
@@ -4856,7 +4862,7 @@ void Client::on_closed() {
   if (logging_out_) {
     parameters_->shared_data_->webhook_db_->erase(bot_token_with_dc_);
 
-    td::Scheduler::instance()->run_on_scheduler(get_database_scheduler_id(),
+    td::Scheduler::instance()->run_on_scheduler(get_file_gc_scheduler_id(),
                                                 [actor_id = actor_id(this), dir = dir_](td::Unit) {
                                                   CHECK(dir.size() >= 24);
                                                   CHECK(dir.back() == TD_DIR_SLASH);
@@ -4883,10 +4889,17 @@ void Client::timeout_expired() {
 }
 
 td::int32 Client::get_database_scheduler_id() {
-  // NB: the same scheduler as for database in Td
+  // the same scheduler as for database in Td
   auto current_scheduler_id = td::Scheduler::instance()->sched_id();
   auto scheduler_count = td::Scheduler::instance()->sched_count();
   return td::min(current_scheduler_id + 1, scheduler_count - 1);
+}
+
+td::int32 Client::get_file_gc_scheduler_id() {
+  // the same scheduler as for file GC in Td
+  auto current_scheduler_id = td::Scheduler::instance()->sched_id();
+  auto scheduler_count = td::Scheduler::instance()->sched_count();
+  return td::min(current_scheduler_id + 2, scheduler_count - 1);
 }
 
 void Client::clear_tqueue() {

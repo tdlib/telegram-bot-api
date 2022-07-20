@@ -42,6 +42,11 @@ class Client final : public WebhookActor::Callback {
  public:
   Client(td::ActorShared<> parent, const td::string &bot_token, bool is_test_dc, td::int64 tqueue_id,
          std::shared_ptr<const ClientParameters> parameters, td::ActorId<BotStatActor> stat_actor);
+  Client(const Client &) = delete;
+  Client &operator=(const Client &) = delete;
+  Client(Client &&) = delete;
+  Client &operator=(Client &&) = delete;
+  ~Client();
 
   void send(PromisedQueryPtr query) final;
 
@@ -303,6 +308,8 @@ class Client final : public WebhookActor::Callback {
   void finish_closing();
 
   static int32 get_database_scheduler_id();
+
+  static int32 get_file_gc_scheduler_id();
 
   void clear_tqueue();
 
