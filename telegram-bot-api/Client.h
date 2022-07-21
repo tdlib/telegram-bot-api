@@ -739,6 +739,10 @@ class Client final : public WebhookActor::Callback {
 
   void set_message_reply_to_message_id(MessageInfo *message_info, int64 reply_to_message_id);
 
+  static Slice get_sticker_type(const object_ptr<td_api::StickerType> &type);
+
+  static td::Result<object_ptr<td_api::StickerType>> get_sticker_type(Slice type);
+
   static td::CSlice get_callback_data(const object_ptr<td_api::InlineKeyboardButtonType> &type);
 
   static bool are_equal_inline_keyboard_buttons(const td_api::inlineKeyboardButton *lhs,

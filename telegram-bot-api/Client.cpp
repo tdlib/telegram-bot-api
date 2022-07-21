@@ -1024,9 +1024,13 @@ class Client::JsonSticker final : public Jsonable {
     if (!set_name.empty()) {
       object("set_name", set_name);
     }
+
     auto format = sticker_->format_->get_id();
     object("is_animated", td::JsonBool(format == td_api::stickerFormatTgs::ID));
     object("is_video", td::JsonBool(format == td_api::stickerFormatWebm::ID));
+
+    object("type", Client::get_sticker_type(sticker_->type_));
+
     const auto &mask_position = sticker_->mask_position_;
     if (mask_position != nullptr) {
       object("mask_position", JsonMaskPosition(mask_position.get()));
@@ -2618,11 +2622,15 @@ class Client::JsonStickerSet final : public Jsonable {
     if (sticker_set_->thumbnail_ != nullptr) {
       client_->json_store_thumbnail(object, sticker_set_->thumbnail_.get());
     }
+
     auto format = sticker_set_->sticker_format_->get_id();
     object("is_animated", td::JsonBool(format == td_api::stickerFormatTgs::ID));
     object("is_video", td::JsonBool(format == td_api::stickerFormatWebm::ID));
-    auto type = sticker_set_->sticker_type_->get_id();
-    object("contains_masks", td::JsonBool(type == td_api::stickerTypeMask::ID));
+
+    auto type = Client::get_sticker_type(sticker_set_->sticker_type_);
+    object("sticker_type", type);
+    object("contains_masks", td::JsonBool(type == "mask"));
+
     object("stickers", JsonStickers(sticker_set_->stickers_, client_));
   }
 
@@ -8280,11 +8288,9 @@ td::Status Client::process_create_new_sticker_set_query(PromisedQueryPtr &query)
   auto title = query->arg("title");
   TRY_RESULT(stickers, get_input_stickers(query.get()));
 
-  object_ptr<td_api::StickerType> sticker_type;
+  TRY_RESULT(sticker_type, get_sticker_type(query->arg("sticker_type")));
   if (to_bool(query->arg("contains_masks"))) {
     sticker_type = make_object<td_api::stickerTypeMask>();
-  } else {
-    sticker_type = make_object<td_api::stickerTypeRegular>();
   }
 
   check_user(user_id, std::move(query),
@@ -9791,6 +9797,34 @@ void Client::set_message_reply_to_message_id(MessageInfo *message_info, int64 re
   }
 
   message_info->reply_to_message_id = reply_to_message_id;
+}
+
+td::Slice Client::get_sticker_type(const object_ptr<td_api::StickerType> &type) {
+  CHECK(type != nullptr);
+  switch (type->get_id()) {
+    case td_api::stickerTypeRegular::ID:
+      return Slice("regular");
+    case td_api::stickerTypeMask::ID:
+      return Slice("mask");
+    case td_api::stickerTypeCustomEmoji::ID:
+      return Slice("custom_emoji");
+    default:
+      UNREACHABLE();
+      return Slice();
+  }
+}
+
+td::Result<td_api::object_ptr<td_api::StickerType>> Client::get_sticker_type(Slice type) {
+  if (type.empty() || type == "regular") {
+    return make_object<td_api::stickerTypeRegular>();
+  }
+  if (type == "mask") {
+    return make_object<td_api::stickerTypeMask>();
+  }
+  if (type == "custom_emoji") {
+    return make_object<td_api::stickerTypeCustomEmoji>();
+  }
+  return Status::Error(400, "Unsupported sticker type specified");
 }
 
 td::CSlice Client::get_callback_data(const object_ptr<td_api::InlineKeyboardButtonType> &type) {
