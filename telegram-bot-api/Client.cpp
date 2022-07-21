@@ -10,6 +10,7 @@
 
 #include "td/db/TQueue.h"
 
+#include "td/actor/MultiPromise.h"
 #include "td/actor/SleepActor.h"
 
 #include "td/utils/algorithm.h"
@@ -268,6 +269,7 @@ bool Client::init_methods() {
   methods_.emplace("approvechatjoinrequest", &Client::process_approve_chat_join_request_query);
   methods_.emplace("declinechatjoinrequest", &Client::process_decline_chat_join_request_query);
   methods_.emplace("getstickerset", &Client::process_get_sticker_set_query);
+  methods_.emplace("getcustomemojistickers", &Client::process_get_custom_emoji_stickers_query);
   methods_.emplace("uploadstickerfile", &Client::process_upload_sticker_file_query);
   methods_.emplace("createnewstickerset", &Client::process_create_new_sticker_set_query);
   methods_.emplace("addstickertoset", &Client::process_add_sticker_to_set_query);
@@ -3681,6 +3683,68 @@ class Client::TdOnReturnStickerSetCallback final : public TdQueryCallback {
  private:
   Client *client_;
   bool return_sticker_set_;
+  PromisedQueryPtr query_;
+};
+
+class Client::TdOnGetStickerSetPromiseCallback final : public TdQueryCallback {
+ public:
+  TdOnGetStickerSetPromiseCallback(Client *client, td::Promise<td::Unit> &&promise)
+      : client_(client), promise_(std::move(promise)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      auto error = move_object_as<td_api::error>(result);
+      return promise_.set_error(Status::Error(error->code_, error->message_));
+    }
+
+    CHECK(result->get_id() == td_api::stickerSet::ID);
+    auto sticker_set = move_object_as<td_api::stickerSet>(result);
+    client_->on_get_sticker_set_name(sticker_set->id_, sticker_set->name_);
+    promise_.set_value(td::Unit());
+  }
+
+ private:
+  Client *client_;
+  td::Promise<td::Unit> promise_;
+};
+
+class Client::TdOnGetStickersCallback final : public TdQueryCallback {
+ public:
+  TdOnGetStickersCallback(Client *client, PromisedQueryPtr query) : client_(client), query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::stickers::ID);
+    auto stickers = move_object_as<td_api::stickers>(result);
+    td::FlatHashSet<int64> sticker_set_ids;
+    for (const auto &sticker : stickers->stickers_) {
+      if (sticker->set_id_ != 0 && client_->get_sticker_set_name(sticker->set_id_).empty()) {
+        sticker_set_ids.insert(sticker->set_id_);
+      }
+    }
+
+    td::MultiPromiseActorSafe mpas("GetStickerSetsMultiPromiseActor");
+    mpas.add_promise(td::PromiseCreator::lambda([actor_id = client_->actor_id(client_), stickers = std::move(stickers),
+                                                 query = std::move(query_)](td::Unit) mutable {
+      send_closure(actor_id, &Client::return_stickers, std::move(stickers), std::move(query));
+    }));
+    mpas.set_ignore_errors(true);
+
+    auto lock = mpas.get_promise();
+    for (auto sticker_set_id : sticker_set_ids) {
+      client_->send_request(make_object<td_api::getStickerSet>(sticker_set_id),
+                            td::make_unique<TdOnGetStickerSetPromiseCallback>(client_, mpas.get_promise()));
+    }
+    lock.set_value(td::Unit());
+  }
+
+ private:
+  Client *client_;
   PromisedQueryPtr query_;
 };
 
@@ -8268,6 +8332,36 @@ td::Status Client::process_get_sticker_set_query(PromisedQueryPtr &query) {
   return Status::OK();
 }
 
+td::Status Client::process_get_custom_emoji_stickers_query(PromisedQueryPtr &query) {
+  TRY_RESULT(custom_emoji_ids_json, get_required_string_arg(query.get(), "custom_emoji_ids"));
+
+  LOG(INFO) << "Parsing JSON object: " << custom_emoji_ids_json;
+  auto r_value = json_decode(custom_emoji_ids_json);
+  if (r_value.is_error()) {
+    return Status::Error(400, "Can't parse custom emoji identifiers JSON object");
+  }
+  auto value = r_value.move_as_ok();
+  if (value.type() != JsonValue::Type::Array) {
+    return Status::Error(400, "Expected an Array of custom emoji identifiers");
+  }
+
+  td::vector<int64> custom_emoji_ids;
+  for (auto &custom_emoji_id : value.get_array()) {
+    if (custom_emoji_id.type() != JsonValue::Type::String) {
+      return Status::Error(400, "Custom emoji identifier must be of type String");
+    }
+    auto parsed_id = td::to_integer_safe<int64>(custom_emoji_id.get_string());
+    if (parsed_id.is_error()) {
+      return Status::Error(400, "Invalid custom emoji identifier specified");
+    }
+    custom_emoji_ids.push_back(parsed_id.ok());
+  }
+
+  send_request(make_object<td_api::getCustomEmojiStickers>(std::move(custom_emoji_ids)),
+               td::make_unique<TdOnGetStickersCallback>(this, std::move(query)));
+  return Status::OK();
+}
+
 td::Status Client::process_upload_sticker_file_query(PromisedQueryPtr &query) {
   TRY_RESULT(user_id, get_user_id(query.get()));
   auto png_sticker = get_input_file(query.get(), "png_sticker");
@@ -8521,6 +8615,10 @@ void Client::on_file_download(int32 file_id, td::Result<object_ptr<td_api::file>
       answer_query(JsonFile(r_file.ok().get(), this, true), std::move(query));
     }
   }
+}
+
+void Client::return_stickers(object_ptr<td_api::stickers> stickers, PromisedQueryPtr query) {
+  answer_query(JsonStickers(stickers->stickers_, this), std::move(query));
 }
 
 void Client::webhook_verified(td::string cached_ip_address) {

@@ -200,6 +200,8 @@ class Client final : public WebhookActor::Callback {
   class TdOnAnswerWebAppQueryCallback;
   class TdOnReturnFileCallback;
   class TdOnReturnStickerSetCallback;
+  class TdOnGetStickerSetPromiseCallback;
+  class TdOnGetStickersCallback;
   class TdOnDownloadFileCallback;
   class TdOnCancelDownloadFileCallback;
   class TdOnSendCustomRequestCallback;
@@ -544,6 +546,7 @@ class Client final : public WebhookActor::Callback {
   Status process_approve_chat_join_request_query(PromisedQueryPtr &query);
   Status process_decline_chat_join_request_query(PromisedQueryPtr &query);
   Status process_get_sticker_set_query(PromisedQueryPtr &query);
+  Status process_get_custom_emoji_stickers_query(PromisedQueryPtr &query);
   Status process_upload_sticker_file_query(PromisedQueryPtr &query);
   Status process_create_new_sticker_set_query(PromisedQueryPtr &query);
   Status process_add_sticker_to_set_query(PromisedQueryPtr &query);
@@ -582,6 +585,8 @@ class Client final : public WebhookActor::Callback {
 
   bool is_file_being_downloaded(int32 file_id) const;
   void on_file_download(int32 file_id, td::Result<object_ptr<td_api::file>> r_file);
+
+  void return_stickers(object_ptr<td_api::stickers> stickers, PromisedQueryPtr query);
 
   void fix_reply_markup_bot_user_ids(object_ptr<td_api::ReplyMarkup> &reply_markup) const;
   void fix_inline_query_results_bot_user_ids(td::vector<object_ptr<td_api::InputInlineQueryResult>> &results) const;
