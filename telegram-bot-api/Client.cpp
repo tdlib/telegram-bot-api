@@ -665,6 +665,9 @@ class Client::JsonChat final : public Jsonable {
           if (user_info->has_private_forwards) {
             object("has_private_forwards", td::JsonTrue());
           }
+          if (user_info->has_restricted_voice_and_video_messages) {
+            object("has_restricted_voice_and_video_messages", td::JsonTrue());
+          }
         }
         photo = user_info->photo.get();
         break;
@@ -4728,6 +4731,8 @@ void Client::on_update(object_ptr<td_api::Object> result) {
         set_user_bio(user_id, std::move(full_info->bio_->text_));
       }
       set_user_has_private_forwards(user_id, full_info->has_private_forwards_);
+      set_user_has_restricted_voice_and_video_messages(user_id,
+                                                       full_info->has_restricted_voice_and_video_note_messages_);
       break;
     }
     case td_api::updateBasicGroup::ID: {
@@ -9117,6 +9122,11 @@ void Client::set_user_bio(int64 user_id, td::string &&bio) {
 
 void Client::set_user_has_private_forwards(int64 user_id, bool has_private_forwards) {
   add_user_info(user_id)->has_private_forwards = has_private_forwards;
+}
+
+void Client::set_user_has_restricted_voice_and_video_messages(int64 user_id,
+                                                              bool has_restricted_voice_and_video_messages) {
+  add_user_info(user_id)->has_restricted_voice_and_video_messages = has_restricted_voice_and_video_messages;
 }
 
 void Client::add_group(GroupInfo *group_info, object_ptr<td_api::basicGroup> &&group) {

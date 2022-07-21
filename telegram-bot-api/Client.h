@@ -634,6 +634,7 @@ class Client final : public WebhookActor::Callback {
     bool can_read_all_group_messages = false;
     bool is_inline_bot = false;
     bool has_private_forwards = false;
+    bool has_restricted_voice_and_video_messages = false;
     bool is_premium = false;
     bool added_to_attachment_menu = false;
   };
@@ -641,6 +642,7 @@ class Client final : public WebhookActor::Callback {
   void set_user_photo(int64 user_id, object_ptr<td_api::chatPhoto> &&photo);
   void set_user_bio(int64 user_id, td::string &&bio);
   void set_user_has_private_forwards(int64 user_id, bool has_private_forwards);
+  void set_user_has_restricted_voice_and_video_messages(int64 user_id, bool has_restricted_voice_and_video_messages);
   UserInfo *add_user_info(int64 user_id);
   const UserInfo *get_user_info(int64 user_id) const;
 
