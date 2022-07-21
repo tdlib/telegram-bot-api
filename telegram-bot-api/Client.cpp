@@ -1033,6 +1033,10 @@ class Client::JsonSticker final : public Jsonable {
 
     object("type", Client::get_sticker_type(sticker_->type_));
 
+    if (sticker_->custom_emoji_id_ != 0) {
+      object("custom_emoji_id", td::to_string(sticker_->custom_emoji_id_));
+    }
+
     const auto &mask_position = sticker_->mask_position_;
     if (mask_position != nullptr) {
       object("mask_position", JsonMaskPosition(mask_position.get()));
