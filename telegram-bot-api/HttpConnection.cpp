@@ -44,9 +44,9 @@ void HttpConnection::handle(td::unique_ptr<td::HttpQuery> http_query,
   }
 
   auto method = url_path_parser.data();
-  auto query = std::make_unique<Query>(std::move(http_query->container_), token, is_test_dc, method,
-                                       std::move(http_query->args_), std::move(http_query->headers_),
-                                       std::move(http_query->files_), shared_data_, http_query->peer_address_, false);
+  auto query = td::make_unique<Query>(std::move(http_query->container_), token, is_test_dc, method,
+                                      std::move(http_query->args_), std::move(http_query->headers_),
+                                      std::move(http_query->files_), shared_data_, http_query->peer_address_, false);
 
   td::PromiseActor<td::unique_ptr<Query>> promise;
   td::FutureActor<td::unique_ptr<Query>> future;

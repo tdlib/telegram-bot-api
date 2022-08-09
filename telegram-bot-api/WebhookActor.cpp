@@ -42,7 +42,7 @@ std::atomic<td::uint64> WebhookActor::total_connections_count_{0};
 
 WebhookActor::WebhookActor(td::ActorShared<Callback> callback, td::int64 tqueue_id, td::HttpUrl url,
                            td::string cert_path, td::int32 max_connections, bool from_db_flag,
-                           td::string cached_ip_address, bool fix_ip_address,
+                           td::string cached_ip_address, bool fix_ip_address, td::string secret_token,
                            std::shared_ptr<const ClientParameters> parameters)
     : callback_(std::move(callback))
     , tqueue_id_(tqueue_id)
@@ -51,7 +51,8 @@ WebhookActor::WebhookActor(td::ActorShared<Callback> callback, td::int64 tqueue_
     , parameters_(std::move(parameters))
     , fix_ip_address_(fix_ip_address)
     , from_db_flag_(from_db_flag)
-    , max_connections_(max_connections) {
+    , max_connections_(max_connections)
+    , secret_token_(std::move(secret_token)) {
   CHECK(max_connections_ > 0);
 
   if (!cached_ip_address.empty()) {
@@ -152,11 +153,11 @@ td::Status WebhookActor::create_connection() {
     }
 
     VLOG(webhook) << "Create connection through proxy " << parameters_->webhook_proxy_ip_address_;
-    class Callback : public td::TransparentProxy::Callback {
+    class Callback final : public td::TransparentProxy::Callback {
      public:
       Callback(td::ActorId<WebhookActor> actor, td::int64 id) : actor_(actor), id_(id) {
       }
-      void set_result(td::Result<td::BufferedFd<td::SocketFd>> result) override {
+      void set_result(td::Result<td::BufferedFd<td::SocketFd>> result) final {
         send_closure(std::move(actor_), &WebhookActor::on_socket_ready_async, std::move(result), id_);
         CHECK(actor_.empty());
       }
@@ -169,7 +170,7 @@ td::Status WebhookActor::create_connection() {
           send_closure(std::move(actor_), &WebhookActor::on_socket_ready_async, td::Status::Error("Canceled"), id_);
         }
       }
-      void on_connected() override {
+      void on_connected() final {
         // nothing to do
       }
 
@@ -356,7 +357,7 @@ void WebhookActor::load_updates() {
 
   auto offset = tqueue_offset_;
   auto limit = td::min(SharedData::TQUEUE_EVENT_BUFFER_SIZE, max_loaded_updates_ - queue_updates_.size());
-  auto updates = mutable_span(parameters_->shared_data_->event_buffer_, limit);
+  td::MutableSpan<td::TQueue::Event> updates(parameters_->shared_data_->event_buffer_, limit);
 
   auto now = td::Time::now();
   auto unix_time_now = parameters_->shared_data_->get_unix_time(now);
@@ -379,11 +380,14 @@ void WebhookActor::load_updates() {
 
   for (auto &update : updates) {
     VLOG(webhook) << "Load update " << update.id;
-    if (update_map_.find(update.id) != update_map_.end()) {
-      LOG(ERROR) << "Receive duplicated event " << update.id << " from tqueue";
+    CHECK(update.id.is_valid());
+    auto &dest_ptr = update_map_[update.id];
+    if (dest_ptr != nullptr) {
+      LOG(ERROR) << "Receive duplicated event " << update.id << " from TQueue";
       continue;
     }
-    auto &dest = update_map_[update.id];
+    dest_ptr = td::make_unique<Update>();
+    auto &dest = *dest_ptr;
     dest.id_ = update.id;
     dest.json_ = update.data.str();
     dest.delay_ = 1;
@@ -437,7 +441,7 @@ void WebhookActor::load_updates() {
 void WebhookActor::drop_event(td::TQueue::EventId event_id) {
   auto it = update_map_.find(event_id);
   CHECK(it != update_map_.end());
-  auto queue_id = it->second.queue_id_;
+  auto queue_id = it->second->queue_id_;
   update_map_.erase(it);
 
   auto queue_updates_it = queue_updates_.find(queue_id);
@@ -448,8 +452,10 @@ void WebhookActor::drop_event(td::TQueue::EventId event_id) {
   if (queue_updates_it->second.event_ids.empty()) {
     queue_updates_.erase(queue_updates_it);
   } else {
-    auto &update = update_map_[queue_updates_it->second.event_ids.front()];
-    queues_.emplace(update.wakeup_at_, update.queue_id_);
+    auto update_id = queue_updates_it->second.event_ids.front();
+    CHECK(update_id.is_valid());
+    auto &update = update_map_[update_id];
+    queues_.emplace(update->wakeup_at_, update->queue_id_);
   }
 
   parameters_->shared_data_->tqueue_->forget(tqueue_id_, event_id);
@@ -462,7 +468,7 @@ void WebhookActor::on_update_ok(td::TQueue::EventId event_id) {
   auto it = update_map_.find(event_id);
   CHECK(it != update_map_.end());
 
-  VLOG(webhook) << "Receive ok for update " << event_id << " in " << (last_success_time_ - it->second.last_send_time_)
+  VLOG(webhook) << "Receive ok for update " << event_id << " in " << (last_success_time_ - it->second->last_send_time_)
                 << " seconds";
 
   drop_event(event_id);
@@ -474,21 +480,22 @@ void WebhookActor::on_update_error(td::TQueue::EventId event_id, td::Slice error
 
   auto it = update_map_.find(event_id);
   CHECK(it != update_map_.end());
+  CHECK(it->second != nullptr);
+  auto &update = *it->second;
 
   const int MAX_RETRY_AFTER = 3600;
   retry_after = td::clamp(retry_after, 0, MAX_RETRY_AFTER);
-  int next_delay = it->second.delay_;
+  int next_delay = update.delay_;
   int next_effective_delay = retry_after;
-  if (retry_after == 0 && it->second.fail_count_ > 0) {
+  if (retry_after == 0 && update.fail_count_ > 0) {
     next_delay = td::min(WEBHOOK_MAX_RESEND_TIMEOUT, next_delay * 2);
     next_effective_delay = next_delay;
   }
-  if (parameters_->shared_data_->get_unix_time(now) + next_effective_delay > it->second.expires_at_) {
+  if (parameters_->shared_data_->get_unix_time(now) + next_effective_delay > update.expires_at_) {
     LOG(WARNING) << "Drop update " << event_id << ": " << error;
     drop_event(event_id);
     return;
   }
-  auto &update = it->second;
   update.delay_ = next_delay;
   update.wakeup_at_ = now + next_effective_delay;
   update.fail_count_++;
@@ -514,10 +521,15 @@ td::Status WebhookActor::send_update() {
   }
 
   auto queue_id = it->id;
+  CHECK(queue_id != 0);
   queues_.erase(it);
   auto event_id = queue_updates_[queue_id].event_ids.front();
+  CHECK(event_id.is_valid());
 
-  auto &update = update_map_[event_id];
+  auto update_map_it = update_map_.find(event_id);
+  CHECK(update_map_it != update_map_.end());
+  CHECK(update_map_it->second != nullptr);
+  auto &update = *update_map_it->second;
   update.last_send_time_ = now;
 
   auto body = td::json_encode<td::BufferSlice>(JsonUpdate(update.id_.value(), update.json_));
@@ -527,6 +539,9 @@ td::Status WebhookActor::send_update() {
   hc.add_header("Host", url_.host_);
   if (!url_.userinfo_.empty()) {
     hc.add_header("Authorization", PSLICE() << "Basic " << td::base64_encode(url_.userinfo_));
+  }
+  if (!secret_token_.empty()) {
+    hc.add_header("X-Telegram-Bot-Api-Secret-Token", secret_token_);
   }
   hc.set_content_type("application/json");
   hc.set_content_size(body.size());
@@ -586,10 +601,10 @@ void WebhookActor::handle(td::unique_ptr<td::HttpQuery> response) {
         if (!method.empty() && method != "deletewebhook" && method != "setwebhook" && method != "close" &&
             method != "logout" && !td::begins_with(method, "get")) {
           VLOG(webhook) << "Receive request " << method << " in response to webhook";
-          auto query = std::make_unique<Query>(std::move(response->container_), td::MutableSlice(), false,
-                                               td::MutableSlice(), std::move(response->args_),
-                                               std::move(response->headers_), std::move(response->files_),
-                                               parameters_->shared_data_, response->peer_address_, false);
+          auto query = td::make_unique<Query>(std::move(response->container_), td::MutableSlice(), false,
+                                              td::MutableSlice(), std::move(response->args_),
+                                              std::move(response->headers_), std::move(response->files_),
+                                              parameters_->shared_data_, response->peer_address_, false);
           auto promised_query =
               PromisedQueryPtr(query.release(), PromiseDeleter(td::PromiseActor<td::unique_ptr<Query>>()));
           send_closure(callback_, &Callback::send, std::move(promised_query));

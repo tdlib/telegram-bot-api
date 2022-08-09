@@ -11,6 +11,7 @@
 #include "telegram-bot-api/WebhookActor.h"
 
 #include "td/telegram/ClientActor.h"
+#include "td/telegram/td_api.h"
 
 #include "td/db/binlog/Binlog.h"
 #include "td/db/binlog/ConcurrentBinlog.h"
@@ -70,8 +71,12 @@ void ClientManager::send(PromisedQueryPtr query) {
     return fail_query(401, "Unauthorized: invalid token specified", std::move(query));
   }
   auto r_user_id = td::to_integer_safe<td::int64>(query->token().substr(0, token.find(':')));
-  if (r_user_id.is_error() || r_user_id.ok() < 0 || !token_range_(r_user_id.ok())) {
+  if (r_user_id.is_error() || !token_range_(r_user_id.ok())) {
     return fail_query(421, "Misdirected Request: unallowed token specified", std::move(query));
+  }
+  auto user_id = r_user_id.ok();
+  if (user_id <= 0 || user_id >= (static_cast<td::int64>(1) << 54)) {
+    return fail_query(401, "Unauthorized: invalid token specified", std::move(query));
   }
 
   if (query->is_test_dc()) {
@@ -80,7 +85,7 @@ void ClientManager::send(PromisedQueryPtr query) {
 
   auto id_it = token_to_id_.find(token);
   if (id_it == token_to_id_.end()) {
-    std::string ip_address;
+    td::string ip_address;
     if (query->peer_address().is_valid() && !query->peer_address().is_reserved()) {  // external connection
       ip_address = query->peer_address().get_ip_str().str();
     } else {
@@ -104,7 +109,7 @@ void ClientManager::send(PromisedQueryPtr query) {
         flood_control.add_limit(60, 20);        // 20 in a minute
         flood_control.add_limit(60 * 60, 600);  // 600 in an hour
       }
-      td::uint32 now = static_cast<td::uint32>(td::Time::now());
+      auto now = static_cast<td::uint32>(td::Time::now());
       td::uint32 wakeup_at = flood_control.get_wakeup_at();
       if (wakeup_at > now) {
         LOG(INFO) << "Failed to create Client from IP address " << ip_address;
@@ -112,7 +117,7 @@ void ClientManager::send(PromisedQueryPtr query) {
       }
       flood_control.add_event(static_cast<td::int32>(now));
     }
-    auto tqueue_id = get_tqueue_id(r_user_id.ok(), query->is_test_dc());
+    auto tqueue_id = get_tqueue_id(user_id, query->is_test_dc());
     if (active_client_count_.find(tqueue_id) != active_client_count_.end()) {
       // return query->set_retry_after_error(1);
     }
@@ -373,6 +378,11 @@ PromisedQueryPtr ClientManager::get_webhook_restore_query(td::Slice token, td::S
     parser.skip('/');
   }
 
+  if (parser.try_skip("#secret")) {
+    args.emplace_back(add_string("secret_token"), add_string(parser.read_till('/')));
+    parser.skip('/');
+  }
+
   if (parser.try_skip("#allow")) {
     args.emplace_back(add_string("allowed_updates"), add_string(parser.read_till('/')));
     parser.skip('/');
@@ -381,9 +391,9 @@ PromisedQueryPtr ClientManager::get_webhook_restore_query(td::Slice token, td::S
   args.emplace_back(add_string("url"), add_string(parser.read_all()));
 
   const auto method = add_string("setwebhook");
-  auto query = std::make_unique<Query>(std::move(containers), token, is_test_dc, method, std::move(args),
-                                       td::vector<std::pair<td::MutableSlice, td::MutableSlice>>(),
-                                       td::vector<td::HttpFile>(), std::move(shared_data), td::IPAddress(), true);
+  auto query = td::make_unique<Query>(std::move(containers), token, is_test_dc, method, std::move(args),
+                                      td::vector<std::pair<td::MutableSlice, td::MutableSlice>>(),
+                                      td::vector<td::HttpFile>(), std::move(shared_data), td::IPAddress(), true);
   return PromisedQueryPtr(query.release(), PromiseDeleter(td::PromiseActor<td::unique_ptr<Query>>()));
 }
 
@@ -391,6 +401,7 @@ void ClientManager::raw_event(const td::Event::Raw &event) {
   auto id = get_link_token();
   auto *info = clients_.get(id);
   CHECK(info != nullptr);
+  CHECK(info->tqueue_id_ != 0);
   auto &value = active_client_count_[info->tqueue_id_];
   if (event.ptr != nullptr) {
     value++;

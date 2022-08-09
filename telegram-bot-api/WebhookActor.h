@@ -20,6 +20,7 @@
 #include "td/utils/BufferedFd.h"
 #include "td/utils/common.h"
 #include "td/utils/Container.h"
+#include "td/utils/FlatHashMap.h"
 #include "td/utils/FloodControlFast.h"
 #include "td/utils/HttpUrl.h"
 #include "td/utils/JsonBuilder.h"
@@ -35,13 +36,12 @@
 #include <memory>
 #include <set>
 #include <tuple>
-#include <unordered_map>
 
 namespace telegram_bot_api {
 
 struct ClientParameters;
 
-class WebhookActor : public td::HttpOutboundConnection::Callback {
+class WebhookActor final : public td::HttpOutboundConnection::Callback {
  public:
   class Callback : public td::Actor {
    public:
@@ -54,7 +54,7 @@ class WebhookActor : public td::HttpOutboundConnection::Callback {
 
   WebhookActor(td::ActorShared<Callback> callback, td::int64 tqueue_id, td::HttpUrl url, td::string cert_path,
                td::int32 max_connections, bool from_db_flag, td::string cached_ip_address, bool fix_ip_address,
-               std::shared_ptr<const ClientParameters> parameters);
+               td::string secret_token, std::shared_ptr<const ClientParameters> parameters);
 
   void update();
 
@@ -127,8 +127,8 @@ class WebhookActor : public td::HttpOutboundConnection::Callback {
       return std::hash<td::int32>()(event_id.value());
     }
   };
-  std::unordered_map<td::TQueue::EventId, Update, EventIdHash> update_map_;
-  std::unordered_map<td::int64, QueueUpdates> queue_updates_;
+  td::FlatHashMap<td::TQueue::EventId, td::unique_ptr<Update>, EventIdHash> update_map_;
+  td::FlatHashMap<td::int64, QueueUpdates> queue_updates_;
   std::set<Queue> queues_;
   td::int64 unique_queue_id_ = static_cast<td::int64>(1) << 60;
 
@@ -139,7 +139,7 @@ class WebhookActor : public td::HttpOutboundConnection::Callback {
   double next_ip_address_resolve_time_ = 0;
   td::FutureActor<td::IPAddress> future_ip_address_;
 
-  class Connection : public td::ListNode {
+  class Connection final : public td::ListNode {
    public:
     Connection() = default;
     Connection(const Connection &) = delete;
@@ -163,6 +163,7 @@ class WebhookActor : public td::HttpOutboundConnection::Callback {
   td::vector<td::BufferedFd<td::SocketFd>> ready_sockets_;
 
   td::int32 max_connections_ = 0;
+  td::string secret_token_;
   td::Container<Connection> connections_;
   td::ListNode ready_connections_;
   td::FloodControlFast active_new_connection_flood_;
@@ -190,26 +191,26 @@ class WebhookActor : public td::HttpOutboundConnection::Callback {
   td::Status send_update() TD_WARN_UNUSED_RESULT;
   void send_updates();
 
-  void loop() override;
-  void handle(td::unique_ptr<td::HttpQuery> response) override;
+  void loop() final;
+  void handle(td::unique_ptr<td::HttpQuery> response) final;
 
-  void hangup_shared() override;
+  void hangup_shared() final;
 
-  void hangup() override;
+  void hangup() final;
 
-  void tear_down() override;
+  void tear_down() final;
 
-  void start_up() override;
+  void start_up() final;
 
   bool check_ip_address(const td::IPAddress &addr) const;
 
   void on_error(td::Status status);
-  void on_connection_error(td::Status error) override;
+  void on_connection_error(td::Status error) final;
   void on_webhook_error(td::Slice error);
   void on_webhook_verified();
 };
 
-class JsonUpdate : public td::Jsonable {
+class JsonUpdate final : public td::Jsonable {
  public:
   JsonUpdate(td::int32 id, td::Slice update) : id_(id), update_(update) {
   }

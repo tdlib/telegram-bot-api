@@ -6,10 +6,10 @@
 //
 #pragma once
 
-#include "td/actor/actor.h"
-
 #include "td/net/HttpInboundConnection.h"
 #include "td/net/TcpListener.h"
+
+#include "td/actor/actor.h"
 
 #include "td/utils/BufferedFd.h"
 #include "td/utils/FloodControlFast.h"
@@ -23,7 +23,7 @@
 
 namespace telegram_bot_api {
 
-class HttpServer : public td::TcpListener::Callback {
+class HttpServer final : public td::TcpListener::Callback {
  public:
   HttpServer(td::string ip_address, int port,
              std::function<td::ActorOwn<td::HttpInboundConnection::Callback>()> creator)
@@ -39,7 +39,7 @@ class HttpServer : public td::TcpListener::Callback {
   td::ActorOwn<td::TcpListener> listener_;
   td::FloodControlFast flood_control_;
 
-  void start_up() override {
+  void start_up() final {
     auto now = td::Time::now();
     auto wakeup_at = flood_control_.get_wakeup_at();
     if (wakeup_at > now) {
@@ -53,13 +53,13 @@ class HttpServer : public td::TcpListener::Callback {
         actor_shared(this, 1), ip_address_);
   }
 
-  void hangup_shared() override {
+  void hangup_shared() final {
     LOG(ERROR) << "TCP listener was closed";
     listener_.release();
     yield();
   }
 
-  void accept(td::SocketFd fd) override {
+  void accept(td::SocketFd fd) final {
     auto scheduler_count = td::Scheduler::instance()->sched_count();
     auto scheduler_id = scheduler_count - 1;
     if (scheduler_id > 0) {
@@ -70,7 +70,7 @@ class HttpServer : public td::TcpListener::Callback {
         .release();
   }
 
-  void loop() override {
+  void loop() final {
     if (listener_.empty()) {
       start_up();
     }
