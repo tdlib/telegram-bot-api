@@ -9097,19 +9097,15 @@ void Client::add_user(UserInfo *user_info, object_ptr<td_api::user> &&user) {
 }
 
 Client::UserInfo *Client::add_user_info(int64 user_id) {
-  auto emplace_result = users_.emplace(user_id, nullptr);
-  auto &user_info = emplace_result.first->second;
-  if (emplace_result.second) {
+  auto &user_info = users_[user_id];
+  if (user_info == nullptr) {
     user_info = td::make_unique<UserInfo>();
-  } else {
-    CHECK(user_info != nullptr);
   }
   return user_info.get();
 }
 
 const Client::UserInfo *Client::get_user_info(int64 user_id) const {
-  auto it = users_.find(user_id);
-  return it == users_.end() ? nullptr : it->second.get();
+  return users_.get_pointer(user_id);
 }
 
 void Client::set_user_photo(int64 user_id, object_ptr<td_api::chatPhoto> &&photo) {
@@ -9141,19 +9137,15 @@ void Client::add_group(GroupInfo *group_info, object_ptr<td_api::basicGroup> &&g
 }
 
 Client::GroupInfo *Client::add_group_info(int64 group_id) {
-  auto emplace_result = groups_.emplace(group_id, nullptr);
-  auto &group_info = emplace_result.first->second;
-  if (emplace_result.second) {
+  auto &group_info = groups_[group_id];
+  if (group_info == nullptr) {
     group_info = td::make_unique<GroupInfo>();
-  } else {
-    CHECK(group_info != nullptr);
   }
   return group_info.get();
 }
 
 const Client::GroupInfo *Client::get_group_info(int64 group_id) const {
-  auto it = groups_.find(group_id);
-  return it == groups_.end() ? nullptr : it->second.get();
+  return groups_.get_pointer(group_id);
 }
 
 void Client::set_group_photo(int64 group_id, object_ptr<td_api::chatPhoto> &&photo) {
@@ -9211,39 +9203,27 @@ void Client::set_supergroup_location(int64 supergroup_id, object_ptr<td_api::cha
 }
 
 Client::SupergroupInfo *Client::add_supergroup_info(int64 supergroup_id) {
-  auto emplace_result = supergroups_.emplace(supergroup_id, nullptr);
-  auto &supergroup_info = emplace_result.first->second;
-  if (emplace_result.second) {
+  auto &supergroup_info = supergroups_[supergroup_id];
+  if (supergroup_info == nullptr) {
     supergroup_info = td::make_unique<SupergroupInfo>();
-  } else {
-    CHECK(supergroup_info != nullptr);
   }
   return supergroup_info.get();
 }
 
 const Client::SupergroupInfo *Client::get_supergroup_info(int64 supergroup_id) const {
-  auto it = supergroups_.find(supergroup_id);
-  return it == supergroups_.end() ? nullptr : it->second.get();
+  return supergroups_.get_pointer(supergroup_id);
 }
 
 Client::ChatInfo *Client::add_chat(int64 chat_id) {
-  LOG(DEBUG) << "Update chat " << chat_id;
-  auto emplace_result = chats_.emplace(chat_id, nullptr);
-  auto &chat_info = emplace_result.first->second;
-  if (emplace_result.second) {
+  auto &chat_info = chats_[chat_id];
+  if (chat_info == nullptr) {
     chat_info = td::make_unique<ChatInfo>();
-  } else {
-    CHECK(chat_info != nullptr);
   }
   return chat_info.get();
 }
 
 const Client::ChatInfo *Client::get_chat(int64 chat_id) const {
-  auto it = chats_.find(chat_id);
-  if (it == chats_.end()) {
-    return nullptr;
-  }
-  return it->second.get();
+  return chats_.get_pointer(chat_id);
 }
 
 Client::ChatType Client::get_chat_type(int64 chat_id) const {
@@ -10054,12 +10034,8 @@ bool Client::have_sticker_set_name(int64 sticker_set_id) const {
   return sticker_set_id == 0 || sticker_set_names_.count(sticker_set_id) > 0;
 }
 
-Client::Slice Client::get_sticker_set_name(int64 sticker_set_id) const {
-  auto it = sticker_set_names_.find(sticker_set_id);
-  if (it == sticker_set_names_.end()) {
-    return Slice();
-  }
-  return it->second;
+td::string Client::get_sticker_set_name(int64 sticker_set_id) const {
+  return sticker_set_names_.get(sticker_set_id);
 }
 
 void Client::process_new_message_queue(int64 chat_id) {
@@ -10169,8 +10145,8 @@ void Client::remove_replies_to_message(int64 chat_id, int64 reply_to_message_id,
 void Client::delete_message(int64 chat_id, int64 message_id, bool only_from_cache) {
   remove_replies_to_message(chat_id, message_id, only_from_cache);
 
-  auto it = messages_.find({chat_id, message_id});
-  if (it == messages_.end()) {
+  auto message_info = messages_.get_pointer({chat_id, message_id});
+  if (message_info == nullptr) {
     if (yet_unsent_messages_.count({chat_id, message_id}) > 0) {
       // yet unsent message is deleted, possible only if we are trying to write to inaccessible supergroup or
       // sent message was deleted before added to the chat
@@ -10197,11 +10173,9 @@ void Client::delete_message(int64 chat_id, int64 message_id, bool only_from_cach
     return;
   }
 
-  auto message_info = it->second.get();
-
   set_message_reply_to_message_id(message_info, 0);
 
-  messages_.erase(it);
+  messages_.erase({chat_id, message_id});
 }
 
 Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message, bool force_update_content) {
@@ -10212,12 +10186,9 @@ Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message,
   int64 message_id = message->id_;
 
   LOG(DEBUG) << "Add message " << message_id << " to chat " << chat_id;
-  td::unique_ptr<MessageInfo> message_info;
-  auto it = messages_.find({chat_id, message_id});
-  if (it == messages_.end()) {
+  auto &message_info = messages_[{chat_id, message_id}];
+  if (message_info == nullptr) {
     message_info = td::make_unique<MessageInfo>();
-  } else {
-    message_info = std::move(it->second);
   }
 
   message_info->id = message_id;
@@ -10326,7 +10297,6 @@ Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message,
   }
   set_message_reply_markup(message_info.get(), std::move(message->reply_markup_));
 
-  messages_[{chat_id, message_id}] = std::move(message_info);
   message = nullptr;
 
   return {chat_id, message_id};
@@ -10354,25 +10324,25 @@ void Client::on_update_message_edited(int64 chat_id, int64 message_id, int32 edi
 }
 
 const Client::MessageInfo *Client::get_message(int64 chat_id, int64 message_id) const {
-  auto it = messages_.find({chat_id, message_id});
-  if (it == messages_.end()) {
+  auto message_info = messages_.get_pointer({chat_id, message_id});
+  if (message_info == nullptr) {
     LOG(DEBUG) << "Not found message " << message_id << " from chat " << chat_id;
     return nullptr;
   }
   LOG(DEBUG) << "Found message " << message_id << " from chat " << chat_id;
 
-  return it->second.get();
+  return message_info;
 }
 
 Client::MessageInfo *Client::get_message_editable(int64 chat_id, int64 message_id) {
-  auto it = messages_.find({chat_id, message_id});
-  if (it == messages_.end()) {
+  auto message_info = messages_.get_pointer({chat_id, message_id});
+  if (message_info == nullptr) {
     LOG(DEBUG) << "Not found message " << message_id << " from chat " << chat_id;
     return nullptr;
   }
   LOG(DEBUG) << "Found message " << message_id << " from chat " << chat_id;
 
-  return it->second.get();
+  return message_info;
 }
 
 td::string Client::get_chat_member_status(const object_ptr<td_api::ChatMemberStatus> &status) {

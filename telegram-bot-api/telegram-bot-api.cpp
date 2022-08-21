@@ -191,9 +191,9 @@ int main(int argc, char *argv[]) {
   td::set_signal_handler(td::SignalType::Other, fail_signal_handler).ensure();
   td::set_extended_signal_handler(td::SignalType::Error, sigsegv_signal_handler).ensure();
 
-  td::set_runtime_signal_handler(0, change_verbosity_level_signal_handler).ensure();
-  td::set_runtime_signal_handler(1, dump_log_signal_handler).ensure();
-  td::set_runtime_signal_handler(2, dump_stacktrace_signal_handler).ensure();
+  td::set_real_time_signal_handler(0, change_verbosity_level_signal_handler).ensure();
+  td::set_real_time_signal_handler(1, dump_log_signal_handler).ensure();
+  td::set_real_time_signal_handler(2, dump_stacktrace_signal_handler).ensure();
 
   td::init_openssl_threads();
 

@@ -26,6 +26,7 @@
 #include "td/utils/Promise.h"
 #include "td/utils/Slice.h"
 #include "td/utils/Status.h"
+#include "td/utils/WaitFreeHashMap.h"
 
 #include <functional>
 #include <limits>
@@ -764,7 +765,7 @@ class Client final : public WebhookActor::Callback {
 
   bool have_sticker_set_name(int64 sticker_set_id) const;
 
-  Slice get_sticker_set_name(int64 sticker_set_id) const;
+  td::string get_sticker_set_name(int64 sticker_set_id) const;
 
   int64 choose_added_member_id(const td_api::messageChatAddMembers *message_add_members) const;
 
@@ -932,11 +933,11 @@ class Client final : public WebhookActor::Callback {
 
   static td::FlatHashMap<td::string, Status (Client::*)(PromisedQueryPtr &query)> methods_;
 
-  td::FlatHashMap<FullMessageId, td::unique_ptr<MessageInfo>, FullMessageIdHash> messages_;  // message cache
-  td::FlatHashMap<int64, td::unique_ptr<UserInfo>> users_;                                   // user info cache
-  td::FlatHashMap<int64, td::unique_ptr<GroupInfo>> groups_;                                 // group info cache
-  td::FlatHashMap<int64, td::unique_ptr<SupergroupInfo>> supergroups_;                       // supergroup info cache
-  td::FlatHashMap<int64, td::unique_ptr<ChatInfo>> chats_;                                   // chat info cache
+  td::WaitFreeHashMap<FullMessageId, td::unique_ptr<MessageInfo>, FullMessageIdHash> messages_;
+  td::WaitFreeHashMap<int64, td::unique_ptr<UserInfo>> users_;
+  td::WaitFreeHashMap<int64, td::unique_ptr<GroupInfo>> groups_;
+  td::WaitFreeHashMap<int64, td::unique_ptr<SupergroupInfo>> supergroups_;
+  td::WaitFreeHashMap<int64, td::unique_ptr<ChatInfo>> chats_;
 
   td::FlatHashMap<FullMessageId, td::FlatHashSet<int64>, FullMessageIdHash>
       reply_message_ids_;  // message -> replies to it
@@ -987,7 +988,7 @@ class Client final : public WebhookActor::Callback {
   };
   td::FlatHashMap<int64, NewCallbackQueryQueue> new_callback_query_queues_;  // sender_user_id -> queue
 
-  td::FlatHashMap<int64, td::string> sticker_set_names_;
+  td::WaitFreeHashMap<int64, td::string> sticker_set_names_;
 
   int64 cur_temp_bot_user_id_ = 1;
   td::FlatHashMap<td::string, int64> bot_user_ids_;
