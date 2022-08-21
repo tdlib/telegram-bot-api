@@ -11,6 +11,7 @@
 #include "telegram-bot-api/HttpStatConnection.h"
 #include "telegram-bot-api/Query.h"
 #include "telegram-bot-api/Stats.h"
+#include "telegram-bot-api/Watchdog.h"
 
 #include "td/telegram/ClientActor.h"
 
@@ -462,7 +463,7 @@ int main(int argc, char *argv[]) {
   //              << (td::GitInfo::is_dirty() ? "(dirty)" : "") << " started";
   LOG(WARNING) << "Bot API " << parameters->version_ << " server started";
 
-  const int threads_n = 5;  // +3 for Td, one for slow HTTP connections and one for DNS resolving
+  const int threads_n = 6;  // +3 for Td, one for watchdog, one for slow HTTP connections, one for DNS resolving
   td::ConcurrentScheduler sched;
   sched.init(threads_n);
 
@@ -474,6 +475,7 @@ int main(int argc, char *argv[]) {
 
   auto client_manager =
       sched.create_actor_unsafe<ClientManager>(0, "ClientManager", std::move(parameters), token_range).release();
+
   sched
       .create_actor_unsafe<HttpServer>(
           0, "HttpServer", http_ip_address, http_port,
@@ -482,6 +484,7 @@ int main(int argc, char *argv[]) {
                 td::create_actor<HttpConnection>("HttpConnection", client_manager, shared_data));
           })
       .release();
+
   if (http_stat_port != 0) {
     sched
         .create_actor_unsafe<HttpServer>(
@@ -492,8 +495,14 @@ int main(int argc, char *argv[]) {
             })
         .release();
   }
+
+  constexpr double WATCHDOG_TIMEOUT = 0.5;
+  auto watchdog_id =
+      sched.create_actor_unsafe<Watchdog>(threads_n - 2, "Watchdog", td::this_thread::get_id(), WATCHDOG_TIMEOUT);
+
   sched.start();
 
+  double next_watchdog_kick_time = start_time;
   double next_cron_time = start_time;
   double last_dump_time = start_time - 1000.0;
   double last_tqueue_gc_time = start_time - 1000.0;
@@ -503,7 +512,7 @@ int main(int argc, char *argv[]) {
   std::atomic_bool can_quit{false};
   ServerCpuStat::instance();  // create ServerCpuStat instance
   while (true) {
-    sched.run_main(next_cron_time - td::Time::now());
+    sched.run_main(td::min(next_cron_time, next_watchdog_kick_time) - td::Time::now());
 
     if (!need_reopen_log.test_and_set()) {
       td::log_interface->after_rotation();
@@ -519,6 +528,7 @@ int main(int argc, char *argv[]) {
       dump_statistics(shared_data, net_query_stats);
       close_flag = true;
       auto guard = sched.get_main_guard();
+      watchdog_id.reset();
       send_closure(client_manager, &ClientManager::close, td::PromiseCreator::lambda([&can_quit](td::Unit) {
                      can_quit.store(true);
                      td::Scheduler::instance()->yield();
@@ -555,6 +565,12 @@ int main(int argc, char *argv[]) {
       }
       next_cron_time += 1.0;
       ServerCpuStat::update(now);
+    }
+
+    if (now >= start_time + 600) {
+      auto guard = sched.get_main_guard();
+      send_closure(watchdog_id, &Watchdog::kick);
+      next_watchdog_kick_time = now + WATCHDOG_TIMEOUT / 2;
     }
 
     if (now > last_tqueue_gc_time + 60.0) {
