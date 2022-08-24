@@ -149,6 +149,15 @@ td::string BotStatActor::get_description() const {
   return res;
 }
 
+double BotStatActor::get_score(double now) {
+  auto minute_stat = stat_[2].stat_duration(now);
+  double result = minute_stat.first.request_count_ + minute_stat.first.update_count_;
+  if (minute_stat.second != 0) {
+    result /= minute_stat.second;
+  }
+  return result;
+}
+
 bool BotStatActor::is_active(double now) const {
   return last_activity_timestamp_ > now - 86400;
 }

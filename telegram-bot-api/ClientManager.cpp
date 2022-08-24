@@ -36,7 +36,7 @@
 #include "td/utils/StringBuilder.h"
 #include "td/utils/Time.h"
 
-#include <map>
+#include <algorithm>
 #include <tuple>
 
 namespace telegram_bot_api {
@@ -182,7 +182,8 @@ void ClientManager::get_stats(td::Promise<td::BufferSlice> promise,
 
   auto now = td::Time::now();
   td::int32 active_bot_count = 0;
-  std::multimap<td::int64, td::uint64> top_bot_ids;
+  td::vector<std::pair<td::int64, td::uint64>> top_bot_ids;
+  size_t max_bots = 50;
   for (auto id : clients_.ids()) {
     auto *client_info = clients_.get(id);
     CHECK(client_info);
@@ -195,15 +196,17 @@ void ClientManager::get_stats(td::Promise<td::BufferSlice> promise,
       continue;
     }
 
-    auto stats = client_info->stat_.as_vector(now);
-    double score = 0.0;
-    for (auto &stat : stats) {
-      if (stat.key_ == "update_count" || stat.key_ == "request_count") {
-        score -= td::to_double(stat.value_);
-      }
+    auto score = static_cast<td::int64>(client_info->stat_.get_score(now) * -1e9);
+    if (score == 0 && top_bot_ids.size() >= max_bots) {
+      continue;
     }
-    top_bot_ids.emplace(static_cast<td::int64>(score * 1e9), id);
+    top_bot_ids.emplace_back(score, id);
   }
+  if (top_bot_ids.size() < max_bots) {
+    max_bots = top_bot_ids.size();
+  }
+  std::partial_sort(top_bot_ids.begin(), top_bot_ids.begin() + max_bots, top_bot_ids.end());
+  top_bot_ids.resize(max_bots);
 
   sb << stat_.get_description() << '\n';
   if (id_filter.empty()) {
