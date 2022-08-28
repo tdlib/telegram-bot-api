@@ -6616,7 +6616,7 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
                                                                                     JsonValue &&input_media,
                                                                                     bool for_album) const {
   if (input_media.type() != JsonValue::Type::Object) {
-    return Status::Error(400, "expected an Object");
+    return Status::Error("expected an Object");
   }
 
   auto &object = input_media.get_object();
@@ -6631,7 +6631,7 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
 
   auto input_file = get_input_file(query, Slice(), media, false);
   if (input_file == nullptr) {
-    return Status::Error(400, "media not found");
+    return Status::Error("media not found");
   }
 
   TRY_RESULT(thumbnail, get_json_object_string_field(object, "thumb"));
@@ -6660,7 +6660,7 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
                                                   std::move(caption), ttl);
   }
   if (for_album && type == "animation") {
-    return Status::Error(400, PSLICE() << "type \"" << type << "\" can't be used in sendMediaGroup");
+    return Status::Error(PSLICE() << "type \"" << type << "\" can't be used in sendMediaGroup");
   }
   if (type == "animation") {
     TRY_RESULT(width, get_json_object_int_field(object, "width"));
@@ -6686,12 +6686,11 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
                                                      disable_content_type_detection || for_album, std::move(caption));
   }
 
-  return Status::Error(400, PSLICE() << "type \"" << type << "\" is unsupported");
+  return Status::Error(PSLICE() << "type \"" << type << "\" is unsupported");
 }
 
 td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_media(const Query *query,
-                                                                                    Slice field_name,
-                                                                                    bool for_album) const {
+                                                                                    Slice field_name) const {
   TRY_RESULT(media, get_required_string_arg(query, field_name));
 
   LOG(INFO) << "Parsing JSON object: " << media;
@@ -6701,7 +6700,7 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
     return Status::Error(400, "Can't parse input media JSON object");
   }
 
-  auto r_input_message_content = get_input_media(query, r_value.move_as_ok(), for_album);
+  auto r_input_message_content = get_input_media(query, r_value.move_as_ok(), false);
   if (r_input_message_content.is_error()) {
     return Status::Error(400, PSLICE() << "Can't parse InputMedia: " << r_input_message_content.error().message());
   }
@@ -6730,8 +6729,11 @@ td::Result<td::vector<td_api::object_ptr<td_api::InputMessageContent>>> Client::
 
   td::vector<object_ptr<td_api::InputMessageContent>> contents;
   for (auto &input_media : value.get_array()) {
-    TRY_RESULT(input_message_content, get_input_media(query, std::move(input_media), true));
-    contents.push_back(std::move(input_message_content));
+    auto r_input_message_content = get_input_media(query, std::move(input_media), true);
+    if (r_input_message_content.is_error()) {
+      return Status::Error(400, PSLICE() << "Can't parse InputMedia: " << r_input_message_content.error().message());
+    }
+    contents.push_back(r_input_message_content.move_as_ok());
   }
   return std::move(contents);
 }
@@ -7522,7 +7524,7 @@ td::Status Client::process_edit_message_media_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
   auto message_id = get_message_id(query.get());
   TRY_RESULT(reply_markup, get_reply_markup(query.get()));
-  TRY_RESULT(input_media, get_input_media(query.get(), "media", false));
+  TRY_RESULT(input_media, get_input_media(query.get(), "media"));
 
   if (chat_id.empty() && message_id == 0) {
     TRY_RESULT(inline_message_id, get_inline_message_id(query.get()));

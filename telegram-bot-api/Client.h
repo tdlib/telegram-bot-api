@@ -437,8 +437,7 @@ class Client final : public WebhookActor::Callback {
   td::Result<object_ptr<td_api::InputMessageContent>> get_input_media(const Query *query, td::JsonValue &&input_media,
                                                                       bool for_album) const;
 
-  td::Result<object_ptr<td_api::InputMessageContent>> get_input_media(const Query *query, Slice field_name,
-                                                                      bool for_album) const;
+  td::Result<object_ptr<td_api::InputMessageContent>> get_input_media(const Query *query, Slice field_name) const;
 
   td::Result<td::vector<object_ptr<td_api::InputMessageContent>>> get_input_message_contents(const Query *query,
                                                                                              Slice field_name) const;
