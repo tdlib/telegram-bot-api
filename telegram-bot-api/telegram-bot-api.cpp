@@ -44,6 +44,7 @@
 #include "td/utils/port/signals.h"
 #include "td/utils/port/stacktrace.h"
 #include "td/utils/port/Stat.h"
+#include "td/utils/port/thread.h"
 #include "td/utils/port/user.h"
 #include "td/utils/Promise.h"
 #include "td/utils/Slice.h"
@@ -223,6 +224,8 @@ int main(int argc, char *argv[]) {
   td::string username;
   td::string groupname;
   td::uint64 max_connections = 0;
+  td::uint64 cpu_affinity = 0;
+  td::uint64 main_thread_affinity = 0;
   ClientManager::TokenRange token_range{0, 1};
 
   parameters->api_id_ = [](auto x) -> td::int32 {
@@ -310,6 +313,17 @@ int main(int argc, char *argv[]) {
   options.add_option('g', "groupname", "effective group name to switch to", td::OptionParser::parse_string(groupname));
   options.add_checked_option('c', "max-connections", "maximum number of open file descriptors",
                              td::OptionParser::parse_integer(max_connections));
+#if TD_HAVE_THREAD_AFFINITY
+  options.add_checked_option('\0', "cpu-affinity", "CPU affinity as 64-bit mask (defaults to all available CPUs)",
+                             td::OptionParser::parse_integer(cpu_affinity));
+  options.add_checked_option(
+      '\0', "main-thread-affinity",
+      "CPU affinity of the main thread as 64-bit mask (defaults to the value of the option --cpu-affinity)",
+      td::OptionParser::parse_integer(main_thread_affinity));
+#else
+  (void)cpu_affinity;
+  (void)main_thread_affinity;
+#endif
 
   options.add_checked_option('\0', "proxy",
                              "HTTP proxy server for outgoing webhook requests in the format http://host:port",
@@ -363,6 +377,26 @@ int main(int argc, char *argv[]) {
   td::TsLog ts_log(&file_log);
 
   auto init_status = [&] {
+#if TD_HAVE_THREAD_AFFINITY
+    if (main_thread_affinity == 0) {
+      main_thread_affinity = cpu_affinity;
+    }
+    if (main_thread_affinity != 0) {
+      auto initial_mask = td::thread::get_affinity_mask(td::this_thread::get_id());
+      if (initial_mask == 0) {
+        return td::Status::Error("Failed to get current thread affinity");
+      }
+      if (cpu_affinity != 0) {
+        TRY_STATUS_PREFIX(td::thread::set_affinity_mask(td::this_thread::get_id(), cpu_affinity),
+                          "Can't set CPU affinity mask: ");
+      } else {
+        cpu_affinity = initial_mask;
+      }
+      TRY_STATUS_PREFIX(td::thread::set_affinity_mask(td::this_thread::get_id(), main_thread_affinity),
+                        "Can't set main thread CPU affinity mask: ");
+    }
+#endif
+
     if (max_connections != 0) {
       TRY_STATUS_PREFIX(td::set_resource_limit(td::ResourceLimitType::NoFile, max_connections),
                         "Can't set file descriptor limit: ");
@@ -463,12 +497,11 @@ int main(int argc, char *argv[]) {
   //              << (td::GitInfo::is_dirty() ? "(dirty)" : "") << " started";
   LOG(WARNING) << "Bot API " << parameters->version_ << " server started";
 
-  const int threads_n = 6;  // +3 for Td, one for watchdog, one for slow HTTP connections, one for DNS resolving
-  td::ConcurrentScheduler sched;
-  sched.init(threads_n);
+  const int thread_count = 6;  // +3 for Td, one for watchdog, one for slow HTTP connections, one for DNS resolving
+  td::ConcurrentScheduler sched(thread_count, cpu_affinity);
 
   td::GetHostByNameActor::Options get_host_by_name_options;
-  get_host_by_name_options.scheduler_id = threads_n;
+  get_host_by_name_options.scheduler_id = thread_count;
   parameters->get_host_by_name_actor_id_ =
       sched.create_actor_unsafe<td::GetHostByNameActor>(0, "GetHostByName", std::move(get_host_by_name_options))
           .release();
@@ -498,7 +531,7 @@ int main(int argc, char *argv[]) {
 
   constexpr double WATCHDOG_TIMEOUT = 0.5;
   auto watchdog_id =
-      sched.create_actor_unsafe<Watchdog>(threads_n - 2, "Watchdog", td::this_thread::get_id(), WATCHDOG_TIMEOUT);
+      sched.create_actor_unsafe<Watchdog>(thread_count - 2, "Watchdog", td::this_thread::get_id(), WATCHDOG_TIMEOUT);
 
   sched.start();
 

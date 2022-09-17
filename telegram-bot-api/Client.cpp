@@ -4472,27 +4472,23 @@ void Client::on_update_authorization_state() {
                                                   make_object<td_api::optionValueBoolean>(true)),
                    td::make_unique<TdOnOkCallback>());
 
-      auto parameters = make_object<td_api::tdlibParameters>();
+      auto request = make_object<td_api::setTdlibParameters>();
+      request->use_test_dc_ = is_test_dc_;
+      request->database_directory_ = dir_;
+      //request->use_file_database_ = false;
+      //request->use_chat_info_database_ = false;
+      //request->use_secret_chats_ = false;
+      request->use_message_database_ = USE_MESSAGE_DATABASE;
+      request->api_id_ = parameters_->api_id_;
+      request->api_hash_ = parameters_->api_hash_;
+      request->system_language_code_ = "en";
+      request->device_model_ = "server";
+      request->application_version_ = parameters_->version_;
+      request->enable_storage_optimizer_ = true;
+      request->ignore_file_names_ = true;
 
-      parameters->use_test_dc_ = is_test_dc_;
-      parameters->database_directory_ = dir_;
-      //parameters->use_file_database_ = false;
-      //parameters->use_chat_info_database_ = false;
-      //parameters->use_secret_chats_ = false;
-      parameters->use_message_database_ = USE_MESSAGE_DATABASE;
-      parameters->api_id_ = parameters_->api_id_;
-      parameters->api_hash_ = parameters_->api_hash_;
-      parameters->system_language_code_ = "en";
-      parameters->device_model_ = "server";
-      parameters->application_version_ = parameters_->version_;
-      parameters->enable_storage_optimizer_ = true;
-      parameters->ignore_file_names_ = true;
-
-      return send_request(make_object<td_api::setTdlibParameters>(std::move(parameters)),
-                          td::make_unique<TdOnInitCallback>(this));
+      return send_request(std::move(request), td::make_unique<TdOnInitCallback>(this));
     }
-    case td_api::authorizationStateWaitEncryptionKey::ID:
-      return send_request(make_object<td_api::checkDatabaseEncryptionKey>(), td::make_unique<TdOnInitCallback>(this));
     case td_api::authorizationStateWaitPhoneNumber::ID:
       send_request(make_object<td_api::setOption>("online", make_object<td_api::optionValueBoolean>(true)),
                    td::make_unique<TdOnOkCallback>());
@@ -5618,7 +5614,7 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
 
 td_api::object_ptr<td_api::messageSendOptions> Client::get_message_send_options(bool disable_notification,
                                                                                 bool protect_content) {
-  return make_object<td_api::messageSendOptions>(disable_notification, false, protect_content, nullptr);
+  return make_object<td_api::messageSendOptions>(disable_notification, false, protect_content, false, nullptr);
 }
 
 td::Result<td::vector<td_api::object_ptr<td_api::InputInlineQueryResult>>> Client::get_inline_query_results(
