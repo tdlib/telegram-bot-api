@@ -135,7 +135,7 @@ void Query::send_response_stat() const {
     return;
   }
   send_closure(stat_actor_, &BotStatActor::add_event<ServerBotStat::Response>,
-               ServerBotStat::Response{state_ == State::OK, answer_.size()}, now);
+               ServerBotStat::Response{state_ == State::OK, answer_.size(), files_size()}, now);
 }
 
 }  // namespace telegram_bot_api

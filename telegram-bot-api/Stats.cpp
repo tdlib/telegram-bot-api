@@ -155,7 +155,17 @@ double BotStatActor::get_score(double now) {
   if (minute_stat.second != 0) {
     result /= minute_stat.second;
   }
+  result += td::max(static_cast<double>(get_active_request_count() - 10), static_cast<double>(0));
+  result += static_cast<double>(get_active_file_upload_bytes()) * 1e-8;
   return result;
+}
+
+td::int64 BotStatActor::get_active_request_count() const {
+  return active_request_count_;
+}
+
+td::int64 BotStatActor::get_active_file_upload_bytes() const {
+  return active_file_upload_bytes_;
 }
 
 bool BotStatActor::is_active(double now) const {
