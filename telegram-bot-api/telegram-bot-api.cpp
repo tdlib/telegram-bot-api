@@ -80,8 +80,15 @@ static td::MemoryLog<1 << 20> memory_log;
 void print_log() {
   auto buf = memory_log.get_buffer();
   auto pos = memory_log.get_pos();
+  size_t tail_length = buf.size() - pos;
+  while (tail_length > 0 && buf[pos + tail_length - 1] == ' ') {
+    tail_length--;
+  }
+  if (tail_length + 100 >= buf.size() - pos) {
+    tail_length = buf.size() - pos;
+  }
   td::signal_safe_write("------- Log dump -------\n");
-  td::signal_safe_write(buf.substr(pos), false);
+  td::signal_safe_write(buf.substr(pos, tail_length), false);
   td::signal_safe_write(buf.substr(0, pos), false);
   td::signal_safe_write("\n", false);
   td::signal_safe_write("------------------------\n");
