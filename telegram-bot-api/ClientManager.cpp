@@ -250,13 +250,20 @@ void ClientManager::get_stats(td::Promise<td::BufferSlice> promise,
     sb << "uptime\t" << now - bot_info.start_time_ << '\n';
     sb << "token\t" << bot_info.token_ << '\n';
     sb << "username\t" << bot_info.username_ << '\n';
-    sb << "is_active\t" << client_info->stat_.is_active(now) << '\n';
-    sb << "webhook\t" << bot_info.webhook_ << '\n';
-    sb << "has_custom_certificate\t" << bot_info.has_webhook_certificate_ << '\n';
+    if (!bot_info.webhook_.empty()) {
+      sb << "webhook\t" << bot_info.webhook_ << '\n';
+      if (bot_info.has_webhook_certificate_) {
+        sb << "has_custom_certificate\t" << bot_info.has_webhook_certificate_ << '\n';
+      }
+      if (bot_info.webhook_max_connections_ != parameters_->default_max_webhook_connections_) {
+        sb << "webhook_max_connections\t" << bot_info.webhook_max_connections_ << '\n';
+      }
+    }
     sb << "head_update_id\t" << bot_info.head_update_id_ << '\n';
-    sb << "tail_update_id\t" << bot_info.tail_update_id_ << '\n';
-    sb << "pending_update_count\t" << bot_info.pending_update_count_ << '\n';
-    sb << "webhook_max_connections\t" << bot_info.webhook_max_connections_ << '\n';
+    if (bot_info.pending_update_count_ != 0) {
+      sb << "tail_update_id\t" << bot_info.tail_update_id_ << '\n';
+      sb << "pending_update_count\t" << bot_info.pending_update_count_ << '\n';
+    }
 
     auto stats = client_info->stat_.as_vector(now);
     for (auto &stat : stats) {
