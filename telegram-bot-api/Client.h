@@ -471,6 +471,8 @@ class Client final : public WebhookActor::Callback {
 
   static bool init_methods();
 
+  static bool is_local_method(Slice method);
+
   void on_cmd(PromisedQueryPtr query);
 
   Status process_get_me_query(PromisedQueryPtr &query);

@@ -287,6 +287,11 @@ bool Client::init_methods() {
   return true;
 }
 
+bool Client::is_local_method(Slice method) {
+  return method == "close" || method == "logout" || method == "getme" || method == "getupdates" ||
+         method == "setwebhook" || method == "deletewebhook" || method == "getwebhookinfo";
+}
+
 class Client::JsonFile final : public Jsonable {
  public:
   JsonFile(const td_api::file *file, const Client *client, bool with_path)
@@ -3895,6 +3900,17 @@ void Client::start_up() {
 void Client::send(PromisedQueryPtr query) {
   if (!query->is_internal()) {
     query->set_stat_actor(stat_actor_);
+    if (!parameters_->local_mode_ && !is_local_method(query->method())) {
+      const BotStatActor *stat = stat_actor_.get_actor_unsafe();
+      if (stat->get_active_request_count() > 10000) {
+        LOG(INFO) << "Fail a query, because there are too many active queries: " << *query;
+        return query->set_retry_after_error(60);
+      }
+      if (stat->get_active_file_upload_bytes() > (static_cast<int64>(1) << 33) && !query->files().empty()) {
+        LOG(INFO) << "Fail a query, because there are too many active file uploads: " << *query;
+        return query->set_retry_after_error(60);
+      }
+    }
   }
   cmd_queue_.emplace(std::move(query));
   loop();
@@ -10457,7 +10473,7 @@ td::int32 Client::as_client_message_id(int64 message_id) {
 }
 
 td::int64 Client::get_supergroup_chat_id(int64 supergroup_id) {
-  return static_cast<td::int64>(-1000000000000ll) - supergroup_id;
+  return static_cast<int64>(-1000000000000ll) - supergroup_id;
 }
 
 td::int64 Client::get_basic_group_chat_id(int64 basic_group_id) {
