@@ -15,7 +15,7 @@ namespace telegram_bot_api {
 
 void HttpStatConnection::handle(td::unique_ptr<td::HttpQuery> http_query,
                                 td::ActorOwn<td::HttpInboundConnection> connection) {
-  CHECK(connection_->empty());
+  CHECK(connection_.empty());
   connection_ = std::move(connection);
 
   auto promise = td::PromiseCreator::lambda([actor_id = actor_id(this)](td::Result<td::BufferSlice> result) {

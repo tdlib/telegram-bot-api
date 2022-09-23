@@ -244,7 +244,7 @@ void ClientManager::get_stats(td::Promise<td::BufferSlice> promise,
     auto *client_info = clients_.get(top_bot_id.second);
     CHECK(client_info);
 
-    auto bot_info = client_info->client_->get_actor_unsafe()->get_bot_info();
+    auto bot_info = client_info->client_.get_actor_unsafe()->get_bot_info();
     auto active_request_count = client_info->stat_.get_active_request_count();
     auto active_file_upload_bytes = client_info->stat_.get_active_file_upload_bytes();
     sb << '\n';

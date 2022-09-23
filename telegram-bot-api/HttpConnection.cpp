@@ -21,7 +21,7 @@ namespace telegram_bot_api {
 
 void HttpConnection::handle(td::unique_ptr<td::HttpQuery> http_query,
                             td::ActorOwn<td::HttpInboundConnection> connection) {
-  CHECK(connection_->empty());
+  CHECK(connection_.empty());
   connection_ = std::move(connection);
 
   LOG(DEBUG) << "Handle " << *http_query;

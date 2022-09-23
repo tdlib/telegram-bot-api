@@ -5619,7 +5619,7 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
                                      need_shipping_address, send_phone_number_to_provider,
                                      send_email_address_to_provider, is_flexible),
         title, description, photo_url, photo_size, photo_width, photo_height, payload, provider_token, provider_data,
-        td::string());
+        td::string(), nullptr);
   }
 
   if (is_input_message_content_required) {
@@ -6750,7 +6750,7 @@ td::Result<td::vector<td_api::object_ptr<td_api::InputMessageContent>>> Client::
   return std::move(contents);
 }
 
-td::Result<td_api::object_ptr<td_api::inputMessageInvoice>> Client::get_input_message_invoice(const Query *query) {
+td::Result<td_api::object_ptr<td_api::inputMessageInvoice>> Client::get_input_message_invoice(const Query *query) const {
   TRY_RESULT(title, get_required_string_arg(query, "title"));
   TRY_RESULT(description, get_required_string_arg(query, "description"));
   TRY_RESULT(payload, get_required_string_arg(query, "payload"));
@@ -6806,13 +6806,18 @@ td::Result<td_api::object_ptr<td_api::inputMessageInvoice>> Client::get_input_me
   auto send_email_address_to_provider = to_bool(query->arg("send_email_to_provider"));
   auto is_flexible = to_bool(query->arg("is_flexible"));
 
+  td_api::object_ptr<td_api::InputMessageContent> extended_media;
+  if (!query->arg("extended_media").empty()) {
+    TRY_RESULT_ASSIGN(extended_media, get_input_media(query, "extended_media"));
+  }
+
   return make_object<td_api::inputMessageInvoice>(
       make_object<td_api::invoice>(currency.str(), std::move(prices), max_tip_amount, std::move(suggested_tip_amounts),
                                    td::string(), false, need_name, need_phone_number, need_email_address,
                                    need_shipping_address, send_phone_number_to_provider, send_email_address_to_provider,
                                    is_flexible),
       title.str(), description.str(), photo_url.str(), photo_size, photo_width, photo_height, payload.str(),
-      provider_token.str(), provider_data.str(), start_parameter.str());
+      provider_token.str(), provider_data.str(), start_parameter.str(), std::move(extended_media));
 }
 
 td::Result<td::vector<td::string>> Client::get_poll_options(const Query *query) {
