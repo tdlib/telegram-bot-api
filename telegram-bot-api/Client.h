@@ -1059,6 +1059,13 @@ class Client final : public WebhookActor::Callback {
 
   td::uint64 webhook_generation_ = 1;
 
+  UpdateType delayed_update_type_ = UpdateType::Size;
+  int64 delayed_chat_id_ = 0;
+  int32 delayed_min_date_ = 0;
+  int32 delayed_max_date_ = 0;
+  int32 delayed_max_time_ = 0;
+  size_t delayed_update_count_ = 0;
+
   std::shared_ptr<const ClientParameters> parameters_;
 
   td::ActorId<BotStatActor> stat_actor_;

@@ -6750,7 +6750,8 @@ td::Result<td::vector<td_api::object_ptr<td_api::InputMessageContent>>> Client::
   return std::move(contents);
 }
 
-td::Result<td_api::object_ptr<td_api::inputMessageInvoice>> Client::get_input_message_invoice(const Query *query) const {
+td::Result<td_api::object_ptr<td_api::inputMessageInvoice>> Client::get_input_message_invoice(
+    const Query *query) const {
   TRY_RESULT(title, get_required_string_arg(query, "title"));
   TRY_RESULT(description, get_required_string_arg(query, "description"));
   TRY_RESULT(payload, get_required_string_arg(query, "payload"));
@@ -10114,12 +10115,36 @@ void Client::process_new_message_queue(int64 chat_id) {
     }
 
     int32 message_date = message->edit_date_ == 0 ? message->date_ : message->edit_date_;
+    if (delayed_update_count_ > 0 && (update_type != delayed_update_type_ || chat_id != delayed_chat_id_)) {
+      if (delayed_update_count_ == 1) {
+        LOG(ERROR) << "Receive very old update " << get_update_type_name(delayed_update_type_) << " sent at "
+                   << delayed_min_date_ << " in chat " << delayed_chat_id_ << " with a delay of " << delayed_max_time_
+                   << " seconds";
+      } else {
+        LOG(ERROR) << "Receive " << delayed_update_count_ << " very old updates "
+                   << get_update_type_name(delayed_update_type_) << " sent from " << delayed_min_date_ << " to "
+                   << delayed_max_date_ << " in chat " << delayed_chat_id_ << " with a delay up to "
+                   << delayed_max_time_ << " seconds";
+      }
+      delayed_update_count_ = 0;
+    }
     auto now = get_unix_time();
     auto update_delay_time = now - td::max(message_date, parameters_->shared_data_->get_unix_time(webhook_set_time_));
     const auto UPDATE_DELAY_WARNING_TIME = 10 * 60;
-    LOG_IF(ERROR, update_delay_time > UPDATE_DELAY_WARNING_TIME)
-        << "Receive very old update " << get_update_type_name(update_type) << " sent at " << message_date << " to chat "
-        << chat_id << " with a delay of " << update_delay_time << " seconds: " << to_string(message);
+    if (update_delay_time > UPDATE_DELAY_WARNING_TIME && message_date > last_synchronization_error_date_ + 60) {
+      if (delayed_update_count_ == 0) {
+        delayed_update_type_ = update_type;
+        delayed_chat_id_ = chat_id;
+        delayed_min_date_ = message_date;
+        delayed_max_date_ = message_date;
+        delayed_max_time_ = update_delay_time;
+      } else {
+        delayed_min_date_ = td::min(message_date, delayed_min_date_);
+        delayed_max_date_ = td::max(message_date, delayed_max_date_);
+        delayed_max_time_ = td::max(update_delay_time, delayed_max_time_);
+      }
+      delayed_update_count_++;
+    }
     auto left_time = message_date + 86400 - now;
     add_message(std::move(message));
 
