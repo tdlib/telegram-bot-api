@@ -572,6 +572,8 @@ class Client final : public WebhookActor::Callback {
   int32 get_webhook_max_connections(const Query *query) const;
   static bool get_webhook_fix_ip_address(const Query *query);
   void do_set_webhook(PromisedQueryPtr query, bool was_deleted);
+  void on_webhook_certificate_copied(Status status);
+  void finish_set_webhook(PromisedQueryPtr query);
   void save_webhook() const;
   td::string get_webhook_certificate_path() const;
 
@@ -1033,6 +1035,7 @@ class Client final : public WebhookActor::Callback {
   WebhookQueryType webhook_query_type_ = WebhookQueryType::Cancel;
   td::ActorOwn<WebhookActor> webhook_id_;
   PromisedQueryPtr webhook_set_query_;
+  PromisedQueryPtr active_webhook_set_query_;
   td::string webhook_url_;
   double webhook_set_time_ = 0;
   int32 webhook_max_connections_ = 0;
