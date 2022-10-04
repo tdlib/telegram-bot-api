@@ -45,9 +45,9 @@ Query::Query(td::vector<td::BufferSlice> &&container, td::Slice token, bool is_t
   start_timestamp_ = td::Time::now();
   LOG(INFO) << "QUERY: create " << td::tag("ptr", this) << *this;
   if (shared_data_) {
-    shared_data_->query_count_++;
+    shared_data_->query_count_.fetch_add(1, std::memory_order_relaxed);
     if (method_ != "getupdates") {
-      shared_data_->query_list_size_++;
+      shared_data_->query_list_size_.fetch_add(1, std::memory_order_relaxed);
       shared_data_->query_list_.put(this);
     }
   }

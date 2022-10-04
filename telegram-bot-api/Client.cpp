@@ -3893,8 +3893,8 @@ void Client::start_up() {
   };
   td::ClientActor::Options options;
   options.net_query_stats = parameters_->net_query_stats_;
-  td_client_ = td::create_actor<td::ClientActor>("TdClientActor", td::make_unique<TdCallback>(actor_id(this)),
-                                                 std::move(options));
+  td_client_ = td::create_actor_on_scheduler<td::ClientActor>(
+      "TdClientActor", 0, td::make_unique<TdCallback>(actor_id(this)), std::move(options));
 }
 
 void Client::send(PromisedQueryPtr query) {
@@ -4993,16 +4993,12 @@ void Client::timeout_expired() {
 
 td::int32 Client::get_database_scheduler_id() {
   // the same scheduler as for database in Td
-  auto current_scheduler_id = td::Scheduler::instance()->sched_id();
-  auto scheduler_count = td::Scheduler::instance()->sched_count();
-  return td::min(current_scheduler_id + 1, scheduler_count - 1);
+  return 1;
 }
 
 td::int32 Client::get_file_gc_scheduler_id() {
   // the same scheduler as for file GC in Td
-  auto current_scheduler_id = td::Scheduler::instance()->sched_id();
-  auto scheduler_count = td::Scheduler::instance()->sched_count();
-  return td::min(current_scheduler_id + 2, scheduler_count - 1);
+  return 2;
 }
 
 void Client::clear_tqueue() {

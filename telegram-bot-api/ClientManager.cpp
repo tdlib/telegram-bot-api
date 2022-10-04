@@ -232,7 +232,7 @@ void ClientManager::get_stats(td::Promise<td::BufferSlice> promise,
 
     sb << "buffer_memory\t" << td::format::as_size(td::BufferAllocator::get_buffer_mem()) << '\n';
     sb << "active_webhook_connections\t" << WebhookActor::get_total_connections_count() << '\n';
-    sb << "active_requests\t" << parameters_->shared_data_->query_count_.load() << '\n';
+    sb << "active_requests\t" << parameters_->shared_data_->query_count_.load(std::memory_order_relaxed) << '\n';
     sb << "active_network_queries\t" << td::get_pending_network_query_count(*parameters_->net_query_stats_) << '\n';
     auto stats = stat_.as_vector(now);
     for (auto &stat : stats) {
@@ -294,9 +294,7 @@ td::int64 ClientManager::get_tqueue_id(td::int64 user_id, bool is_test_dc) {
 
 void ClientManager::start_up() {
   //NB: the same scheduler as for database in Td
-  auto current_scheduler_id = td::Scheduler::instance()->sched_id();
-  auto scheduler_count = td::Scheduler::instance()->sched_count();
-  auto scheduler_id = td::min(current_scheduler_id + 1, scheduler_count - 1);
+  auto scheduler_id = 1;
 
   // init tqueue
   {

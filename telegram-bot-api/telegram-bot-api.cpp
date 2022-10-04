@@ -158,10 +158,10 @@ static void dump_statistics(const std::shared_ptr<SharedData> &shared_data,
   LOG(WARNING) << td::tag("buffer_mem", td::format::as_size(td::BufferAllocator::get_buffer_mem()));
   LOG(WARNING) << td::tag("buffer_slice_size", td::format::as_size(td::BufferAllocator::get_buffer_slice_size()));
 
-  auto query_list_size = shared_data->query_list_size_;
-  auto query_count = shared_data->query_count_.load();
+  auto query_list_size = shared_data->query_list_size_.load(std::memory_order_relaxed);
+  auto query_count = shared_data->query_count_.load(std::memory_order_relaxed);
   LOG(WARNING) << td::tag("pending queries", query_count) << td::tag("pending requests", query_list_size);
-
+/*
   td::uint64 i = 0;
   bool was_gap = false;
   for (auto end = &shared_data->query_list_, cur = end->prev; cur != end; cur = cur->prev, i++) {
@@ -175,7 +175,7 @@ static void dump_statistics(const std::shared_ptr<SharedData> &shared_data,
       was_gap = true;
     }
   }
-
+*/
   td::dump_pending_network_queries(*net_query_stats);
 }
 
@@ -504,7 +504,12 @@ int main(int argc, char *argv[]) {
   //              << (td::GitInfo::is_dirty() ? "(dirty)" : "") << " started";
   LOG(WARNING) << "Bot API " << parameters->version_ << " server started";
 
-  const int thread_count = 6;  // +3 for Td, one for watchdog, one for slow HTTP connections, one for DNS resolving
+  // +3 threads for Td
+  // one thread for ClientManager and all Clients
+  // one thread for watchdog
+  // one thread for slow HTTP connections
+  // one thread for DNS resolving
+  const int thread_count = 7;
   td::ConcurrentScheduler sched(thread_count, cpu_affinity);
 
   td::GetHostByNameActor::Options get_host_by_name_options;
@@ -514,11 +519,12 @@ int main(int argc, char *argv[]) {
           .release();
 
   auto client_manager =
-      sched.create_actor_unsafe<ClientManager>(0, "ClientManager", std::move(parameters), token_range).release();
+      sched.create_actor_unsafe<ClientManager>(thread_count - 3, "ClientManager", std::move(parameters), token_range)
+          .release();
 
   sched
       .create_actor_unsafe<HttpServer>(
-          0, "HttpServer", http_ip_address, http_port,
+          thread_count - 3, "HttpServer", http_ip_address, http_port,
           [client_manager, shared_data] {
             return td::ActorOwn<td::HttpInboundConnection::Callback>(
                 td::create_actor<HttpConnection>("HttpConnection", client_manager, shared_data));
@@ -528,7 +534,7 @@ int main(int argc, char *argv[]) {
   if (http_stat_port != 0) {
     sched
         .create_actor_unsafe<HttpServer>(
-            0, "HttpStatsServer", http_stat_ip_address, http_stat_port,
+            thread_count - 3, "HttpStatsServer", http_stat_ip_address, http_stat_port,
             [client_manager] {
               return td::ActorOwn<td::HttpInboundConnection::Callback>(
                   td::create_actor<HttpStatConnection>("HttpStatConnection", client_manager));
@@ -613,7 +619,7 @@ int main(int argc, char *argv[]) {
       next_watchdog_kick_time = now + WATCHDOG_TIMEOUT / 2;
     }
 
-    if (now > last_tqueue_gc_time + 60.0) {
+    if (now > last_tqueue_gc_time + 60.0 && false) {
       auto unix_time = shared_data->get_unix_time(now);
       LOG(INFO) << "Run TQueue GC at " << unix_time;
       last_tqueue_gc_time = now;
