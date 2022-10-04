@@ -13,7 +13,7 @@ namespace telegram_bot_api {
 void Watchdog::kick() {
   auto now = td::Time::now();
   if (now >= last_kick_time_ + timeout_ && last_kick_time_ > 0) {
-    LOG(ERROR) << "Watchdog timeout expired after " << now - last_kick_time_ << " seconds";
+    LOG(ERROR) << get_name() << " timeout expired after " << now - last_kick_time_ << " seconds";
     td::thread::send_real_time_signal(main_thread_id_, 2);
   }
   last_kick_time_ = now;

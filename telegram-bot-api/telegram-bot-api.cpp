@@ -506,7 +506,7 @@ int main(int argc, char *argv[]) {
 
   // +3 threads for Td
   // one thread for ClientManager and all Clients
-  // one thread for watchdog
+  // one thread for watchdogs
   // one thread for slow HTTP connections
   // one thread for DNS resolving
   const int thread_count = 7;

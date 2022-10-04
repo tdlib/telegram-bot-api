@@ -9,6 +9,7 @@
 #include "telegram-bot-api/Client.h"
 #include "telegram-bot-api/Query.h"
 #include "telegram-bot-api/Stats.h"
+#include "telegram-bot-api/Watchdog.h"
 
 #include "td/actor/actor.h"
 
@@ -68,6 +69,10 @@ class ClientManager final : public td::Actor {
   bool close_flag_ = false;
   td::vector<td::Promise<td::Unit>> close_promises_;
 
+  td::ActorOwn<Watchdog> watchdog_id_;
+
+  static constexpr double WATCHDOG_TIMEOUT = 0.5;
+
   static td::int64 get_tqueue_id(td::int64 user_id, bool is_test_dc);
 
   static PromisedQueryPtr get_webhook_restore_query(td::Slice token, td::Slice webhook_info,
@@ -75,6 +80,7 @@ class ClientManager final : public td::Actor {
 
   void start_up() final;
   void raw_event(const td::Event::Raw &event) final;
+  void timeout_expired() final;
   void hangup_shared() final;
   void close_db();
   void finish_close();

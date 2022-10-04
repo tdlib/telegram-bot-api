@@ -352,6 +352,11 @@ void ClientManager::start_up() {
     auto query = get_webhook_restore_query(key_value.first, key_value.second, parameters_->shared_data_);
     send_closure_later(actor_id(this), &ClientManager::send, std::move(query));
   }
+
+  // launch watchdog
+  watchdog_id_ = td::create_actor_on_scheduler<Watchdog>(
+      "ManagerWatchdog", td::Scheduler::instance()->sched_count() - 3, td::this_thread::get_id(), WATCHDOG_TIMEOUT);
+  set_timeout_in(600.0);
 }
 
 PromisedQueryPtr ClientManager::get_webhook_restore_query(td::Slice token, td::Slice webhook_info,
@@ -429,6 +434,11 @@ void ClientManager::raw_event(const td::Event::Raw &event) {
   }
 }
 
+void ClientManager::timeout_expired() {
+  send_closure(watchdog_id_, &Watchdog::kick);
+  set_timeout_in(WATCHDOG_TIMEOUT / 2);
+}
+
 void ClientManager::hangup_shared() {
   auto id = get_link_token();
   auto *info = clients_.get(id);
@@ -458,11 +468,14 @@ void ClientManager::close_db() {
 
 void ClientManager::finish_close() {
   LOG(WARNING) << "Stop ClientManager";
+  watchdog_id_.reset();
   auto promises = std::move(close_promises_);
   for (auto &promise : promises) {
     promise.set_value(td::Unit());
   }
   stop();
 }
+
+constexpr double ClientManager::WATCHDOG_TIMEOUT;
 
 }  // namespace telegram_bot_api
