@@ -7014,11 +7014,8 @@ void Client::on_cmd(PromisedQueryPtr query) {
     }
   }
 
-  if (logging_out_) {
-    return fail_query(LOGGING_OUT_ERROR_CODE, get_logging_out_error_description(), std::move(query));
-  }
-  if (closing_) {
-    return fail_query(CLOSING_ERROR_CODE, CLOSING_ERROR_DESCRIPTION, std::move(query));
+  if (logging_out_ || closing_) {
+    return fail_query_closing(std::move(query));
   }
   CHECK(was_authorized_);
 
@@ -8791,6 +8788,9 @@ bool Client::get_webhook_fix_ip_address(const Query *query) {
 
 void Client::do_set_webhook(PromisedQueryPtr query, bool was_deleted) {
   CHECK(webhook_url_.empty());
+  if (logging_out_ || closing_) {
+    return fail_query_closing(std::move(query));
+  }
   if (to_bool(query->arg("drop_pending_updates"))) {
     clear_tqueue();
   }
@@ -8859,6 +8859,9 @@ void Client::finish_set_webhook(PromisedQueryPtr query) {
   CHECK(!active_webhook_set_query_);
   CHECK(!webhook_set_query_);
   CHECK(webhook_url_.empty());
+  if (logging_out_ || closing_) {
+    return fail_query_closing(std::move(query));
+  }
   Slice new_url = query->arg("url");
   CHECK(!new_url.empty());
   webhook_url_ = new_url.str();
@@ -8983,6 +8986,16 @@ void Client::fail_query_conflict(Slice message, PromisedQueryPtr &&query) {
         }))
         .release();
   }
+}
+
+void Client::fail_query_closing(PromisedQueryPtr &&query) const {
+  if (logging_out_) {
+    return fail_query(LOGGING_OUT_ERROR_CODE, get_logging_out_error_description(), std::move(query));
+  }
+  if (closing_) {
+    return fail_query(CLOSING_ERROR_CODE, CLOSING_ERROR_DESCRIPTION, std::move(query));
+  }
+  UNREACHABLE();
 }
 
 class Client::JsonUpdates final : public Jsonable {

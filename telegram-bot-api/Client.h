@@ -600,6 +600,8 @@ class Client final : public WebhookActor::Callback {
 
   void abort_long_poll(bool from_set_webhook);
 
+  void fail_query_closing(PromisedQueryPtr &&query) const;
+
   void fail_query_conflict(Slice message, PromisedQueryPtr &&query);
 
   static void fail_query_with_error(PromisedQueryPtr query, int32 error_code, Slice error_message,
