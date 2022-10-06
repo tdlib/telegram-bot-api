@@ -6,7 +6,6 @@
 //
 #include "telegram-bot-api/ClientManager.h"
 
-#include "telegram-bot-api/Client.h"
 #include "telegram-bot-api/ClientParameters.h"
 #include "telegram-bot-api/WebhookActor.h"
 
@@ -36,6 +35,8 @@
 #include "td/utils/StringBuilder.h"
 #include "td/utils/Time.h"
 
+#include "memprof/memprof.h"
+
 #include <algorithm>
 #include <tuple>
 
@@ -48,6 +49,7 @@ void ClientManager::close(td::Promise<td::Unit> &&promise) {
   }
 
   close_flag_ = true;
+  dump_statistics();
   auto ids = clients_.ids();
   for (auto id : ids) {
     auto *client_info = clients_.get(id);
@@ -417,6 +419,61 @@ PromisedQueryPtr ClientManager::get_webhook_restore_query(td::Slice token, td::S
                                       td::vector<std::pair<td::MutableSlice, td::MutableSlice>>(),
                                       td::vector<td::HttpFile>(), std::move(shared_data), td::IPAddress(), true);
   return PromisedQueryPtr(query.release(), PromiseDeleter(td::Promise<td::unique_ptr<Query>>()));
+}
+
+void ClientManager::dump_statistics() {
+  if (is_memprof_on()) {
+    LOG(WARNING) << "Memory dump:";
+    td::vector<AllocInfo> v;
+    dump_alloc([&](const AllocInfo &info) { v.push_back(info); });
+    std::sort(v.begin(), v.end(), [](const AllocInfo &a, const AllocInfo &b) { return a.size > b.size; });
+    size_t total_size = 0;
+    size_t other_size = 0;
+    int count = 0;
+    for (auto &info : v) {
+      if (count++ < 50) {
+        LOG(WARNING) << td::format::as_size(info.size) << td::format::as_array(info.backtrace);
+      } else {
+        other_size += info.size;
+      }
+      total_size += info.size;
+    }
+    LOG(WARNING) << td::tag("other", td::format::as_size(other_size));
+    LOG(WARNING) << td::tag("total size", td::format::as_size(total_size));
+    LOG(WARNING) << td::tag("total traces", get_ht_size());
+    LOG(WARNING) << td::tag("fast_backtrace_success_rate", get_fast_backtrace_success_rate());
+  }
+  auto r_mem_stat = td::mem_stat();
+  if (r_mem_stat.is_ok()) {
+    auto mem_stat = r_mem_stat.move_as_ok();
+    LOG(WARNING) << td::tag("rss", td::format::as_size(mem_stat.resident_size_));
+    LOG(WARNING) << td::tag("vm", td::format::as_size(mem_stat.virtual_size_));
+    LOG(WARNING) << td::tag("rss_peak", td::format::as_size(mem_stat.resident_size_peak_));
+    LOG(WARNING) << td::tag("vm_peak", td::format::as_size(mem_stat.virtual_size_peak_));
+  }
+  LOG(WARNING) << td::tag("buffer_mem", td::format::as_size(td::BufferAllocator::get_buffer_mem()));
+  LOG(WARNING) << td::tag("buffer_slice_size", td::format::as_size(td::BufferAllocator::get_buffer_slice_size()));
+
+  const auto &shared_data = parameters_->shared_data_;
+  auto query_list_size = shared_data->query_list_size_.load(std::memory_order_relaxed);
+  auto query_count = shared_data->query_count_.load(std::memory_order_relaxed);
+  LOG(WARNING) << td::tag("pending queries", query_count) << td::tag("pending requests", query_list_size);
+
+  td::uint64 i = 0;
+  bool was_gap = false;
+  for (auto end = &shared_data->query_list_, cur = end->prev; cur != end; cur = cur->prev, i++) {
+    if (i < 20 || i > query_list_size - 20 || i % (query_list_size / 50 + 1) == 0) {
+      if (was_gap) {
+        LOG(WARNING) << "...";
+        was_gap = false;
+      }
+      LOG(WARNING) << static_cast<const Query &>(*cur);
+    } else {
+      was_gap = true;
+    }
+  }
+
+  td::dump_pending_network_queries(*parameters_->net_query_stats_);
 }
 
 void ClientManager::raw_event(const td::Event::Raw &event) {

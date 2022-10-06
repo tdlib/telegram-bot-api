@@ -9,11 +9,8 @@
 #include "telegram-bot-api/HttpConnection.h"
 #include "telegram-bot-api/HttpServer.h"
 #include "telegram-bot-api/HttpStatConnection.h"
-#include "telegram-bot-api/Query.h"
 #include "telegram-bot-api/Stats.h"
 #include "telegram-bot-api/Watchdog.h"
-
-#include "td/telegram/ClientActor.h"
 
 #include "td/db/binlog/Binlog.h"
 
@@ -23,13 +20,11 @@
 #include "td/actor/actor.h"
 #include "td/actor/ConcurrentScheduler.h"
 
-#include "td/utils/buffer.h"
 #include "td/utils/CombinedLog.h"
 #include "td/utils/common.h"
 #include "td/utils/crypto.h"
 #include "td/utils/ExitGuard.h"
 #include "td/utils/FileLog.h"
-#include "td/utils/format.h"
 //#include "td/utils/GitInfo.h"
 #include "td/utils/logging.h"
 #include "td/utils/MemoryLog.h"
@@ -42,7 +37,6 @@
 #include "td/utils/port/rlimit.h"
 #include "td/utils/port/signals.h"
 #include "td/utils/port/stacktrace.h"
-#include "td/utils/port/Stat.h"
 #include "td/utils/port/thread.h"
 #include "td/utils/port/user.h"
 #include "td/utils/Promise.h"
@@ -52,9 +46,6 @@
 #include "td/utils/Time.h"
 #include "td/utils/TsLog.h"
 
-#include "memprof/memprof.h"
-
-#include <algorithm>
 #include <atomic>
 #include <cstdlib>
 #include <memory>
@@ -121,61 +112,6 @@ static void dump_log_signal_handler(int sig) {
 static void sigsegv_signal_handler(int signum, void *addr) {
   td::signal_safe_write_pointer(addr);
   fail_signal_handler(signum);
-}
-
-static void dump_statistics(const std::shared_ptr<SharedData> &shared_data,
-                            const std::shared_ptr<td::NetQueryStats> &net_query_stats) {
-  if (is_memprof_on()) {
-    LOG(WARNING) << "Memory dump:";
-    td::vector<AllocInfo> v;
-    dump_alloc([&](const AllocInfo &info) { v.push_back(info); });
-    std::sort(v.begin(), v.end(), [](const AllocInfo &a, const AllocInfo &b) { return a.size > b.size; });
-    size_t total_size = 0;
-    size_t other_size = 0;
-    int count = 0;
-    for (auto &info : v) {
-      if (count++ < 50) {
-        LOG(WARNING) << td::format::as_size(info.size) << td::format::as_array(info.backtrace);
-      } else {
-        other_size += info.size;
-      }
-      total_size += info.size;
-    }
-    LOG(WARNING) << td::tag("other", td::format::as_size(other_size));
-    LOG(WARNING) << td::tag("total size", td::format::as_size(total_size));
-    LOG(WARNING) << td::tag("total traces", get_ht_size());
-    LOG(WARNING) << td::tag("fast_backtrace_success_rate", get_fast_backtrace_success_rate());
-  }
-  auto r_mem_stat = td::mem_stat();
-  if (r_mem_stat.is_ok()) {
-    auto mem_stat = r_mem_stat.move_as_ok();
-    LOG(WARNING) << td::tag("rss", td::format::as_size(mem_stat.resident_size_));
-    LOG(WARNING) << td::tag("vm", td::format::as_size(mem_stat.virtual_size_));
-    LOG(WARNING) << td::tag("rss_peak", td::format::as_size(mem_stat.resident_size_peak_));
-    LOG(WARNING) << td::tag("vm_peak", td::format::as_size(mem_stat.virtual_size_peak_));
-  }
-  LOG(WARNING) << td::tag("buffer_mem", td::format::as_size(td::BufferAllocator::get_buffer_mem()));
-  LOG(WARNING) << td::tag("buffer_slice_size", td::format::as_size(td::BufferAllocator::get_buffer_slice_size()));
-
-  auto query_list_size = shared_data->query_list_size_.load(std::memory_order_relaxed);
-  auto query_count = shared_data->query_count_.load(std::memory_order_relaxed);
-  LOG(WARNING) << td::tag("pending queries", query_count) << td::tag("pending requests", query_list_size);
-  /*
-  td::uint64 i = 0;
-  bool was_gap = false;
-  for (auto end = &shared_data->query_list_, cur = end->prev; cur != end; cur = cur->prev, i++) {
-    if (i < 20 || i > query_list_size - 20 || i % (query_list_size / 50 + 1) == 0) {
-      if (was_gap) {
-        LOG(WARNING) << "...";
-        was_gap = false;
-      }
-      LOG(WARNING) << static_cast<const Query &>(*cur);
-    } else {
-      was_gap = true;
-    }
-  }
-*/
-  td::dump_pending_network_queries(*net_query_stats);
 }
 
 int main(int argc, char *argv[]) {
@@ -416,7 +352,7 @@ int main(int argc, char *argv[]) {
       TRY_RESULT_PREFIX_ASSIGN(working_directory, td::realpath(working_directory, true),
                                "Invalid working directory specified: ");
       if (working_directory.empty()) {
-        return td::Status::Error("Working directory can't be empty");
+        return td::Status::Error("Empty path specified as working directory");
       }
       if (working_directory.back() != TD_DIR_SLASH) {
         working_directory += TD_DIR_SLASH;
@@ -567,7 +503,6 @@ int main(int argc, char *argv[]) {
       }
 
       LOG(WARNING) << "Stopping engine with uptime " << (td::Time::now() - start_time) << " seconds by a signal";
-      dump_statistics(shared_data, net_query_stats);
       close_flag = true;
       auto guard = sched.get_main_guard();
       watchdog_id.reset();
@@ -597,7 +532,8 @@ int main(int argc, char *argv[]) {
 
     if (!need_dump_log.test_and_set()) {
       print_log();
-      dump_statistics(shared_data, net_query_stats);
+      auto guard = sched.get_main_guard();
+      send_closure(client_manager, &ClientManager::dump_statistics);
     }
 
     double now = td::Time::now();
@@ -617,12 +553,15 @@ int main(int argc, char *argv[]) {
 
     if (now > last_dump_time + 300.0) {
       last_dump_time = now;
-      dump_statistics(shared_data, net_query_stats);
+      auto guard = sched.get_main_guard();
+      send_closure(client_manager, &ClientManager::dump_statistics);
     }
   }
 
   LOG(WARNING) << "--------------------FINISH ENGINE--------------------";
-  CHECK(net_query_stats.use_count() == 1);
+  if (net_query_stats.use_count() != 1) {
+    LOG(ERROR) << "NetQueryStats have leaked";
+  }
   net_query_stats = nullptr;
   sched.finish();
   SET_VERBOSITY_LEVEL(VERBOSITY_NAME(FATAL));

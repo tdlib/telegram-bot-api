@@ -6806,7 +6806,7 @@ td::Result<td_api::object_ptr<td_api::inputMessageInvoice>> Client::get_input_me
   auto send_email_address_to_provider = to_bool(query->arg("send_email_to_provider"));
   auto is_flexible = to_bool(query->arg("is_flexible"));
 
-  td_api::object_ptr<td_api::InputMessageContent> extended_media;
+  object_ptr<td_api::InputMessageContent> extended_media;
   if (!query->arg("extended_media").empty()) {
     TRY_RESULT_ASSIGN(extended_media, get_input_media(query, "extended_media"));
   }

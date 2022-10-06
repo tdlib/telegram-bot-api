@@ -42,6 +42,8 @@ class ClientManager final : public td::Actor {
       : parameters_(std::move(parameters)), token_range_(token_range) {
   }
 
+  void dump_statistics();
+
   void send(PromisedQueryPtr query);
 
   void get_stats(td::Promise<td::BufferSlice> promise, td::vector<std::pair<td::string, td::string>> args);
