@@ -70,6 +70,9 @@ class ClientManager final : public td::Actor {
   td::vector<td::Promise<td::Unit>> close_promises_;
 
   td::ActorOwn<Watchdog> watchdog_id_;
+  double last_tqueue_gc_time_ = 0.0;
+  td::int64 tqueue_deleted_events_ = 0;
+  td::int64 last_tqueue_deleted_events_ = 0;
 
   static constexpr double WATCHDOG_TIMEOUT = 0.5;
 
