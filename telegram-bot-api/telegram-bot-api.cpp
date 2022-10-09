@@ -20,11 +20,11 @@
 #include "td/actor/actor.h"
 #include "td/actor/ConcurrentScheduler.h"
 
+#include "td/utils/AsyncFileLog.h"
 #include "td/utils/CombinedLog.h"
 #include "td/utils/common.h"
 #include "td/utils/crypto.h"
 #include "td/utils/ExitGuard.h"
-#include "td/utils/FileLog.h"
 //#include "td/utils/GitInfo.h"
 #include "td/utils/logging.h"
 #include "td/utils/MemoryLog.h"
@@ -44,7 +44,6 @@
 #include "td/utils/SliceBuilder.h"
 #include "td/utils/Status.h"
 #include "td/utils/Time.h"
-#include "td/utils/TsLog.h"
 
 #include <atomic>
 #include <cstdlib>
@@ -315,8 +314,7 @@ int main(int argc, char *argv[]) {
   log.set_second(&memory_log);
   td::log_interface = &log;
 
-  td::FileLog file_log;
-  td::TsLog ts_log(&file_log);
+  td::AsyncFileLog file_log;
 
   auto init_status = [&] {
 #if TD_HAVE_THREAD_AFFINITY
@@ -408,13 +406,13 @@ int main(int argc, char *argv[]) {
         log_file_path = working_directory + log_file_path;
       }
       TRY_STATUS_PREFIX(file_log.init(log_file_path, log_max_file_size), "Can't open log file: ");
-      log.set_first(&ts_log);
+      log.set_first(&file_log);
     }
 
     return td::Status::OK();
   }();
   if (init_status.is_error()) {
-    LOG(PLAIN) << init_status.error().message();
+    LOG(PLAIN) << init_status.message();
     LOG(PLAIN) << options;
     return 1;
   }

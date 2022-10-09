@@ -29,6 +29,7 @@
 #include "td/utils/Parser.h"
 #include "td/utils/port/IPAddress.h"
 #include "td/utils/port/Stat.h"
+#include "td/utils/port/thread.h"
 #include "td/utils/Slice.h"
 #include "td/utils/SliceBuilder.h"
 #include "td/utils/StackAllocator.h"
@@ -38,6 +39,7 @@
 #include "memprof/memprof.h"
 
 #include <algorithm>
+#include <atomic>
 #include <tuple>
 
 namespace telegram_bot_api {
@@ -341,7 +343,7 @@ void ClientManager::start_up() {
   auto concurrent_webhook_db = td::make_unique<td::BinlogKeyValue<td::ConcurrentBinlog>>();
   auto status = concurrent_webhook_db->init(parameters_->working_directory_ + "webhooks_db.binlog", td::DbKey::empty(),
                                             scheduler_id);
-  LOG_IF(FATAL, status.is_error()) << "Can't open webhooks_db.binlog " << status.error();
+  LOG_IF(FATAL, status.is_error()) << "Can't open webhooks_db.binlog " << status;
   parameters_->shared_data_->webhook_db_ = std::move(concurrent_webhook_db);
 
   auto &webhook_db = *parameters_->shared_data_->webhook_db_;

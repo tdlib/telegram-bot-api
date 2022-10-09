@@ -6,6 +6,7 @@
 //
 #include "telegram-bot-api/Watchdog.h"
 
+#include "td/utils/logging.h"
 #include "td/utils/Time.h"
 
 namespace telegram_bot_api {

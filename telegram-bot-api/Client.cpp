@@ -6593,7 +6593,7 @@ td::Result<td_api::object_ptr<td_api::chatPermissions>> Client::get_chat_permiss
     }();
 
     if (status.is_error()) {
-      return Status::Error(400, PSLICE() << "Can't parse chat permissions: " << status.error().message());
+      return Status::Error(400, PSLICE() << "Can't parse chat permissions: " << status.message());
     }
   } else if (allow_legacy) {
     allow_legacy = false;

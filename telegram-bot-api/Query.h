@@ -23,6 +23,7 @@
 #include "td/utils/StringBuilder.h"
 
 #include <algorithm>
+#include <atomic>
 #include <memory>
 #include <utility>
 
