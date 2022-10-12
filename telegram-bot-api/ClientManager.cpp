@@ -51,6 +51,7 @@ void ClientManager::close(td::Promise<td::Unit> &&promise) {
   }
 
   close_flag_ = true;
+  watchdog_id_.reset();
   dump_statistics();
   auto ids = clients_.ids();
   for (auto id : ids) {
@@ -543,7 +544,6 @@ void ClientManager::close_db() {
 
 void ClientManager::finish_close() {
   LOG(WARNING) << "Stop ClientManager";
-  watchdog_id_.reset();
   auto promises = std::move(close_promises_);
   for (auto &promise : promises) {
     promise.set_value(td::Unit());
