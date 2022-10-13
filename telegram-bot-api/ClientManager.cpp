@@ -337,7 +337,7 @@ void ClientManager::start_up() {
 
     LOG(WARNING) << "Loaded " << loaded_event_count << " TQueue events in " << (td::Time::now() - load_start_time)
                  << " seconds";
-    last_tqueue_gc_time_ = td::Time::now();
+    next_tqueue_gc_time_ = td::Time::now() + 600;
   }
 
   // init webhook_db
@@ -500,12 +500,14 @@ void ClientManager::timeout_expired() {
   set_timeout_in(WATCHDOG_TIMEOUT / 2);
 
   double now = td::Time::now();
-  if (now > last_tqueue_gc_time_ + 60.0) {
+  if (now > next_tqueue_gc_time_) {
     auto unix_time = parameters_->shared_data_->get_unix_time(now);
     LOG(INFO) << "Run TQueue GC at " << unix_time;
-    last_tqueue_gc_time_ = now;
-    auto deleted_events = parameters_->shared_data_->tqueue_->run_gc(unix_time);
+    td::int64 deleted_events;
+    bool is_finished;
+    std::tie(deleted_events, is_finished) = parameters_->shared_data_->tqueue_->run_gc(unix_time);
     LOG(INFO) << "TQueue GC deleted " << deleted_events << " events";
+    next_tqueue_gc_time_ = td::Time::now() + (is_finished ? 60.0 : 1.0);
 
     tqueue_deleted_events_ += deleted_events;
     if (tqueue_deleted_events_ > last_tqueue_deleted_events_ + 10000) {
