@@ -83,11 +83,17 @@ void print_log() {
   td::signal_safe_write("------------------------\n");
 }
 
+static std::atomic_bool has_failed{false};
+
 static void dump_stacktrace_signal_handler(int sig) {
+  if (has_failed) {
+    return;
+  }
   td::Stacktrace::print_to_stderr();
 }
 
 static void fail_signal_handler(int sig) {
+  has_failed = true;
   td::signal_safe_write_signal_number(sig);
   td::Stacktrace::PrintOptions options;
   options.use_gdb = true;
@@ -105,6 +111,9 @@ static void change_verbosity_level_signal_handler(int sig) {
 static std::atomic_flag need_dump_log;
 
 static void dump_log_signal_handler(int sig) {
+  if (has_failed) {
+    return;
+  }
   need_dump_log.clear();
 }
 
