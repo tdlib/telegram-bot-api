@@ -8518,6 +8518,9 @@ td::Status Client::process_get_updates_query(PromisedQueryPtr &query) {
   if (offset == previous_get_updates_offset_ && timeout < 3 && now < previous_get_updates_start_time_ + 3.0) {
     timeout = 3;
   }
+  if (offset == previous_get_updates_offset_ && now < previous_get_updates_start_time_ + 0.5) {
+    limit = 1;
+  }
   previous_get_updates_offset_ = offset;
   previous_get_updates_start_time_ = now;
   do_get_updates(offset, limit, timeout, std::move(query));
