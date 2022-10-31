@@ -664,6 +664,10 @@ class Client::JsonChat final : public Jsonable {
         }
         object("type", "private");
         if (is_full_) {
+          if (!user_info->active_usernames.empty()) {
+            object("active_usernames", td::json_array(user_info->active_usernames,
+                                                      [](Slice username) { return td::JsonString(username); }));
+          }
           if (!user_info->bio.empty()) {
             object("bio", user_info->bio);
           }
@@ -720,6 +724,10 @@ class Client::JsonChat final : public Jsonable {
           object("type", "channel");
         }
         if (is_full_) {
+          if (!supergroup_info->active_usernames.empty()) {
+            object("active_usernames", td::json_array(supergroup_info->active_usernames,
+                                                      [](Slice username) { return td::JsonString(username); }));
+          }
           if (!supergroup_info->description.empty()) {
             object("description", supergroup_info->description);
           }
