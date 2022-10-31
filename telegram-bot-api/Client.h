@@ -632,6 +632,7 @@ class Client final : public WebhookActor::Callback {
     td::vector<td::string> active_usernames;
     td::string editable_username;
     td::string language_code;
+    int64 emoji_status_custom_emoji_id;
 
     object_ptr<td_api::chatPhoto> photo;
     td::string bio;

@@ -668,6 +668,9 @@ class Client::JsonChat final : public Jsonable {
             object("active_usernames", td::json_array(user_info->active_usernames,
                                                       [](Slice username) { return td::JsonString(username); }));
           }
+          if (user_info->emoji_status_custom_emoji_id != 0) {
+            object("emoji_status_custom_emoji_id", user_info->emoji_status_custom_emoji_id);
+          }
           if (!user_info->bio.empty()) {
             object("bio", user_info->bio);
           }
@@ -9160,6 +9163,7 @@ void Client::add_user(UserInfo *user_info, object_ptr<td_api::user> &&user) {
     user_info->editable_username = std::move(user->usernames_->editable_username_);
   }
   user_info->language_code = std::move(user->language_code_);
+  user_info->emoji_status_custom_emoji_id = user->emoji_status_ != nullptr ? user->emoji_status_->custom_emoji_id_ : 0;
 
   user_info->have_access = user->have_access_;
   user_info->is_premium = user->is_premium_;
