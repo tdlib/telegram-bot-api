@@ -6155,12 +6155,14 @@ td::Result<td_api::object_ptr<td_api::chatAdministratorRights>> Client::get_chat
   TRY_RESULT(can_invite_users, get_json_object_bool_field(object, "can_invite_users"));
   TRY_RESULT(can_restrict_members, get_json_object_bool_field(object, "can_restrict_members"));
   TRY_RESULT(can_pin_messages, get_json_object_bool_field(object, "can_pin_messages"));
+  TRY_RESULT(can_manage_topics, get_json_object_bool_field(object, "can_manage_topics"));
   TRY_RESULT(can_promote_members, get_json_object_bool_field(object, "can_promote_members"));
   TRY_RESULT(can_manage_video_chats, get_json_object_bool_field(object, "can_manage_video_chats"));
   TRY_RESULT(is_anonymous, get_json_object_bool_field(object, "is_anonymous"));
-  return make_object<td_api::chatAdministratorRights>(
-      can_manage_chat, can_change_info, can_post_messages, can_edit_messages, can_delete_messages, can_invite_users,
-      can_restrict_members, can_pin_messages, false, can_promote_members, can_manage_video_chats, is_anonymous);
+  return make_object<td_api::chatAdministratorRights>(can_manage_chat, can_change_info, can_post_messages,
+                                                      can_edit_messages, can_delete_messages, can_invite_users,
+                                                      can_restrict_members, can_pin_messages, can_manage_topics,
+                                                      can_promote_members, can_manage_video_chats, is_anonymous);
 }
 
 td::Result<td_api::object_ptr<td_api::chatAdministratorRights>> Client::get_chat_administrator_rights(
@@ -8139,15 +8141,17 @@ td::Status Client::process_promote_chat_member_query(PromisedQueryPtr &query) {
   auto can_invite_users = to_bool(query->arg("can_invite_users"));
   auto can_restrict_members = to_bool(query->arg("can_restrict_members"));
   auto can_pin_messages = to_bool(query->arg("can_pin_messages"));
+  auto can_manage_topics = to_bool(query->arg("can_manage_topics"));
   auto can_promote_members = to_bool(query->arg("can_promote_members"));
   auto can_manage_video_chats =
       to_bool(query->arg("can_manage_voice_chats")) || to_bool(query->arg("can_manage_video_chats"));
   auto is_anonymous = to_bool(query->arg("is_anonymous"));
   auto status = make_object<td_api::chatMemberStatusAdministrator>(
       td::string(), true,
-      make_object<td_api::chatAdministratorRights>(
-          can_manage_chat, can_change_info, can_post_messages, can_edit_messages, can_delete_messages, can_invite_users,
-          can_restrict_members, can_pin_messages, false, can_promote_members, can_manage_video_chats, is_anonymous));
+      make_object<td_api::chatAdministratorRights>(can_manage_chat, can_change_info, can_post_messages,
+                                                   can_edit_messages, can_delete_messages, can_invite_users,
+                                                   can_restrict_members, can_pin_messages, can_manage_topics,
+                                                   can_promote_members, can_manage_video_chats, is_anonymous));
   check_chat(chat_id, AccessRights::Write, std::move(query),
              [this, user_id, status = std::move(status)](int64 chat_id, PromisedQueryPtr query) mutable {
                auto chat_info = get_chat(chat_id);
@@ -9470,6 +9474,9 @@ void Client::json_store_administrator_rights(td::JsonObjectScope &object, const 
   object("can_restrict_members", td::JsonBool(rights->can_restrict_members_));
   if (chat_type == ChatType::Group || chat_type == ChatType::Supergroup) {
     object("can_pin_messages", td::JsonBool(rights->can_pin_messages_));
+  }
+  if (chat_type == ChatType::Supergroup) {
+    object("can_manage_topics", td::JsonBool(rights->can_manage_topics_));
   }
   object("can_promote_members", td::JsonBool(rights->can_promote_members_));
   object("can_manage_video_chats", td::JsonBool(rights->can_manage_video_chats_));
