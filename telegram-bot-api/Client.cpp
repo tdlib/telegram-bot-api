@@ -1364,6 +1364,13 @@ class Client::JsonForumTopicCreated final : public Jsonable {
   const td_api::messageForumTopicCreated *forum_topic_created_;
 };
 
+class Client::JsonForumTopicIsClosedToggled final : public Jsonable {
+ public:
+  void store(JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+  }
+};
+
 class Client::JsonAddress final : public Jsonable {
  public:
   explicit JsonAddress(const td_api::address *address) : address_(address) {
@@ -1983,8 +1990,15 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
     }
     case td_api::messageForumTopicEdited::ID:
       break;
-    case td_api::messageForumTopicIsClosedToggled::ID:
+    case td_api::messageForumTopicIsClosedToggled::ID: {
+      auto content = static_cast<const td_api::messageForumTopicIsClosedToggled *>(message_->content.get());
+      if (content->is_closed_) {
+        object("forum_topic_closed", JsonForumTopicIsClosedToggled());
+      } else {
+        object("forum_topic_reopened", JsonForumTopicIsClosedToggled());
+      }
       break;
+    }
     case td_api::messagePinMessage::ID: {
       auto content = static_cast<const td_api::messagePinMessage *>(message_->content.get());
       auto message_id = content->message_id_;
@@ -9889,6 +9903,7 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       case td_api::messageVideoChatEnded::ID:
       case td_api::messageInviteVideoChatParticipants::ID:
       case td_api::messageForumTopicCreated::ID:
+      case td_api::messageForumTopicIsClosedToggled::ID:
         // don't skip
         break;
       default:
@@ -9988,8 +10003,6 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageGiftedPremium::ID:
       return true;
     case td_api::messageForumTopicEdited::ID:
-      return true;
-    case td_api::messageForumTopicIsClosedToggled::ID:
       return true;
     default:
       break;
