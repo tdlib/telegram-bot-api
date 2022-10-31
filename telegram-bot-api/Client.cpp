@@ -2077,6 +2077,9 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
   if (!message_->can_be_saved) {
     object("has_protected_content", td::JsonTrue());
   }
+  if (message_->is_topic_message) {
+    object("is_topic_message", td::JsonTrue());
+  }
 }
 
 class Client::JsonDeletedMessage final : public Jsonable {
@@ -10430,6 +10433,7 @@ Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message,
   }
 
   message_info->can_be_saved = message->can_be_saved_;
+  message_info->is_topic_message = message->is_topic_message_;
   message_info->author_signature = std::move(message->author_signature_);
 
   if (message->reply_in_chat_id_ != chat_id && message->reply_to_message_id_ != 0) {
