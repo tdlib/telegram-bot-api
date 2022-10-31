@@ -254,6 +254,7 @@ bool Client::init_methods() {
   methods_.emplace("setchatstickerset", &Client::process_set_chat_sticker_set_query);
   methods_.emplace("deletechatstickerset", &Client::process_delete_chat_sticker_set_query);
   methods_.emplace("getforumtopiciconstickers", &Client::process_get_forum_topic_icon_stickers_query);
+  methods_.emplace("createforumtopic", &Client::process_create_forum_topic_query);
   methods_.emplace("getchatmember", &Client::process_get_chat_member_query);
   methods_.emplace("getchatadministrators", &Client::process_get_chat_administrators_query);
   methods_.emplace("getchatmembercount", &Client::process_get_chat_member_count_query);
@@ -1370,6 +1371,24 @@ class Client::JsonForumTopicIsClosedToggled final : public Jsonable {
   void store(JsonValueScope *scope) const {
     auto object = scope->enter_object();
   }
+};
+
+class Client::JsonForumTopicInfo final : public Jsonable {
+ public:
+  explicit JsonForumTopicInfo(const td_api::forumTopicInfo *forum_topic_info) : forum_topic_info_(forum_topic_info) {
+  }
+  void store(JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("message_thread_id", as_client_message_id(forum_topic_info_->message_thread_id_));
+    object("name", forum_topic_info_->name_);
+    object("icon_color", forum_topic_info_->icon_->color_);
+    if (forum_topic_info_->icon_->custom_emoji_id_ != 0) {
+      object("icon_custom_emoji_id", forum_topic_info_->icon_->custom_emoji_id_);
+    }
+  }
+
+ private:
+  const td_api::forumTopicInfo *forum_topic_info_;
 };
 
 class Client::JsonAddress final : public Jsonable {
@@ -3497,6 +3516,25 @@ class Client::TdOnGetMyDefaultAdministratorRightsCallback final : public TdQuery
 
  private:
   bool for_channels_;
+  PromisedQueryPtr query_;
+};
+
+class Client::TdOnGetForumTopicInfoCallback final : public TdQueryCallback {
+ public:
+  explicit TdOnGetForumTopicInfoCallback(PromisedQueryPtr query) : query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::forumTopicInfo::ID);
+    auto forum_topic_info = move_object_as<td_api::forumTopicInfo>(result);
+    answer_query(JsonForumTopicInfo(forum_topic_info.get()), std::move(query_));
+  }
+
+ private:
   PromisedQueryPtr query_;
 };
 
@@ -8109,6 +8147,21 @@ td::Status Client::process_delete_chat_sticker_set_query(PromisedQueryPtr &query
 td::Status Client::process_get_forum_topic_icon_stickers_query(PromisedQueryPtr &query) {
   send_request(make_object<td_api::getForumTopicDefaultIcons>(),
                td::make_unique<TdOnGetStickersCallback>(this, std::move(query)));
+  return Status::OK();
+}
+
+td::Status Client::process_create_forum_topic_query(PromisedQueryPtr &query) {
+  auto chat_id = query->arg("chat_id");
+  auto name = query->arg("name");
+  int32 icon_color = get_integer_arg(query.get(), "icon_color", 0);
+  auto icon_custom_emoji_id = td::to_integer<int64>(query->arg("icon_custom_emoji_id"));
+
+  check_chat(chat_id, AccessRights::Write, std::move(query),
+             [this, name = name.str(), icon_color, icon_custom_emoji_id](int64 chat_id, PromisedQueryPtr query) {
+               send_request(make_object<td_api::createForumTopic>(
+                                chat_id, name, make_object<td_api::forumTopicIcon>(icon_color, icon_custom_emoji_id)),
+                            td::make_unique<TdOnGetForumTopicInfoCallback>(std::move(query)));
+             });
   return Status::OK();
 }
 
