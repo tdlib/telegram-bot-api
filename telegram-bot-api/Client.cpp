@@ -7480,6 +7480,7 @@ td::Status Client::process_forward_message_query(PromisedQueryPtr &query) {
 
 td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
+  auto message_thread_id = get_message_id(query.get(), "message_thread_id");
   auto reply_to_message_id = get_message_id(query.get(), "reply_to_message_id");
   auto allow_sending_without_reply = to_bool(query->arg("allow_sending_without_reply"));
   auto disable_notification = to_bool(query->arg("disable_notification"));
@@ -7490,10 +7491,10 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
 
   resolve_reply_markup_bot_usernames(
       std::move(reply_markup), std::move(query),
-      [this, chat_id = chat_id.str(), reply_to_message_id, allow_sending_without_reply, disable_notification,
-       protect_content, input_message_contents = std::move(input_message_contents)](
+      [this, chat_id = chat_id.str(), message_thread_id, reply_to_message_id, allow_sending_without_reply,
+       disable_notification, protect_content, input_message_contents = std::move(input_message_contents)](
           object_ptr<td_api::ReplyMarkup> reply_markup, PromisedQueryPtr query) mutable {
-        auto on_success = [this, disable_notification, protect_content,
+        auto on_success = [this, message_thread_id, disable_notification, protect_content,
                            input_message_contents = std::move(input_message_contents),
                            reply_markup = std::move(reply_markup)](int64 chat_id, int64 reply_to_message_id,
                                                                    PromisedQueryPtr query) mutable {
@@ -7503,7 +7504,7 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
           }
 
           send_request(
-              make_object<td_api::sendMessageAlbum>(chat_id, 0, reply_to_message_id,
+              make_object<td_api::sendMessageAlbum>(chat_id, message_thread_id, reply_to_message_id,
                                                     get_message_send_options(disable_notification, protect_content),
                                                     std::move(input_message_contents), false),
               td::make_unique<TdOnSendMessageAlbumCallback>(this, std::move(query)));
@@ -8964,6 +8965,7 @@ void Client::finish_set_webhook(PromisedQueryPtr query) {
 
 void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_message_content, PromisedQueryPtr query) {
   auto chat_id = query->arg("chat_id");
+  auto message_thread_id = get_message_id(query.get(), "message_thread_id");
   auto reply_to_message_id = get_message_id(query.get(), "reply_to_message_id");
   auto allow_sending_without_reply = to_bool(query->arg("allow_sending_without_reply"));
   auto disable_notification = to_bool(query->arg("disable_notification"));
@@ -8976,10 +8978,10 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
 
   resolve_reply_markup_bot_usernames(
       std::move(reply_markup), std::move(query),
-      [this, chat_id = chat_id.str(), reply_to_message_id, allow_sending_without_reply, disable_notification,
-       protect_content, input_message_content = std::move(input_message_content)](
+      [this, chat_id = chat_id.str(), message_thread_id, reply_to_message_id, allow_sending_without_reply,
+       disable_notification, protect_content, input_message_content = std::move(input_message_content)](
           object_ptr<td_api::ReplyMarkup> reply_markup, PromisedQueryPtr query) mutable {
-        auto on_success = [this, disable_notification, protect_content,
+        auto on_success = [this, message_thread_id, disable_notification, protect_content,
                            input_message_content = std::move(input_message_content),
                            reply_markup = std::move(reply_markup)](int64 chat_id, int64 reply_to_message_id,
                                                                    PromisedQueryPtr query) mutable {
@@ -8988,7 +8990,7 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
             return query->set_retry_after_error(60);
           }
 
-          send_request(make_object<td_api::sendMessage>(chat_id, 0, reply_to_message_id,
+          send_request(make_object<td_api::sendMessage>(chat_id, message_thread_id, reply_to_message_id,
                                                         get_message_send_options(disable_notification, protect_content),
                                                         std::move(reply_markup), std::move(input_message_content)),
                        td::make_unique<TdOnSendMessageCallback>(this, std::move(query)));
