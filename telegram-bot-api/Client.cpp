@@ -1346,6 +1346,24 @@ class Client::JsonPollAnswer final : public Jsonable {
   const Client *client_;
 };
 
+class Client::JsonForumTopicCreated final : public Jsonable {
+ public:
+  explicit JsonForumTopicCreated(const td_api::messageForumTopicCreated *forum_topic_created)
+      : forum_topic_created_(forum_topic_created) {
+  }
+  void store(JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("name", forum_topic_created_->name_);
+    object("icon_color", forum_topic_created_->icon_->color_);
+    if (forum_topic_created_->icon_->custom_emoji_id_ != 0) {
+      object("icon_custom_emoji_id", forum_topic_created_->icon_->custom_emoji_id_);
+    }
+  }
+
+ private:
+  const td_api::messageForumTopicCreated *forum_topic_created_;
+};
+
 class Client::JsonAddress final : public Jsonable {
  public:
   explicit JsonAddress(const td_api::address *address) : address_(address) {
@@ -1958,8 +1976,11 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
       object("migrate_from_chat_id", td::JsonLong(chat_id));
       break;
     }
-    case td_api::messageForumTopicCreated::ID:
+    case td_api::messageForumTopicCreated::ID: {
+      auto content = static_cast<const td_api::messageForumTopicCreated *>(message_->content.get());
+      object("forum_topic_created", JsonForumTopicCreated(content));
       break;
+    }
     case td_api::messageForumTopicEdited::ID:
       break;
     case td_api::messageForumTopicIsClosedToggled::ID:
@@ -9867,6 +9888,7 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       case td_api::messageVideoChatStarted::ID:
       case td_api::messageVideoChatEnded::ID:
       case td_api::messageInviteVideoChatParticipants::ID:
+      case td_api::messageForumTopicCreated::ID:
         // don't skip
         break;
       default:
@@ -9964,8 +9986,6 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageWebAppDataSent::ID:
       return true;
     case td_api::messageGiftedPremium::ID:
-      return true;
-    case td_api::messageForumTopicCreated::ID:
       return true;
     case td_api::messageForumTopicEdited::ID:
       return true;
