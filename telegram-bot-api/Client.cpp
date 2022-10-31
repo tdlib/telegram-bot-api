@@ -355,8 +355,8 @@ class Client::JsonUser final : public Jsonable {
     if (user_info != nullptr && !user_info->last_name.empty()) {
       object("last_name", user_info->last_name);
     }
-    if (user_info != nullptr && !user_info->username.empty()) {
-      object("username", user_info->username);
+    if (user_info != nullptr && !user_info->active_usernames.empty()) {
+      object("username", user_info->active_usernames[0]);
     }
     if (user_info != nullptr && !user_info->language_code.empty()) {
       object("language_code", user_info->language_code);
@@ -659,8 +659,8 @@ class Client::JsonChat final : public Jsonable {
         if (!user_info->last_name.empty()) {
           object("last_name", user_info->last_name);
         }
-        if (!user_info->username.empty()) {
-          object("username", user_info->username);
+        if (!user_info->active_usernames.empty()) {
+          object("username", user_info->active_usernames[0]);
         }
         object("type", "private");
         if (is_full_) {
@@ -707,8 +707,8 @@ class Client::JsonChat final : public Jsonable {
 
         auto supergroup_info = client_->get_supergroup_info(chat_info->supergroup_id);
         CHECK(supergroup_info != nullptr);
-        if (!supergroup_info->username.empty()) {
-          object("username", supergroup_info->username);
+        if (!supergroup_info->active_usernames.empty()) {
+          object("username", supergroup_info->active_usernames[0]);
         }
 
         if (supergroup_info->is_supergroup) {
@@ -1941,6 +1941,12 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
       object("migrate_from_chat_id", td::JsonLong(chat_id));
       break;
     }
+    case td_api::messageForumTopicCreated::ID:
+      break;
+    case td_api::messageForumTopicEdited::ID:
+      break;
+    case td_api::messageForumTopicIsClosedToggled::ID:
+      break;
     case td_api::messagePinMessage::ID: {
       auto content = static_cast<const td_api::messagePinMessage *>(message_->content.get());
       auto message_id = content->message_id_;
@@ -3817,7 +3823,7 @@ ServerBotInfo Client::get_bot_info() const {
   res.token_ = bot_token_;
   auto user_info = get_user_info(my_id_);
   if (user_info != nullptr) {
-    res.username_ = user_info->username;
+    res.username_ = user_info->editable_username;
   } else if (!was_authorized_) {
     res.username_ = "<unauthorized>";
   } else {
@@ -4114,7 +4120,7 @@ void Client::check_chat_access(int64 chat_id, AccessRights access_rights, const 
     case ChatInfo::Type::Supergroup: {
       auto supergroup_info = get_supergroup_info(chat_info->supergroup_id);
       CHECK(supergroup_info != nullptr);
-      bool is_public = !supergroup_info->username.empty() || supergroup_info->has_location;
+      bool is_public = !supergroup_info->active_usernames.empty() || supergroup_info->has_location;
       if (supergroup_info->status->get_id() == td_api::chatMemberStatusBanned::ID) {
         if (supergroup_info->is_supergroup) {
           return fail_query(403, "Forbidden: bot was kicked from the supergroup chat", std::move(query));
@@ -4518,7 +4524,7 @@ void Client::on_update_authorization_state() {
       }
 
       if (!was_authorized_) {
-        LOG(WARNING) << "Logged in as @" << user_info->username;
+        LOG(WARNING) << "Logged in as @" << user_info->editable_username;
         was_authorized_ = true;
         td::send_event(parent_, td::Event::raw(static_cast<void *>(this)));
         update_shared_unix_time_difference();
@@ -5139,7 +5145,7 @@ td::Result<td_api::object_ptr<td_api::inlineKeyboardButton>> Client::get_inline_
         }
       }
       if (cur_temp_bot_user_id_ >= 100000) {
-        return Status::Error(400, "Too much different LoginUrl bot usernames");
+        return Status::Error(400, "Too many different LoginUrl bot usernames");
       }
       auto &user_id = bot_user_ids_[bot_username];
       if (user_id == 0) {
@@ -6140,7 +6146,7 @@ td::Result<td_api::object_ptr<td_api::chatAdministratorRights>> Client::get_chat
   TRY_RESULT(is_anonymous, get_json_object_bool_field(object, "is_anonymous"));
   return make_object<td_api::chatAdministratorRights>(
       can_manage_chat, can_change_info, can_post_messages, can_edit_messages, can_delete_messages, can_invite_users,
-      can_restrict_members, can_pin_messages, can_promote_members, can_manage_video_chats, is_anonymous);
+      can_restrict_members, can_pin_messages, false, can_promote_members, can_manage_video_chats, is_anonymous);
 }
 
 td::Result<td_api::object_ptr<td_api::chatAdministratorRights>> Client::get_chat_administrator_rights(
@@ -6620,7 +6626,7 @@ td::Result<td_api::object_ptr<td_api::chatPermissions>> Client::get_chat_permiss
   }
   return make_object<td_api::chatPermissions>(can_send_messages, can_send_media_messages, can_send_polls,
                                               can_send_other_messages, can_add_web_page_previews, can_change_info,
-                                              can_invite_users, can_pin_messages);
+                                              can_invite_users, can_pin_messages, false);
 }
 
 td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_media(const Query *query,
@@ -8127,7 +8133,7 @@ td::Status Client::process_promote_chat_member_query(PromisedQueryPtr &query) {
       td::string(), true,
       make_object<td_api::chatAdministratorRights>(
           can_manage_chat, can_change_info, can_post_messages, can_edit_messages, can_delete_messages, can_invite_users,
-          can_restrict_members, can_pin_messages, can_promote_members, can_manage_video_chats, is_anonymous));
+          can_restrict_members, can_pin_messages, false, can_promote_members, can_manage_video_chats, is_anonymous));
   check_chat(chat_id, AccessRights::Write, std::move(query),
              [this, user_id, status = std::move(status)](int64 chat_id, PromisedQueryPtr query) mutable {
                auto chat_info = get_chat(chat_id);
@@ -9135,7 +9141,13 @@ void Client::long_poll_wakeup(bool force_flag) {
 void Client::add_user(UserInfo *user_info, object_ptr<td_api::user> &&user) {
   user_info->first_name = std::move(user->first_name_);
   user_info->last_name = std::move(user->last_name_);
-  user_info->username = std::move(user->username_);
+  if (user->usernames_ == nullptr) {
+    user_info->active_usernames.clear();
+    user_info->editable_username.clear();
+  } else {
+    user_info->active_usernames = std::move(user->usernames_->active_usernames_);
+    user_info->editable_username = std::move(user->usernames_->editable_username_);
+  }
   user_info->language_code = std::move(user->language_code_);
 
   user_info->have_access = user->have_access_;
@@ -9231,7 +9243,13 @@ void Client::set_group_invite_link(int64 group_id, td::string &&invite_link) {
 }
 
 void Client::add_supergroup(SupergroupInfo *supergroup_info, object_ptr<td_api::supergroup> &&supergroup) {
-  supergroup_info->username = std::move(supergroup->username_);
+  if (supergroup->usernames_ == nullptr) {
+    supergroup_info->active_usernames.clear();
+    supergroup_info->editable_username.clear();
+  } else {
+    supergroup_info->active_usernames = std::move(supergroup->usernames_->active_usernames_);
+    supergroup_info->editable_username = std::move(supergroup->usernames_->editable_username_);
+  }
   supergroup_info->date = supergroup->date_;
   supergroup_info->status = std::move(supergroup->status_);
   supergroup_info->is_supergroup = !supergroup->is_channel_;
@@ -9351,7 +9369,7 @@ td::string Client::get_chat_description(int64 chat_id) const {
       }
       return PSTRING() << (supergroup_info->is_supergroup ? "supergroup" : "channel") << " chat " << chat_id
                        << ", chat status = " << to_string(supergroup_info->status)
-                       << ", username = " << supergroup_info->username;
+                       << ", usernames = " << supergroup_info->active_usernames;
     }
     case ChatInfo::Type::Unknown:
       return PSTRING() << "unknown chat " << chat_id;
@@ -9908,6 +9926,12 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageWebAppDataSent::ID:
       return true;
     case td_api::messageGiftedPremium::ID:
+      return true;
+    case td_api::messageForumTopicCreated::ID:
+      return true;
+    case td_api::messageForumTopicEdited::ID:
+      return true;
+    case td_api::messageForumTopicIsClosedToggled::ID:
       return true;
     default:
       break;

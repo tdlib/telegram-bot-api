@@ -629,7 +629,8 @@ class Client final : public WebhookActor::Callback {
 
     td::string first_name;
     td::string last_name;
-    td::string username;
+    td::vector<td::string> active_usernames;
+    td::string editable_username;
     td::string language_code;
 
     object_ptr<td_api::chatPhoto> photo;
@@ -670,7 +671,8 @@ class Client final : public WebhookActor::Callback {
   const GroupInfo *get_group_info(int64 group_id) const;
 
   struct SupergroupInfo {
-    td::string username;
+    td::vector<td::string> active_usernames;
+    td::string editable_username;
     object_ptr<td_api::chatPhoto> photo;
     td::string description;
     td::string invite_link;
