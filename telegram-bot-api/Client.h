@@ -683,6 +683,7 @@ class Client final : public WebhookActor::Callback {
     object_ptr<td_api::chatLocation> location;
     object_ptr<td_api::ChatMemberStatus> status;
     bool is_supergroup = false;
+    bool is_forum = false;
     bool can_set_sticker_set = false;
     bool has_location = false;
     bool join_to_send_messages = false;

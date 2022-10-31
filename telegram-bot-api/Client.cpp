@@ -710,6 +710,9 @@ class Client::JsonChat final : public Jsonable {
         if (!supergroup_info->active_usernames.empty()) {
           object("username", supergroup_info->active_usernames[0]);
         }
+        if (supergroup_info->is_supergroup && supergroup_info->is_forum) {
+          object("is_forum", td::JsonTrue());
+        }
 
         if (supergroup_info->is_supergroup) {
           object("type", "supergroup");
@@ -9253,6 +9256,7 @@ void Client::add_supergroup(SupergroupInfo *supergroup_info, object_ptr<td_api::
   supergroup_info->date = supergroup->date_;
   supergroup_info->status = std::move(supergroup->status_);
   supergroup_info->is_supergroup = !supergroup->is_channel_;
+  supergroup_info->is_forum = supergroup->is_forum_;
   supergroup_info->has_location = supergroup->has_location_;
   supergroup_info->join_to_send_messages = supergroup->join_to_send_messages_;
   supergroup_info->join_by_request = supergroup->join_by_request_;
