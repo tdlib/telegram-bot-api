@@ -256,6 +256,7 @@ bool Client::init_methods() {
   methods_.emplace("getforumtopiciconstickers", &Client::process_get_forum_topic_icon_stickers_query);
   methods_.emplace("createforumtopic", &Client::process_create_forum_topic_query);
   methods_.emplace("editforumtopic", &Client::process_edit_forum_topic_query);
+  methods_.emplace("closeforumtopic", &Client::process_close_forum_topic_query);
   methods_.emplace("getchatmember", &Client::process_get_chat_member_query);
   methods_.emplace("getchatadministrators", &Client::process_get_chat_administrators_query);
   methods_.emplace("getchatmembercount", &Client::process_get_chat_member_count_query);
@@ -8175,6 +8176,18 @@ td::Status Client::process_edit_forum_topic_query(PromisedQueryPtr &query) {
   check_chat(chat_id, AccessRights::Write, std::move(query),
              [this, message_thread_id, name = name.str(), icon_custom_emoji_id](int64 chat_id, PromisedQueryPtr query) {
                send_request(make_object<td_api::editForumTopic>(chat_id, message_thread_id, name, icon_custom_emoji_id),
+                            td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+             });
+  return Status::OK();
+}
+
+td::Status Client::process_close_forum_topic_query(PromisedQueryPtr &query) {
+  auto chat_id = query->arg("chat_id");
+  auto message_thread_id = get_message_id(query.get(), "message_thread_id");
+
+  check_chat(chat_id, AccessRights::Write, std::move(query),
+             [this, message_thread_id](int64 chat_id, PromisedQueryPtr query) {
+               send_request(make_object<td_api::toggleForumTopicIsClosed>(chat_id, message_thread_id, true),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
   return Status::OK();
