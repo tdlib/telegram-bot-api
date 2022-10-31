@@ -536,6 +536,7 @@ class Client final : public WebhookActor::Callback {
   Status process_unpin_all_chat_messages_query(PromisedQueryPtr &query);
   Status process_set_chat_sticker_set_query(PromisedQueryPtr &query);
   Status process_delete_chat_sticker_set_query(PromisedQueryPtr &query);
+  Status process_get_forum_topic_icon_stickers_query(PromisedQueryPtr &query);
   Status process_get_chat_member_query(PromisedQueryPtr &query);
   Status process_get_chat_administrators_query(PromisedQueryPtr &query);
   Status process_get_chat_member_count_query(PromisedQueryPtr &query);

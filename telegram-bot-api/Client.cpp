@@ -253,6 +253,7 @@ bool Client::init_methods() {
   methods_.emplace("unpinallchatmessages", &Client::process_unpin_all_chat_messages_query);
   methods_.emplace("setchatstickerset", &Client::process_set_chat_sticker_set_query);
   methods_.emplace("deletechatstickerset", &Client::process_delete_chat_sticker_set_query);
+  methods_.emplace("getforumtopiciconstickers", &Client::process_get_forum_topic_icon_stickers_query);
   methods_.emplace("getchatmember", &Client::process_get_chat_member_query);
   methods_.emplace("getchatadministrators", &Client::process_get_chat_administrators_query);
   methods_.emplace("getchatmembercount", &Client::process_get_chat_member_count_query);
@@ -8102,6 +8103,12 @@ td::Status Client::process_delete_chat_sticker_set_query(PromisedQueryPtr &query
     send_request(make_object<td_api::setSupergroupStickerSet>(chat_info->supergroup_id, 0),
                  td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   });
+  return Status::OK();
+}
+
+td::Status Client::process_get_forum_topic_icon_stickers_query(PromisedQueryPtr &query) {
+  send_request(make_object<td_api::getForumTopicDefaultIcons>(),
+               td::make_unique<TdOnGetStickersCallback>(this, std::move(query)));
   return Status::OK();
 }
 
