@@ -1746,6 +1746,9 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
   if (message_->edit_date > 0) {
     object("edit_date", message_->edit_date);
   }
+  if (message_->message_thread_id != 0) {
+    object("message_thread_id", as_client_message_id(message_->message_thread_id));
+  }
   if (message_->initial_send_date > 0) {
     if (message_->initial_sender_user_id != 0) {
       object("forward_from", JsonUser(message_->initial_sender_user_id, client_));
@@ -10343,6 +10346,7 @@ Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message,
 
   message_info->id = message_id;
   message_info->chat_id = chat_id;
+  message_info->message_thread_id = message->message_thread_id_;
   message_info->date = message->date_;
   message_info->edit_date = message->edit_date_;
   message_info->media_album_id = message->media_album_id_;

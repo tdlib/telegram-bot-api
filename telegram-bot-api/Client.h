@@ -730,6 +730,7 @@ class Client final : public WebhookActor::Callback {
     int64 sender_user_id = 0;
     int64 sender_chat_id = 0;
     int64 chat_id = 0;
+    int64 message_thread_id = 0;
     int32 date = 0;
     int32 edit_date = 0;
     int64 initial_chat_id = 0;
