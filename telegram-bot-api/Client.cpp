@@ -6586,6 +6586,7 @@ td::Result<td_api::object_ptr<td_api::chatPermissions>> Client::get_chat_permiss
   auto can_change_info = false;
   auto can_invite_users = false;
   auto can_pin_messages = false;
+  auto can_manage_topics = false;
 
   if (query->has_arg("permissions")) {
     allow_legacy = false;
@@ -6611,6 +6612,11 @@ td::Result<td_api::object_ptr<td_api::chatPermissions>> Client::get_chat_permiss
       TRY_RESULT_ASSIGN(can_change_info, get_json_object_bool_field(object, "can_change_info"));
       TRY_RESULT_ASSIGN(can_invite_users, get_json_object_bool_field(object, "can_invite_users"));
       TRY_RESULT_ASSIGN(can_pin_messages, get_json_object_bool_field(object, "can_pin_messages"));
+      if (has_json_object_field(object, "can_manage_topics")) {
+        TRY_RESULT_ASSIGN(can_manage_topics, get_json_object_bool_field(object, "can_manage_topics"));
+      } else {
+        can_manage_topics = can_pin_messages;
+      }
       return Status::OK();
     }();
 
@@ -6631,6 +6637,7 @@ td::Result<td_api::object_ptr<td_api::chatPermissions>> Client::get_chat_permiss
       can_change_info = true;
       can_invite_users = true;
       can_pin_messages = true;
+      can_manage_topics = true;
     } else if (query->has_arg("can_send_messages") || query->has_arg("can_send_media_messages") ||
                query->has_arg("can_send_other_messages") || query->has_arg("can_add_web_page_previews")) {
       allow_legacy = true;
@@ -6642,7 +6649,7 @@ td::Result<td_api::object_ptr<td_api::chatPermissions>> Client::get_chat_permiss
   }
   return make_object<td_api::chatPermissions>(can_send_messages, can_send_media_messages, can_send_polls,
                                               can_send_other_messages, can_add_web_page_previews, can_change_info,
-                                              can_invite_users, can_pin_messages, false);
+                                              can_invite_users, can_pin_messages, can_manage_topics);
 }
 
 td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_media(const Query *query,
@@ -8257,6 +8264,7 @@ td::Status Client::process_restrict_chat_member_query(PromisedQueryPtr &query) {
                        permissions->can_change_info_ = old_permissions->can_change_info_;
                        permissions->can_invite_users_ = old_permissions->can_invite_users_;
                        permissions->can_pin_messages_ = old_permissions->can_pin_messages_;
+                       permissions->can_manage_topics_ = old_permissions->can_manage_topics_;
                      }
 
                      send_request(make_object<td_api::setChatMemberStatus>(
@@ -9492,6 +9500,7 @@ void Client::json_store_permissions(td::JsonObjectScope &object, const td_api::c
   object("can_change_info", td::JsonBool(permissions->can_change_info_));
   object("can_invite_users", td::JsonBool(permissions->can_invite_users_));
   object("can_pin_messages", td::JsonBool(permissions->can_pin_messages_));
+  object("can_manage_topics", td::JsonBool(permissions->can_manage_topics_));
 }
 
 Client::Slice Client::get_update_type_name(UpdateType update_type) {
