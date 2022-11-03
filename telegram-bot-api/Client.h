@@ -812,7 +812,8 @@ class Client final : public WebhookActor::Callback {
   static void json_store_permissions(td::JsonObjectScope &object, const td_api::chatPermissions *permissions);
 
   void remove_replies_to_message(int64 chat_id, int64 reply_to_message_id, bool only_from_cache);
-  void delete_message(int64 chat_id, int64 message_id, bool only_from_cache);
+
+  td::unique_ptr<MessageInfo> delete_message(int64 chat_id, int64 message_id, bool only_from_cache);
 
   void add_new_message(object_ptr<td_api::message> &&message, bool is_edited);
   void process_new_message_queue(int64 chat_id);

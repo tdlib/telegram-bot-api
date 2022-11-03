@@ -4806,9 +4806,14 @@ void Client::on_update(object_ptr<td_api::Object> result) {
     }
     case td_api::updateDeleteMessages::ID: {
       auto update = move_object_as<td_api::updateDeleteMessages>(result);
+      td::vector<td::unique_ptr<MessageInfo>> deleted_messages;
       for (auto message_id : update->message_ids_) {
-        delete_message(update->chat_id_, message_id, update->from_cache_);
+        auto deleted_message = delete_message(update->chat_id_, message_id, update->from_cache_);
+        if (deleted_message != nullptr) {
+          deleted_messages.push_back(std::move(deleted_message));
+        }
       }
+      td::Scheduler::instance()->destroy_on_scheduler(get_file_gc_scheduler_id(), deleted_messages);
       break;
     }
     case td_api::updateFile::ID: {
@@ -10548,10 +10553,10 @@ void Client::remove_replies_to_message(int64 chat_id, int64 reply_to_message_id,
   reply_message_ids_.erase(it);
 }
 
-void Client::delete_message(int64 chat_id, int64 message_id, bool only_from_cache) {
+td::unique_ptr<Client::MessageInfo> Client::delete_message(int64 chat_id, int64 message_id, bool only_from_cache) {
   remove_replies_to_message(chat_id, message_id, only_from_cache);
 
-  auto message_info = messages_.get_pointer({chat_id, message_id});
+  auto message_info = std::move(messages_[{chat_id, message_id}]);
   if (message_info == nullptr) {
     if (yet_unsent_messages_.count({chat_id, message_id}) > 0) {
       // yet unsent message is deleted, possible only if we are trying to write to inaccessible supergroup or
@@ -10576,12 +10581,11 @@ void Client::delete_message(int64 chat_id, int64 message_id, bool only_from_cach
 
       on_message_send_failed(chat_id, message_id, 0, std::move(error));
     }
-    return;
+  } else {
+    set_message_reply_to_message_id(message_info.get(), 0);
+    messages_.erase({chat_id, message_id});
   }
-
-  set_message_reply_to_message_id(message_info, 0);
-
-  messages_.erase({chat_id, message_id});
+  return message_info;
 }
 
 Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message, bool force_update_content) {
