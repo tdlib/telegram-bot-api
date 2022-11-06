@@ -676,7 +676,7 @@ class Client::JsonChat final : public Jsonable {
                                                       [](Slice username) { return td::JsonString(username); }));
           }
           if (user_info->emoji_status_custom_emoji_id != 0) {
-            object("emoji_status_custom_emoji_id", user_info->emoji_status_custom_emoji_id);
+            object("emoji_status_custom_emoji_id", td::to_string(user_info->emoji_status_custom_emoji_id));
           }
           if (!user_info->bio.empty()) {
             object("bio", user_info->bio);
