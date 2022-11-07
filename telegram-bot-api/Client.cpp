@@ -1363,7 +1363,7 @@ class Client::JsonForumTopicCreated final : public Jsonable {
     object("name", forum_topic_created_->name_);
     object("icon_color", forum_topic_created_->icon_->color_);
     if (forum_topic_created_->icon_->custom_emoji_id_ != 0) {
-      object("icon_custom_emoji_id", forum_topic_created_->icon_->custom_emoji_id_);
+      object("icon_custom_emoji_id", td::to_string(forum_topic_created_->icon_->custom_emoji_id_));
     }
   }
 
@@ -1388,7 +1388,7 @@ class Client::JsonForumTopicInfo final : public Jsonable {
     object("name", forum_topic_info_->name_);
     object("icon_color", forum_topic_info_->icon_->color_);
     if (forum_topic_info_->icon_->custom_emoji_id_ != 0) {
-      object("icon_custom_emoji_id", forum_topic_info_->icon_->custom_emoji_id_);
+      object("icon_custom_emoji_id", td::to_string(forum_topic_info_->icon_->custom_emoji_id_));
     }
   }
 
@@ -7158,7 +7158,7 @@ void Client::on_message_send_failed(int64 chat_id, int64 old_message_id, int64 n
   auto &query = *pending_send_message_queries_[query_id];
   if (query.is_multisend) {
     if (query.error == nullptr || query.error->message_ == "Group send failed") {
-      if (error->code_ == 429 || error->message_ == "Group send failed") {
+      if (error->code_ == 429 || error->code_ >= 500 || error->message_ == "Group send failed") {
         query.error = std::move(error);
       } else {
         auto pos = (query.total_message_count - query.awaited_message_count + 1);
