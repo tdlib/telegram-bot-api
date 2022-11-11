@@ -46,7 +46,7 @@ class HttpServer final : public td::TcpListener::Callback {
       set_timeout_at(wakeup_at);
       return;
     }
-    flood_control_.add_event(static_cast<td::int32>(now));
+    flood_control_.add_event(now);
     LOG(INFO) << "Create tcp listener " << td::tag("address", ip_address_) << td::tag("port", port_);
     listener_ = td::create_actor<td::TcpListener>(
         PSLICE() << "TcpListener" << td::tag("address", ip_address_) << td::tag("port", port_), port_,

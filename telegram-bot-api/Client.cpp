@@ -2024,6 +2024,12 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
       }
       break;
     }
+    case td_api::messageForumTopicIsHiddenToggled::ID: {
+      // auto content = static_cast<const td_api::messageForumTopicIsHiddenToggled *>(message_->content.get());
+      // temporary; the topic is closed when it is hidden or unhidden
+      object("forum_topic_closed", JsonForumTopicIsClosedToggled());
+      break;
+    }
     case td_api::messagePinMessage::ID: {
       auto content = static_cast<const td_api::messagePinMessage *>(message_->content.get());
       auto message_id = content->message_id_;
@@ -8259,11 +8265,14 @@ td::Status Client::process_edit_forum_topic_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
   auto message_thread_id = get_message_id(query.get(), "message_thread_id");
   auto name = query->arg("name");
+  auto edit_icon_custom_emoji_id = query->has_arg("icon_custom_emoji_id");
   auto icon_custom_emoji_id = td::to_integer<int64>(query->arg("icon_custom_emoji_id"));
 
   check_chat(chat_id, AccessRights::Write, std::move(query),
-             [this, message_thread_id, name = name.str(), icon_custom_emoji_id](int64 chat_id, PromisedQueryPtr query) {
-               send_request(make_object<td_api::editForumTopic>(chat_id, message_thread_id, name, icon_custom_emoji_id),
+             [this, message_thread_id, name = name.str(), edit_icon_custom_emoji_id, icon_custom_emoji_id](
+                 int64 chat_id, PromisedQueryPtr query) {
+               send_request(make_object<td_api::editForumTopic>(chat_id, message_thread_id, name,
+                                                                edit_icon_custom_emoji_id, icon_custom_emoji_id),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
   return Status::OK();
@@ -8863,7 +8872,7 @@ td::Status Client::process_set_webhook_query(PromisedQueryPtr &query) {
   if (now > next_set_webhook_logging_time_ || webhook_url_ != new_url) {
     next_set_webhook_logging_time_ = now + 300;
     LOG(WARNING) << "Set webhook to " << new_url << ", max_connections = " << new_max_connections
-                 << ", IP address = " << new_ip_address;
+                 << ", IP address = " << new_ip_address << ", drop_pending_updates = " << drop_pending_updates;
   }
 
   if (!new_url.empty()) {
@@ -10125,7 +10134,9 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       case td_api::messageVideoChatEnded::ID:
       case td_api::messageInviteVideoChatParticipants::ID:
       case td_api::messageForumTopicCreated::ID:
+      case td_api::messageForumTopicEdited::ID:
       case td_api::messageForumTopicIsClosedToggled::ID:
+      case td_api::messageForumTopicIsHiddenToggled::ID:
         // don't skip
         break;
       default:

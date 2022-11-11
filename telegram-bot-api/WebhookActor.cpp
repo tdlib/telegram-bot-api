@@ -11,7 +11,6 @@
 #include "td/net/GetHostByNameActor.h"
 #include "td/net/HttpHeaderCreator.h"
 #include "td/net/HttpProxy.h"
-#include "td/net/SslStream.h"
 #include "td/net/TransparentProxy.h"
 
 #include "td/actor/actor.h"
@@ -136,12 +135,7 @@ td::Status WebhookActor::create_connection() {
   if (parameters_->webhook_proxy_ip_address_.is_valid()) {
     auto r_proxy_socket_fd = td::SocketFd::open(parameters_->webhook_proxy_ip_address_);
     if (r_proxy_socket_fd.is_error()) {
-      td::Slice error_message = "Can't connect to the webhook proxy";
-      auto error = td::Status::Error(PSLICE() << error_message << ": " << r_proxy_socket_fd.error());
-      VLOG(webhook) << error;
-      on_webhook_error(error_message);
-      on_error(td::Status::Error(error_message));
-      return error;
+      return create_webhook_error("Can't connect to the webhook proxy", r_proxy_socket_fd.move_as_error(), false);
     }
     if (!was_checked_) {
       TRY_STATUS(create_ssl_stream());  // check certificate
@@ -188,14 +182,22 @@ td::Status WebhookActor::create_connection() {
 
   auto r_fd = td::SocketFd::open(ip_address_);
   if (r_fd.is_error()) {
-    td::Slice error_message = "Can't connect to the webhook";
-    auto error = td::Status::Error(PSLICE() << error_message << ": " << r_fd.error());
-    VLOG(webhook) << error;
-    on_webhook_error(error_message);
-    on_error(r_fd.move_as_error());
-    return error;
+    return create_webhook_error("Can't connect to the webhook", r_fd.move_as_error(), false);
   }
   return create_connection(td::BufferedFd<td::SocketFd>(r_fd.move_as_ok()));
+}
+
+td::Status WebhookActor::create_webhook_error(td::Slice error_message, td::Status &&result, bool is_public) {
+  CHECK(result.is_error());
+  auto error = td::Status::Error(PSLICE() << error_message << ": " << result);
+  VLOG(webhook) << error;
+  if (is_public) {
+    on_webhook_error(PSLICE() << error_message << ": " << result.public_message());
+  } else {
+    on_webhook_error(error_message);
+  }
+  on_error(std::move(result));
+  return std::move(error);
 }
 
 td::Result<td::SslStream> WebhookActor::create_ssl_stream() {
@@ -203,14 +205,17 @@ td::Result<td::SslStream> WebhookActor::create_ssl_stream() {
     return td::SslStream();
   }
 
-  auto r_ssl_stream = td::SslStream::create(url_.host_, cert_path_, td::SslStream::VerifyPeer::On, !cert_path_.empty());
+  if (!ssl_ctx_) {
+    auto r_ssl_ctx = td::SslCtx::create(cert_path_, td::SslCtx::VerifyPeer::On);
+    if (r_ssl_ctx.is_error()) {
+      return create_webhook_error("Can't create an SSL context", r_ssl_ctx.move_as_error(), true);
+    }
+    ssl_ctx_ = r_ssl_ctx.move_as_ok();
+  }
+
+  auto r_ssl_stream = td::SslStream::create(url_.host_, ssl_ctx_, !cert_path_.empty());
   if (r_ssl_stream.is_error()) {
-    td::Slice error_message = "Can't create an SSL connection";
-    auto error = td::Status::Error(PSLICE() << error_message << ": " << r_ssl_stream.error());
-    VLOG(webhook) << error;
-    on_webhook_error(PSLICE() << error_message << ": " << r_ssl_stream.error().public_message());
-    on_error(r_ssl_stream.move_as_error());
-    return std::move(error);
+    return create_webhook_error("Can't create an SSL connection", r_ssl_stream.move_as_error(), true);
   }
   return r_ssl_stream.move_as_ok();
 }
@@ -287,7 +292,7 @@ void WebhookActor::create_new_connections() {
                     << td::tag("after", td::format::as_time(wakeup_at - now));
       break;
     }
-    flood->add_event(static_cast<td::int32>(now));
+    flood->add_event(now);
     if (create_connection().is_error()) {
       relax_wakeup_at(now + 1.0, "create_new_connections error");
       return;

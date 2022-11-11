@@ -12,6 +12,7 @@
 
 #include "td/net/HttpOutboundConnection.h"
 #include "td/net/HttpQuery.h"
+#include "td/net/SslCtx.h"
 #include "td/net/SslStream.h"
 
 #include "td/actor/actor.h"
@@ -76,7 +77,7 @@ class WebhookActor final : public td::HttpOutboundConnection::Callback {
   bool tqueue_empty_ = false;
   std::size_t last_pending_update_count_ = MIN_PENDING_UPDATES_WARNING;
   td::HttpUrl url_;
-  td::string cert_path_;
+  const td::string cert_path_;
   std::shared_ptr<const ClientParameters> parameters_;
 
   double last_error_time_ = 0;
@@ -133,6 +134,7 @@ class WebhookActor final : public td::HttpOutboundConnection::Callback {
 
   double first_error_410_time_ = 0;
 
+  td::SslCtx ssl_ctx_;
   td::IPAddress ip_address_;
   td::int32 ip_generation_ = 0;
   double next_ip_address_resolve_time_ = 0;
@@ -175,6 +177,8 @@ class WebhookActor final : public td::HttpOutboundConnection::Callback {
 
   void resolve_ip_address();
   void on_resolved_ip_address(td::Result<td::IPAddress> r_ip_address);
+
+  td::Status create_webhook_error(td::Slice error_message, td::Status &&result, bool is_public);
 
   td::Result<td::SslStream> create_ssl_stream();
   td::Status create_connection() TD_WARN_UNUSED_RESULT;
