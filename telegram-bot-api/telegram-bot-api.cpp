@@ -67,6 +67,7 @@ static void quit_signal_handler(int sig) {
 static td::MemoryLog<1 << 20> memory_log;
 
 void print_log() {
+  td::LogGuard log_guard;
   auto buf = memory_log.get_buffer();
   auto pos = memory_log.get_pos();
   size_t tail_length = buf.size() - pos;
@@ -89,15 +90,23 @@ static void dump_stacktrace_signal_handler(int sig) {
   if (has_failed) {
     return;
   }
+  td::LogGuard log_guard;
+  if (LOG_TAG != nullptr && *LOG_TAG) {
+    td::signal_safe_write(td::Slice(LOG_TAG));
+    td::signal_safe_write(td::Slice("\n"), false);
+  }
   td::Stacktrace::print_to_stderr();
 }
 
 static void fail_signal_handler(int sig) {
   has_failed = true;
-  td::signal_safe_write_signal_number(sig);
-  td::Stacktrace::PrintOptions options;
-  options.use_gdb = true;
-  td::Stacktrace::print_to_stderr(options);
+  {
+    td::LogGuard log_guard;
+    td::signal_safe_write_signal_number(sig);
+    td::Stacktrace::PrintOptions options;
+    options.use_gdb = true;
+    td::Stacktrace::print_to_stderr(options);
+  }
   print_log();
   _Exit(EXIT_FAILURE);
 }
