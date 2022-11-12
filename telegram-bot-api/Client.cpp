@@ -5193,15 +5193,7 @@ td::int32 Client::get_file_gc_scheduler_id() {
 void Client::clear_tqueue() {
   CHECK(webhook_id_.empty());
   auto &tqueue = parameters_->shared_data_->tqueue_;
-  auto size = tqueue->get_size(tqueue_id_);
-  if (size > 0) {
-    LOG(INFO) << "Removing " << size << " tqueue events";
-    td::MutableSpan<td::TQueue::Event> span;
-    auto r_size = tqueue->get(tqueue_id_, tqueue->get_tail(tqueue_id_), true, 0, span);
-    CHECK(r_size.is_ok());
-    CHECK(r_size.ok() == 0);
-    CHECK(tqueue->get_size(tqueue_id_) == 0);
-  }
+  tqueue->clear(tqueue_id_, 0);
 }
 
 bool Client::to_bool(td::MutableSlice value) {
@@ -9326,17 +9318,11 @@ void Client::do_get_updates(int32 offset, int32 limit, int32 timeout, PromisedQu
   LOG(DEBUG) << "Get updates with offset = " << offset << ", limit = " << limit << " and timeout = " << timeout;
   LOG(DEBUG) << "Queue head = " << tqueue->get_head(tqueue_id_) << ", queue tail = " << tqueue->get_tail(tqueue_id_);
 
+  if (offset < 0) {
+    tqueue->clear(tqueue_id_, -offset);
+  }
   if (offset <= 0) {
-    auto head = tqueue->get_head(tqueue_id_);
-    if (!head.empty() && offset < 0) {
-      // negative offset is counted from the end
-      auto tail = tqueue->get_tail(tqueue_id_);
-      CHECK(!tail.empty());
-      offset += tail.value();
-    }
-    if (offset < head.value()) {
-      offset = head.value();
-    }
+    offset = tqueue->get_head(tqueue_id_).value();
   }
 
   td::MutableSpan<td::TQueue::Event> updates(parameters_->shared_data_->event_buffer_,
