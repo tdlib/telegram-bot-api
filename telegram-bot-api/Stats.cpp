@@ -168,6 +168,10 @@ td::int64 BotStatActor::get_active_file_upload_bytes() const {
   return active_file_upload_bytes_;
 }
 
+td::int64 BotStatActor::get_active_file_upload_count() const {
+  return active_file_upload_count_;
+}
+
 bool BotStatActor::is_active(double now) const {
   return last_activity_timestamp_ > now - 86400;
 }

@@ -4067,6 +4067,10 @@ void Client::send(PromisedQueryPtr query) {
         return query->set_retry_after_error(60);
       }
       if (stat->get_active_file_upload_bytes() > (static_cast<int64>(1) << 33) && !query->files().empty()) {
+        LOG(INFO) << "Fail a query, because the total size of active file uploads is too big: " << *query;
+        return query->set_retry_after_error(60);
+      }
+      if (stat->get_active_file_upload_count() > 500 && !query->files().empty()) {
         LOG(INFO) << "Fail a query, because there are too many active file uploads: " << *query;
         return query->set_retry_after_error(60);
       }

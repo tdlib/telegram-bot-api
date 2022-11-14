@@ -252,6 +252,7 @@ void ClientManager::get_stats(td::Promise<td::BufferSlice> promise,
     auto bot_info = client_info->client_.get_actor_unsafe()->get_bot_info();
     auto active_request_count = client_info->stat_.get_active_request_count();
     auto active_file_upload_bytes = client_info->stat_.get_active_file_upload_bytes();
+    auto active_file_upload_count = client_info->stat_.get_active_file_upload_count();
     sb << '\n';
     sb << "id\t" << bot_info.id_ << '\n';
     sb << "uptime\t" << now - bot_info.start_time_ << '\n';
@@ -262,6 +263,9 @@ void ClientManager::get_stats(td::Promise<td::BufferSlice> promise,
     }
     if (active_file_upload_bytes != 0) {
       sb << "active_file_upload_bytes\t" << active_file_upload_bytes << '\n';
+    }
+    if (active_file_upload_count != 0) {
+      sb << "active_file_upload_count\t" << active_file_upload_count << '\n';
     }
     if (!bot_info.webhook_.empty()) {
       sb << "webhook\t" << bot_info.webhook_ << '\n';
