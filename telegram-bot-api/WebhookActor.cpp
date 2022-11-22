@@ -673,10 +673,10 @@ void WebhookActor::start_up() {
   max_loaded_updates_ = max_connections_ * 2;
 
   next_ip_address_resolve_time_ = last_success_time_ = td::Time::now() - 3600;
-  active_new_connection_flood_.add_limit(1, 10 * max_connections_);
-  active_new_connection_flood_.add_limit(5, 20 * max_connections_);
 
-  pending_new_connection_flood_.add_limit(1, 1);
+  active_new_connection_flood_.add_limit(1, 20);
+
+  pending_new_connection_flood_.add_limit(2, 1);
 
   if (!parameters_->local_mode_) {
     if (url_.protocol_ == td::HttpUrl::Protocol::Https) {
