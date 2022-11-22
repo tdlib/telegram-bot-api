@@ -71,7 +71,7 @@ class Client final : public WebhookActor::Callback {
   static constexpr int32 MAX_CERTIFICATE_FILE_SIZE = 3 << 20;
   static constexpr int32 MAX_DOWNLOAD_FILE_SIZE = 20 << 20;
 
-  static constexpr int32 MAX_CONCURRENTLY_SENT_CHAT_MESSAGES = 1000;  // some unreasonably big value
+  static constexpr int32 MAX_CONCURRENTLY_SENT_CHAT_MESSAGES = 250;  // some unreasonably big value
 
   static constexpr std::size_t MIN_PENDING_UPDATES_WARNING = 200;
 
@@ -473,6 +473,8 @@ class Client final : public WebhookActor::Callback {
   static td::Result<Slice> get_inline_message_id(const Query *query, Slice field_name = Slice("inline_message_id"));
 
   static td::Result<int64> get_user_id(const Query *query, Slice field_name = Slice("user_id"));
+
+  void decrease_yet_unsent_message_count(int64 chat_id, int32 count);
 
   int64 extract_yet_unsent_message_query_id(int64 chat_id, int64 message_id, bool *is_reply_to_message_deleted);
 
