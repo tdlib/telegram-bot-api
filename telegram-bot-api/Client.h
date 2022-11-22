@@ -816,7 +816,8 @@ class Client final : public WebhookActor::Callback {
   td::unique_ptr<MessageInfo> delete_message(int64 chat_id, int64 message_id, bool only_from_cache);
 
   void add_new_message(object_ptr<td_api::message> &&message, bool is_edited);
-  void process_new_message_queue(int64 chat_id);
+
+  void process_new_message_queue(int64 chat_id, int state);
 
   struct FullMessageId {
     int64 chat_id;
@@ -840,7 +841,7 @@ class Client final : public WebhookActor::Callback {
   };
 
   FullMessageId add_message(object_ptr<td_api::message> &&message, bool force_update_content = false);
-  const MessageInfo *get_message(int64 chat_id, int64 message_id) const;
+  const MessageInfo *get_message(int64 chat_id, int64 message_id, bool force_cache) const;
   MessageInfo *get_message_editable(int64 chat_id, int64 message_id);
 
   void update_message_content(int64 chat_id, int64 message_id, object_ptr<td_api::MessageContent> &&content);
@@ -870,6 +871,7 @@ class Client final : public WebhookActor::Callback {
                                     const td::string &inline_message_id);
 
   void add_new_callback_query(object_ptr<td_api::updateNewCallbackQuery> &&query);
+
   void process_new_callback_query_queue(int64 user_id, int state);
 
   void add_new_inline_callback_query(object_ptr<td_api::updateNewInlineCallbackQuery> &&query);

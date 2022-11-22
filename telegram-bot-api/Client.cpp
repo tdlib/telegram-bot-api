@@ -813,7 +813,7 @@ class Client::JsonChat final : public Jsonable {
       }
       if (pinned_message_id_ != 0) {
         CHECK(pinned_message_id_ != -1);
-        const MessageInfo *pinned_message = client_->get_message(chat_id_, pinned_message_id_);
+        const MessageInfo *pinned_message = client_->get_message(chat_id_, pinned_message_id_, true);
         if (pinned_message != nullptr) {
           object("pinned_message", JsonMessage(pinned_message, false, "pin in JsonChat", client_));
         } else {
@@ -1824,7 +1824,7 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
     object("forward_date", message_->initial_send_date);
   }
   if (message_->reply_to_message_id > 0 && need_reply_ && !message_->is_reply_to_message_deleted) {
-    const MessageInfo *reply_to_message = client_->get_message(message_->chat_id, message_->reply_to_message_id);
+    const MessageInfo *reply_to_message = client_->get_message(message_->chat_id, message_->reply_to_message_id, true);
     if (reply_to_message != nullptr) {
       object("reply_to_message", JsonMessage(reply_to_message, false, "reply in " + source_, client_));
     } else {
@@ -2034,7 +2034,7 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
       auto content = static_cast<const td_api::messagePinMessage *>(message_->content.get());
       auto message_id = content->message_id_;
       if (message_id > 0) {
-        const MessageInfo *pinned_message = client_->get_message(message_->chat_id, message_id);
+        const MessageInfo *pinned_message = client_->get_message(message_->chat_id, message_id, true);
         if (pinned_message != nullptr) {
           object("pinned_message", JsonMessage(pinned_message, false, "pin in " + source_, client_));
         } else {
@@ -2898,7 +2898,7 @@ class Client::TdOnDeleteFailedToSendMessageCallback final : public TdQueryCallba
     }
 
     CHECK(result->get_id() == td_api::ok::ID);
-    if (client_->get_message(chat_id_, message_id_) != nullptr) {
+    if (client_->get_message(chat_id_, message_id_, true) != nullptr) {
       LOG(ERROR) << "Have cache for message " << message_id_ << " in the chat " << chat_id_;
       client_->delete_message(chat_id_, message_id_, false);
     }
@@ -2926,7 +2926,7 @@ class Client::TdOnEditMessageCallback final : public TdQueryCallback {
     int64 chat_id = message->chat_id_;
     int64 message_id = message->id_;
 
-    auto message_info = client_->get_message(chat_id, message_id);
+    auto message_info = client_->get_message(chat_id, message_id, true);
     if (message_info == nullptr) {
       return fail_query_with_error(std::move(query_), 400, "message not found");
     }
@@ -2969,7 +2969,7 @@ class Client::TdOnStopPollCallback final : public TdQueryCallback {
     }
 
     CHECK(result->get_id() == td_api::ok::ID);
-    auto message_info = client_->get_message(chat_id_, message_id_);
+    auto message_info = client_->get_message(chat_id_, message_id_, true);
     if (message_info == nullptr) {
       return fail_query_with_error(std::move(query_), 400, "message not found");
     }
@@ -3227,7 +3227,7 @@ class Client::TdOnCheckMessageThreadCallback final : public TdQueryCallback {
     CHECK(full_message_id.chat_id == chat_id_);
     CHECK(full_message_id.message_id == message_thread_id_);
 
-    const MessageInfo *message_info = client_->get_message(chat_id_, message_thread_id_);
+    const MessageInfo *message_info = client_->get_message(chat_id_, message_thread_id_, true);
     CHECK(message_info != nullptr);
     if (message_info->message_thread_id != message_thread_id_) {
       return fail_query_with_error(std::move(query_), 400, "MESSAGE_THREAD_INVALID", "Message thread not found");
@@ -4115,7 +4115,7 @@ void Client::on_get_reply_message(int64 chat_id, object_ptr<td_api::message> rep
     add_message(std::move(reply_to_message));
   }
 
-  process_new_message_queue(chat_id);
+  process_new_message_queue(chat_id, 1);
 }
 
 void Client::on_get_edited_message(object_ptr<td_api::message> edited_message) {
@@ -4189,7 +4189,7 @@ void Client::on_get_sticker_set(int64 set_id, int64 new_callback_query_user_id, 
     process_new_callback_query_queue(new_callback_query_user_id, 2);
   }
   if (new_message_chat_id != 0) {
-    process_new_message_queue(new_message_chat_id);
+    process_new_message_queue(new_message_chat_id, 2);
   }
 }
 
@@ -4448,7 +4448,7 @@ void Client::check_message_thread(int64 chat_id, int64 message_thread_id, int64 
   }
 
   if (reply_to_message_id != 0) {
-    const MessageInfo *message_info = get_message(chat_id, reply_to_message_id);
+    const MessageInfo *message_info = get_message(chat_id, reply_to_message_id, true);
     CHECK(message_info != nullptr);
     if (message_info->message_thread_id != message_thread_id) {
       return fail_query_with_error(std::move(query), 400, "MESSAGE_THREAD_INVALID",
@@ -7123,7 +7123,7 @@ void Client::on_message_send_succeeded(object_ptr<td_api::message> &&message, in
   int64 new_message_id = full_message_id.message_id;
   CHECK(new_message_id > 0);
 
-  auto message_info = get_message(chat_id, new_message_id);
+  auto message_info = get_message(chat_id, new_message_id, true);
   CHECK(message_info != nullptr);
   message_info->is_content_changed = false;
 
@@ -9931,7 +9931,7 @@ void Client::add_new_message(object_ptr<td_api::message> &&message, bool is_edit
   auto chat_id = message->chat_id_;
   CHECK(chat_id != 0);
   new_message_queues_[chat_id].queue_.emplace(std::move(message), is_edited);
-  process_new_message_queue(chat_id);
+  process_new_message_queue(chat_id, 0);
 }
 
 void Client::add_update_poll(object_ptr<td_api::updatePoll> &&update) {
@@ -9972,9 +9972,13 @@ void Client::process_new_callback_query_queue(int64 user_id, int state) {
   auto &queue = new_callback_query_queues_[user_id];
   if (queue.has_active_request_) {
     CHECK(state == 0);
+    CHECK(!queue.queue_.empty());
+    LOG(INFO) << "Have an active request in callback query queue of size " << queue.queue_.size() << " for user "
+              << user_id;
     return;
   }
   if (logging_out_ || closing_) {
+    LOG(INFO) << "Ignore callback query while closing for user " << user_id;
     new_callback_query_queues_.erase(user_id);
     return;
   }
@@ -9982,8 +9986,10 @@ void Client::process_new_callback_query_queue(int64 user_id, int state) {
     auto &query = queue.queue_.front();
     int64 chat_id = query->chat_id_;
     int64 message_id = query->message_id_;
-    auto message_info = get_message(chat_id, message_id);
+    auto message_info = get_message(chat_id, message_id, state > 0);
     // callback message can be already deleted in the bot outbox
+    LOG(INFO) << "Process callback query from user " << user_id << " in message " << message_id << " in chat "
+              << chat_id << " with state " << state;
     if (state == 0) {
       if (message_info == nullptr) {
         // get the message from the server
@@ -9996,7 +10002,7 @@ void Client::process_new_callback_query_queue(int64 user_id, int state) {
     if (state == 1) {
       auto reply_to_message_id =
           message_info == nullptr || message_info->is_reply_to_message_deleted ? 0 : message_info->reply_to_message_id;
-      if (reply_to_message_id > 0 && get_message(chat_id, reply_to_message_id) == nullptr) {
+      if (reply_to_message_id > 0 && get_message(chat_id, reply_to_message_id, false) == nullptr) {
         queue.has_active_request_ = true;
         return send_request(make_object<td_api::getRepliedMessage>(chat_id, message_id),
                             td::make_unique<TdOnGetCallbackQueryMessageCallback>(this, user_id, state));
@@ -10013,7 +10019,7 @@ void Client::process_new_callback_query_queue(int64 user_id, int state) {
       auto reply_to_message_id =
           message_info == nullptr || message_info->is_reply_to_message_deleted ? 0 : message_info->reply_to_message_id;
       if (reply_to_message_id > 0) {
-        auto reply_to_message_info = get_message(chat_id, reply_to_message_id);
+        auto reply_to_message_info = get_message(chat_id, reply_to_message_id, true);
         auto reply_sticker_set_id =
             reply_to_message_info == nullptr ? 0 : get_sticker_set_id(reply_to_message_info->content);
         if (!have_sticker_set_name(reply_sticker_set_id)) {
@@ -10189,7 +10195,7 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       if (pinned_message_id <= 0) {
         return true;
       }
-      const MessageInfo *pinned_message = get_message(chat_id, pinned_message_id);
+      const MessageInfo *pinned_message = get_message(chat_id, pinned_message_id, true);
       if (pinned_message == nullptr) {
         LOG(WARNING) << "Pinned unknown, inaccessible or deleted message " << pinned_message_id << " in " << chat_id;
         return true;
@@ -10232,7 +10238,7 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
   }
 
   if (is_edited) {
-    const MessageInfo *old_message = get_message(chat_id, message->id_);
+    const MessageInfo *old_message = get_message(chat_id, message->id_, true);
     if (old_message != nullptr && !old_message->is_content_changed) {
       return true;
     }
@@ -10426,7 +10432,7 @@ td::string Client::get_sticker_set_name(int64 sticker_set_id) const {
   return sticker_set_names_.get(sticker_set_id);
 }
 
-void Client::process_new_message_queue(int64 chat_id) {
+void Client::process_new_message_queue(int64 chat_id, int state) {
   auto &queue = new_message_queues_[chat_id];
   if (queue.has_active_request_) {
     return;
@@ -10440,7 +10446,7 @@ void Client::process_new_message_queue(int64 chat_id) {
     CHECK(chat_id == message_ref->chat_id_);
     int64 message_id = message_ref->id_;
     int64 reply_to_message_id = get_reply_to_message_id(message_ref);
-    if (reply_to_message_id > 0 && get_message(chat_id, reply_to_message_id) == nullptr) {
+    if (reply_to_message_id > 0 && get_message(chat_id, reply_to_message_id, state > 0) == nullptr) {
       queue.has_active_request_ = true;
       return send_request(make_object<td_api::getRepliedMessage>(chat_id, message_id),
                           td::make_unique<TdOnGetReplyMessageCallback>(this, chat_id));
@@ -10452,7 +10458,7 @@ void Client::process_new_message_queue(int64 chat_id) {
                           td::make_unique<TdOnGetStickerSetCallback>(this, message_sticker_set_id, 0, chat_id));
     }
     if (reply_to_message_id > 0) {
-      auto reply_to_message_info = get_message(chat_id, reply_to_message_id);
+      auto reply_to_message_info = get_message(chat_id, reply_to_message_id, true);
       CHECK(reply_to_message_info != nullptr);
       auto reply_sticker_set_id = get_sticker_set_id(reply_to_message_info->content);
       if (!have_sticker_set_name(reply_sticker_set_id)) {
@@ -10516,7 +10522,7 @@ void Client::process_new_message_queue(int64 chat_id) {
     auto left_time = message_date + 86400 - now;
     add_message(std::move(message));
 
-    auto message_info = get_message(chat_id, message_id);
+    auto message_info = get_message(chat_id, message_id, true);
     CHECK(message_info != nullptr);
 
     message_info->is_content_changed = false;
@@ -10707,6 +10713,8 @@ Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message,
       send_request(make_object<td_api::getStickerSet>(sticker_set_id),
                    td::make_unique<TdOnGetStickerSetCallback>(this, sticker_set_id, 0, 0));
     }
+  } else if (message->content_->get_id() == td_api::messagePoll::ID) {
+    message_info->content = std::move(message->content_);
   }
   set_message_reply_markup(message_info.get(), std::move(message->reply_markup_));
 
@@ -10736,14 +10744,18 @@ void Client::on_update_message_edited(int64 chat_id, int64 message_id, int32 edi
   set_message_reply_markup(message_info, std::move(reply_markup));
 }
 
-const Client::MessageInfo *Client::get_message(int64 chat_id, int64 message_id) const {
+const Client::MessageInfo *Client::get_message(int64 chat_id, int64 message_id, bool force_cache) const {
   auto message_info = messages_.get_pointer({chat_id, message_id});
   if (message_info == nullptr) {
     LOG(DEBUG) << "Not found message " << message_id << " from chat " << chat_id;
     return nullptr;
   }
-  LOG(DEBUG) << "Found message " << message_id << " from chat " << chat_id;
+  if (!force_cache && message_info->content->get_id() == td_api::messagePoll::ID) {
+    LOG(DEBUG) << "Ignore found message " << message_id << " from chat " << chat_id;
+    return nullptr;
+  }
 
+  LOG(DEBUG) << "Found message " << message_id << " from chat " << chat_id;
   return message_info;
 }
 
