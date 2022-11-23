@@ -7876,7 +7876,6 @@ td::Status Client::process_delete_message_query(PromisedQueryPtr &query) {
 
   check_message(chat_id, message_id, false, AccessRights::Write, "message to delete", std::move(query),
                 [this](int64 chat_id, int64 message_id, PromisedQueryPtr query) {
-                  delete_message(chat_id, message_id, false);
                   send_request(make_object<td_api::deleteMessages>(chat_id, td::vector<int64>{message_id}, true),
                                td::make_unique<TdOnOkQueryCallback>(std::move(query)));
                 });
