@@ -31,8 +31,6 @@
 #include "td/utils/Span.h"
 #include "td/utils/Time.h"
 
-#include <limits>
-
 namespace telegram_bot_api {
 
 static int VERBOSITY_NAME(webhook) = VERBOSITY_NAME(DEBUG);

@@ -22,6 +22,7 @@
 #include "td/utils/Container.h"
 #include "td/utils/FlatHashMap.h"
 #include "td/utils/FloodControlFast.h"
+#include "td/utils/HashTableUtils.h"
 #include "td/utils/HttpUrl.h"
 #include "td/utils/JsonBuilder.h"
 #include "td/utils/List.h"
@@ -32,7 +33,6 @@
 #include "td/utils/VectorQueue.h"
 
 #include <atomic>
-#include <functional>
 #include <memory>
 #include <set>
 #include <tuple>
@@ -123,8 +123,8 @@ class WebhookActor final : public td::HttpOutboundConnection::Callback {
   td::TQueue::EventId tqueue_offset_;
   std::size_t max_loaded_updates_ = 0;
   struct EventIdHash {
-    std::size_t operator()(td::TQueue::EventId event_id) const {
-      return std::hash<td::int32>()(event_id.value());
+    td::uint32 operator()(td::TQueue::EventId event_id) const {
+      return td::Hash<td::int32>()(event_id.value());
     }
   };
   td::FlatHashMap<td::TQueue::EventId, td::unique_ptr<Update>, EventIdHash> update_map_;

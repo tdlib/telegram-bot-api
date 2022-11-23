@@ -22,13 +22,13 @@
 #include "td/utils/Container.h"
 #include "td/utils/FlatHashMap.h"
 #include "td/utils/FlatHashSet.h"
+#include "td/utils/HashTableUtils.h"
 #include "td/utils/JsonBuilder.h"
 #include "td/utils/Promise.h"
 #include "td/utils/Slice.h"
 #include "td/utils/Status.h"
 #include "td/utils/WaitFreeHashMap.h"
 
-#include <functional>
 #include <limits>
 #include <memory>
 #include <queue>
@@ -836,9 +836,9 @@ class Client final : public WebhookActor::Callback {
   };
 
   struct FullMessageIdHash {
-    std::size_t operator()(FullMessageId full_message_id) const {
-      return std::hash<td::int64>()(full_message_id.chat_id) * 2023654985u +
-             std::hash<td::int64>()(full_message_id.message_id);
+    td::uint32 operator()(FullMessageId full_message_id) const {
+      return td::Hash<td::int64>()(full_message_id.chat_id) * 2023654985u +
+             td::Hash<td::int64>()(full_message_id.message_id);
     }
   };
 
