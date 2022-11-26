@@ -35,7 +35,7 @@ namespace telegram_bot_api {
 
 static int VERBOSITY_NAME(webhook) = VERBOSITY_NAME(DEBUG);
 
-std::atomic<td::uint64> WebhookActor::total_connections_count_{0};
+std::atomic<td::uint64> WebhookActor::total_connection_count_{0};
 
 WebhookActor::WebhookActor(td::ActorShared<Callback> callback, td::int64 tqueue_id, td::HttpUrl url,
                            td::string cert_path, td::int32 max_connections, bool from_db_flag,
@@ -71,6 +71,11 @@ WebhookActor::WebhookActor(td::ActorShared<Callback> callback, td::int64 tqueue_
             << "\", protocol = " << (url_.protocol_ == td::HttpUrl::Protocol::Http ? "http" : "https")
             << ", host = " << url_.host_ << ", port = " << url_.port_ << ", query = " << url_.query_
             << ", max_connections = " << max_connections_;
+}
+
+WebhookActor::~WebhookActor() {
+  td::Scheduler::instance()->destroy_on_scheduler(SharedData::get_file_gc_scheduler_id(), update_map_, queue_updates_,
+                                                  queues_);
 }
 
 void WebhookActor::relax_wakeup_at(double wakeup_at, const char *source) {
@@ -232,7 +237,7 @@ td::Status WebhookActor::create_connection(td::BufferedFd<td::SocketFd> fd) {
   conn->event_id_ = {};
   conn->id_ = id;
   ready_connections_.put(conn->to_list_node());
-  total_connections_count_.fetch_add(1, std::memory_order_relaxed);
+  total_connection_count_.fetch_add(1, std::memory_order_relaxed);
 
   if (!was_checked_) {
     was_checked_ = true;
@@ -657,7 +662,7 @@ void WebhookActor::handle(td::unique_ptr<td::HttpQuery> response) {
   if (need_close || close_connection) {
     VLOG(webhook) << "Close connection " << connection_id;
     connections_.erase(connection_ptr->id_);
-    total_connections_count_.fetch_sub(1, std::memory_order_relaxed);
+    total_connection_count_.fetch_sub(1, std::memory_order_relaxed);
   } else {
     ready_connections_.put(connection_ptr->to_list_node());
   }
@@ -725,7 +730,7 @@ void WebhookActor::close() {
 }
 
 void WebhookActor::tear_down() {
-  total_connections_count_.fetch_sub(connections_.size(), std::memory_order_relaxed);
+  total_connection_count_.fetch_sub(connections_.size(), std::memory_order_relaxed);
 }
 
 void WebhookActor::on_webhook_verified() {

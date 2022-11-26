@@ -236,7 +236,7 @@ void ClientManager::get_stats(td::Promise<td::BufferSlice> promise,
     }
 
     sb << "buffer_memory\t" << td::format::as_size(td::BufferAllocator::get_buffer_mem()) << '\n';
-    sb << "active_webhook_connections\t" << WebhookActor::get_total_connections_count() << '\n';
+    sb << "active_webhook_connections\t" << WebhookActor::get_total_connection_count() << '\n';
     sb << "active_requests\t" << parameters_->shared_data_->query_count_.load(std::memory_order_relaxed) << '\n';
     sb << "active_network_queries\t" << td::get_pending_network_query_count(*parameters_->net_query_stats_) << '\n';
     auto stats = stat_.as_vector(now);

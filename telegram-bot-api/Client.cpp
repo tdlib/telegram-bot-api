@@ -187,9 +187,9 @@ Client::Client(td::ActorShared<> parent, const td::string &bot_token, bool is_te
 }
 
 Client::~Client() {
-  td::Scheduler::instance()->destroy_on_scheduler(get_file_gc_scheduler_id(), messages_, users_, groups_, supergroups_,
-                                                  chats_, reply_message_ids_, yet_unsent_reply_message_ids_,
-                                                  sticker_set_names_);
+  td::Scheduler::instance()->destroy_on_scheduler(SharedData::get_file_gc_scheduler_id(), messages_, users_, groups_,
+                                                  supergroups_, chats_, reply_message_ids_,
+                                                  yet_unsent_reply_message_ids_, sticker_set_names_);
 }
 
 bool Client::init_methods() {
@@ -4833,7 +4833,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
           deleted_messages.push_back(std::move(deleted_message));
         }
       }
-      td::Scheduler::instance()->destroy_on_scheduler(get_file_gc_scheduler_id(), deleted_messages);
+      td::Scheduler::instance()->destroy_on_scheduler(SharedData::get_file_gc_scheduler_id(), deleted_messages);
       break;
     }
     case td_api::updateFile::ID: {
@@ -5168,7 +5168,7 @@ void Client::on_closed() {
   if (logging_out_) {
     parameters_->shared_data_->webhook_db_->erase(bot_token_with_dc_);
 
-    td::Scheduler::instance()->run_on_scheduler(get_file_gc_scheduler_id(),
+    td::Scheduler::instance()->run_on_scheduler(SharedData::get_file_gc_scheduler_id(),
                                                 [actor_id = actor_id(this), dir = dir_](td::Unit) {
                                                   CHECK(dir.size() >= 24);
                                                   CHECK(dir.back() == TD_DIR_SLASH);
@@ -5192,16 +5192,6 @@ void Client::finish_closing() {
 void Client::timeout_expired() {
   LOG(WARNING) << "Stop client";
   stop();
-}
-
-td::int32 Client::get_database_scheduler_id() {
-  // the same scheduler as for database in Td
-  return 1;
-}
-
-td::int32 Client::get_file_gc_scheduler_id() {
-  // the same scheduler as for file GC in Td
-  return 2;
 }
 
 void Client::clear_tqueue() {
@@ -9034,7 +9024,7 @@ void Client::webhook_error(Status status) {
 
 void Client::webhook_closed(Status status) {
   if (has_webhook_certificate_) {
-    td::Scheduler::instance()->run_on_scheduler(get_database_scheduler_id(),
+    td::Scheduler::instance()->run_on_scheduler(SharedData::get_database_scheduler_id(),
                                                 [actor_id = actor_id(this), path = get_webhook_certificate_path(),
                                                  status = std::move(status)](td::Unit) mutable {
                                                   LOG(INFO) << "Unlink certificate " << path;
@@ -9147,8 +9137,9 @@ void Client::do_set_webhook(PromisedQueryPtr query, bool was_deleted) {
         CHECK(!webhook_set_query_);
         active_webhook_set_query_ = std::move(query);
         td::Scheduler::instance()->run_on_scheduler(
-            get_database_scheduler_id(), [actor_id = actor_id(this), from_path = cert_file_ptr->temp_file_name,
-                                          to_path = get_webhook_certificate_path(), size](td::Unit) mutable {
+            SharedData::get_database_scheduler_id(),
+            [actor_id = actor_id(this), from_path = cert_file_ptr->temp_file_name,
+             to_path = get_webhook_certificate_path(), size](td::Unit) mutable {
               LOG(INFO) << "Copy certificate to " << to_path;
               auto status = td::copy_file(from_path, to_path, size);
               send_closure(actor_id, &Client::on_webhook_certificate_copied, std::move(status));

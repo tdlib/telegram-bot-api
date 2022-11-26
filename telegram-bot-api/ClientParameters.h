@@ -52,6 +52,16 @@ struct SharedData {
     }
     return static_cast<td::int32>(result);
   }
+
+  static td::int32 get_database_scheduler_id() {
+    // the same scheduler as for database in Td
+    return 1;
+  }
+
+  static td::int32 get_file_gc_scheduler_id() {
+    // the same scheduler as for file GC in Td
+    return 2;
+  }
 };
 
 struct ClientParameters {

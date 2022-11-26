@@ -55,13 +55,18 @@ class WebhookActor final : public td::HttpOutboundConnection::Callback {
   WebhookActor(td::ActorShared<Callback> callback, td::int64 tqueue_id, td::HttpUrl url, td::string cert_path,
                td::int32 max_connections, bool from_db_flag, td::string cached_ip_address, bool fix_ip_address,
                td::string secret_token, std::shared_ptr<const ClientParameters> parameters);
+  WebhookActor(const WebhookActor &) = delete;
+  WebhookActor &operator=(const WebhookActor &) = delete;
+  WebhookActor(WebhookActor &&) = delete;
+  WebhookActor &operator=(WebhookActor &&) = delete;
+  ~WebhookActor();
 
   void update();
 
   void close();
 
-  static td::int64 get_total_connections_count() {
-    return total_connections_count_;
+  static td::int64 get_total_connection_count() {
+    return total_connection_count_;
   }
 
  private:
@@ -70,7 +75,7 @@ class WebhookActor final : public td::HttpOutboundConnection::Callback {
   static constexpr int WEBHOOK_MAX_RESEND_TIMEOUT = 60;
   static constexpr int WEBHOOK_DROP_TIMEOUT = 60 * 60 * 23;
 
-  static std::atomic<td::uint64> total_connections_count_;
+  static std::atomic<td::uint64> total_connection_count_;
 
   td::ActorShared<Callback> callback_;
   td::int64 tqueue_id_;
