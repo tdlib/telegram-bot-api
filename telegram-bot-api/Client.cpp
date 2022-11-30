@@ -4076,14 +4076,17 @@ void Client::send(PromisedQueryPtr query) {
       auto update_per_minute = static_cast<int64>(stat->get_minute_update_count(td::Time::now()) * 60);
       if (stat->get_active_request_count() > 500 + update_per_minute) {
         LOG(INFO) << "Fail a query, because there are too many active queries: " << *query;
+        flood_limited_query_count_++;
         return query->set_retry_after_error(60);
       }
       if (stat->get_active_file_upload_bytes() > (static_cast<int64>(1) << 33) && !query->files().empty()) {
         LOG(INFO) << "Fail a query, because the total size of active file uploads is too big: " << *query;
+        flood_limited_query_count_++;
         return query->set_retry_after_error(60);
       }
       if (stat->get_active_file_upload_count() > 100 + update_per_minute / 5 && !query->files().empty()) {
         LOG(INFO) << "Fail a query, because there are too many active file uploads: " << *query;
+        flood_limited_query_count_++;
         return query->set_retry_after_error(60);
       }
     }
@@ -5100,6 +5103,12 @@ void Client::on_update(object_ptr<td_api::Object> result) {
 
 void Client::on_result(td::uint64 id, object_ptr<td_api::Object> result) {
   LOG(DEBUG) << "Receive from Td: " << id << " " << to_string(result);
+  if (flood_limited_query_count_ > 0 && td::Time::now() > next_flood_limit_warning_time_) {
+    LOG(WARNING) << "Flood-limited " << flood_limited_query_count_ << " queries";
+    flood_limited_query_count_ = 0;
+    next_flood_limit_warning_time_ = td::Time::now() + 1;
+  }
+
   if (id == 0) {
     return on_update(std::move(result));
   }
@@ -7341,6 +7350,7 @@ td::Status Client::process_send_message_query(PromisedQueryPtr &query) {
     // fast path
     auto it = yet_unsent_message_count_.find(r_chat_id.ok());
     if (it != yet_unsent_message_count_.end() && it->second >= MAX_CONCURRENTLY_SENT_CHAT_MESSAGES) {
+      flood_limited_query_count_++;
       query->set_retry_after_error(60);
       return Status::OK();
     }
@@ -7646,6 +7656,7 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
                                                PromisedQueryPtr query) mutable {
             auto &count = yet_unsent_message_count_[chat_id];
             if (count >= MAX_CONCURRENTLY_SENT_CHAT_MESSAGES) {
+              flood_limited_query_count_++;
               return query->set_retry_after_error(60);
             }
             auto message_count = input_message_contents.size();
@@ -9228,6 +9239,7 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
                                                        int64 reply_to_message_id, PromisedQueryPtr query) mutable {
                 auto &count = yet_unsent_message_count_[chat_id];
                 if (count >= MAX_CONCURRENTLY_SENT_CHAT_MESSAGES) {
+                  flood_limited_query_count_++;
                   return query->set_retry_after_error(60);
                 }
                 count++;

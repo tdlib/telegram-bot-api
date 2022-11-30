@@ -1086,6 +1086,9 @@ class Client final : public WebhookActor::Callback {
   double previous_get_updates_finish_time_ = 0;
   double next_get_updates_conflict_time_ = 0;
 
+  int32 flood_limited_query_count_ = 0;
+  double next_flood_limit_warning_time_ = 0;
+
   td::uint64 webhook_generation_ = 1;
 
   UpdateType delayed_update_type_ = UpdateType::Size;
