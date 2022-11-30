@@ -182,9 +182,12 @@ class BotStatActor final : public td::Actor {
   }
 
   td::vector<StatItem> as_vector(double now);
+
   td::string get_description() const;
 
   double get_score(double now);
+
+  double get_minute_update_count(double now);
 
   td::int64 get_active_request_count() const;
 

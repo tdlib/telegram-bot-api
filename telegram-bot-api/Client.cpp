@@ -4070,9 +4070,11 @@ void Client::start_up() {
 void Client::send(PromisedQueryPtr query) {
   if (!query->is_internal()) {
     query->set_stat_actor(stat_actor_);
-    if (!parameters_->local_mode_ && !is_local_method(query->method())) {
-      const BotStatActor *stat = stat_actor_.get_actor_unsafe();
-      if (stat->get_active_request_count() > 5000) {
+    if (!parameters_->local_mode_ && !is_local_method(query->method()) &&
+        td::Time::now() > parameters_->start_time_ + 10 * 60) {
+      BotStatActor *stat = stat_actor_.get_actor_unsafe();
+      auto update_per_minute = static_cast<int64>(stat->get_minute_update_count(td::Time::now()) * 60);
+      if (stat->get_active_request_count() > 500 + update_per_minute) {
         LOG(INFO) << "Fail a query, because there are too many active queries: " << *query;
         return query->set_retry_after_error(60);
       }
@@ -4080,7 +4082,7 @@ void Client::send(PromisedQueryPtr query) {
         LOG(INFO) << "Fail a query, because the total size of active file uploads is too big: " << *query;
         return query->set_retry_after_error(60);
       }
-      if (stat->get_active_file_upload_count() > 500 && !query->files().empty()) {
+      if (stat->get_active_file_upload_count() > 100 + update_per_minute / 5 && !query->files().empty()) {
         LOG(INFO) << "Fail a query, because there are too many active file uploads: " << *query;
         return query->set_retry_after_error(60);
       }
