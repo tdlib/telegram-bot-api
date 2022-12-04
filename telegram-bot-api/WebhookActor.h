@@ -212,7 +212,7 @@ class WebhookActor final : public td::HttpOutboundConnection::Callback {
 
   void start_up() final;
 
-  bool check_ip_address(const td::IPAddress &addr) const;
+  td::Status check_ip_address(const td::IPAddress &addr) const;
 
   void on_error(td::Status status);
   void on_connection_error(td::Status error) final;

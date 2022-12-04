@@ -118,8 +118,9 @@ void WebhookActor::on_resolved_ip_address(td::Result<td::IPAddress> r_ip_address
     return on_error(r_ip_address.move_as_error());
   }
   auto new_ip_address = r_ip_address.move_as_ok();
-  if (!check_ip_address(new_ip_address)) {
-    return on_error(td::Status::Error(PSLICE() << "IP address " << new_ip_address.get_ip_str() << " is reserved"));
+  auto check_status = check_ip_address(new_ip_address);
+  if (check_status.is_error()) {
+    return on_error(std::move(check_status));
   }
   if (!(ip_address_ == new_ip_address)) {
     VLOG(webhook) << "IP address has changed: " << ip_address_ << " --> " << new_ip_address;
@@ -692,15 +693,14 @@ void WebhookActor::start_up() {
     } else {
       CHECK(url_.protocol_ == td::HttpUrl::Protocol::Http);
       VLOG(webhook) << "Can't create connection: HTTP is forbidden";
-      on_error(td::Status::Error("HTTPS url must be provided for webhook"));
+      on_error(td::Status::Error("An HTTPS URL must be provided for webhook"));
     }
   }
 
   if (fix_ip_address_ && !stop_flag_) {
-    if (!ip_address_.is_valid()) {
-      on_error(td::Status::Error("Invalid IP address specified"));
-    } else if (!check_ip_address(ip_address_)) {
-      on_error(td::Status::Error(PSLICE() << "IP address " << ip_address_.get_ip_str() << " is reserved"));
+    auto check_status = check_ip_address(ip_address_);
+    if (check_status.is_error()) {
+      return on_error(std::move(check_status));
     }
   }
 
@@ -741,19 +741,21 @@ void WebhookActor::on_webhook_verified() {
   send_closure(callback_, &Callback::webhook_verified, std::move(ip_address_str));
 }
 
-bool WebhookActor::check_ip_address(const td::IPAddress &addr) const {
+td::Status WebhookActor::check_ip_address(const td::IPAddress &addr) const {
   if (!addr.is_valid()) {
-    return false;
+    return td::Status::Error("Invalid IP address specified");
   }
   if (parameters_->local_mode_) {
-    // allow any valid IP address
-    return true;
+    return td::Status::OK();
   }
   if (!addr.is_ipv4()) {
     VLOG(webhook) << "Bad IP address (not IPv4): " << addr;
-    return false;
+    return td::Status::Error("IPv6-only addresses are not allowed");
   }
-  return !addr.is_reserved();
+  if (addr.is_reserved()) {
+    return td::Status::Error(PSLICE() << "IP address " << addr.get_ip_str() << " is reserved");
+  }
+  return td::Status::OK();
 }
 
 void WebhookActor::on_error(td::Status status) {
