@@ -619,6 +619,8 @@ class Client final : public WebhookActor::Callback {
 
   void fail_query_conflict(Slice message, PromisedQueryPtr &&query);
 
+  static int get_retry_after_time(Slice error_message);
+
   static void fail_query_with_error(PromisedQueryPtr query, int32 error_code, Slice error_message,
                                     Slice default_message = Slice());
 

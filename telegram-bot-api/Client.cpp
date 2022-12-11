@@ -42,15 +42,23 @@ using td::JsonValue;
 using td_api::make_object;
 using td_api::move_object_as;
 
+int Client::get_retry_after_time(Slice error_message) {
+  Slice prefix = "Too Many Requests: retry after ";
+  if (begins_with(error_message, prefix)) {
+    auto r_retry_after = td::to_integer_safe<int>(error_message.substr(prefix.size()));
+    if (r_retry_after.is_ok() && r_retry_after.ok() > 0) {
+      return r_retry_after.ok();
+    }
+  }
+  return 0;
+}
+
 void Client::fail_query_with_error(PromisedQueryPtr query, int32 error_code, Slice error_message,
                                    Slice default_message) {
   if (error_code == 429) {
-    Slice prefix = "Too Many Requests: retry after ";
-    if (begins_with(error_message, prefix)) {
-      auto r_retry_after = td::to_integer_safe<int>(error_message.substr(prefix.size()));
-      if (r_retry_after.is_ok() && r_retry_after.ok() > 0) {
-        return query->set_retry_after_error(r_retry_after.ok());
-      }
+    auto retry_after_time = get_retry_after_time(error_message);
+    if (retry_after_time > 0) {
+      return query->set_retry_after_error(retry_after_time);
     }
     LOG(ERROR) << "Wrong error message: " << error_message << " from " << *query;
     return fail_query(500, error_message, std::move(query));
