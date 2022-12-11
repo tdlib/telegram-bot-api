@@ -13,8 +13,6 @@
 #include "td/net/HttpProxy.h"
 #include "td/net/TransparentProxy.h"
 
-#include "td/actor/actor.h"
-
 #include "td/utils/base64.h"
 #include "td/utils/buffer.h"
 #include "td/utils/common.h"
@@ -133,19 +131,25 @@ void WebhookActor::on_resolved_ip_address(td::Result<td::IPAddress> r_ip_address
   VLOG(webhook) << "IP address was verified";
 }
 
-td::Status WebhookActor::create_connection() {
-  if (!ip_address_.is_valid()) {
-    VLOG(webhook) << "Can't create connection: IP address is not ready";
-    return td::Status::Error("IP address is not ready");
+void WebhookActor::on_ssl_context_created(td::Result<td::SslCtx> r_ssl_ctx) {
+  if (r_ssl_ctx.is_error()) {
+    create_webhook_error("Can't create an SSL context", r_ssl_ctx.move_as_error(), true);
+    loop();
+    return;
   }
+  ssl_ctx_ = r_ssl_ctx.move_as_ok();
+  VLOG(webhook) << "SSL context was created";
+  loop();
+}
+
+td::Status WebhookActor::create_connection() {
+  CHECK(ip_address_.is_valid());
   if (parameters_->webhook_proxy_ip_address_.is_valid()) {
     auto r_proxy_socket_fd = td::SocketFd::open(parameters_->webhook_proxy_ip_address_);
     if (r_proxy_socket_fd.is_error()) {
       return create_webhook_error("Can't connect to the webhook proxy", r_proxy_socket_fd.move_as_error(), false);
     }
     if (!was_checked_) {
-      TRY_STATUS(create_ssl_stream());  // check certificate
-
       // verify webhook even we can't establish connection to the webhook
       was_checked_ = true;
       on_webhook_verified();
@@ -211,14 +215,7 @@ td::Result<td::SslStream> WebhookActor::create_ssl_stream() {
     return td::SslStream();
   }
 
-  if (!ssl_ctx_) {
-    auto r_ssl_ctx = td::SslCtx::create(cert_path_, td::SslCtx::VerifyPeer::On);
-    if (r_ssl_ctx.is_error()) {
-      return create_webhook_error("Can't create an SSL context", r_ssl_ctx.move_as_error(), true);
-    }
-    ssl_ctx_ = r_ssl_ctx.move_as_ok();
-  }
-
+  CHECK(ssl_ctx_);
   auto r_ssl_stream = td::SslStream::create(url_.host_, ssl_ctx_, !cert_path_.empty());
   if (r_ssl_stream.is_error()) {
     return create_webhook_error("Can't create an SSL connection", r_ssl_stream.move_as_error(), true);
@@ -262,6 +259,15 @@ void WebhookActor::on_socket_ready_async(td::Result<td::BufferedFd<td::SocketFd>
 }
 
 void WebhookActor::create_new_connections() {
+  if (!ip_address_.is_valid()) {
+    VLOG(webhook) << "Can't create new connections: IP address is not ready";
+    return;
+  }
+  if (url_.protocol_ != td::HttpUrl::Protocol::Http && !ssl_ctx_) {
+    VLOG(webhook) << "Can't create new connections: SSL context is not ready";
+    return;
+  }
+
   size_t need_connections = queue_updates_.size();
   if (need_connections > static_cast<size_t>(max_connections_)) {
     need_connections = max_connections_;
@@ -709,6 +715,15 @@ void WebhookActor::start_up() {
     on_webhook_verified();
   }
 
+  if (url_.protocol_ != td::HttpUrl::Protocol::Http && !stop_flag_) {
+    // asynchronously create SSL context
+    td::Scheduler::instance()->run_on_scheduler(
+        SharedData::get_database_scheduler_id(), [actor_id = actor_id(this), cert_path = cert_path_](td::Unit) mutable {
+          send_closure(actor_id, &WebhookActor::on_ssl_context_created,
+                       td::SslCtx::create(cert_path, td::SslCtx::VerifyPeer::On));
+        });
+  }
+
   yield();
 }
 
@@ -760,7 +775,7 @@ td::Status WebhookActor::check_ip_address(const td::IPAddress &addr) const {
 
 void WebhookActor::on_error(td::Status status) {
   VLOG(webhook) << "Receive webhook error " << status;
-  if (!was_checked_) {
+  if (!was_checked_ && !stop_flag_) {
     CHECK(!callback_.empty());
     send_closure(std::move(callback_), &Callback::webhook_closed, std::move(status));
     stop_flag_ = true;

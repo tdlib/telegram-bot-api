@@ -184,6 +184,8 @@ class WebhookActor final : public td::HttpOutboundConnection::Callback {
   void resolve_ip_address();
   void on_resolved_ip_address(td::Result<td::IPAddress> r_ip_address);
 
+  void on_ssl_context_created(td::Result<td::SslCtx> r_ssl_ctx);
+
   td::Status create_webhook_error(td::Slice error_message, td::Status &&result, bool is_public);
 
   td::Result<td::SslStream> create_ssl_stream();
