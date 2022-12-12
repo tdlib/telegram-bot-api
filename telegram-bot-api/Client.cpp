@@ -4633,12 +4633,9 @@ void Client::get_chat_member(int64 chat_id, int64 user_id, PromisedQueryPtr quer
 }
 
 void Client::send_request(object_ptr<td_api::Function> &&f, td::unique_ptr<TdQueryCallback> handler) {
-  if (logging_out_) {
-    return handler->on_result(
-        make_object<td_api::error>(LOGGING_OUT_ERROR_CODE, get_logging_out_error_description().str()));
-  }
-  if (closing_) {
-    return handler->on_result(make_object<td_api::error>(CLOSING_ERROR_CODE, CLOSING_ERROR_DESCRIPTION.str()));
+  if (closing_ || logging_out_) {
+    auto error = get_closing_error();
+    return handler->on_result(make_object<td_api::error>(error.code, error.message.str()));
   }
 
   do_send_request(std::move(f), std::move(handler));
@@ -4671,13 +4668,12 @@ void Client::on_update_file(object_ptr<td_api::file> file) {
   }
   if (!file->local_->is_downloading_active_ && download_started_file_ids_.count(file_id)) {
     // also includes all 5xx and 429 errors
+    if (closing_ || logging_out_) {
+      auto error = get_closing_error();
+      return on_file_download(file_id, Status::Error(error.code, error.message));
+    }
+
     auto error = Status::Error(400, "Bad Request: wrong file_id or the file is temporarily unavailable");
-    if (logging_out_) {
-      error = Status::Error(LOGGING_OUT_ERROR_CODE, get_logging_out_error_description());
-    }
-    if (closing_) {
-      error = Status::Error(CLOSING_ERROR_CODE, CLOSING_ERROR_DESCRIPTION);
-    }
     return on_file_download(file_id, std::move(error));
   }
 }
@@ -5126,10 +5122,6 @@ void Client::on_result(td::uint64 id, object_ptr<td_api::Object> result) {
   auto handler = std::move(*handler_ptr);
   handler->on_result(std::move(result));
   handlers_.erase(id);
-}
-
-td::Slice Client::get_logging_out_error_description() const {
-  return is_api_id_invalid_ ? API_ID_INVALID_ERROR_DESCRIPTION : LOGGING_OUT_ERROR_DESCRIPTION;
 }
 
 void Client::on_closed() {
@@ -9331,14 +9323,26 @@ void Client::fail_query_conflict(Slice message, PromisedQueryPtr &&query) {
   }
 }
 
-void Client::fail_query_closing(PromisedQueryPtr &&query) const {
+void Client::fail_query_closing(PromisedQueryPtr &&query) {
+  auto error = get_closing_error();
+  fail_query(error.code, error.message, std::move(query));
+}
+
+Client::ClosingError Client::get_closing_error() {
+  ClosingError result;
   if (logging_out_) {
-    return fail_query(LOGGING_OUT_ERROR_CODE, get_logging_out_error_description(), std::move(query));
+    result.code = 401;
+    if (is_api_id_invalid_) {
+      result.message = Slice("Unauthorized: invalid api-id/api-hash");
+    } else {
+      result.message = Slice("Unauthorized");
+    }
+  } else {
+    CHECK(closing_);
+    result.code = 500;
+    result.message = Slice("Internal Server Error: restart");
   }
-  if (closing_) {
-    return fail_query(CLOSING_ERROR_CODE, CLOSING_ERROR_DESCRIPTION, std::move(query));
-  }
-  UNREACHABLE();
+  return result;
 }
 
 class Client::JsonUpdates final : public Jsonable {
@@ -10939,13 +10943,6 @@ constexpr Client::int64 Client::GREAT_MINDS_SET_ID;
 constexpr Client::Slice Client::GREAT_MINDS_SET_NAME;
 
 constexpr Client::Slice Client::MASK_POINTS[MASK_POINTS_SIZE];
-
-constexpr int Client::LOGGING_OUT_ERROR_CODE;
-constexpr Client::Slice Client::LOGGING_OUT_ERROR_DESCRIPTION;
-constexpr Client::Slice Client::API_ID_INVALID_ERROR_DESCRIPTION;
-
-constexpr int Client::CLOSING_ERROR_CODE;
-constexpr Client::Slice Client::CLOSING_ERROR_DESCRIPTION;
 
 td::FlatHashMap<td::string, td::Status (Client::*)(PromisedQueryPtr &query)> Client::methods_;
 

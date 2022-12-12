@@ -84,13 +84,6 @@ class Client final : public WebhookActor::Callback {
   static constexpr int32 MAX_LENGTH = 10000;  // max width or height
   static constexpr int32 MAX_DURATION = 24 * 60 * 60;
 
-  static constexpr int LOGGING_OUT_ERROR_CODE = 401;
-  static constexpr Slice LOGGING_OUT_ERROR_DESCRIPTION = "Unauthorized";
-  static constexpr Slice API_ID_INVALID_ERROR_DESCRIPTION = "Unauthorized: invalid api-id/api-hash";
-
-  static constexpr int CLOSING_ERROR_CODE = 500;
-  static constexpr Slice CLOSING_ERROR_DESCRIPTION = "Internal Server Error: restart";
-
   class JsonFile;
   class JsonDatedFile;
   class JsonDatedFiles;
@@ -316,7 +309,6 @@ class Client final : public WebhookActor::Callback {
 
   void on_update_authorization_state();
   void log_out(bool is_api_id_invalid);
-  Slice get_logging_out_error_description() const;
   void on_closed();
   void finish_closing();
 
@@ -615,9 +607,15 @@ class Client final : public WebhookActor::Callback {
 
   void abort_long_poll(bool from_set_webhook);
 
-  void fail_query_closing(PromisedQueryPtr &&query) const;
+  void fail_query_closing(PromisedQueryPtr &&query);
 
   void fail_query_conflict(Slice message, PromisedQueryPtr &&query);
+
+  struct ClosingError {
+    int code;
+    Slice message;
+  };
+  ClosingError get_closing_error();
 
   static int get_retry_after_time(Slice error_message);
 
