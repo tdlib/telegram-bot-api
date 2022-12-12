@@ -2789,13 +2789,12 @@ class Client::TdOnAuthorizationCallback final : public TdQueryCallback {
     bool was_ready = client_->authorization_state_->get_id() != td_api::authorizationStateWaitPhoneNumber::ID;
     if (result->get_id() == td_api::error::ID) {
       auto error = move_object_as<td_api::error>(result);
-      if (error->code_ == 429 || error->code_ >= 500 || (error->code_ != 401 && was_ready)) {
+      if (error->code_ != 401 && was_ready) {
         // try again
         return client_->on_update_authorization_state();
       }
 
-      LOG(WARNING) << "Logging out due to " << td::oneline(to_string(error));
-      client_->log_out(error->message_ == "API_ID_INVALID");
+      client_->log_out(error->code_, error->message_);
     } else if (was_ready) {
       client_->on_update_authorization_state();
     }
@@ -3966,8 +3965,18 @@ void Client::close() {
   }
 }
 
-void Client::log_out(bool is_api_id_invalid) {
-  is_api_id_invalid_ |= is_api_id_invalid;
+void Client::log_out(int32 error_code, Slice error_message) {
+  LOG(WARNING) << "Logging out due to error " << error_code << ": " << error_message;
+  if (error_message == "API_ID_INVALID") {
+    is_api_id_invalid_ = true;
+  } else if (error_code == 429) {
+    auto retry_after_time = get_retry_after_time(error_message);
+    if (retry_after_time > 0) {
+      next_authorization_time_ = td::max(next_authorization_time_, td::Time::now() + retry_after_time);
+    }
+  } else if (error_code >= 500) {
+    next_authorization_time_ = td::max(next_authorization_time_, td::Time::now() + 1);
+  }
   if (!td_client_.empty() && !logging_out_ && !closing_) {
     do_send_request(make_object<td_api::logOut>(), td::make_unique<TdOnOkCallback>());
   }
@@ -4763,7 +4772,7 @@ void Client::on_update_authorization_state() {
     case td_api::authorizationStateClosed::ID:
       return on_closed();
     default:
-      return log_out(false);  // just in case
+      return log_out(500, "Unknown authorization state");  // just in case
   }
 }
 
@@ -5201,7 +5210,18 @@ void Client::finish_closing() {
     clear_tqueue();
   }
 
-  set_timeout_in(need_close_ ? 0 : 600);
+  if (need_close_) {
+    return stop();
+  }
+
+  auto timeout = [&] {
+    if (next_authorization_time_ <= 0.0) {
+      return 600.0;
+    }
+    return td::min(next_authorization_time_ - td::Time::now(), 600.0);
+  }();
+  set_timeout_in(timeout);
+  LOG(INFO) << "Keep client opened for " << timeout << " seconds";
 }
 
 void Client::timeout_expired() {
@@ -7209,7 +7229,7 @@ void Client::on_message_send_failed(int64 chat_id, int64 old_message_id, int64 n
 
 void Client::on_cmd(PromisedQueryPtr query) {
   LOG(DEBUG) << "Process query " << *query;
-  if (!td_client_.empty()) {
+  if (!td_client_.empty() && was_authorized_) {
     if (query->method() == "close") {
       auto retry_after = static_cast<int>(10 * 60 - (td::Time::now() - start_time_));
       if (retry_after > 0 && start_time_ > parameters_->start_time_ + 10 * 60) {
@@ -9325,16 +9345,33 @@ void Client::fail_query_conflict(Slice message, PromisedQueryPtr &&query) {
 
 void Client::fail_query_closing(PromisedQueryPtr &&query) {
   auto error = get_closing_error();
-  fail_query(error.code, error.message, std::move(query));
+  if (error.retry_after > 0) {
+    query->set_retry_after_error(error.retry_after);
+  } else {
+    fail_query(error.code, error.message, std::move(query));
+  }
 }
 
 Client::ClosingError Client::get_closing_error() {
   ClosingError result;
+  result.retry_after = 0;
   if (logging_out_) {
-    result.code = 401;
     if (is_api_id_invalid_) {
+      result.code = 401;
       result.message = Slice("Unauthorized: invalid api-id/api-hash");
+    } else if (next_authorization_time_ > 0.0) {
+      result.code = 429;
+      result.retry_after = td::max(static_cast<int>(next_authorization_time_ - td::Time::now()), 0) + 1;
+      if (result.retry_after != prev_retry_after) {
+        prev_retry_after = result.retry_after;
+        retry_after_error_message = PSTRING() << "Too Many Requests: retry after " << result.retry_after;
+      }
+      result.message = retry_after_error_message;
+    } else if (clear_tqueue_) {
+      result.code = 400;
+      result.message = Slice("Logged out");
     } else {
+      result.code = 401;
       result.message = Slice("Unauthorized");
     }
   } else {

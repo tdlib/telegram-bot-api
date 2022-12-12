@@ -308,7 +308,7 @@ class Client final : public WebhookActor::Callback {
   void on_result(td::uint64 id, object_ptr<td_api::Object> result);
 
   void on_update_authorization_state();
-  void log_out(bool is_api_id_invalid);
+  void log_out(int32 error_code, Slice error_message);
   void on_closed();
   void finish_closing();
 
@@ -613,6 +613,7 @@ class Client final : public WebhookActor::Callback {
 
   struct ClosingError {
     int code;
+    int retry_after;
     Slice message;
   };
   ClosingError get_closing_error();
@@ -955,6 +956,10 @@ class Client final : public WebhookActor::Callback {
 
   int64 my_id_ = -1;
   int32 authorization_date_ = -1;
+  double next_authorization_time_ = 0;
+
+  int32 prev_retry_after = 0;
+  td::string retry_after_error_message;
 
   int64 group_anonymous_bot_user_id_ = 0;
   int64 channel_bot_user_id_ = 0;
