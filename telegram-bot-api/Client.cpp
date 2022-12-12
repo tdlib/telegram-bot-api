@@ -5138,13 +5138,11 @@ void Client::on_closed() {
   CHECK(!td_client_.empty());
   td_client_.reset();
 
-  int http_status_code = logging_out_ ? LOGGING_OUT_ERROR_CODE : CLOSING_ERROR_CODE;
-  Slice description = logging_out_ ? get_logging_out_error_description() : CLOSING_ERROR_DESCRIPTION;
   if (webhook_set_query_) {
-    fail_query(http_status_code, description, std::move(webhook_set_query_));
+    fail_query_closing(std::move(webhook_set_query_));
   }
   if (active_webhook_set_query_) {
-    fail_query(http_status_code, description, std::move(active_webhook_set_query_));
+    fail_query_closing(std::move(active_webhook_set_query_));
   }
   if (!webhook_url_.empty()) {
     webhook_id_.reset();
@@ -5157,23 +5155,24 @@ void Client::on_closed() {
   while (!cmd_queue_.empty()) {
     auto query = std::move(cmd_queue_.front());
     cmd_queue_.pop();
-    fail_query(http_status_code, description, std::move(query));
+    fail_query_closing(std::move(query));
   }
 
-  while (!yet_unsent_messages_.empty()) {
-    auto it = yet_unsent_messages_.begin();
-    auto chat_id = it->first.chat_id;
-    auto message_id = it->first.message_id;
+  while (!pending_send_message_queries_.empty()) {
+    auto it = pending_send_message_queries_.begin();
     if (!USE_MESSAGE_DATABASE) {
-      LOG(ERROR) << "Doesn't receive updateMessageSendFailed for message " << message_id << " in chat " << chat_id;
+      LOG(ERROR) << "Doesn't receive updateMessageSendFailed for " << *it->second->query << " with "
+                 << it->second->awaited_message_count << " awaited messages";
     }
-    on_message_send_failed(chat_id, message_id, 0, Status::Error(http_status_code, description));
+    fail_query_closing(std::move(it->second->query));
+    pending_send_message_queries_.erase(it);
   }
   yet_unsent_message_count_.clear();
+  yet_unsent_messages_.clear();
 
   while (!pending_bot_resolve_queries_.empty()) {
     auto it = pending_bot_resolve_queries_.begin();
-    fail_query(http_status_code, description, std::move(it->second.query));
+    fail_query_closing(std::move(it->second.query));
     pending_bot_resolve_queries_.erase(it);
   }
 
@@ -5181,8 +5180,13 @@ void Client::on_closed() {
     auto it = file_download_listeners_.begin();
     auto file_id = it->first;
     LOG(ERROR) << "Doesn't receive updateFile for file " << file_id;
-    on_file_download(file_id, Status::Error(http_status_code, description));
+    auto queries = std::move(it->second);
+    file_download_listeners_.erase(it);
+    for (auto &query : queries) {
+      fail_query_closing(std::move(query));
+    }
   }
+  download_started_file_ids_.clear();
 
   if (logging_out_) {
     parameters_->shared_data_->webhook_db_->erase(bot_token_with_dc_);
@@ -7184,7 +7188,7 @@ void Client::on_message_send_failed(int64 chat_id, int64 old_message_id, int64 n
   auto &query = *pending_send_message_queries_[query_id];
   if (query.is_multisend) {
     if (query.error == nullptr || query.error->message_ == "Group send failed") {
-      if (error->code_ == 429 || error->code_ >= 500 || error->message_ == "Group send failed") {
+      if (error->code_ == 401 || error->code_ == 429 || error->code_ >= 500 || error->message_ == "Group send failed") {
         query.error = std::move(error);
       } else {
         auto pos = (query.total_message_count - query.awaited_message_count + 1);
