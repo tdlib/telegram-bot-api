@@ -7703,14 +7703,15 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
 
 td::Status Client::process_send_chat_action_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
+  auto message_thread_id = get_message_id(query.get(), "message_thread_id");
   object_ptr<td_api::ChatAction> action = get_chat_action(query.get());
   if (action == nullptr) {
     return Status::Error(400, "Wrong parameter action in request");
   }
 
   check_chat(chat_id, AccessRights::Write, std::move(query),
-             [this, action = std::move(action)](int64 chat_id, PromisedQueryPtr query) mutable {
-               send_request(make_object<td_api::sendChatAction>(chat_id, 0, std::move(action)),
+             [this, message_thread_id, action = std::move(action)](int64 chat_id, PromisedQueryPtr query) mutable {
+               send_request(make_object<td_api::sendChatAction>(chat_id, message_thread_id, std::move(action)),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
   return Status::OK();
