@@ -158,7 +158,7 @@ class Client final : public WebhookActor::Callback {
   class JsonVideoChatStarted;
   class JsonVideoChatEnded;
   class JsonInviteVideoChatParticipants;
-  class JsonChatSetTtl;
+  class JsonChatSetMessageAutoDeleteTime;
   class JsonUpdateTypes;
   class JsonWebhookInfo;
   class JsonStickerSet;
