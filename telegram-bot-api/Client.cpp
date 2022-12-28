@@ -5431,7 +5431,8 @@ td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(Jso
   td::vector<td::vector<object_ptr<td_api::keyboardButton>>> rows;
   td::vector<td::vector<object_ptr<td_api::inlineKeyboardButton>>> inline_rows;
   Slice input_field_placeholder;
-  bool resize = false;
+  bool resize_keyboard = false;
+  bool is_persistent = false;
   bool one_time = false;
   bool remove = false;
   bool is_personal = false;
@@ -5485,7 +5486,12 @@ td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(Jso
       if (field_value.second.type() != JsonValue::Type::Boolean) {
         return Status::Error(400, "Field \"resize_keyboard\" of the ReplyKeyboardMarkup must be of the type Boolean");
       }
-      resize = field_value.second.get_boolean();
+      resize_keyboard = field_value.second.get_boolean();
+    } else if (field_value.first == "is_persistent") {
+      if (field_value.second.type() != JsonValue::Type::Boolean) {
+        return Status::Error(400, "Field \"is_persistent\" of the ReplyKeyboardMarkup must be of the type Boolean");
+      }
+      is_persistent = field_value.second.get_boolean();
     } else if (field_value.first == "one_time_keyboard") {
       if (field_value.second.type() != JsonValue::Type::Boolean) {
         return Status::Error(400, "Field \"one_time_keyboard\" of the ReplyKeyboardMarkup must be of the type Boolean");
@@ -5516,8 +5522,8 @@ td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(Jso
 
   object_ptr<td_api::ReplyMarkup> result;
   if (!rows.empty()) {
-    result = make_object<td_api::replyMarkupShowKeyboard>(std::move(rows), false, resize, one_time, is_personal,
-                                                          input_field_placeholder.str());
+    result = make_object<td_api::replyMarkupShowKeyboard>(std::move(rows), is_persistent, resize_keyboard, one_time,
+                                                          is_personal, input_field_placeholder.str());
   } else if (!inline_rows.empty()) {
     result = make_object<td_api::replyMarkupInlineKeyboard>(std::move(inline_rows));
   } else if (remove) {
