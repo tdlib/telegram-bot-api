@@ -2183,6 +2183,7 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
     case td_api::messageSuggestProfilePhoto::ID:
       break;
     case td_api::messageBotWriteAccessAllowed::ID:
+      object("write_access_allowed", JsonEmptyObject());
       break;
     default:
       UNREACHABLE();
@@ -10375,8 +10376,6 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageGiftedPremium::ID:
       return true;
     case td_api::messageSuggestProfilePhoto::ID:
-      return true;
-    case td_api::messageBotWriteAccessAllowed::ID:
       return true;
     default:
       break;
