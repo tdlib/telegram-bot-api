@@ -84,6 +84,7 @@ class Client final : public WebhookActor::Callback {
   static constexpr int32 MAX_LENGTH = 10000;  // max width or height
   static constexpr int32 MAX_DURATION = 24 * 60 * 60;
 
+  class JsonEmptyObject;
   class JsonFile;
   class JsonDatedFile;
   class JsonDatedFiles;
@@ -119,7 +120,6 @@ class Client final : public WebhookActor::Callback {
   class JsonPollAnswer;
   class JsonEntity;
   class JsonVectorEntities;
-  class JsonCallbackGame;
   class JsonWebAppInfo;
   class JsonInlineKeyboardButton;
   class JsonInlineKeyboard;
@@ -144,7 +144,6 @@ class Client final : public WebhookActor::Callback {
   class JsonChatJoinRequest;
   class JsonForumTopicCreated;
   class JsonForumTopicEdited;
-  class JsonForumTopicIsClosedToggled;
   class JsonForumTopicInfo;
   class JsonGameHighScore;
   class JsonAddress;
@@ -156,7 +155,6 @@ class Client final : public WebhookActor::Callback {
   class JsonWebAppData;
   class JsonProximityAlertTriggered;
   class JsonVideoChatScheduled;
-  class JsonVideoChatStarted;
   class JsonVideoChatEnded;
   class JsonInviteVideoChatParticipants;
   class JsonChatSetMessageAutoDeleteTime;

@@ -307,6 +307,13 @@ bool Client::is_local_method(Slice method) {
          method == "setwebhook" || method == "deletewebhook" || method == "getwebhookinfo";
 }
 
+class Client::JsonEmptyObject final : public Jsonable {
+ public:
+  void store(JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+  }
+};
+
 class Client::JsonFile final : public Jsonable {
  public:
   JsonFile(const td_api::file *file, const Client *client, bool with_path)
@@ -1423,13 +1430,6 @@ class Client::JsonForumTopicEdited final : public Jsonable {
   const td_api::messageForumTopicEdited *forum_topic_edited_;
 };
 
-class Client::JsonForumTopicIsClosedToggled final : public Jsonable {
- public:
-  void store(JsonValueScope *scope) const {
-    auto object = scope->enter_object();
-  }
-};
-
 class Client::JsonForumTopicInfo final : public Jsonable {
  public:
   explicit JsonForumTopicInfo(const td_api::forumTopicInfo *forum_topic_info) : forum_topic_info_(forum_topic_info) {
@@ -1666,13 +1666,6 @@ class Client::JsonVideoChatScheduled final : public Jsonable {
   const td_api::messageVideoChatScheduled *video_chat_scheduled_;
 };
 
-class Client::JsonVideoChatStarted final : public Jsonable {
- public:
-  void store(JsonValueScope *scope) const {
-    auto object = scope->enter_object();
-  }
-};
-
 class Client::JsonVideoChatEnded final : public Jsonable {
  public:
   explicit JsonVideoChatEnded(const td_api::messageVideoChatEnded *video_chat_ended)
@@ -1718,13 +1711,6 @@ class Client::JsonChatSetMessageAutoDeleteTime final : public Jsonable {
   const td_api::messageChatSetMessageAutoDeleteTime *chat_set_message_auto_delete_time_;
 };
 
-class Client::JsonCallbackGame final : public Jsonable {
- public:
-  void store(JsonValueScope *scope) const {
-    auto object = scope->enter_object();
-  }
-};
-
 class Client::JsonWebAppInfo final : public Jsonable {
  public:
   explicit JsonWebAppInfo(const td::string &url) : url_(url) {
@@ -1767,7 +1753,7 @@ class Client::JsonInlineKeyboardButton final : public Jsonable {
         break;
       }
       case td_api::inlineKeyboardButtonTypeCallbackGame::ID:
-        object("callback_game", JsonCallbackGame());
+        object("callback_game", JsonEmptyObject());
         break;
       case td_api::inlineKeyboardButtonTypeSwitchInline::ID: {
         auto type = static_cast<const td_api::inlineKeyboardButtonTypeSwitchInline *>(button_->type_.get());
@@ -2078,16 +2064,16 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
     case td_api::messageForumTopicIsClosedToggled::ID: {
       auto content = static_cast<const td_api::messageForumTopicIsClosedToggled *>(message_->content.get());
       if (content->is_closed_) {
-        object("forum_topic_closed", JsonForumTopicIsClosedToggled());
+        object("forum_topic_closed", JsonEmptyObject());
       } else {
-        object("forum_topic_reopened", JsonForumTopicIsClosedToggled());
+        object("forum_topic_reopened", JsonEmptyObject());
       }
       break;
     }
     case td_api::messageForumTopicIsHiddenToggled::ID: {
       // auto content = static_cast<const td_api::messageForumTopicIsHiddenToggled *>(message_->content.get());
       // temporary; the topic is closed when it is hidden or unhidden
-      object("forum_topic_closed", JsonForumTopicIsClosedToggled());
+      object("forum_topic_closed", JsonEmptyObject());
       break;
     }
     case td_api::messagePinMessage::ID: {
@@ -2167,8 +2153,8 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
       break;
     }
     case td_api::messageVideoChatStarted::ID:
-      object("video_chat_started", JsonVideoChatStarted());
-      object("voice_chat_started", JsonVideoChatStarted());
+      object("video_chat_started", JsonEmptyObject());
+      object("voice_chat_started", JsonEmptyObject());
       break;
     case td_api::messageVideoChatEnded::ID: {
       auto content = static_cast<const td_api::messageVideoChatEnded *>(message_->content.get());
