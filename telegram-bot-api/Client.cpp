@@ -6905,6 +6905,7 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
   TRY_RESULT(caption, get_formatted_text(std::move(input_caption), std::move(parse_mode), std::move(entities)));
   // TRY_RESULT(self_destruct_time, get_json_object_int_field(object, "self_destruct_time"));
   int32 self_destruct_time = 0;
+  TRY_RESULT(has_spoiler, get_json_object_bool_field(object, "has_spoiler"));
   TRY_RESULT(media, get_json_object_string_field(object, "media", true));
 
   auto input_file = get_input_file(query, Slice(), media, false);
@@ -6923,7 +6924,7 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
   if (type == "photo") {
     return make_object<td_api::inputMessagePhoto>(std::move(input_file), std::move(input_thumbnail),
                                                   td::vector<int32>(), 0, 0, std::move(caption), self_destruct_time,
-                                                  false);
+                                                  has_spoiler);
   }
   if (type == "video") {
     TRY_RESULT(width, get_json_object_int_field(object, "width"));
@@ -6936,7 +6937,7 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
 
     return make_object<td_api::inputMessageVideo>(std::move(input_file), std::move(input_thumbnail),
                                                   td::vector<int32>(), duration, width, height, supports_streaming,
-                                                  std::move(caption), self_destruct_time, false);
+                                                  std::move(caption), self_destruct_time, has_spoiler);
   }
   if (for_album && type == "animation") {
     return Status::Error(PSLICE() << "type \"" << type << "\" can't be used in sendMediaGroup");
@@ -6950,7 +6951,7 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
     duration = td::clamp(duration, 0, MAX_DURATION);
     return make_object<td_api::inputMessageAnimation>(std::move(input_file), std::move(input_thumbnail),
                                                       td::vector<int32>(), duration, width, height, std::move(caption),
-                                                      false);
+                                                      has_spoiler);
   }
   if (type == "audio") {
     TRY_RESULT(duration, get_json_object_int_field(object, "duration"));
@@ -7435,9 +7436,10 @@ td::Status Client::process_send_animation_query(PromisedQueryPtr &query) {
   int32 width = get_integer_arg(query.get(), "width", 0, 0, MAX_LENGTH);
   int32 height = get_integer_arg(query.get(), "height", 0, 0, MAX_LENGTH);
   TRY_RESULT(caption, get_caption(query.get()));
+  auto has_spoiler = to_bool(query->arg("has_spoiler"));
   do_send_message(
       make_object<td_api::inputMessageAnimation>(std::move(animation), std::move(thumbnail), td::vector<int32>(),
-                                                 duration, width, height, std::move(caption), false),
+                                                 duration, width, height, std::move(caption), has_spoiler),
       std::move(query));
   return Status::OK();
 }
@@ -7485,8 +7487,9 @@ td::Status Client::process_send_photo_query(PromisedQueryPtr &query) {
   }
   TRY_RESULT(caption, get_caption(query.get()));
   auto self_destruct_time = 0;
+  auto has_spoiler = to_bool(query->arg("has_spoiler"));
   do_send_message(make_object<td_api::inputMessagePhoto>(std::move(photo), nullptr, td::vector<int32>(), 0, 0,
-                                                         std::move(caption), self_destruct_time, false),
+                                                         std::move(caption), self_destruct_time, has_spoiler),
                   std::move(query));
   return Status::OK();
 }
@@ -7513,9 +7516,10 @@ td::Status Client::process_send_video_query(PromisedQueryPtr &query) {
   bool supports_streaming = to_bool(query->arg("supports_streaming"));
   TRY_RESULT(caption, get_caption(query.get()));
   auto self_destruct_time = 0;
+  auto has_spoiler = to_bool(query->arg("has_spoiler"));
   do_send_message(make_object<td_api::inputMessageVideo>(std::move(video), std::move(thumbnail), td::vector<int32>(),
                                                          duration, width, height, supports_streaming,
-                                                         std::move(caption), self_destruct_time, false),
+                                                         std::move(caption), self_destruct_time, has_spoiler),
                   std::move(query));
   return Status::OK();
 }
