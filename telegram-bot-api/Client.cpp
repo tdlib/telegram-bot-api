@@ -2071,9 +2071,12 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
       break;
     }
     case td_api::messageForumTopicIsHiddenToggled::ID: {
-      // auto content = static_cast<const td_api::messageForumTopicIsHiddenToggled *>(message_->content.get());
-      // temporary; the topic is closed when it is hidden or unhidden
-      object("forum_topic_closed", JsonEmptyObject());
+      auto content = static_cast<const td_api::messageForumTopicIsHiddenToggled *>(message_->content.get());
+      if (content->is_hidden_) {
+        object("general_forum_topic_hidden", JsonEmptyObject());
+      } else {
+        object("general_forum_topic_unhidden", JsonEmptyObject());
+      }
       break;
     }
     case td_api::messagePinMessage::ID: {
