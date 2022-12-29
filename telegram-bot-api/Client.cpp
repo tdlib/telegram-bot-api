@@ -1402,6 +1402,27 @@ class Client::JsonForumTopicCreated final : public Jsonable {
   const td_api::messageForumTopicCreated *forum_topic_created_;
 };
 
+class Client::JsonForumTopicEdited final : public Jsonable {
+ public:
+  explicit JsonForumTopicEdited(const td_api::messageForumTopicEdited *forum_topic_edited)
+      : forum_topic_edited_(forum_topic_edited) {
+  }
+  void store(JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    if (!forum_topic_edited_->name_.empty()) {
+      object("name", forum_topic_edited_->name_);
+    }
+    if (forum_topic_edited_->edit_icon_custom_emoji_id_) {
+      object("icon_custom_emoji_id", forum_topic_edited_->icon_custom_emoji_id_ == 0
+                                         ? td::string()
+                                         : td::to_string(forum_topic_edited_->icon_custom_emoji_id_));
+    }
+  }
+
+ private:
+  const td_api::messageForumTopicEdited *forum_topic_edited_;
+};
+
 class Client::JsonForumTopicIsClosedToggled final : public Jsonable {
  public:
   void store(JsonValueScope *scope) const {
@@ -2049,8 +2070,11 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
       object("forum_topic_created", JsonForumTopicCreated(content));
       break;
     }
-    case td_api::messageForumTopicEdited::ID:
+    case td_api::messageForumTopicEdited::ID: {
+      auto content = static_cast<const td_api::messageForumTopicEdited *>(message_->content.get());
+      object("forum_topic_edited", JsonForumTopicEdited(content));
       break;
+    }
     case td_api::messageForumTopicIsClosedToggled::ID: {
       auto content = static_cast<const td_api::messageForumTopicIsClosedToggled *>(message_->content.get());
       if (content->is_closed_) {
@@ -10360,8 +10384,6 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageWebAppDataSent::ID:
       return true;
     case td_api::messageGiftedPremium::ID:
-      return true;
-    case td_api::messageForumTopicEdited::ID:
       return true;
     case td_api::messageSuggestProfilePhoto::ID:
       return true;

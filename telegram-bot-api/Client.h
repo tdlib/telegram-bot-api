@@ -143,6 +143,7 @@ class Client final : public WebhookActor::Callback {
   class JsonChatMemberUpdated;
   class JsonChatJoinRequest;
   class JsonForumTopicCreated;
+  class JsonForumTopicEdited;
   class JsonForumTopicIsClosedToggled;
   class JsonForumTopicInfo;
   class JsonGameHighScore;
