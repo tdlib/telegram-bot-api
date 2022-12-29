@@ -711,6 +711,7 @@ class Client final : public WebhookActor::Callback {
     bool has_location = false;
     bool join_to_send_messages = false;
     bool join_by_request = false;
+    bool has_hidden_members = false;
   };
   static void add_supergroup(SupergroupInfo *supergroup_info, object_ptr<td_api::supergroup> &&supergroup);
   void set_supergroup_photo(int64 supergroup_id, object_ptr<td_api::chatPhoto> &&photo);
@@ -721,6 +722,7 @@ class Client final : public WebhookActor::Callback {
   void set_supergroup_slow_mode_delay(int64 supergroup_id, int32 slow_mode_delay);
   void set_supergroup_linked_chat_id(int64 supergroup_id, int64 linked_chat_id);
   void set_supergroup_location(int64 supergroup_id, object_ptr<td_api::chatLocation> location);
+  void set_supergroup_has_hidden_members(int64 supergroup_id, bool has_hidden_members);
   SupergroupInfo *add_supergroup_info(int64 supergroup_id);
   const SupergroupInfo *get_supergroup_info(int64 supergroup_id) const;
 
