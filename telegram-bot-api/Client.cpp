@@ -5016,7 +5016,8 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       auto update = move_object_as<td_api::updateUserFullInfo>(result);
       auto user_id = update->user_id_;
       auto full_info = update->user_full_info_.get();
-      set_user_photo(user_id, std::move(full_info->photo_));
+      set_user_photo(user_id,
+                     full_info->photo_ == nullptr ? std::move(full_info->public_photo_) : std::move(full_info->photo_));
       if (full_info->bio_ != nullptr) {
         set_user_bio(user_id, std::move(full_info->bio_->text_));
       }
