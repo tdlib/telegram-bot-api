@@ -268,6 +268,11 @@ bool Client::init_methods() {
   methods_.emplace("reopenforumtopic", &Client::process_reopen_forum_topic_query);
   methods_.emplace("deleteforumtopic", &Client::process_delete_forum_topic_query);
   methods_.emplace("unpinallforumtopicmessages", &Client::process_unpin_all_forum_topic_messages_query);
+  methods_.emplace("editgeneralforumtopic", &Client::process_edit_general_forum_topic_query);
+  methods_.emplace("closegeneralforumtopic", &Client::process_close_general_forum_topic_query);
+  methods_.emplace("reopengeneralforumtopic", &Client::process_reopen_general_forum_topic_query);
+  methods_.emplace("hidegeneralforumtopic", &Client::process_hide_general_forum_topic_query);
+  methods_.emplace("unhidegeneralforumtopic", &Client::process_unhide_general_forum_topic_query);
   methods_.emplace("getchatmember", &Client::process_get_chat_member_query);
   methods_.emplace("getchatadministrators", &Client::process_get_chat_administrators_query);
   methods_.emplace("getchatmembercount", &Client::process_get_chat_member_count_query);
@@ -8435,6 +8440,58 @@ td::Status Client::process_unpin_all_forum_topic_messages_query(PromisedQueryPtr
   return Status::OK();
 }
 
+td::Status Client::process_edit_general_forum_topic_query(PromisedQueryPtr &query) {
+  auto chat_id = query->arg("chat_id");
+  auto name = query->arg("name");
+
+  check_chat(chat_id, AccessRights::Write, std::move(query),
+             [this, name = name.str()](int64 chat_id, PromisedQueryPtr query) {
+               send_request(make_object<td_api::editForumTopic>(chat_id, GENERAL_MESSAGE_THREAD_ID, name, false, 0),
+                            td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+             });
+  return Status::OK();
+}
+
+td::Status Client::process_close_general_forum_topic_query(PromisedQueryPtr &query) {
+  auto chat_id = query->arg("chat_id");
+
+  check_chat(chat_id, AccessRights::Write, std::move(query), [this](int64 chat_id, PromisedQueryPtr query) {
+    send_request(make_object<td_api::toggleForumTopicIsClosed>(chat_id, GENERAL_MESSAGE_THREAD_ID, true),
+                 td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+  });
+  return Status::OK();
+}
+
+td::Status Client::process_reopen_general_forum_topic_query(PromisedQueryPtr &query) {
+  auto chat_id = query->arg("chat_id");
+
+  check_chat(chat_id, AccessRights::Write, std::move(query), [this](int64 chat_id, PromisedQueryPtr query) {
+    send_request(make_object<td_api::toggleForumTopicIsClosed>(chat_id, GENERAL_MESSAGE_THREAD_ID, false),
+                 td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+  });
+  return Status::OK();
+}
+
+td::Status Client::process_hide_general_forum_topic_query(PromisedQueryPtr &query) {
+  auto chat_id = query->arg("chat_id");
+
+  check_chat(chat_id, AccessRights::Write, std::move(query), [this](int64 chat_id, PromisedQueryPtr query) {
+    send_request(make_object<td_api::toggleGeneralForumTopicIsHidden>(chat_id, true),
+                 td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+  });
+  return Status::OK();
+}
+
+td::Status Client::process_unhide_general_forum_topic_query(PromisedQueryPtr &query) {
+  auto chat_id = query->arg("chat_id");
+
+  check_chat(chat_id, AccessRights::Write, std::move(query), [this](int64 chat_id, PromisedQueryPtr query) {
+    send_request(make_object<td_api::toggleGeneralForumTopicIsHidden>(chat_id, false),
+                 td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+  });
+  return Status::OK();
+}
+
 td::Status Client::process_get_chat_member_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
   TRY_RESULT(user_id, get_user_id(query.get()));
@@ -11034,6 +11091,8 @@ td::int64 Client::get_supergroup_chat_id(int64 supergroup_id) {
 td::int64 Client::get_basic_group_chat_id(int64 basic_group_id) {
   return -basic_group_id;
 }
+
+constexpr Client::int64 Client::GENERAL_MESSAGE_THREAD_ID;
 
 constexpr Client::int64 Client::GREAT_MINDS_SET_ID;
 constexpr Client::Slice Client::GREAT_MINDS_SET_NAME;

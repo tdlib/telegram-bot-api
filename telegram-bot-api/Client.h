@@ -68,6 +68,8 @@ class Client final : public WebhookActor::Callback {
 
   static constexpr bool USE_MESSAGE_DATABASE = false;
 
+  static constexpr int64 GENERAL_MESSAGE_THREAD_ID = 1 << 20;
+
   static constexpr int32 MAX_CERTIFICATE_FILE_SIZE = 3 << 20;
   static constexpr int32 MAX_DOWNLOAD_FILE_SIZE = 20 << 20;
 
@@ -540,6 +542,11 @@ class Client final : public WebhookActor::Callback {
   Status process_reopen_forum_topic_query(PromisedQueryPtr &query);
   Status process_delete_forum_topic_query(PromisedQueryPtr &query);
   Status process_unpin_all_forum_topic_messages_query(PromisedQueryPtr &query);
+  Status process_edit_general_forum_topic_query(PromisedQueryPtr &query);
+  Status process_close_general_forum_topic_query(PromisedQueryPtr &query);
+  Status process_reopen_general_forum_topic_query(PromisedQueryPtr &query);
+  Status process_hide_general_forum_topic_query(PromisedQueryPtr &query);
+  Status process_unhide_general_forum_topic_query(PromisedQueryPtr &query);
   Status process_get_chat_member_query(PromisedQueryPtr &query);
   Status process_get_chat_administrators_query(PromisedQueryPtr &query);
   Status process_get_chat_member_count_query(PromisedQueryPtr &query);
