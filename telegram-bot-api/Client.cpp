@@ -653,6 +653,12 @@ class Client::JsonMessage final : public Jsonable {
       }
     }
   }
+
+  void add_media_spoiler(td::JsonObjectScope &object, bool has_spoiler) const {
+    if (has_spoiler) {
+      object("has_media_spoiler", td::JsonTrue());
+    }
+  }
 };
 
 class Client::JsonChat final : public Jsonable {
@@ -1876,6 +1882,7 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
       object("animation", JsonAnimation(content->animation_.get(), false, client_));
       object("document", JsonAnimation(content->animation_.get(), true, client_));
       add_caption(object, content->caption_);
+      add_media_spoiler(object, content->has_spoiler_);
       break;
     }
     case td_api::messageAudio::ID: {
@@ -1895,6 +1902,7 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
       CHECK(content->photo_ != nullptr);
       object("photo", JsonPhoto(content->photo_.get(), client_));
       add_caption(object, content->caption_);
+      add_media_spoiler(object, content->has_spoiler_);
       break;
     }
     case td_api::messageSticker::ID: {
@@ -1906,6 +1914,7 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
       auto content = static_cast<const td_api::messageVideo *>(message_->content.get());
       object("video", JsonVideo(content->video_.get(), client_));
       add_caption(object, content->caption_);
+      add_media_spoiler(object, content->has_spoiler_);
       break;
     }
     case td_api::messageVideoNote::ID: {
