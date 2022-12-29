@@ -793,6 +793,9 @@ class Client::JsonChat final : public Jsonable {
           if (supergroup_info->is_supergroup && supergroup_info->has_hidden_members) {
             object("has_hidden_members", td::JsonTrue());
           }
+          if (supergroup_info->has_aggressive_anti_spam_enabled) {
+            object("has_aggressive_anti_spam_enabled", td::JsonTrue());
+          }
           if (supergroup_info->slow_mode_delay != 0) {
             object("slow_mode_delay", supergroup_info->slow_mode_delay);
           }
@@ -5060,6 +5063,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       set_supergroup_linked_chat_id(supergroup_id, full_info->linked_chat_id_);
       set_supergroup_location(supergroup_id, std::move(full_info->location_));
       set_supergroup_has_hidden_members(supergroup_id, full_info->has_hidden_members_);
+      set_supergroup_has_aggressive_anti_spam_enabled(supergroup_id, full_info->has_aggressive_anti_spam_enabled_);
       break;
     }
     case td_api::updateOption::ID: {
@@ -9787,6 +9791,11 @@ void Client::set_supergroup_location(int64 supergroup_id, object_ptr<td_api::cha
 
 void Client::set_supergroup_has_hidden_members(int64 supergroup_id, bool has_hidden_members) {
   add_supergroup_info(supergroup_id)->has_hidden_members = has_hidden_members;
+}
+
+void Client::set_supergroup_has_aggressive_anti_spam_enabled(int64 supergroup_id,
+                                                             bool has_aggressive_anti_spam_enabled) {
+  add_supergroup_info(supergroup_id)->has_aggressive_anti_spam_enabled = has_aggressive_anti_spam_enabled;
 }
 
 Client::SupergroupInfo *Client::add_supergroup_info(int64 supergroup_id) {
