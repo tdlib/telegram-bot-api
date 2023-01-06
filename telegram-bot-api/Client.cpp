@@ -5292,7 +5292,8 @@ void Client::timeout_expired() {
 void Client::clear_tqueue() {
   CHECK(webhook_id_.empty());
   auto &tqueue = parameters_->shared_data_->tqueue_;
-  tqueue->clear(tqueue_id_, 0);
+  auto deleted_events = tqueue->clear(tqueue_id_, 0);
+  td::Scheduler::instance()->destroy_on_scheduler(SharedData::get_file_gc_scheduler_id(), deleted_events);
 }
 
 bool Client::to_bool(td::MutableSlice value) {
@@ -9533,7 +9534,8 @@ void Client::do_get_updates(int32 offset, int32 limit, int32 timeout, PromisedQu
   LOG(DEBUG) << "Queue head = " << tqueue->get_head(tqueue_id_) << ", queue tail = " << tqueue->get_tail(tqueue_id_);
 
   if (offset < 0) {
-    tqueue->clear(tqueue_id_, -offset);
+    auto deleted_events = tqueue->clear(tqueue_id_, -offset);
+    td::Scheduler::instance()->destroy_on_scheduler(SharedData::get_file_gc_scheduler_id(), deleted_events);
   }
   if (offset <= 0) {
     offset = tqueue->get_head(tqueue_id_).value();
