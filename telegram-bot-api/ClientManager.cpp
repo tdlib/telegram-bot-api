@@ -488,6 +488,37 @@ void ClientManager::dump_statistics() {
   }
 
   td::dump_pending_network_queries(*parameters_->net_query_stats_);
+
+  auto now = td::Time::now();
+  auto top_clients = get_top_clients(10, {});
+  for (auto top_client_id : top_clients.top_client_ids) {
+    auto *client_info = clients_.get(top_client_id);
+    CHECK(client_info);
+
+    auto bot_info = client_info->client_.get_actor_unsafe()->get_bot_info();
+    td::string update_count;
+    td::string request_count;
+    auto replace_tabs = [](td::string &str) {
+      for (auto &c : str) {
+        if (c == '\t') {
+          c = ' ';
+        }
+      }
+    };
+    auto stats = client_info->stat_.as_vector(now);
+    for (auto &stat : stats) {
+      if (stat.key_ == "update_count") {
+        replace_tabs(stat.value_);
+        update_count = std::move(stat.value_);
+      }
+      if (stat.key_ == "request_count") {
+        replace_tabs(stat.value_);
+        request_count = std::move(stat.value_);
+      }
+    }
+    LOG(WARNING) << td::tag("id", bot_info.id_) << td::tag("update_count", update_count)
+                 << td::tag("request_count", request_count);
+  }
 }
 
 void ClientManager::raw_event(const td::Event::Raw &event) {
