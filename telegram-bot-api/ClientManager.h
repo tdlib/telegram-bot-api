@@ -83,6 +83,12 @@ class ClientManager final : public td::Actor {
   static PromisedQueryPtr get_webhook_restore_query(td::Slice token, td::Slice webhook_info,
                                                     std::shared_ptr<SharedData> shared_data);
 
+  struct TopClients {
+    td::int32 active_count = 0;
+    td::vector<td::uint64> top_client_ids;
+  };
+  TopClients get_top_clients(std::size_t max_count, td::Slice token_filter);
+
   void start_up() final;
   void raw_event(const td::Event::Raw &event) final;
   void timeout_expired() final;

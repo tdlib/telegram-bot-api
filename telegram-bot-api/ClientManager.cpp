@@ -150,6 +150,39 @@ void ClientManager::send(PromisedQueryPtr query) {
                std::move(query));  // will send 429 if the client is already closed
 }
 
+ClientManager::TopClients ClientManager::get_top_clients(std::size_t max_count, td::Slice token_filter) {
+  auto now = td::Time::now();
+  TopClients result;
+  td::vector<std::pair<td::int64, td::uint64>> top_client_ids;
+  for (auto id : clients_.ids()) {
+    auto *client_info = clients_.get(id);
+    CHECK(client_info);
+
+    if (client_info->stat_.is_active(now)) {
+      result.active_count++;
+    }
+
+    if (!td::begins_with(client_info->token_, token_filter)) {
+      continue;
+    }
+
+    auto score = static_cast<td::int64>(client_info->stat_.get_score(now) * -1e9);
+    if (score == 0 && top_client_ids.size() >= max_count) {
+      continue;
+    }
+    top_client_ids.emplace_back(score, id);
+  }
+  if (top_client_ids.size() < max_count) {
+    max_count = top_client_ids.size();
+  }
+  std::partial_sort(top_client_ids.begin(), top_client_ids.begin() + max_count, top_client_ids.end());
+  result.top_client_ids.reserve(max_count);
+  for (std::size_t i = 0; i < max_count; i++) {
+    result.top_client_ids.push_back(top_client_ids[i].second);
+  }
+  return result;
+}
+
 void ClientManager::get_stats(td::Promise<td::BufferSlice> promise,
                               td::vector<std::pair<td::string, td::string>> args) {
   if (close_flag_) {
@@ -186,38 +219,12 @@ void ClientManager::get_stats(td::Promise<td::BufferSlice> promise,
   }
 
   auto now = td::Time::now();
-  td::int32 active_bot_count = 0;
-  td::vector<std::pair<td::int64, td::uint64>> top_bot_ids;
-  size_t max_bots = 50;
-  for (auto id : clients_.ids()) {
-    auto *client_info = clients_.get(id);
-    CHECK(client_info);
-
-    if (client_info->stat_.is_active(now)) {
-      active_bot_count++;
-    }
-
-    if (!td::begins_with(client_info->token_, id_filter)) {
-      continue;
-    }
-
-    auto score = static_cast<td::int64>(client_info->stat_.get_score(now) * -1e9);
-    if (score == 0 && top_bot_ids.size() >= max_bots) {
-      continue;
-    }
-    top_bot_ids.emplace_back(score, id);
-  }
-  if (top_bot_ids.size() < max_bots) {
-    max_bots = top_bot_ids.size();
-  }
-  std::partial_sort(top_bot_ids.begin(), top_bot_ids.begin() + max_bots, top_bot_ids.end());
-  top_bot_ids.resize(max_bots);
-
+  auto top_clients = get_top_clients(50, id_filter);
   sb << stat_.get_description() << '\n';
   if (id_filter.empty()) {
     sb << "uptime\t" << now - parameters_->start_time_ << '\n';
     sb << "bot_count\t" << clients_.size() << '\n';
-    sb << "active_bot_count\t" << active_bot_count << '\n';
+    sb << "active_bot_count\t" << top_clients.active_count << '\n';
     auto r_mem_stat = td::mem_stat();
     if (r_mem_stat.is_ok()) {
       auto mem_stat = r_mem_stat.move_as_ok();
@@ -245,8 +252,8 @@ void ClientManager::get_stats(td::Promise<td::BufferSlice> promise,
     }
   }
 
-  for (auto top_bot_id : top_bot_ids) {
-    auto *client_info = clients_.get(top_bot_id.second);
+  for (auto top_client_id : top_clients.top_client_ids) {
+    auto *client_info = clients_.get(top_client_id);
     CHECK(client_info);
 
     auto bot_info = client_info->client_.get_actor_unsafe()->get_bot_info();
