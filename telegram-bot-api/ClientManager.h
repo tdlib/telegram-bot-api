@@ -76,7 +76,7 @@ class ClientManager final : public td::Actor {
   td::int64 tqueue_deleted_events_ = 0;
   td::int64 last_tqueue_deleted_events_ = 0;
 
-  static constexpr double WATCHDOG_TIMEOUT = 0.5;
+  static constexpr double WATCHDOG_TIMEOUT = 0.25;
 
   static td::int64 get_tqueue_id(td::int64 user_id, bool is_test_dc);
 
