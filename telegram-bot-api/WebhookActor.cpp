@@ -504,7 +504,8 @@ void WebhookActor::on_update_error(td::TQueue::EventId event_id, td::Slice error
   int next_delay = update.delay_;
   int next_effective_delay = retry_after;
   if (retry_after == 0 && update.fail_count_ > 0) {
-    next_delay = td::min(WEBHOOK_MAX_RESEND_TIMEOUT, next_delay * 2);
+    auto max_timeout = td::Random::fast(WEBHOOK_MAX_RESEND_TIMEOUT, WEBHOOK_MAX_RESEND_TIMEOUT * 2);
+    next_delay = td::min(max_timeout, next_delay * 2);
     next_effective_delay = next_delay;
   }
   if (parameters_->shared_data_->get_unix_time(now) + next_effective_delay > update.expires_at_) {
