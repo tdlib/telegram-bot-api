@@ -5362,6 +5362,34 @@ td::Result<td_api::object_ptr<td_api::keyboardButton>> Client::get_keyboard_butt
                                                                    restrict_user_is_premium, user_is_premium));
     }
 
+    if (has_json_object_field(object, "request_chat")) {
+      TRY_RESULT(request_chat, get_json_object_field(object, "request_chat", JsonValue::Type::Object, false));
+      auto &request_chat_object = request_chat.get_object();
+      TRY_RESULT(id, get_json_object_int_field(request_chat_object, "request_id", false));
+      TRY_RESULT(chat_is_channel, get_json_object_bool_field(request_chat_object, "chat_is_channel"));
+      auto restrict_chat_is_forum = has_json_object_field(request_chat_object, "chat_is_forum");
+      TRY_RESULT(chat_is_forum, get_json_object_bool_field(request_chat_object, "chat_is_forum"));
+      auto restrict_chat_has_username = has_json_object_field(request_chat_object, "chat_has_username");
+      TRY_RESULT(chat_has_username, get_json_object_bool_field(request_chat_object, "chat_has_username"));
+      TRY_RESULT(chat_is_created, get_json_object_bool_field(request_chat_object, "chat_is_created"));
+      td_api::object_ptr<td_api::chatAdministratorRights> user_administrator_rights;
+      if (has_json_object_field(request_chat_object, "user_administrator_rights")) {
+        TRY_RESULT_ASSIGN(user_administrator_rights, get_chat_administrator_rights(get_json_object_field_force(
+                                                         request_chat_object, "user_administrator_rights")));
+      }
+      td_api::object_ptr<td_api::chatAdministratorRights> bot_administrator_rights;
+      if (has_json_object_field(request_chat_object, "bot_administrator_rights")) {
+        TRY_RESULT_ASSIGN(bot_administrator_rights, get_chat_administrator_rights(get_json_object_field_force(
+                                                        request_chat_object, "bot_administrator_rights")));
+      }
+      TRY_RESULT(bot_is_member, get_json_object_bool_field(request_chat_object, "bot_is_member"));
+      return make_object<td_api::keyboardButton>(
+          text, make_object<td_api::keyboardButtonTypeRequestChat>(
+                    id, chat_is_channel, restrict_chat_is_forum, chat_is_forum, restrict_chat_has_username,
+                    chat_has_username, chat_is_created, std::move(user_administrator_rights),
+                    std::move(bot_administrator_rights), bot_is_member));
+    }
+
     return make_object<td_api::keyboardButton>(text, nullptr);
   }
   if (button.type() == JsonValue::Type::String) {
