@@ -687,7 +687,7 @@ void WebhookActor::start_up() {
 
   next_ip_address_resolve_time_ = last_success_time_ = td::Time::now() - 3600;
 
-  active_new_connection_flood_.add_limit(1, 20);
+  active_new_connection_flood_.add_limit(0.5, 10);
 
   pending_new_connection_flood_.add_limit(2, 1);
 

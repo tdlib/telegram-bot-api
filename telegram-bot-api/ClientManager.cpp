@@ -382,7 +382,7 @@ PromisedQueryPtr ClientManager::get_webhook_restore_query(td::Slice token, td::S
   td::vector<td::BufferSlice> containers;
   auto add_string = [&containers](td::Slice str) {
     containers.emplace_back(str);
-    return containers.back().as_slice();
+    return containers.back().as_mutable_slice();
   };
 
   token = add_string(token);
