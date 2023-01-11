@@ -5349,6 +5349,19 @@ td::Result<td_api::object_ptr<td_api::keyboardButton>> Client::get_keyboard_butt
       return make_object<td_api::keyboardButton>(text, make_object<td_api::keyboardButtonTypeWebApp>(url));
     }
 
+    if (has_json_object_field(object, "request_user")) {
+      TRY_RESULT(request_user, get_json_object_field(object, "request_user", JsonValue::Type::Object, false));
+      auto &request_user_object = request_user.get_object();
+      TRY_RESULT(id, get_json_object_int_field(request_user_object, "request_id", false));
+      auto restrict_user_is_bot = has_json_object_field(request_user_object, "user_is_bot");
+      TRY_RESULT(user_is_bot, get_json_object_bool_field(request_user_object, "user_is_bot"));
+      auto restrict_user_is_premium = has_json_object_field(request_user_object, "user_is_premium");
+      TRY_RESULT(user_is_premium, get_json_object_bool_field(request_user_object, "user_is_premium"));
+      return make_object<td_api::keyboardButton>(
+          text, make_object<td_api::keyboardButtonTypeRequestUser>(id, restrict_user_is_bot, user_is_bot,
+                                                                   restrict_user_is_premium, user_is_premium));
+    }
+
     return make_object<td_api::keyboardButton>(text, nullptr);
   }
   if (button.type() == JsonValue::Type::String) {
