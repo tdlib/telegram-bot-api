@@ -1724,6 +1724,34 @@ class Client::JsonChatSetMessageAutoDeleteTime final : public Jsonable {
   const td_api::messageChatSetMessageAutoDeleteTime *chat_set_message_auto_delete_time_;
 };
 
+class Client::JsonUserShared final : public Jsonable {
+ public:
+  explicit JsonUserShared(const td_api::messageUserShared *user_shared) : user_shared_(user_shared) {
+  }
+  void store(JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("user_id", user_shared_->user_id_);
+    object("request_id", user_shared_->button_id_);
+  }
+
+ private:
+  const td_api::messageUserShared *user_shared_;
+};
+
+class Client::JsonChatShared final : public Jsonable {
+ public:
+  explicit JsonChatShared(const td_api::messageChatShared *chat_shared) : chat_shared_(chat_shared) {
+  }
+  void store(JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("chat_id", chat_shared_->chat_id_);
+    object("request_id", chat_shared_->button_id_);
+  }
+
+ private:
+  const td_api::messageChatShared *chat_shared_;
+};
+
 class Client::JsonWebAppInfo final : public Jsonable {
  public:
   explicit JsonWebAppInfo(const td::string &url) : url_(url) {
@@ -2198,10 +2226,16 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
     case td_api::messageBotWriteAccessAllowed::ID:
       object("write_access_allowed", JsonEmptyObject());
       break;
-    case td_api::messageUserShared::ID:
+    case td_api::messageUserShared::ID: {
+      auto content = static_cast<const td_api::messageUserShared *>(message_->content.get());
+      object("user_shared", JsonUserShared(content));
       break;
-    case td_api::messageChatShared::ID:
+    }
+    case td_api::messageChatShared::ID: {
+      auto content = static_cast<const td_api::messageChatShared *>(message_->content.get());
+      object("chat_shared", JsonChatShared(content));
       break;
+    }
     default:
       UNREACHABLE();
   }
@@ -10505,10 +10539,6 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageGiftedPremium::ID:
       return true;
     case td_api::messageSuggestProfilePhoto::ID:
-      return true;
-    case td_api::messageUserShared::ID:
-      return true;
-    case td_api::messageChatShared::ID:
       return true;
     default:
       break;
