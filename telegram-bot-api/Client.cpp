@@ -4103,7 +4103,11 @@ ServerBotInfo Client::get_bot_info() const {
   if (user_info != nullptr) {
     res.username_ = user_info->editable_username;
   } else if (!was_authorized_) {
-    res.username_ = "<unauthorized>";
+    if (logging_out_) {
+      res.username_ = "<failed to authorize>";
+    } else {
+      res.username_ = "<unauthorized>";
+    }
   } else {
     res.username_ = "<unknown>";
   }
