@@ -590,6 +590,11 @@ void WebhookActor::send_updates() {
 }
 
 void WebhookActor::handle(td::unique_ptr<td::HttpQuery> response) {
+  SCOPE_EXIT {
+    bool dummy = false;
+    td::Scheduler::instance()->destroy_on_scheduler(SharedData::get_file_gc_scheduler_id(), response, dummy);
+  };
+
   auto connection_id = get_link_token();
   if (response) {
     VLOG(webhook) << "Got response from connection " << connection_id;

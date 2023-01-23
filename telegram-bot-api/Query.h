@@ -114,6 +114,8 @@ class Query final : public td::ListNode {
       if (!empty()) {
         shared_data_->query_list_size_.fetch_sub(1, std::memory_order_relaxed);
       }
+      td::Scheduler::instance()->destroy_on_scheduler(SharedData::get_file_gc_scheduler_id(), container_, args_,
+                                                      headers_, files_, answer_);
     }
   }
 
