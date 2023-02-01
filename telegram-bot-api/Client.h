@@ -433,7 +433,8 @@ class Client final : public WebhookActor::Callback {
 
   static td::Result<object_ptr<td_api::location>> get_location(const Query *query);
 
-  static td::Result<object_ptr<td_api::chatPermissions>> get_chat_permissions(const Query *query, bool &allow_legacy);
+  static td::Result<object_ptr<td_api::chatPermissions>> get_chat_permissions(const Query *query, bool &allow_legacy,
+                                                                              bool use_independent_chat_permissions);
 
   td::Result<object_ptr<td_api::InputMessageContent>> get_input_media(const Query *query, td::JsonValue &&input_media,
                                                                       bool for_album) const;

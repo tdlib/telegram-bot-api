@@ -6929,8 +6929,8 @@ td::Result<td_api::object_ptr<td_api::location>> Client::get_location(const Quer
                                        td::to_double(horizontal_accuracy));
 }
 
-td::Result<td_api::object_ptr<td_api::chatPermissions>> Client::get_chat_permissions(const Query *query,
-                                                                                     bool &allow_legacy) {
+td::Result<td_api::object_ptr<td_api::chatPermissions>> Client::get_chat_permissions(
+    const Query *query, bool &allow_legacy, bool use_independent_chat_permissions) {
   auto can_send_messages = false;
   auto can_send_audios = false;
   auto can_send_documents = false;
@@ -6992,7 +6992,7 @@ td::Result<td_api::object_ptr<td_api::chatPermissions>> Client::get_chat_permiss
         can_send_videos = can_send_media_messages;
         can_send_video_notes = can_send_media_messages;
         can_send_voice_notes = can_send_media_messages;
-        if (can_send_media_messages) {
+        if (can_send_media_messages && !use_independent_chat_permissions) {
           can_send_messages = true;
         }
       }
@@ -7003,7 +7003,7 @@ td::Result<td_api::object_ptr<td_api::chatPermissions>> Client::get_chat_permiss
       return Status::Error(400, PSLICE() << "Can't parse chat permissions: " << status.message());
     }
 
-    if (can_send_other_messages || can_add_web_page_previews) {
+    if ((can_send_other_messages || can_add_web_page_previews) && !use_independent_chat_permissions) {
       can_send_audios = true;
       can_send_documents = true;
       can_send_photos = true;
@@ -7012,7 +7012,7 @@ td::Result<td_api::object_ptr<td_api::chatPermissions>> Client::get_chat_permiss
       can_send_voice_notes = true;
       can_send_messages = true;
     }
-    if (can_send_polls) {
+    if (can_send_polls && !use_independent_chat_permissions) {
       can_send_messages = true;
     }
   } else if (allow_legacy) {
@@ -7022,10 +7022,10 @@ td::Result<td_api::object_ptr<td_api::chatPermissions>> Client::get_chat_permiss
     bool can_send_media_messages = to_bool(query->arg("can_send_media_messages"));
     can_send_other_messages = to_bool(query->arg("can_send_other_messages"));
     can_add_web_page_previews = to_bool(query->arg("can_add_web_page_previews"));
-    if (can_send_other_messages || can_add_web_page_previews) {
+    if ((can_send_other_messages || can_add_web_page_previews) && !use_independent_chat_permissions) {
       can_send_media_messages = true;
     }
-    if (can_send_media_messages) {
+    if (can_send_media_messages && !use_independent_chat_permissions) {
       can_send_messages = true;
     }
 
@@ -8395,7 +8395,8 @@ td::Status Client::process_set_chat_title_query(PromisedQueryPtr &query) {
 td::Status Client::process_set_chat_permissions_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
   bool allow_legacy = false;
-  TRY_RESULT(permissions, get_chat_permissions(query.get(), allow_legacy));
+  auto use_independent_chat_permissions = to_bool(query->arg("use_independent_chat_permissions"));
+  TRY_RESULT(permissions, get_chat_permissions(query.get(), allow_legacy, use_independent_chat_permissions));
   CHECK(!allow_legacy);
 
   check_chat(chat_id, AccessRights::Write, std::move(query),
@@ -8818,7 +8819,8 @@ td::Status Client::process_restrict_chat_member_query(PromisedQueryPtr &query) {
   TRY_RESULT(user_id, get_user_id(query.get()));
   int32 until_date = get_integer_arg(query.get(), "until_date", 0);
   bool allow_legacy = true;
-  TRY_RESULT(permissions, get_chat_permissions(query.get(), allow_legacy));
+  auto use_independent_chat_permissions = to_bool(query->arg("use_independent_chat_permissions"));
+  TRY_RESULT(permissions, get_chat_permissions(query.get(), allow_legacy, use_independent_chat_permissions));
 
   check_chat(chat_id, AccessRights::Write, std::move(query),
              [this, user_id, until_date, is_legacy = allow_legacy, permissions = std::move(permissions)](
