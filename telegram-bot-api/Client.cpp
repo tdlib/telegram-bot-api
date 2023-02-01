@@ -2725,6 +2725,7 @@ class Client::JsonChatJoinRequest final : public Jsonable {
     auto object = scope->enter_object();
     object("chat", JsonChat(update_->chat_id_, false, client_));
     object("from", JsonUser(update_->request_->user_id_, client_));
+    object("user_chat_id", update_->user_chat_id_);
     object("date", update_->request_->date_);
     if (!update_->request_->bio_.empty()) {
       object("bio", update_->request_->bio_);
