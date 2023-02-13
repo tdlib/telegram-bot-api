@@ -618,6 +618,8 @@ class Client final : public WebhookActor::Callback {
 
   void fail_query_closing(PromisedQueryPtr &&query);
 
+  void fail_query_flood_limit_exceeded(PromisedQueryPtr &&query);
+
   void fail_query_conflict(Slice message, PromisedQueryPtr &&query);
 
   struct ClosingError {
