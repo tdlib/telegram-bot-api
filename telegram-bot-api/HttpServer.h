@@ -66,7 +66,7 @@ class HttpServer final : public td::TcpListener::Callback {
       scheduler_id--;
     }
     td::create_actor<td::HttpInboundConnection>("HttpInboundConnection", td::BufferedFd<td::SocketFd>(std::move(fd)), 0,
-                                                20, 500, creator_(), scheduler_id)
+                                                50, 500, creator_(), scheduler_id)
         .release();
   }
 
