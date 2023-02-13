@@ -36,8 +36,8 @@
 namespace telegram_bot_api {
 
 using td::Jsonable;
-using td::JsonValueScope;
 using td::JsonValue;
+using td::JsonValueScope;
 
 using td_api::make_object;
 using td_api::move_object_as;
