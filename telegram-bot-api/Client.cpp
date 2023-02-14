@@ -1118,6 +1118,9 @@ class Client::JsonSticker final : public Jsonable {
         if (full_type->custom_emoji_id_ != 0) {
           object("custom_emoji_id", td::to_string(full_type->custom_emoji_id_));
         }
+        if (full_type->needs_repainting_) {
+          object("needs_repainting", td::JsonBool(full_type->needs_repainting_));
+        }
         break;
       }
       default:
