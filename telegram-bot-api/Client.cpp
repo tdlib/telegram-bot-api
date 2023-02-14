@@ -6804,6 +6804,14 @@ td::Result<td::vector<td_api::object_ptr<td_api::inputSticker>>> Client::get_inp
   return std::move(stickers);
 }
 
+td::Result<td_api::object_ptr<td_api::InputFile>> Client::get_sticker_input_file(const Query *query) {
+  auto file_id = trim(query->arg("sticker"));
+  if (file_id.empty()) {
+    return Status::Error(400, "Sticker is not specified");
+  }
+  return make_object<td_api::inputFileRemote>(file_id.str());
+}
+
 td::Result<td::string> Client::get_passport_element_hash(Slice encoded_hash) {
   if (!td::is_base64(encoded_hash)) {
     return Status::Error(400, "hash isn't a valid base64-encoded string");
@@ -9248,25 +9256,18 @@ td::Status Client::process_set_custom_emoji_sticker_set_thumbnail_query(Promised
 }
 
 td::Status Client::process_set_sticker_position_in_set_query(PromisedQueryPtr &query) {
-  auto file_id = trim(query->arg("sticker"));
-  if (file_id.empty()) {
-    return Status::Error(400, "Sticker is not specified");
-  }
+  TRY_RESULT(input_file, get_sticker_input_file(query.get()));
   int32 position = get_integer_arg(query.get(), "position", -1);
 
-  send_request(
-      make_object<td_api::setStickerPositionInSet>(make_object<td_api::inputFileRemote>(file_id.str()), position),
-      td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+  send_request(make_object<td_api::setStickerPositionInSet>(std::move(input_file), position),
+               td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   return Status::OK();
 }
 
 td::Status Client::process_delete_sticker_from_set_query(PromisedQueryPtr &query) {
-  auto file_id = trim(query->arg("sticker"));
-  if (file_id.empty()) {
-    return Status::Error(400, "Sticker is not specified");
-  }
+  TRY_RESULT(input_file, get_sticker_input_file(query.get()));
 
-  send_request(make_object<td_api::removeStickerFromSet>(make_object<td_api::inputFileRemote>(file_id.str())),
+  send_request(make_object<td_api::removeStickerFromSet>(std::move(input_file)),
                td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   return Status::OK();
 }

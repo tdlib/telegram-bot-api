@@ -414,6 +414,8 @@ class Client final : public WebhookActor::Callback {
   td::Result<td::vector<object_ptr<td_api::inputSticker>>> get_input_stickers(
       const Query *query, object_ptr<td_api::StickerFormat> &sticker_format) const;
 
+  static td::Result<object_ptr<td_api::InputFile>> get_sticker_input_file(const Query *query);
+
   static td::Result<td::string> get_passport_element_hash(Slice encoded_hash);
 
   static td::Result<object_ptr<td_api::InputPassportElementErrorSource>> get_passport_element_error_source(
