@@ -302,6 +302,7 @@ bool Client::init_methods() {
   methods_.emplace("deletestickerfromset", &Client::process_delete_sticker_from_set_query);
   methods_.emplace("setstickeremojilist", &Client::process_set_sticker_emoji_list_query);
   methods_.emplace("setstickerkeywords", &Client::process_set_sticker_keywords_query);
+  methods_.emplace("setstickermaskposition", &Client::process_set_sticker_mask_position_query);
   methods_.emplace("setpassportdataerrors", &Client::process_set_passport_data_errors_query);
   methods_.emplace("sendcustomrequest", &Client::process_send_custom_request_query);
   methods_.emplace("answercustomquery", &Client::process_answer_custom_query_query);
@@ -9325,6 +9326,15 @@ td::Status Client::process_set_sticker_keywords_query(PromisedQueryPtr &query) {
   }
 
   send_request(make_object<td_api::setStickerKeywords>(std::move(input_file), std::move(input_keywords)),
+               td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+  return Status::OK();
+}
+
+td::Status Client::process_set_sticker_mask_position_query(PromisedQueryPtr &query) {
+  TRY_RESULT(input_file, get_sticker_input_file(query.get()));
+  TRY_RESULT(mask_position, get_mask_position(query.get(), "mask_position"));
+
+  send_request(make_object<td_api::setStickerMaskPosition>(std::move(input_file), std::move(mask_position)),
                td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   return Status::OK();
 }
