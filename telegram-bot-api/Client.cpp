@@ -9032,6 +9032,7 @@ td::Status Client::process_create_new_sticker_set_query(PromisedQueryPtr &query)
   TRY_RESULT(user_id, get_user_id(query.get()));
   auto name = query->arg("name");
   auto title = query->arg("title");
+  auto needs_repainting = to_bool(query->arg("needs_repainting"));
   object_ptr<td_api::StickerFormat> sticker_format;
   TRY_RESULT(stickers, get_input_stickers(query.get(), &sticker_format));
 
@@ -9040,14 +9041,15 @@ td::Status Client::process_create_new_sticker_set_query(PromisedQueryPtr &query)
     sticker_type = make_object<td_api::stickerTypeMask>();
   }
 
-  check_user(user_id, std::move(query),
-             [this, user_id, title, name, sticker_format = std::move(sticker_format),
-              sticker_type = std::move(sticker_type), stickers = std::move(stickers)](PromisedQueryPtr query) mutable {
-               send_request(make_object<td_api::createNewStickerSet>(
-                                user_id, title.str(), name.str(), std::move(sticker_format), std::move(sticker_type),
-                                false, std::move(stickers), PSTRING() << "bot" << my_id_),
-                            td::make_unique<TdOnReturnStickerSetCallback>(this, false, std::move(query)));
-             });
+  check_user(
+      user_id, std::move(query),
+      [this, user_id, title, name, sticker_format = std::move(sticker_format), sticker_type = std::move(sticker_type),
+       needs_repainting, stickers = std::move(stickers)](PromisedQueryPtr query) mutable {
+        send_request(make_object<td_api::createNewStickerSet>(
+                         user_id, title.str(), name.str(), std::move(sticker_format), std::move(sticker_type),
+                         needs_repainting, std::move(stickers), PSTRING() << "bot" << my_id_),
+                     td::make_unique<TdOnReturnStickerSetCallback>(this, false, std::move(query)));
+      });
   return Status::OK();
 }
 
