@@ -405,6 +405,8 @@ class Client final : public WebhookActor::Callback {
 
   static td::Result<td::string> get_sticker_emojis(td::JsonValue &&value);
 
+  static td::Result<td::string> get_sticker_emojis(td::MutableSlice emoji_list);
+
   static td::Result<object_ptr<td_api::StickerFormat>> get_sticker_format(Slice sticker_format);
 
   td::Result<object_ptr<td_api::inputSticker>> get_input_sticker(const Query *query) const;
@@ -586,6 +588,7 @@ class Client final : public WebhookActor::Callback {
   Status process_set_custom_emoji_sticker_set_thumbnail_query(PromisedQueryPtr &query);
   Status process_set_sticker_position_in_set_query(PromisedQueryPtr &query);
   Status process_delete_sticker_from_set_query(PromisedQueryPtr &query);
+  Status process_set_sticker_emoji_list_query(PromisedQueryPtr &query);
   Status process_set_passport_data_errors_query(PromisedQueryPtr &query);
   Status process_send_custom_request_query(PromisedQueryPtr &query);
   Status process_answer_custom_query_query(PromisedQueryPtr &query);

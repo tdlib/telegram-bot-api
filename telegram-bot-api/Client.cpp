@@ -300,6 +300,7 @@ bool Client::init_methods() {
   methods_.emplace("setcustomemojistickersetthumbnail", &Client::process_set_custom_emoji_sticker_set_thumbnail_query);
   methods_.emplace("setstickerpositioninset", &Client::process_set_sticker_position_in_set_query);
   methods_.emplace("deletestickerfromset", &Client::process_delete_sticker_from_set_query);
+  methods_.emplace("setstickeremojilist", &Client::process_set_sticker_emoji_list_query);
   methods_.emplace("setpassportdataerrors", &Client::process_set_passport_data_errors_query);
   methods_.emplace("sendcustomrequest", &Client::process_send_custom_request_query);
   methods_.emplace("answercustomquery", &Client::process_answer_custom_query_query);
@@ -6632,6 +6633,10 @@ td::Result<td_api::object_ptr<td_api::maskPosition>> Client::get_mask_position(c
 }
 
 td::Result<td::string> Client::get_sticker_emojis(JsonValue &&value) {
+  if (value.type() != JsonValue::Type::Array) {
+    return Status::Error(400, "expected an Array of string");
+  }
+
   td::string result;
   auto emoji_count = value.get_array().size();
   if (emoji_count == 0) {
@@ -6650,6 +6655,21 @@ td::Result<td::string> Client::get_sticker_emojis(JsonValue &&value) {
     result += emoji.get_string().str();
   }
   return std::move(result);
+}
+
+td::Result<td::string> Client::get_sticker_emojis(td::MutableSlice emoji_list) {
+  LOG(INFO) << "Parsing JSON object: " << emoji_list;
+  auto r_value = json_decode(emoji_list);
+  if (r_value.is_error()) {
+    LOG(INFO) << "Can't parse JSON object: " << r_value.error();
+    return Status::Error(400, "Can't parse emoji list JSON array");
+  }
+
+  auto r_emojis = get_sticker_emojis(r_value.move_as_ok());
+  if (r_emojis.is_error()) {
+    return Status::Error(400, PSLICE() << "Can't parse emoji list: " << r_emojis.error().message());
+  }
+  return r_emojis.move_as_ok();
 }
 
 td::Result<td_api::object_ptr<td_api::StickerFormat>> Client::get_sticker_format(Slice sticker_format) {
@@ -9268,6 +9288,15 @@ td::Status Client::process_delete_sticker_from_set_query(PromisedQueryPtr &query
   TRY_RESULT(input_file, get_sticker_input_file(query.get()));
 
   send_request(make_object<td_api::removeStickerFromSet>(std::move(input_file)),
+               td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+  return Status::OK();
+}
+
+td::Status Client::process_set_sticker_emoji_list_query(PromisedQueryPtr &query) {
+  TRY_RESULT(input_file, get_sticker_input_file(query.get()));
+  TRY_RESULT(emojis, get_sticker_emojis(query->arg("emoji_list")));
+
+  send_request(make_object<td_api::setStickerEmojis>(std::move(input_file), emojis),
                td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   return Status::OK();
 }
