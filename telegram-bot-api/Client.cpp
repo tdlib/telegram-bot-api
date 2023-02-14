@@ -294,6 +294,7 @@ bool Client::init_methods() {
   methods_.emplace("uploadstickerfile", &Client::process_upload_sticker_file_query);
   methods_.emplace("createnewstickerset", &Client::process_create_new_sticker_set_query);
   methods_.emplace("addstickertoset", &Client::process_add_sticker_to_set_query);
+  methods_.emplace("setstickersettitle", &Client::process_set_sticker_set_title_query);
   methods_.emplace("setstickersetthumb", &Client::process_set_sticker_set_thumbnail_query);
   methods_.emplace("setstickersetthumbnail", &Client::process_set_sticker_set_thumbnail_query);
   methods_.emplace("setcustomemojistickersetthumbnail", &Client::process_set_custom_emoji_sticker_set_thumbnail_query);
@@ -9212,6 +9213,14 @@ td::Status Client::process_add_sticker_to_set_query(PromisedQueryPtr &query) {
                send_request(make_object<td_api::addStickerToSet>(user_id, name.str(), std::move(sticker)),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
+  return Status::OK();
+}
+
+td::Status Client::process_set_sticker_set_title_query(PromisedQueryPtr &query) {
+  auto name = query->arg("name");
+  auto title = query->arg("title");
+  send_request(make_object<td_api::setStickerSetTitle>(name.str(), title.str()),
+               td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   return Status::OK();
 }
 
