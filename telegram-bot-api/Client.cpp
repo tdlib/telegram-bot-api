@@ -301,6 +301,7 @@ bool Client::init_methods() {
   methods_.emplace("setstickerpositioninset", &Client::process_set_sticker_position_in_set_query);
   methods_.emplace("deletestickerfromset", &Client::process_delete_sticker_from_set_query);
   methods_.emplace("setstickeremojilist", &Client::process_set_sticker_emoji_list_query);
+  methods_.emplace("setstickerkeywords", &Client::process_set_sticker_keywords_query);
   methods_.emplace("setpassportdataerrors", &Client::process_set_passport_data_errors_query);
   methods_.emplace("sendcustomrequest", &Client::process_send_custom_request_query);
   methods_.emplace("answercustomquery", &Client::process_answer_custom_query_query);
@@ -9297,6 +9298,33 @@ td::Status Client::process_set_sticker_emoji_list_query(PromisedQueryPtr &query)
   TRY_RESULT(emojis, get_sticker_emojis(query->arg("emoji_list")));
 
   send_request(make_object<td_api::setStickerEmojis>(std::move(input_file), emojis),
+               td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+  return Status::OK();
+}
+
+td::Status Client::process_set_sticker_keywords_query(PromisedQueryPtr &query) {
+  TRY_RESULT(input_file, get_sticker_input_file(query.get()));
+  td::vector<td::string> input_keywords;
+  if (query->has_arg("keywords")) {
+    auto r_value = json_decode(query->arg("keywords"));
+    if (r_value.is_error()) {
+      LOG(INFO) << "Can't parse JSON object: " << r_value.error();
+      return Status::Error(400, "Can't parse keywords JSON object");
+    }
+    auto value = r_value.move_as_ok();
+
+    if (value.type() != JsonValue::Type::Array) {
+      return Status::Error(400, "Field \"keywords\" must be an Array");
+    }
+    for (auto &keyword : value.get_array()) {
+      if (keyword.type() != JsonValue::Type::String) {
+        return Status::Error(400, "keyword must be a string");
+      }
+      input_keywords.push_back(keyword.get_string().str());
+    }
+  }
+
+  send_request(make_object<td_api::setStickerKeywords>(std::move(input_file), std::move(input_keywords)),
                td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   return Status::OK();
 }
