@@ -86,6 +86,8 @@ class Client final : public WebhookActor::Callback {
   static constexpr int32 MAX_LENGTH = 10000;  // max width or height
   static constexpr int32 MAX_DURATION = 24 * 60 * 60;
 
+  static constexpr std::size_t MAX_STICKER_EMOJI_COUNT = 20;
+
   class JsonEmptyObject;
   class JsonFile;
   class JsonDatedFile;
@@ -400,6 +402,12 @@ class Client final : public WebhookActor::Callback {
   static int32 mask_point_to_index(const object_ptr<td_api::MaskPoint> &mask_point);
 
   static object_ptr<td_api::MaskPoint> mask_index_to_point(int32 index);
+
+  static td::Result<td::string> get_sticker_emojis(td::JsonValue &&value);
+
+  td::Result<object_ptr<td_api::inputSticker>> get_input_sticker(const Query *query) const;
+
+  td::Result<object_ptr<td_api::inputSticker>> get_input_sticker(const Query *query, td::JsonValue &&value) const;
 
   td::Result<td::vector<object_ptr<td_api::inputSticker>>> get_input_stickers(
       const Query *query, object_ptr<td_api::StickerFormat> *sticker_format) const;

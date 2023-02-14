@@ -15,6 +15,7 @@
 
 #include "td/utils/algorithm.h"
 #include "td/utils/base64.h"
+#include "td/utils/emoji.h"
 #include "td/utils/filesystem.h"
 #include "td/utils/HttpUrl.h"
 #include "td/utils/JsonBuilder.h"
@@ -6548,6 +6549,9 @@ td::Result<td_api::object_ptr<td_api::chatAdministratorRights>> Client::get_chat
 
 td::Result<td_api::object_ptr<td_api::maskPosition>> Client::get_mask_position(JsonValue &&value) {
   if (value.type() != JsonValue::Type::Object) {
+    if (value.type() == JsonValue::Type::Null) {
+      return nullptr;
+    }
     return Status::Error(400, "MaskPosition must be an Object");
   }
 
@@ -6623,6 +6627,90 @@ td::Result<td_api::object_ptr<td_api::maskPosition>> Client::get_mask_position(c
     return Status::Error(400, PSLICE() << "Can't parse mask position: " << r_mask_position.error().message());
   }
   return r_mask_position.move_as_ok();
+}
+
+td::Result<td::string> Client::get_sticker_emojis(JsonValue &&value) {
+  td::string result;
+  auto emoji_count = value.get_array().size();
+  if (emoji_count == 0) {
+    return Status::Error(400, "emoji list must be non-empty");
+  }
+  if (emoji_count > MAX_STICKER_EMOJI_COUNT) {
+    return Status::Error(400, "too many emoji specified");
+  }
+  for (auto &emoji : value.get_array()) {
+    if (emoji.type() != JsonValue::Type::String) {
+      return Status::Error(400, "emoji must be a string");
+    }
+    if (!td::is_emoji(emoji.get_string())) {
+      return Status::Error(400, "expected a Unicode emoji");
+    }
+    result += emoji.get_string().str();
+  }
+  return std::move(result);
+}
+
+td::Result<td_api::object_ptr<td_api::inputSticker>> Client::get_input_sticker(const Query *query,
+                                                                               JsonValue &&value) const {
+  if (value.type() != JsonValue::Type::Object) {
+    return Status::Error(400, "InputSticker must be an Object");
+  }
+
+  auto &object = value.get_object();
+
+  TRY_RESULT(sticker, get_json_object_string_field(object, "sticker"));
+  auto input_file = get_input_file(query, Slice(), sticker, false);
+  if (input_file == nullptr) {
+    return Status::Error("sticker not found");
+  }
+  TRY_RESULT(emoji_list, get_json_object_field(object, "emoji_list", JsonValue::Type::Array, false));
+  TRY_RESULT(emojis, get_sticker_emojis(std::move(emoji_list)));
+  TRY_RESULT(mask_position, get_mask_position(get_json_object_field_force(object, "mask_position")));
+  return make_object<td_api::inputSticker>(std::move(input_file), emojis, std::move(mask_position),
+                                           td::vector<td::string>());
+}
+
+td::Result<td_api::object_ptr<td_api::inputSticker>> Client::get_input_sticker(const Query *query) const {
+  if (query->has_arg("sticker") || query->file("sticker") != nullptr) {
+    auto sticker = query->arg("sticker");
+    LOG(INFO) << "Parsing JSON object: " << sticker;
+    auto r_value = json_decode(sticker);
+    if (r_value.is_error()) {
+      LOG(INFO) << "Can't parse JSON object: " << r_value.error();
+      return Status::Error(400, "Can't parse sticker JSON object");
+    }
+
+    auto r_sticker = get_input_sticker(query, r_value.move_as_ok());
+    if (r_sticker.is_error()) {
+      return Status::Error(400, PSLICE() << "Can't parse sticker: " << r_sticker.error().message());
+    }
+    return r_sticker.move_as_ok();
+  }
+
+  auto emojis = query->arg("emojis");
+
+  auto sticker = get_input_file(query, "png_sticker");
+  object_ptr<td_api::maskPosition> mask_position;
+  if (sticker != nullptr) {
+    TRY_RESULT_ASSIGN(mask_position, get_mask_position(query, "mask_position"));
+  } else {
+    sticker = get_input_file(query, "tgs_sticker", true);
+    if (sticker == nullptr) {
+      sticker = get_input_file(query, "webm_sticker", true);
+      if (sticker == nullptr) {
+        if (!query->arg("tgs_sticker").empty()) {
+          return Status::Error(400, "Bad Request: animated sticker must be uploaded as an InputFile");
+        }
+        if (!query->arg("webm_sticker").empty()) {
+          return Status::Error(400, "Bad Request: video sticker must be uploaded as an InputFile");
+        }
+        return Status::Error(400, "Bad Request: there is no sticker file in the request");
+      }
+    }
+  }
+
+  return make_object<td_api::inputSticker>(std::move(sticker), emojis.str(), std::move(mask_position),
+                                           td::vector<td::string>());
 }
 
 td::Result<td::vector<td_api::object_ptr<td_api::inputSticker>>> Client::get_input_stickers(
@@ -9059,11 +9147,10 @@ td::Status Client::process_create_new_sticker_set_query(PromisedQueryPtr &query)
 td::Status Client::process_add_sticker_to_set_query(PromisedQueryPtr &query) {
   TRY_RESULT(user_id, get_user_id(query.get()));
   auto name = query->arg("name");
-  TRY_RESULT(stickers, get_input_stickers(query.get(), nullptr));
-  CHECK(!stickers.empty());
+  TRY_RESULT(sticker, get_input_sticker(query.get()));
 
   check_user(user_id, std::move(query),
-             [this, user_id, name, sticker = std::move(stickers[0])](PromisedQueryPtr query) mutable {
+             [this, user_id, name, sticker = std::move(sticker)](PromisedQueryPtr query) mutable {
                send_request(make_object<td_api::addStickerToSet>(user_id, name.str(), std::move(sticker)),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
