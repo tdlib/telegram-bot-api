@@ -296,6 +296,7 @@ bool Client::init_methods() {
   methods_.emplace("addstickertoset", &Client::process_add_sticker_to_set_query);
   methods_.emplace("setstickersetthumb", &Client::process_set_sticker_set_thumbnail_query);
   methods_.emplace("setstickersetthumbnail", &Client::process_set_sticker_set_thumbnail_query);
+  methods_.emplace("setcustomemojistickersetthumbnail", &Client::process_set_custom_emoji_sticker_set_thumbnail_query);
   methods_.emplace("setstickerpositioninset", &Client::process_set_sticker_position_in_set_query);
   methods_.emplace("deletestickerfromset", &Client::process_delete_sticker_from_set_query);
   methods_.emplace("setpassportdataerrors", &Client::process_set_passport_data_errors_query);
@@ -9226,6 +9227,14 @@ td::Status Client::process_set_sticker_set_thumbnail_query(PromisedQueryPtr &que
                send_request(make_object<td_api::setStickerSetThumbnail>(user_id, name.str(), std::move(thumbnail)),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
+  return Status::OK();
+}
+
+td::Status Client::process_set_custom_emoji_sticker_set_thumbnail_query(PromisedQueryPtr &query) {
+  auto name = query->arg("name");
+  auto custom_emoji_id = td::to_integer<int64>(query->arg("custom_emoji_id"));
+  send_request(make_object<td_api::setCustomEmojiStickerSetThumbnail>(name.str(), custom_emoji_id),
+               td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   return Status::OK();
 }
 
