@@ -293,7 +293,8 @@ bool Client::init_methods() {
   methods_.emplace("uploadstickerfile", &Client::process_upload_sticker_file_query);
   methods_.emplace("createnewstickerset", &Client::process_create_new_sticker_set_query);
   methods_.emplace("addstickertoset", &Client::process_add_sticker_to_set_query);
-  methods_.emplace("setstickersetthumb", &Client::process_set_sticker_set_thumb_query);
+  methods_.emplace("setstickersetthumb", &Client::process_set_sticker_set_thumbnail_query);
+  methods_.emplace("setstickersetthumbnail", &Client::process_set_sticker_set_thumbnail_query);
   methods_.emplace("setstickerpositioninset", &Client::process_set_sticker_position_in_set_query);
   methods_.emplace("deletestickerfromset", &Client::process_delete_sticker_from_set_query);
   methods_.emplace("setpassportdataerrors", &Client::process_set_passport_data_errors_query);
@@ -5879,10 +5880,13 @@ td_api::object_ptr<td_api::InputFile> Client::get_input_file(const Query *query,
   return nullptr;
 }
 
-td_api::object_ptr<td_api::inputThumbnail> Client::get_input_thumbnail(const Query *query, Slice field_name) const {
-  auto input_file = get_input_file(query, field_name, true);
+td_api::object_ptr<td_api::inputThumbnail> Client::get_input_thumbnail(const Query *query) const {
+  auto input_file = get_input_file(query, "thumbnail", true);
   if (input_file == nullptr) {
-    return nullptr;
+    input_file = get_input_file(query, "thumb", true);
+    if (input_file == nullptr) {
+      return nullptr;
+    }
   }
   return make_object<td_api::inputThumbnail>(std::move(input_file), 0, 0);
 }
@@ -6101,15 +6105,26 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
     TRY_RESULT_ASSIGN(reply_markup, get_reply_markup(std::move(reply_markup_object)));
   }
 
+  auto thumbnail_url_field_name = Slice("thumbnail_url");
+  auto thumbnail_width_field_name = Slice("thumbnail_width");
+  auto thumbnail_height_field_name = Slice("thumbnail_height");
+  if (!has_json_object_field(object, thumbnail_url_field_name) &&
+      !has_json_object_field(object, thumbnail_width_field_name) &&
+      !has_json_object_field(object, thumbnail_height_field_name)) {
+    thumbnail_url_field_name = Slice("thumb_url");
+    thumbnail_width_field_name = Slice("thumb_width");
+    thumbnail_height_field_name = Slice("thumb_height");
+  }
+  TRY_RESULT(thumbnail_url, get_json_object_string_field(object, thumbnail_url_field_name));
+  TRY_RESULT(thumbnail_width, get_json_object_int_field(object, thumbnail_width_field_name));
+  TRY_RESULT(thumbnail_height, get_json_object_int_field(object, thumbnail_height_field_name));
+
   object_ptr<td_api::InputInlineQueryResult> result;
   if (type == "article") {
     TRY_RESULT(url, get_json_object_string_field(object, "url"));
     TRY_RESULT(hide_url, get_json_object_bool_field(object, "hide_url"));
     TRY_RESULT(title, get_json_object_string_field(object, "title", false));
     TRY_RESULT(description, get_json_object_string_field(object, "description"));
-    TRY_RESULT(thumbnail_url, get_json_object_string_field(object, "thumb_url"));
-    TRY_RESULT(thumbnail_width, get_json_object_int_field(object, "thumb_width"));
-    TRY_RESULT(thumbnail_height, get_json_object_int_field(object, "thumb_height"));
 
     CHECK(input_message_content != nullptr);
     return make_object<td_api::inputInlineQueryResultArticle>(
@@ -6137,9 +6152,6 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
     TRY_RESULT(first_name, get_json_object_string_field(object, "first_name", false));
     TRY_RESULT(last_name, get_json_object_string_field(object, "last_name"));
     TRY_RESULT(vcard, get_json_object_string_field(object, "vcard"));
-    TRY_RESULT(thumbnail_url, get_json_object_string_field(object, "thumb_url"));
-    TRY_RESULT(thumbnail_width, get_json_object_int_field(object, "thumb_width"));
-    TRY_RESULT(thumbnail_height, get_json_object_int_field(object, "thumb_height"));
 
     if (input_message_content == nullptr) {
       input_message_content = make_object<td_api::inputMessageContact>(
@@ -6152,11 +6164,8 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
   if (type == "document") {
     TRY_RESULT(title, get_json_object_string_field(object, "title", false));
     TRY_RESULT(description, get_json_object_string_field(object, "description"));
-    TRY_RESULT(thumbnail_url, get_json_object_string_field(object, "thumb_url"));
     TRY_RESULT(document_url, get_json_object_string_field(object, "document_url"));
     TRY_RESULT(mime_type, get_json_object_string_field(object, "mime_type", document_url.empty()));
-    TRY_RESULT(thumbnail_width, get_json_object_int_field(object, "thumb_width"));
-    TRY_RESULT(thumbnail_height, get_json_object_int_field(object, "thumb_height"));
     if (document_url.empty()) {
       TRY_RESULT_ASSIGN(document_url, get_json_object_string_field(object, "document_file_id", false));
     }
@@ -6175,8 +6184,11 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
   if (type == "gif") {
     TRY_RESULT(title, get_json_object_string_field(object, "title"));
     TRY_RESULT(gif_url, get_json_object_string_field(object, "gif_url"));
-    TRY_RESULT(thumbnail_url, get_json_object_string_field(object, "thumb_url", gif_url.empty()));
-    TRY_RESULT(thumbnail_mime_type, get_json_object_string_field(object, "thumb_mime_type", true));
+    auto thumbnail_mime_type_field_name = Slice("thumbnail_mime_type");
+    if (!has_json_object_field(object, thumbnail_mime_type_field_name)) {
+      thumbnail_mime_type_field_name = Slice("thumb_mime_type");
+    }
+    TRY_RESULT(thumbnail_mime_type, get_json_object_string_field(object, thumbnail_mime_type_field_name));
     TRY_RESULT(gif_duration, get_json_object_int_field(object, "gif_duration"));
     TRY_RESULT(gif_width, get_json_object_int_field(object, "gif_width"));
     TRY_RESULT(gif_height, get_json_object_int_field(object, "gif_height"));
@@ -6200,9 +6212,6 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
     TRY_RESULT(heading, get_json_object_int_field(object, "heading"));
     TRY_RESULT(proximity_alert_radius, get_json_object_int_field(object, "proximity_alert_radius"));
     TRY_RESULT(title, get_json_object_string_field(object, "title", false));
-    TRY_RESULT(thumbnail_url, get_json_object_string_field(object, "thumb_url"));
-    TRY_RESULT(thumbnail_width, get_json_object_int_field(object, "thumb_width"));
-    TRY_RESULT(thumbnail_height, get_json_object_int_field(object, "thumb_height"));
 
     if (input_message_content == nullptr) {
       auto location = make_object<td_api::location>(latitude, longitude, horizontal_accuracy);
@@ -6216,8 +6225,11 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
   if (type == "mpeg4_gif") {
     TRY_RESULT(title, get_json_object_string_field(object, "title"));
     TRY_RESULT(mpeg4_url, get_json_object_string_field(object, "mpeg4_url"));
-    TRY_RESULT(thumbnail_url, get_json_object_string_field(object, "thumb_url", mpeg4_url.empty()));
-    TRY_RESULT(thumbnail_mime_type, get_json_object_string_field(object, "thumb_mime_type", true));
+    auto thumbnail_mime_type_field_name = Slice("thumbnail_mime_type");
+    if (!has_json_object_field(object, thumbnail_mime_type_field_name)) {
+      thumbnail_mime_type_field_name = Slice("thumb_mime_type");
+    }
+    TRY_RESULT(thumbnail_mime_type, get_json_object_string_field(object, thumbnail_mime_type_field_name));
     TRY_RESULT(mpeg4_duration, get_json_object_int_field(object, "mpeg4_duration"));
     TRY_RESULT(mpeg4_width, get_json_object_int_field(object, "mpeg4_width"));
     TRY_RESULT(mpeg4_height, get_json_object_int_field(object, "mpeg4_height"));
@@ -6237,7 +6249,6 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
     TRY_RESULT(title, get_json_object_string_field(object, "title"));
     TRY_RESULT(description, get_json_object_string_field(object, "description"));
     TRY_RESULT(photo_url, get_json_object_string_field(object, "photo_url"));
-    TRY_RESULT(thumbnail_url, get_json_object_string_field(object, "thumb_url", photo_url.empty()));
     TRY_RESULT(photo_width, get_json_object_int_field(object, "photo_width"));
     TRY_RESULT(photo_height, get_json_object_int_field(object, "photo_height"));
     if (photo_url.empty()) {
@@ -6271,9 +6282,6 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
     TRY_RESULT(foursquare_type, get_json_object_string_field(object, "foursquare_type"));
     TRY_RESULT(google_place_id, get_json_object_string_field(object, "google_place_id"));
     TRY_RESULT(google_place_type, get_json_object_string_field(object, "google_place_type"));
-    TRY_RESULT(thumbnail_url, get_json_object_string_field(object, "thumb_url"));
-    TRY_RESULT(thumbnail_width, get_json_object_int_field(object, "thumb_width"));
-    TRY_RESULT(thumbnail_height, get_json_object_int_field(object, "thumb_height"));
 
     td::string provider;
     td::string venue_id;
@@ -6304,7 +6312,6 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
     TRY_RESULT(title, get_json_object_string_field(object, "title", false));
     TRY_RESULT(description, get_json_object_string_field(object, "description"));
     TRY_RESULT(video_url, get_json_object_string_field(object, "video_url"));
-    TRY_RESULT(thumbnail_url, get_json_object_string_field(object, "thumb_url", video_url.empty()));
     TRY_RESULT(mime_type, get_json_object_string_field(object, "mime_type", video_url.empty()));
     TRY_RESULT(video_width, get_json_object_int_field(object, "video_width"));
     TRY_RESULT(video_height, get_json_object_int_field(object, "video_height"));
@@ -7074,25 +7081,33 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
   // TRY_RESULT(self_destruct_time, get_json_object_int_field(object, "self_destruct_time"));
   int32 self_destruct_time = 0;
   TRY_RESULT(has_spoiler, get_json_object_bool_field(object, "has_spoiler"));
-  TRY_RESULT(media, get_json_object_string_field(object, "media", true));
+  TRY_RESULT(media, get_json_object_string_field(object, "media"));
 
   auto input_file = get_input_file(query, Slice(), media, false);
   if (input_file == nullptr) {
     return Status::Error("media not found");
   }
 
-  TRY_RESULT(thumbnail, get_json_object_string_field(object, "thumb"));
+  TRY_RESULT(thumbnail, get_json_object_string_field(object, "thumbnail"));
+  if (thumbnail.empty()) {
+    TRY_RESULT_ASSIGN(thumbnail, get_json_object_string_field(object, "thumb"));
+  }
+  auto thumbnail_input_file = get_input_file(query, Slice(), thumbnail, true);
+  if (thumbnail_input_file == nullptr) {
+    thumbnail_input_file = get_input_file(query, "thumbnail", Slice(), true);
+    if (thumbnail_input_file == nullptr) {
+      thumbnail_input_file = get_input_file(query, "thumb", Slice(), true);
+    }
+  }
   object_ptr<td_api::inputThumbnail> input_thumbnail;
-  auto thumbanil_input_file = get_input_file(query, thumbnail.empty() ? Slice("thumb") : Slice(), thumbnail, true);
-  if (thumbanil_input_file != nullptr) {
-    input_thumbnail = make_object<td_api::inputThumbnail>(std::move(thumbanil_input_file), 0, 0);
+  if (thumbnail_input_file != nullptr) {
+    input_thumbnail = make_object<td_api::inputThumbnail>(std::move(thumbnail_input_file), 0, 0);
   }
 
   TRY_RESULT(type, get_json_object_string_field(object, "type", false));
   if (type == "photo") {
-    return make_object<td_api::inputMessagePhoto>(std::move(input_file), std::move(input_thumbnail),
-                                                  td::vector<int32>(), 0, 0, std::move(caption), self_destruct_time,
-                                                  has_spoiler);
+    return make_object<td_api::inputMessagePhoto>(std::move(input_file), nullptr, td::vector<int32>(), 0, 0,
+                                                  std::move(caption), self_destruct_time, has_spoiler);
   }
   if (type == "video") {
     TRY_RESULT(width, get_json_object_int_field(object, "width"));
@@ -7598,7 +7613,7 @@ td::Status Client::process_send_animation_query(PromisedQueryPtr &query) {
   if (animation == nullptr) {
     return Status::Error(400, "There is no animation in the request");
   }
-  auto thumbnail = get_input_thumbnail(query.get(), "thumb");
+  auto thumbnail = get_input_thumbnail(query.get());
   int32 duration = get_integer_arg(query.get(), "duration", 0, 0, MAX_DURATION);
   int32 width = get_integer_arg(query.get(), "width", 0, 0, MAX_LENGTH);
   int32 height = get_integer_arg(query.get(), "height", 0, 0, MAX_LENGTH);
@@ -7616,7 +7631,7 @@ td::Status Client::process_send_audio_query(PromisedQueryPtr &query) {
   if (audio == nullptr) {
     return Status::Error(400, "There is no audio in the request");
   }
-  auto thumbnail = get_input_thumbnail(query.get(), "thumb");
+  auto thumbnail = get_input_thumbnail(query.get());
   int32 duration = get_integer_arg(query.get(), "duration", 0, 0, MAX_DURATION);
   auto title = query->arg("title").str();
   auto performer = query->arg("performer").str();
@@ -7638,7 +7653,7 @@ td::Status Client::process_send_document_query(PromisedQueryPtr &query) {
   if (document == nullptr) {
     return Status::Error(400, "There is no document in the request");
   }
-  auto thumbnail = get_input_thumbnail(query.get(), "thumb");
+  auto thumbnail = get_input_thumbnail(query.get());
   TRY_RESULT(caption, get_caption(query.get()));
   bool disable_content_type_detection = to_bool(query->arg("disable_content_type_detection"));
   do_send_message(make_object<td_api::inputMessageDocument>(std::move(document), std::move(thumbnail),
@@ -7676,7 +7691,7 @@ td::Status Client::process_send_video_query(PromisedQueryPtr &query) {
   if (video == nullptr) {
     return Status::Error(400, "There is no video in the request");
   }
-  auto thumbnail = get_input_thumbnail(query.get(), "thumb");
+  auto thumbnail = get_input_thumbnail(query.get());
   int32 duration = get_integer_arg(query.get(), "duration", 0, 0, MAX_DURATION);
   int32 width = get_integer_arg(query.get(), "width", 0, 0, MAX_LENGTH);
   int32 height = get_integer_arg(query.get(), "height", 0, 0, MAX_LENGTH);
@@ -7696,7 +7711,7 @@ td::Status Client::process_send_video_note_query(PromisedQueryPtr &query) {
   if (video_note == nullptr) {
     return Status::Error(400, "There is no video note in the request");
   }
-  auto thumbnail = get_input_thumbnail(query.get(), "thumb");
+  auto thumbnail = get_input_thumbnail(query.get());
   int32 duration = get_integer_arg(query.get(), "duration", 0, 0, MAX_DURATION);
   int32 length = get_integer_arg(query.get(), "length", 0, 0, MAX_LENGTH);
   do_send_message(
@@ -9050,10 +9065,13 @@ td::Status Client::process_add_sticker_to_set_query(PromisedQueryPtr &query) {
   return Status::OK();
 }
 
-td::Status Client::process_set_sticker_set_thumb_query(PromisedQueryPtr &query) {
+td::Status Client::process_set_sticker_set_thumbnail_query(PromisedQueryPtr &query) {
   TRY_RESULT(user_id, get_user_id(query.get()));
   auto name = query->arg("name");
-  auto thumbnail = get_input_file(query.get(), "thumb");
+  auto thumbnail = get_input_file(query.get(), "thumbnail");
+  if (thumbnail == nullptr) {
+    thumbnail = get_input_file(query.get(), "thumb");
+  }
   check_user(user_id, std::move(query),
              [this, user_id, name, thumbnail = std::move(thumbnail)](PromisedQueryPtr query) mutable {
                send_request(make_object<td_api::setStickerSetThumbnail>(user_id, name.str(), std::move(thumbnail)),
@@ -10074,6 +10092,7 @@ void Client::json_store_thumbnail(td::JsonObjectScope &object, const td_api::thu
   }
 
   CHECK(thumbnail->file_->id_ > 0);
+  object("thumbnail", JsonThumbnail(thumbnail, this));
   object("thumb", JsonThumbnail(thumbnail, this));
 }
 

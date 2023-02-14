@@ -356,7 +356,7 @@ class Client final : public WebhookActor::Callback {
   object_ptr<td_api::InputFile> get_input_file(const Query *query, Slice field_name, Slice file_id,
                                                bool force_file) const;
 
-  object_ptr<td_api::inputThumbnail> get_input_thumbnail(const Query *query, Slice field_name) const;
+  object_ptr<td_api::inputThumbnail> get_input_thumbnail(const Query *query) const;
 
   td::Result<object_ptr<td_api::InputInlineQueryResult>> get_inline_query_result(const Query *query);
 
@@ -569,7 +569,7 @@ class Client final : public WebhookActor::Callback {
   Status process_upload_sticker_file_query(PromisedQueryPtr &query);
   Status process_create_new_sticker_set_query(PromisedQueryPtr &query);
   Status process_add_sticker_to_set_query(PromisedQueryPtr &query);
-  Status process_set_sticker_set_thumb_query(PromisedQueryPtr &query);
+  Status process_set_sticker_set_thumbnail_query(PromisedQueryPtr &query);
   Status process_set_sticker_position_in_set_query(PromisedQueryPtr &query);
   Status process_delete_sticker_from_set_query(PromisedQueryPtr &query);
   Status process_set_passport_data_errors_query(PromisedQueryPtr &query);
