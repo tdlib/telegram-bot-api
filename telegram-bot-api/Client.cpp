@@ -6679,8 +6679,18 @@ td::Result<td_api::object_ptr<td_api::inputSticker>> Client::get_input_sticker(c
   TRY_RESULT(emoji_list, get_json_object_field(object, "emoji_list", JsonValue::Type::Array, false));
   TRY_RESULT(emojis, get_sticker_emojis(std::move(emoji_list)));
   TRY_RESULT(mask_position, get_mask_position(get_json_object_field_force(object, "mask_position")));
+  td::vector<td::string> input_keywords;
+  if (has_json_object_field(object, "keywords")) {
+    TRY_RESULT(keywords, get_json_object_field(object, "keywords", JsonValue::Type::Array, false));
+    for (auto &keyword : keywords.get_array()) {
+      if (keyword.type() != JsonValue::Type::String) {
+        return Status::Error(400, "keyword must be a string");
+      }
+      input_keywords.push_back(keyword.get_string().str());
+    }
+  }
   return make_object<td_api::inputSticker>(std::move(input_file), emojis, std::move(mask_position),
-                                           td::vector<td::string>());
+                                           std::move(input_keywords));
 }
 
 td::Result<td_api::object_ptr<td_api::inputSticker>> Client::get_input_sticker(const Query *query) const {
