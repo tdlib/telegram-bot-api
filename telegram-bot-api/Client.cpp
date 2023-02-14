@@ -6650,6 +6650,19 @@ td::Result<td::string> Client::get_sticker_emojis(JsonValue &&value) {
   return std::move(result);
 }
 
+td::Result<td_api::object_ptr<td_api::StickerFormat>> Client::get_sticker_format(Slice sticker_format) {
+  if (sticker_format == "static") {
+    return make_object<td_api::stickerFormatWebp>();
+  }
+  if (sticker_format == "animated") {
+    return make_object<td_api::stickerFormatTgs>();
+  }
+  if (sticker_format == "video") {
+    return make_object<td_api::stickerFormatWebm>();
+  }
+  return Status::Error(400, "Invalid sticker format specified");
+}
+
 td::Result<td_api::object_ptr<td_api::inputSticker>> Client::get_input_sticker(const Query *query,
                                                                                JsonValue &&value) const {
   if (value.type() != JsonValue::Type::Object) {
@@ -6714,28 +6727,53 @@ td::Result<td_api::object_ptr<td_api::inputSticker>> Client::get_input_sticker(c
 }
 
 td::Result<td::vector<td_api::object_ptr<td_api::inputSticker>>> Client::get_input_stickers(
-    const Query *query, object_ptr<td_api::StickerFormat> *sticker_format) const {
+    const Query *query, object_ptr<td_api::StickerFormat> &sticker_format) const {
+  if (query->has_arg("stickers")) {
+    TRY_RESULT_ASSIGN(sticker_format, get_sticker_format(query->arg("sticker_format")));
+    auto stickers = query->arg("stickers");
+    LOG(INFO) << "Parsing JSON object: " << stickers;
+    auto r_value = json_decode(stickers);
+    if (r_value.is_error()) {
+      LOG(INFO) << "Can't parse JSON object: " << r_value.error();
+      return Status::Error(400, "Can't parse stickers JSON object");
+    }
+    auto value = r_value.move_as_ok();
+
+    if (value.type() != JsonValue::Type::Array) {
+      return Status::Error(400, "Expected an Array of InputSticker");
+    }
+
+    constexpr std::size_t MAX_STICKER_COUNT = 50;
+    if (value.get_array().size() > MAX_STICKER_COUNT) {
+      return Status::Error(400, "Too many stickers specified");
+    }
+
+    td::vector<object_ptr<td_api::inputSticker>> input_stickers;
+    for (auto &input_sticker : value.get_array()) {
+      auto r_input_sticker = get_input_sticker(query, std::move(input_sticker));
+      if (r_input_sticker.is_error()) {
+        return Status::Error(400, PSLICE() << "Can't parse InputSticker: " << r_input_sticker.error().message());
+      }
+      input_stickers.push_back(r_input_sticker.move_as_ok());
+    }
+    return std::move(input_stickers);
+  }
+
   auto emojis = query->arg("emojis");
 
   auto sticker = get_input_file(query, "png_sticker");
   object_ptr<td_api::maskPosition> mask_position;
   if (sticker != nullptr) {
-    if (sticker_format != nullptr) {
-      *sticker_format = make_object<td_api::stickerFormatWebp>();
-    }
+    sticker_format = make_object<td_api::stickerFormatWebp>();
     TRY_RESULT_ASSIGN(mask_position, get_mask_position(query, "mask_position"));
   } else {
     sticker = get_input_file(query, "tgs_sticker", true);
     if (sticker != nullptr) {
-      if (sticker_format != nullptr) {
-        *sticker_format = make_object<td_api::stickerFormatTgs>();
-      }
+      sticker_format = make_object<td_api::stickerFormatTgs>();
     } else {
       sticker = get_input_file(query, "webm_sticker", true);
       if (sticker != nullptr) {
-        if (sticker_format != nullptr) {
-          *sticker_format = make_object<td_api::stickerFormatWebm>();
-        }
+        sticker_format = make_object<td_api::stickerFormatWebm>();
       } else {
         if (!query->arg("tgs_sticker").empty()) {
           return Status::Error(400, "Bad Request: animated sticker must be uploaded as an InputFile");
@@ -9125,7 +9163,7 @@ td::Status Client::process_create_new_sticker_set_query(PromisedQueryPtr &query)
   auto title = query->arg("title");
   auto needs_repainting = to_bool(query->arg("needs_repainting"));
   object_ptr<td_api::StickerFormat> sticker_format;
-  TRY_RESULT(stickers, get_input_stickers(query.get(), &sticker_format));
+  TRY_RESULT(stickers, get_input_stickers(query.get(), sticker_format));
 
   TRY_RESULT(sticker_type, get_sticker_type(query->arg("sticker_type")));
   if (to_bool(query->arg("contains_masks"))) {

@@ -405,12 +405,14 @@ class Client final : public WebhookActor::Callback {
 
   static td::Result<td::string> get_sticker_emojis(td::JsonValue &&value);
 
+  static td::Result<object_ptr<td_api::StickerFormat>> get_sticker_format(Slice sticker_format);
+
   td::Result<object_ptr<td_api::inputSticker>> get_input_sticker(const Query *query) const;
 
   td::Result<object_ptr<td_api::inputSticker>> get_input_sticker(const Query *query, td::JsonValue &&value) const;
 
   td::Result<td::vector<object_ptr<td_api::inputSticker>>> get_input_stickers(
-      const Query *query, object_ptr<td_api::StickerFormat> *sticker_format) const;
+      const Query *query, object_ptr<td_api::StickerFormat> &sticker_format) const;
 
   static td::Result<td::string> get_passport_element_hash(Slice encoded_hash);
 
