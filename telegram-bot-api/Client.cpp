@@ -9146,13 +9146,22 @@ td::Status Client::process_get_custom_emoji_stickers_query(PromisedQueryPtr &que
 
 td::Status Client::process_upload_sticker_file_query(PromisedQueryPtr &query) {
   TRY_RESULT(user_id, get_user_id(query.get()));
-  auto png_sticker = get_input_file(query.get(), "png_sticker");
+  object_ptr<td_api::StickerFormat> sticker_format;
+  td_api::object_ptr<td_api::InputFile> sticker;
+  if (query->has_arg("sticker") || query->file("sticker") != nullptr) {
+    TRY_RESULT_ASSIGN(sticker_format, get_sticker_format(query->arg("sticker_format")));
+    sticker = get_input_file(query.get(), "sticker", true);
+  } else {
+    sticker_format = make_object<td_api::stickerFormatWebp>();
+    sticker = get_input_file(query.get(), "png_sticker", true);
+  }
 
   check_user(user_id, std::move(query),
-             [this, user_id, png_sticker = std::move(png_sticker)](PromisedQueryPtr query) mutable {
-               send_request(make_object<td_api::uploadStickerFile>(user_id, make_object<td_api::stickerFormatWebp>(),
-                                                                   std::move(png_sticker)),
-                            td::make_unique<TdOnReturnFileCallback>(this, std::move(query)));
+             [this, user_id, sticker_format = std::move(sticker_format),
+              sticker = std::move(sticker)](PromisedQueryPtr query) mutable {
+               send_request(
+                   make_object<td_api::uploadStickerFile>(user_id, std::move(sticker_format), std::move(sticker)),
+                   td::make_unique<TdOnReturnFileCallback>(this, std::move(query)));
              });
   return Status::OK();
 }
