@@ -586,6 +586,7 @@ class Client final : public WebhookActor::Callback {
   Status process_set_sticker_set_title_query(PromisedQueryPtr &query);
   Status process_set_sticker_set_thumbnail_query(PromisedQueryPtr &query);
   Status process_set_custom_emoji_sticker_set_thumbnail_query(PromisedQueryPtr &query);
+  Status process_delete_sticker_set_query(PromisedQueryPtr &query);
   Status process_set_sticker_position_in_set_query(PromisedQueryPtr &query);
   Status process_delete_sticker_from_set_query(PromisedQueryPtr &query);
   Status process_set_sticker_emoji_list_query(PromisedQueryPtr &query);
