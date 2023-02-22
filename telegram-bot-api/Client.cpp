@@ -36,10 +36,6 @@
 
 namespace telegram_bot_api {
 
-using td::Jsonable;
-using td::JsonValue;
-using td::JsonValueScope;
-
 using td_api::make_object;
 using td_api::move_object_as;
 
@@ -321,19 +317,19 @@ bool Client::is_local_method(td::Slice method) {
          method == "setwebhook" || method == "deletewebhook" || method == "getwebhookinfo";
 }
 
-class Client::JsonEmptyObject final : public Jsonable {
+class Client::JsonEmptyObject final : public td::Jsonable {
  public:
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
   }
 };
 
-class Client::JsonFile final : public Jsonable {
+class Client::JsonFile final : public td::Jsonable {
  public:
   JsonFile(const td_api::file *file, const Client *client, bool with_path)
       : file_(file), client_(client), with_path_(with_path) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     client_->json_store_file(object, file_, with_path_);
   }
@@ -344,11 +340,11 @@ class Client::JsonFile final : public Jsonable {
   bool with_path_;
 };
 
-class Client::JsonDatedFile final : public Jsonable {
+class Client::JsonDatedFile final : public td::Jsonable {
  public:
   JsonDatedFile(const td_api::datedFile *file, const Client *client) : file_(file), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     client_->json_store_file(object, file_->file_.get());
     object("file_date", file_->date_);
@@ -359,12 +355,12 @@ class Client::JsonDatedFile final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonDatedFiles final : public Jsonable {
+class Client::JsonDatedFiles final : public td::Jsonable {
  public:
   JsonDatedFiles(const td::vector<object_ptr<td_api::datedFile>> &files, const Client *client)
       : files_(files), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto array = scope->enter_array();
     for (auto &file : files_) {
       array << JsonDatedFile(file.get(), client_);
@@ -376,12 +372,12 @@ class Client::JsonDatedFiles final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonUser final : public Jsonable {
+class Client::JsonUser final : public td::Jsonable {
  public:
   JsonUser(int64 user_id, const Client *client, bool full_bot_info = false)
       : user_id_(user_id), client_(client), full_bot_info_(full_bot_info) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     auto user_info = client_->get_user_info(user_id_);
     object("id", user_id_);
@@ -416,11 +412,11 @@ class Client::JsonUser final : public Jsonable {
   bool full_bot_info_;
 };
 
-class Client::JsonUsers final : public Jsonable {
+class Client::JsonUsers final : public td::Jsonable {
  public:
   JsonUsers(const td::vector<int64> &user_ids, const Client *client) : user_ids_(user_ids), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto array = scope->enter_array();
     for (auto &user_id : user_ids_) {
       array << JsonUser(user_id, client_);
@@ -432,11 +428,11 @@ class Client::JsonUsers final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonEntity final : public Jsonable {
+class Client::JsonEntity final : public td::Jsonable {
  public:
   JsonEntity(const td_api::textEntity *entity, const Client *client) : entity_(entity), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("offset", entity_->offset_);
     object("length", entity_->length_);
@@ -520,12 +516,12 @@ class Client::JsonEntity final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonVectorEntities final : public Jsonable {
+class Client::JsonVectorEntities final : public td::Jsonable {
  public:
   JsonVectorEntities(const td::vector<object_ptr<td_api::textEntity>> &entities, const Client *client)
       : entities_(entities), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto array = scope->enter_array();
     for (auto &entity : entities_) {
       auto entity_type = entity->type_->get_id();
@@ -541,7 +537,7 @@ class Client::JsonVectorEntities final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonLocation final : public Jsonable {
+class Client::JsonLocation final : public td::Jsonable {
  public:
   explicit JsonLocation(const td_api::location *location, double expires_in = 0.0, int32 live_period = 0,
                         int32 heading = 0, int32 proximity_alert_radius = 0)
@@ -551,7 +547,7 @@ class Client::JsonLocation final : public Jsonable {
       , heading_(heading)
       , proximity_alert_radius_(proximity_alert_radius) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("latitude", location_->latitude_);
     object("longitude", location_->longitude_);
@@ -577,11 +573,11 @@ class Client::JsonLocation final : public Jsonable {
   int32 proximity_alert_radius_;
 };
 
-class Client::JsonChatPermissions final : public Jsonable {
+class Client::JsonChatPermissions final : public td::Jsonable {
  public:
   explicit JsonChatPermissions(const td_api::chatPermissions *chat_permissions) : chat_permissions_(chat_permissions) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     Client::json_store_permissions(object, chat_permissions_);
   }
@@ -590,11 +586,11 @@ class Client::JsonChatPermissions final : public Jsonable {
   const td_api::chatPermissions *chat_permissions_;
 };
 
-class Client::JsonChatPhotoInfo final : public Jsonable {
+class Client::JsonChatPhotoInfo final : public td::Jsonable {
  public:
   explicit JsonChatPhotoInfo(const td_api::chatPhotoInfo *chat_photo) : chat_photo_(chat_photo) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("small_file_id", chat_photo_->small_->remote_->id_);
     object("small_file_unique_id", chat_photo_->small_->remote_->unique_id_);
@@ -606,11 +602,11 @@ class Client::JsonChatPhotoInfo final : public Jsonable {
   const td_api::chatPhotoInfo *chat_photo_;
 };
 
-class Client::JsonChatLocation final : public Jsonable {
+class Client::JsonChatLocation final : public td::Jsonable {
  public:
   explicit JsonChatLocation(const td_api::chatLocation *chat_location) : chat_location_(chat_location) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("location", JsonLocation(chat_location_->location_.get()));
     object("address", chat_location_->address_);
@@ -620,12 +616,12 @@ class Client::JsonChatLocation final : public Jsonable {
   const td_api::chatLocation *chat_location_;
 };
 
-class Client::JsonChatInviteLink final : public Jsonable {
+class Client::JsonChatInviteLink final : public td::Jsonable {
  public:
   JsonChatInviteLink(const td_api::chatInviteLink *chat_invite_link, const Client *client)
       : chat_invite_link_(chat_invite_link), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("invite_link", chat_invite_link_->invite_link_);
     if (!chat_invite_link_->name_.empty()) {
@@ -651,12 +647,12 @@ class Client::JsonChatInviteLink final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonMessage final : public Jsonable {
+class Client::JsonMessage final : public td::Jsonable {
  public:
   JsonMessage(const MessageInfo *message, bool need_reply, const td::string &source, const Client *client)
       : message_(message), need_reply_(need_reply), source_(source), client_(client) {
   }
-  void store(JsonValueScope *scope) const;
+  void store(td::JsonValueScope *scope) const;
 
  private:
   const MessageInfo *message_;
@@ -682,12 +678,12 @@ class Client::JsonMessage final : public Jsonable {
   }
 };
 
-class Client::JsonChat final : public Jsonable {
+class Client::JsonChat final : public td::Jsonable {
  public:
   JsonChat(int64 chat_id, bool is_full, const Client *client, int64 pinned_message_id = -1)
       : chat_id_(chat_id), is_full_(is_full), client_(client), pinned_message_id_(pinned_message_id) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto chat_info = client_->get_chat(chat_id_);
     CHECK(chat_info != nullptr);
     auto object = scope->enter_object();
@@ -879,12 +875,12 @@ class Client::JsonChat final : public Jsonable {
   int64 pinned_message_id_;
 };
 
-class Client::JsonMessageSender final : public Jsonable {
+class Client::JsonMessageSender final : public td::Jsonable {
  public:
   JsonMessageSender(const td_api::MessageSender *sender_id, const Client *client)
       : sender_id_(sender_id), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     CHECK(sender_id_ != nullptr);
     switch (sender_id_->get_id()) {
       case td_api::messageSenderUser::ID: {
@@ -907,11 +903,11 @@ class Client::JsonMessageSender final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonMessages final : public Jsonable {
+class Client::JsonMessages final : public td::Jsonable {
  public:
   explicit JsonMessages(const td::vector<td::string> &messages) : messages_(messages) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto array = scope->enter_array();
     for (auto &message : messages_) {
       array << td::JsonRaw(message);
@@ -922,12 +918,12 @@ class Client::JsonMessages final : public Jsonable {
   const td::vector<td::string> &messages_;
 };
 
-class Client::JsonAnimation final : public Jsonable {
+class Client::JsonAnimation final : public td::Jsonable {
  public:
   JsonAnimation(const td_api::animation *animation, bool as_document, const Client *client)
       : animation_(animation), as_document_(as_document), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     if (!animation_->file_name_.empty()) {
       object("file_name", animation_->file_name_);
@@ -950,11 +946,11 @@ class Client::JsonAnimation final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonAudio final : public Jsonable {
+class Client::JsonAudio final : public td::Jsonable {
  public:
   JsonAudio(const td_api::audio *audio, const Client *client) : audio_(audio), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("duration", audio_->duration_);
     if (!audio_->file_name_.empty()) {
@@ -978,11 +974,11 @@ class Client::JsonAudio final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonDocument final : public Jsonable {
+class Client::JsonDocument final : public td::Jsonable {
  public:
   JsonDocument(const td_api::document *document, const Client *client) : document_(document), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     if (!document_->file_name_.empty()) {
       object("file_name", document_->file_name_);
@@ -999,11 +995,11 @@ class Client::JsonDocument final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonPhotoSize final : public Jsonable {
+class Client::JsonPhotoSize final : public td::Jsonable {
  public:
   JsonPhotoSize(const td_api::photoSize *photo_size, const Client *client) : photo_size_(photo_size), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     client_->json_store_file(object, photo_size_->photo_.get());
     object("width", photo_size_->width_);
@@ -1015,11 +1011,11 @@ class Client::JsonPhotoSize final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonThumbnail final : public Jsonable {
+class Client::JsonThumbnail final : public td::Jsonable {
  public:
   JsonThumbnail(const td_api::thumbnail *thumbnail, const Client *client) : thumbnail_(thumbnail), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     client_->json_store_file(object, thumbnail_->file_.get());
     object("width", thumbnail_->width_);
@@ -1031,11 +1027,11 @@ class Client::JsonThumbnail final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonPhoto final : public Jsonable {
+class Client::JsonPhoto final : public td::Jsonable {
  public:
   JsonPhoto(const td_api::photo *photo, const Client *client) : photo_(photo), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto array = scope->enter_array();
     for (auto &photo_size : photo_->sizes_) {
       if (photo_size->type_ != "i" && photo_size->type_ != "t" && !photo_size->photo_->remote_->id_.empty()) {
@@ -1049,11 +1045,11 @@ class Client::JsonPhoto final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonChatPhoto final : public Jsonable {
+class Client::JsonChatPhoto final : public td::Jsonable {
  public:
   JsonChatPhoto(const td_api::chatPhoto *photo, const Client *client) : photo_(photo), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto array = scope->enter_array();
     for (auto &photo_size : photo_->sizes_) {
       if (photo_size->type_ != "i" && photo_size->type_ != "t" && !photo_size->photo_->remote_->id_.empty()) {
@@ -1067,11 +1063,11 @@ class Client::JsonChatPhoto final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonMaskPosition final : public Jsonable {
+class Client::JsonMaskPosition final : public td::Jsonable {
  public:
   explicit JsonMaskPosition(const td_api::maskPosition *mask_position) : mask_position_(mask_position) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("point", Client::MASK_POINTS[Client::mask_point_to_index(mask_position_->point_)]);
     object("x_shift", mask_position_->x_shift_);
@@ -1083,11 +1079,11 @@ class Client::JsonMaskPosition final : public Jsonable {
   const td_api::maskPosition *mask_position_;
 };
 
-class Client::JsonSticker final : public Jsonable {
+class Client::JsonSticker final : public td::Jsonable {
  public:
   JsonSticker(const td_api::sticker *sticker, const Client *client) : sticker_(sticker), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("width", sticker_->width_);
     object("height", sticker_->height_);
@@ -1145,12 +1141,12 @@ class Client::JsonSticker final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonStickers final : public Jsonable {
+class Client::JsonStickers final : public td::Jsonable {
  public:
   JsonStickers(const td::vector<object_ptr<td_api::sticker>> &stickers, const Client *client)
       : stickers_(stickers), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto array = scope->enter_array();
     for (auto &sticker : stickers_) {
       array << JsonSticker(sticker.get(), client_);
@@ -1162,11 +1158,11 @@ class Client::JsonStickers final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonVideo final : public Jsonable {
+class Client::JsonVideo final : public td::Jsonable {
  public:
   JsonVideo(const td_api::video *video, const Client *client) : video_(video), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("duration", video_->duration_);
     object("width", video_->width_);
@@ -1186,11 +1182,11 @@ class Client::JsonVideo final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonVideoNote final : public Jsonable {
+class Client::JsonVideoNote final : public td::Jsonable {
  public:
   JsonVideoNote(const td_api::videoNote *video_note, const Client *client) : video_note_(video_note), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("duration", video_note_->duration_);
     object("length", video_note_->length_);
@@ -1203,11 +1199,11 @@ class Client::JsonVideoNote final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonVoiceNote final : public Jsonable {
+class Client::JsonVoiceNote final : public td::Jsonable {
  public:
   JsonVoiceNote(const td_api::voiceNote *voice_note, const Client *client) : voice_note_(voice_note), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("duration", voice_note_->duration_);
     if (!voice_note_->mime_type_.empty()) {
@@ -1221,11 +1217,11 @@ class Client::JsonVoiceNote final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonVenue final : public Jsonable {
+class Client::JsonVenue final : public td::Jsonable {
  public:
   explicit JsonVenue(const td_api::venue *venue) : venue_(venue) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("location", JsonLocation(venue_->location_.get()));
     object("title", venue_->title_);
@@ -1252,11 +1248,11 @@ class Client::JsonVenue final : public Jsonable {
   const td_api::venue *venue_;
 };
 
-class Client::JsonContact final : public Jsonable {
+class Client::JsonContact final : public td::Jsonable {
  public:
   explicit JsonContact(const td_api::contact *contact) : contact_(contact) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("phone_number", contact_->phone_number_);
     object("first_name", contact_->first_name_);
@@ -1275,11 +1271,11 @@ class Client::JsonContact final : public Jsonable {
   const td_api::contact *contact_;
 };
 
-class Client::JsonDice final : public Jsonable {
+class Client::JsonDice final : public td::Jsonable {
  public:
   JsonDice(const td::string &emoji, int32 value) : emoji_(emoji), value_(value) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("emoji", emoji_);
     object("value", value_);
@@ -1290,11 +1286,11 @@ class Client::JsonDice final : public Jsonable {
   int32 value_;
 };
 
-class Client::JsonGame final : public Jsonable {
+class Client::JsonGame final : public td::Jsonable {
  public:
   JsonGame(const td_api::game *game, const Client *client) : game_(game), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("title", game_->title_);
     if (!game_->text_->text_.empty()) {
@@ -1316,11 +1312,11 @@ class Client::JsonGame final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonInvoice final : public Jsonable {
+class Client::JsonInvoice final : public td::Jsonable {
  public:
   explicit JsonInvoice(const td_api::messageInvoice *invoice) : invoice_(invoice) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("title", invoice_->title_);
     object("description", invoice_->description_->text_);
@@ -1337,11 +1333,11 @@ class Client::JsonInvoice final : public Jsonable {
   const td_api::messageInvoice *invoice_;
 };
 
-class Client::JsonPollOption final : public Jsonable {
+class Client::JsonPollOption final : public td::Jsonable {
  public:
   explicit JsonPollOption(const td_api::pollOption *option) : option_(option) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("text", option_->text_);
     object("voter_count", option_->voter_count_);
@@ -1352,11 +1348,11 @@ class Client::JsonPollOption final : public Jsonable {
   const td_api::pollOption *option_;
 };
 
-class Client::JsonPoll final : public Jsonable {
+class Client::JsonPoll final : public td::Jsonable {
  public:
   JsonPoll(const td_api::poll *poll, const Client *client) : poll_(poll), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("id", td::to_string(poll_->id_));
     object("question", poll_->question_);
@@ -1399,12 +1395,12 @@ class Client::JsonPoll final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonPollAnswer final : public Jsonable {
+class Client::JsonPollAnswer final : public td::Jsonable {
  public:
   JsonPollAnswer(const td_api::updatePollAnswer *poll_answer, const Client *client)
       : poll_answer_(poll_answer), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("poll_id", td::to_string(poll_answer_->poll_id_));
     object("user", JsonUser(poll_answer_->user_id_, client_));
@@ -1416,12 +1412,12 @@ class Client::JsonPollAnswer final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonForumTopicCreated final : public Jsonable {
+class Client::JsonForumTopicCreated final : public td::Jsonable {
  public:
   explicit JsonForumTopicCreated(const td_api::messageForumTopicCreated *forum_topic_created)
       : forum_topic_created_(forum_topic_created) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("name", forum_topic_created_->name_);
     object("icon_color", forum_topic_created_->icon_->color_);
@@ -1434,12 +1430,12 @@ class Client::JsonForumTopicCreated final : public Jsonable {
   const td_api::messageForumTopicCreated *forum_topic_created_;
 };
 
-class Client::JsonForumTopicEdited final : public Jsonable {
+class Client::JsonForumTopicEdited final : public td::Jsonable {
  public:
   explicit JsonForumTopicEdited(const td_api::messageForumTopicEdited *forum_topic_edited)
       : forum_topic_edited_(forum_topic_edited) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     if (!forum_topic_edited_->name_.empty()) {
       object("name", forum_topic_edited_->name_);
@@ -1455,11 +1451,11 @@ class Client::JsonForumTopicEdited final : public Jsonable {
   const td_api::messageForumTopicEdited *forum_topic_edited_;
 };
 
-class Client::JsonForumTopicInfo final : public Jsonable {
+class Client::JsonForumTopicInfo final : public td::Jsonable {
  public:
   explicit JsonForumTopicInfo(const td_api::forumTopicInfo *forum_topic_info) : forum_topic_info_(forum_topic_info) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("message_thread_id", as_client_message_id(forum_topic_info_->message_thread_id_));
     object("name", forum_topic_info_->name_);
@@ -1473,11 +1469,11 @@ class Client::JsonForumTopicInfo final : public Jsonable {
   const td_api::forumTopicInfo *forum_topic_info_;
 };
 
-class Client::JsonAddress final : public Jsonable {
+class Client::JsonAddress final : public td::Jsonable {
  public:
   explicit JsonAddress(const td_api::address *address) : address_(address) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("country_code", address_->country_code_);
     object("state", address_->state_);
@@ -1491,11 +1487,11 @@ class Client::JsonAddress final : public Jsonable {
   const td_api::address *address_;
 };
 
-class Client::JsonOrderInfo final : public Jsonable {
+class Client::JsonOrderInfo final : public td::Jsonable {
  public:
   explicit JsonOrderInfo(const td_api::orderInfo *order_info) : order_info_(order_info) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     if (!order_info_->name_.empty()) {
       object("name", order_info_->name_);
@@ -1515,12 +1511,12 @@ class Client::JsonOrderInfo final : public Jsonable {
   const td_api::orderInfo *order_info_;
 };
 
-class Client::JsonSuccessfulPaymentBot final : public Jsonable {
+class Client::JsonSuccessfulPaymentBot final : public td::Jsonable {
  public:
   explicit JsonSuccessfulPaymentBot(const td_api::messagePaymentSuccessfulBot *successful_payment)
       : successful_payment_(successful_payment) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("currency", successful_payment_->currency_);
     object("total_amount", successful_payment_->total_amount_);
@@ -1545,12 +1541,12 @@ class Client::JsonSuccessfulPaymentBot final : public Jsonable {
   const td_api::messagePaymentSuccessfulBot *successful_payment_;
 };
 
-class Client::JsonEncryptedPassportElement final : public Jsonable {
+class Client::JsonEncryptedPassportElement final : public td::Jsonable {
  public:
   JsonEncryptedPassportElement(const td_api::encryptedPassportElement *element, const Client *client)
       : element_(element), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     auto id = element_->type_->get_id();
     object("type", Client::get_passport_element_type(id));
@@ -1612,11 +1608,11 @@ class Client::JsonEncryptedPassportElement final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonEncryptedCredentials final : public Jsonable {
+class Client::JsonEncryptedCredentials final : public td::Jsonable {
  public:
   explicit JsonEncryptedCredentials(const td_api::encryptedCredentials *credentials) : credentials_(credentials) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("data", td::base64_encode(credentials_->data_));
     object("hash", td::base64_encode(credentials_->hash_));
@@ -1627,12 +1623,12 @@ class Client::JsonEncryptedCredentials final : public Jsonable {
   const td_api::encryptedCredentials *credentials_;
 };
 
-class Client::JsonPassportData final : public Jsonable {
+class Client::JsonPassportData final : public td::Jsonable {
  public:
   JsonPassportData(const td_api::messagePassportDataReceived *passport_data, const Client *client)
       : passport_data_(passport_data), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("data", td::json_array(passport_data_->elements_, [client = client_](auto &element) {
              return JsonEncryptedPassportElement(element.get(), client);
@@ -1645,11 +1641,11 @@ class Client::JsonPassportData final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonWebAppData final : public Jsonable {
+class Client::JsonWebAppData final : public td::Jsonable {
  public:
   explicit JsonWebAppData(const td_api::messageWebAppDataReceived *web_app_data) : web_app_data_(web_app_data) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("button_text", web_app_data_->button_text_);
     object("data", web_app_data_->data_);
@@ -1659,13 +1655,13 @@ class Client::JsonWebAppData final : public Jsonable {
   const td_api::messageWebAppDataReceived *web_app_data_;
 };
 
-class Client::JsonProximityAlertTriggered final : public Jsonable {
+class Client::JsonProximityAlertTriggered final : public td::Jsonable {
  public:
   JsonProximityAlertTriggered(const td_api::messageProximityAlertTriggered *proximity_alert_triggered,
                               const Client *client)
       : proximity_alert_triggered_(proximity_alert_triggered), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("traveler", JsonMessageSender(proximity_alert_triggered_->traveler_id_.get(), client_));
     object("watcher", JsonMessageSender(proximity_alert_triggered_->watcher_id_.get(), client_));
@@ -1677,12 +1673,12 @@ class Client::JsonProximityAlertTriggered final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonVideoChatScheduled final : public Jsonable {
+class Client::JsonVideoChatScheduled final : public td::Jsonable {
  public:
   explicit JsonVideoChatScheduled(const td_api::messageVideoChatScheduled *video_chat_scheduled)
       : video_chat_scheduled_(video_chat_scheduled) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("start_date", video_chat_scheduled_->start_date_);
   }
@@ -1691,12 +1687,12 @@ class Client::JsonVideoChatScheduled final : public Jsonable {
   const td_api::messageVideoChatScheduled *video_chat_scheduled_;
 };
 
-class Client::JsonVideoChatEnded final : public Jsonable {
+class Client::JsonVideoChatEnded final : public td::Jsonable {
  public:
   explicit JsonVideoChatEnded(const td_api::messageVideoChatEnded *video_chat_ended)
       : video_chat_ended_(video_chat_ended) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("duration", video_chat_ended_->duration_);
   }
@@ -1705,13 +1701,13 @@ class Client::JsonVideoChatEnded final : public Jsonable {
   const td_api::messageVideoChatEnded *video_chat_ended_;
 };
 
-class Client::JsonInviteVideoChatParticipants final : public Jsonable {
+class Client::JsonInviteVideoChatParticipants final : public td::Jsonable {
  public:
   JsonInviteVideoChatParticipants(const td_api::messageInviteVideoChatParticipants *invite_video_chat_participants,
                                   const Client *client)
       : invite_video_chat_participants_(invite_video_chat_participants), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("users", JsonUsers(invite_video_chat_participants_->user_ids_, client_));
   }
@@ -1721,13 +1717,13 @@ class Client::JsonInviteVideoChatParticipants final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonChatSetMessageAutoDeleteTime final : public Jsonable {
+class Client::JsonChatSetMessageAutoDeleteTime final : public td::Jsonable {
  public:
   explicit JsonChatSetMessageAutoDeleteTime(
       const td_api::messageChatSetMessageAutoDeleteTime *chat_set_message_auto_delete_time)
       : chat_set_message_auto_delete_time_(chat_set_message_auto_delete_time) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("message_auto_delete_time", chat_set_message_auto_delete_time_->message_auto_delete_time_);
   }
@@ -1736,11 +1732,11 @@ class Client::JsonChatSetMessageAutoDeleteTime final : public Jsonable {
   const td_api::messageChatSetMessageAutoDeleteTime *chat_set_message_auto_delete_time_;
 };
 
-class Client::JsonUserShared final : public Jsonable {
+class Client::JsonUserShared final : public td::Jsonable {
  public:
   explicit JsonUserShared(const td_api::messageUserShared *user_shared) : user_shared_(user_shared) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("user_id", user_shared_->user_id_);
     object("request_id", user_shared_->button_id_);
@@ -1750,11 +1746,11 @@ class Client::JsonUserShared final : public Jsonable {
   const td_api::messageUserShared *user_shared_;
 };
 
-class Client::JsonChatShared final : public Jsonable {
+class Client::JsonChatShared final : public td::Jsonable {
  public:
   explicit JsonChatShared(const td_api::messageChatShared *chat_shared) : chat_shared_(chat_shared) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("chat_id", chat_shared_->chat_id_);
     object("request_id", chat_shared_->button_id_);
@@ -1764,11 +1760,11 @@ class Client::JsonChatShared final : public Jsonable {
   const td_api::messageChatShared *chat_shared_;
 };
 
-class Client::JsonWebAppInfo final : public Jsonable {
+class Client::JsonWebAppInfo final : public td::Jsonable {
  public:
   explicit JsonWebAppInfo(const td::string &url) : url_(url) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("url", url_);
   }
@@ -1777,11 +1773,11 @@ class Client::JsonWebAppInfo final : public Jsonable {
   const td::string &url_;
 };
 
-class Client::JsonInlineKeyboardButton final : public Jsonable {
+class Client::JsonInlineKeyboardButton final : public td::Jsonable {
  public:
   explicit JsonInlineKeyboardButton(const td_api::inlineKeyboardButton *button) : button_(button) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("text", button_->text_);
     switch (button_->type_->get_id()) {
@@ -1840,12 +1836,12 @@ class Client::JsonInlineKeyboardButton final : public Jsonable {
   const td_api::inlineKeyboardButton *button_;
 };
 
-class Client::JsonInlineKeyboard final : public Jsonable {
+class Client::JsonInlineKeyboard final : public td::Jsonable {
  public:
   explicit JsonInlineKeyboard(const td_api::replyMarkupInlineKeyboard *inline_keyboard)
       : inline_keyboard_(inline_keyboard) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto array = scope->enter_array();
     for (auto &row : inline_keyboard_->rows_) {
       array << td::json_array(row, [](auto &button) { return JsonInlineKeyboardButton(button.get()); });
@@ -1856,11 +1852,11 @@ class Client::JsonInlineKeyboard final : public Jsonable {
   const td_api::replyMarkupInlineKeyboard *inline_keyboard_;
 };
 
-class Client::JsonReplyMarkup final : public Jsonable {
+class Client::JsonReplyMarkup final : public td::Jsonable {
  public:
   explicit JsonReplyMarkup(const td_api::ReplyMarkup *reply_markup) : reply_markup_(reply_markup) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     CHECK(reply_markup_->get_id() == td_api::replyMarkupInlineKeyboard::ID);
     auto object = scope->enter_object();
     object("inline_keyboard",
@@ -1871,7 +1867,7 @@ class Client::JsonReplyMarkup final : public Jsonable {
   const td_api::ReplyMarkup *reply_markup_;
 };
 
-void Client::JsonMessage::store(JsonValueScope *scope) const {
+void Client::JsonMessage::store(td::JsonValueScope *scope) const {
   CHECK(message_ != nullptr);
   auto object = scope->enter_object();
   object("message_id", as_client_message_id(message_->id));
@@ -2265,12 +2261,12 @@ void Client::JsonMessage::store(JsonValueScope *scope) const {
   }
 }
 
-class Client::JsonDeletedMessage final : public Jsonable {
+class Client::JsonDeletedMessage final : public td::Jsonable {
  public:
   JsonDeletedMessage(int64 chat_id, int64 message_id, const Client *client)
       : chat_id_(chat_id), message_id_(message_id), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("message_id", as_client_message_id(message_id_));
     object("chat", JsonChat(chat_id_, false, client_));
@@ -2283,11 +2279,11 @@ class Client::JsonDeletedMessage final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonMessageId final : public Jsonable {
+class Client::JsonMessageId final : public td::Jsonable {
  public:
   explicit JsonMessageId(int64 message_id) : message_id_(message_id) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("message_id", as_client_message_id(message_id_));
   }
@@ -2296,7 +2292,7 @@ class Client::JsonMessageId final : public Jsonable {
   int64 message_id_;
 };
 
-class Client::JsonInlineQuery final : public Jsonable {
+class Client::JsonInlineQuery final : public td::Jsonable {
  public:
   JsonInlineQuery(int64 inline_query_id, int64 sender_user_id, const td_api::location *user_location,
                   const td_api::ChatType *chat_type, const td::string &query, const td::string &offset,
@@ -2310,7 +2306,7 @@ class Client::JsonInlineQuery final : public Jsonable {
       , client_(client) {
   }
 
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("id", td::to_string(inline_query_id_));
     object("from", JsonUser(sender_user_id_, client_));
@@ -2362,7 +2358,7 @@ class Client::JsonInlineQuery final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonChosenInlineResult final : public Jsonable {
+class Client::JsonChosenInlineResult final : public td::Jsonable {
  public:
   JsonChosenInlineResult(int64 sender_user_id, const td_api::location *user_location, const td::string &query,
                          const td::string &result_id, const td::string &inline_message_id, const Client *client)
@@ -2374,7 +2370,7 @@ class Client::JsonChosenInlineResult final : public Jsonable {
       , client_(client) {
   }
 
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("from", JsonUser(sender_user_id_, client_));
     if (user_location_ != nullptr) {
@@ -2396,7 +2392,7 @@ class Client::JsonChosenInlineResult final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonCallbackQuery final : public Jsonable {
+class Client::JsonCallbackQuery final : public td::Jsonable {
  public:
   JsonCallbackQuery(int64 callback_query_id, int64 sender_user_id, int64 chat_id, int64 message_id,
                     const MessageInfo *message_info, int64 chat_instance, td_api::CallbackQueryPayload *payload,
@@ -2411,7 +2407,7 @@ class Client::JsonCallbackQuery final : public Jsonable {
       , client_(client) {
   }
 
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("id", td::to_string(callback_query_id_));
     object("from", JsonUser(sender_user_id_, client_));
@@ -2435,7 +2431,7 @@ class Client::JsonCallbackQuery final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonInlineCallbackQuery final : public Jsonable {
+class Client::JsonInlineCallbackQuery final : public td::Jsonable {
  public:
   JsonInlineCallbackQuery(int64 callback_query_id, int64 sender_user_id, const td::string &inline_message_id,
                           int64 chat_instance, td_api::CallbackQueryPayload *payload, const Client *client)
@@ -2447,7 +2443,7 @@ class Client::JsonInlineCallbackQuery final : public Jsonable {
       , client_(client) {
   }
 
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("id", td::to_string(callback_query_id_));
     object("from", JsonUser(sender_user_id_, client_));
@@ -2465,13 +2461,13 @@ class Client::JsonInlineCallbackQuery final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonShippingQuery final : public Jsonable {
+class Client::JsonShippingQuery final : public td::Jsonable {
  public:
   JsonShippingQuery(const td_api::updateNewShippingQuery *query, const Client *client)
       : query_(query), client_(client) {
   }
 
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("id", td::to_string(query_->id_));
     object("from", JsonUser(query_->sender_user_id_, client_));
@@ -2489,13 +2485,13 @@ class Client::JsonShippingQuery final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonPreCheckoutQuery final : public Jsonable {
+class Client::JsonPreCheckoutQuery final : public td::Jsonable {
  public:
   JsonPreCheckoutQuery(const td_api::updateNewPreCheckoutQuery *query, const Client *client)
       : query_(query), client_(client) {
   }
 
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("id", td::to_string(query_->id_));
     object("from", JsonUser(query_->sender_user_id_, client_));
@@ -2520,12 +2516,12 @@ class Client::JsonPreCheckoutQuery final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonCustomJson final : public Jsonable {
+class Client::JsonCustomJson final : public td::Jsonable {
  public:
   explicit JsonCustomJson(const td::string &json) : json_(json) {
   }
 
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     *scope << td::JsonRaw(json_);
   }
 
@@ -2533,11 +2529,11 @@ class Client::JsonCustomJson final : public Jsonable {
   const td::string &json_;
 };
 
-class Client::JsonBotCommand final : public Jsonable {
+class Client::JsonBotCommand final : public td::Jsonable {
  public:
   explicit JsonBotCommand(const td_api::botCommand *command) : command_(command) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("command", command_->command_);
     object("description", command_->description_);
@@ -2547,11 +2543,11 @@ class Client::JsonBotCommand final : public Jsonable {
   const td_api::botCommand *command_;
 };
 
-class Client::JsonBotMenuButton final : public Jsonable {
+class Client::JsonBotMenuButton final : public td::Jsonable {
  public:
   explicit JsonBotMenuButton(const td_api::botMenuButton *menu_button) : menu_button_(menu_button) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     if (menu_button_->text_.empty()) {
       object("type", menu_button_->url_.empty() ? "commands" : "default");
@@ -2566,13 +2562,13 @@ class Client::JsonBotMenuButton final : public Jsonable {
   const td_api::botMenuButton *menu_button_;
 };
 
-class Client::JsonChatAdministratorRights final : public Jsonable {
+class Client::JsonChatAdministratorRights final : public td::Jsonable {
  public:
   JsonChatAdministratorRights(const td_api::chatAdministratorRights *rights, Client::ChatType chat_type)
       : rights_(rights), chat_type_(chat_type) {
   }
 
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     td_api::chatAdministratorRights empty_rights;
     Client::json_store_administrator_rights(object, rights_ == nullptr ? &empty_rights : rights_, chat_type_);
@@ -2583,11 +2579,11 @@ class Client::JsonChatAdministratorRights final : public Jsonable {
   Client::ChatType chat_type_;
 };
 
-class Client::JsonChatPhotos final : public Jsonable {
+class Client::JsonChatPhotos final : public td::Jsonable {
  public:
   JsonChatPhotos(const td_api::chatPhotos *photos, const Client *client) : photos_(photos), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("total_count", photos_->total_count_);
     object("photos", td::json_array(photos_->photos_,
@@ -2599,13 +2595,13 @@ class Client::JsonChatPhotos final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonChatMember final : public Jsonable {
+class Client::JsonChatMember final : public td::Jsonable {
  public:
   JsonChatMember(const td_api::chatMember *member, Client::ChatType chat_type, const Client *client)
       : member_(member), chat_type_(chat_type), client_(client) {
   }
 
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     CHECK(member_->member_id_ != nullptr);
     switch (member_->member_id_->get_id()) {
@@ -2668,13 +2664,13 @@ class Client::JsonChatMember final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonChatMembers final : public Jsonable {
+class Client::JsonChatMembers final : public td::Jsonable {
  public:
   JsonChatMembers(const td::vector<object_ptr<td_api::chatMember>> &members, Client::ChatType chat_type,
                   bool administrators_only, const Client *client)
       : members_(members), chat_type_(chat_type), administrators_only_(administrators_only), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto array = scope->enter_array();
     for (auto &member : members_) {
       CHECK(member != nullptr);
@@ -2705,12 +2701,12 @@ class Client::JsonChatMembers final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonChatMemberUpdated final : public Jsonable {
+class Client::JsonChatMemberUpdated final : public td::Jsonable {
  public:
   JsonChatMemberUpdated(const td_api::updateChatMember *update, const Client *client)
       : update_(update), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("chat", JsonChat(update_->chat_id_, false, client_));
     object("from", JsonUser(update_->actor_user_id_, client_));
@@ -2728,12 +2724,12 @@ class Client::JsonChatMemberUpdated final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonChatJoinRequest final : public Jsonable {
+class Client::JsonChatJoinRequest final : public td::Jsonable {
  public:
   JsonChatJoinRequest(const td_api::updateNewChatJoinRequest *update, const Client *client)
       : update_(update), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("chat", JsonChat(update_->chat_id_, false, client_));
     object("from", JsonUser(update_->request_->user_id_, client_));
@@ -2752,12 +2748,12 @@ class Client::JsonChatJoinRequest final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonGameHighScore final : public Jsonable {
+class Client::JsonGameHighScore final : public td::Jsonable {
  public:
   JsonGameHighScore(const td_api::gameHighScore *score, const Client *client) : score_(score), client_(client) {
   }
 
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("position", score_->position_);
     object("user", JsonUser(score_->user_id_, client_));
@@ -2769,11 +2765,11 @@ class Client::JsonGameHighScore final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonUpdateTypes final : public Jsonable {
+class Client::JsonUpdateTypes final : public td::Jsonable {
  public:
   explicit JsonUpdateTypes(td::uint32 update_types) : update_types_(update_types) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto array = scope->enter_array();
     for (int32 i = 0; i < static_cast<int32>(UpdateType::Size); i++) {
       if (((update_types_ >> i) & 1) != 0) {
@@ -2789,11 +2785,11 @@ class Client::JsonUpdateTypes final : public Jsonable {
   td::uint32 update_types_;
 };
 
-class Client::JsonWebhookInfo final : public Jsonable {
+class Client::JsonWebhookInfo final : public td::Jsonable {
  public:
   explicit JsonWebhookInfo(const Client *client) : client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     td::CSlice url = client_->webhook_url_;
     if (td::check_utf8(url)) {
@@ -2830,12 +2826,12 @@ class Client::JsonWebhookInfo final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonStickerSet final : public Jsonable {
+class Client::JsonStickerSet final : public td::Jsonable {
  public:
   JsonStickerSet(const td_api::stickerSet *sticker_set, const Client *client)
       : sticker_set_(sticker_set), client_(client) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     if (sticker_set_->id_ == Client::GREAT_MINDS_SET_ID) {
       object("name", GREAT_MINDS_SET_NAME);
@@ -2863,11 +2859,11 @@ class Client::JsonStickerSet final : public Jsonable {
   const Client *client_;
 };
 
-class Client::JsonSentWebAppMessage final : public Jsonable {
+class Client::JsonSentWebAppMessage final : public td::Jsonable {
  public:
   explicit JsonSentWebAppMessage(const td_api::sentWebAppMessage *message) : message_(message) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     if (!message_->inline_message_id_.empty()) {
       object("inline_message_id", message_->inline_message_id_);
@@ -5357,8 +5353,8 @@ bool Client::to_bool(td::MutableSlice value) {
   return value == "true" || value == "yes" || value == "1";
 }
 
-td::Result<td_api::object_ptr<td_api::keyboardButton>> Client::get_keyboard_button(JsonValue &button) {
-  if (button.type() == JsonValue::Type::Object) {
+td::Result<td_api::object_ptr<td_api::keyboardButton>> Client::get_keyboard_button(td::JsonValue &button) {
+  if (button.type() == td::JsonValue::Type::Object) {
     auto &object = button.get_object();
 
     TRY_RESULT(text, get_json_object_string_field(object, "text", false));
@@ -5377,7 +5373,7 @@ td::Result<td_api::object_ptr<td_api::keyboardButton>> Client::get_keyboard_butt
     if (has_json_object_field(object, "request_poll")) {
       bool force_regular = false;
       bool force_quiz = false;
-      TRY_RESULT(request_poll, get_json_object_field(object, "request_poll", JsonValue::Type::Object, false));
+      TRY_RESULT(request_poll, get_json_object_field(object, "request_poll", td::JsonValue::Type::Object, false));
       auto &request_poll_object = request_poll.get_object();
       if (has_json_object_field(request_poll_object, "type")) {
         TRY_RESULT(type, get_json_object_string_field(request_poll_object, "type"));
@@ -5392,14 +5388,14 @@ td::Result<td_api::object_ptr<td_api::keyboardButton>> Client::get_keyboard_butt
     }
 
     if (has_json_object_field(object, "web_app")) {
-      TRY_RESULT(web_app, get_json_object_field(object, "web_app", JsonValue::Type::Object, false));
+      TRY_RESULT(web_app, get_json_object_field(object, "web_app", td::JsonValue::Type::Object, false));
       auto &web_app_object = web_app.get_object();
       TRY_RESULT(url, get_json_object_string_field(web_app_object, "url", false));
       return make_object<td_api::keyboardButton>(text, make_object<td_api::keyboardButtonTypeWebApp>(url));
     }
 
     if (has_json_object_field(object, "request_user")) {
-      TRY_RESULT(request_user, get_json_object_field(object, "request_user", JsonValue::Type::Object, false));
+      TRY_RESULT(request_user, get_json_object_field(object, "request_user", td::JsonValue::Type::Object, false));
       auto &request_user_object = request_user.get_object();
       TRY_RESULT(id, get_json_object_int_field(request_user_object, "request_id", false));
       auto restrict_user_is_bot = has_json_object_field(request_user_object, "user_is_bot");
@@ -5412,7 +5408,7 @@ td::Result<td_api::object_ptr<td_api::keyboardButton>> Client::get_keyboard_butt
     }
 
     if (has_json_object_field(object, "request_chat")) {
-      TRY_RESULT(request_chat, get_json_object_field(object, "request_chat", JsonValue::Type::Object, false));
+      TRY_RESULT(request_chat, get_json_object_field(object, "request_chat", td::JsonValue::Type::Object, false));
       auto &request_chat_object = request_chat.get_object();
       TRY_RESULT(id, get_json_object_int_field(request_chat_object, "request_id", false));
       TRY_RESULT(chat_is_channel, get_json_object_bool_field(request_chat_object, "chat_is_channel"));
@@ -5441,15 +5437,15 @@ td::Result<td_api::object_ptr<td_api::keyboardButton>> Client::get_keyboard_butt
 
     return make_object<td_api::keyboardButton>(text, nullptr);
   }
-  if (button.type() == JsonValue::Type::String) {
+  if (button.type() == td::JsonValue::Type::String) {
     return make_object<td_api::keyboardButton>(button.get_string().str(), nullptr);
   }
 
   return td::Status::Error(400, "KeyboardButton must be a String or an Object");
 }
 
-td::Result<td_api::object_ptr<td_api::inlineKeyboardButton>> Client::get_inline_keyboard_button(JsonValue &button) {
-  if (button.type() != JsonValue::Type::Object) {
+td::Result<td_api::object_ptr<td_api::inlineKeyboardButton>> Client::get_inline_keyboard_button(td::JsonValue &button) {
+  if (button.type() != td::JsonValue::Type::Object) {
     return td::Status::Error(400, "InlineKeyboardButton must be an Object");
   }
 
@@ -5492,8 +5488,8 @@ td::Result<td_api::object_ptr<td_api::inlineKeyboardButton>> Client::get_inline_
   }
 
   if (has_json_object_field(object, "login_url")) {
-    TRY_RESULT(login_url, get_json_object_field(object, "login_url", JsonValue::Type::Object, false));
-    CHECK(login_url.type() == JsonValue::Type::Object);
+    TRY_RESULT(login_url, get_json_object_field(object, "login_url", td::JsonValue::Type::Object, false));
+    CHECK(login_url.type() == td::JsonValue::Type::Object);
     auto &login_url_object = login_url.get_object();
     TRY_RESULT(url, get_json_object_string_field(login_url_object, "url", false));
     TRY_RESULT(bot_username, get_json_object_string_field(login_url_object, "bot_username"));
@@ -5536,7 +5532,7 @@ td::Result<td_api::object_ptr<td_api::inlineKeyboardButton>> Client::get_inline_
   }
 
   if (has_json_object_field(object, "web_app")) {
-    TRY_RESULT(web_app, get_json_object_field(object, "web_app", JsonValue::Type::Object, false));
+    TRY_RESULT(web_app, get_json_object_field(object, "web_app", td::JsonValue::Type::Object, false));
     auto &web_app_object = web_app.get_object();
     TRY_RESULT(url, get_json_object_string_field(web_app_object, "url", false));
     return make_object<td_api::inlineKeyboardButton>(text, make_object<td_api::inlineKeyboardButtonTypeWebApp>(url));
@@ -5561,7 +5557,7 @@ td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(con
   return get_reply_markup(r_value.move_as_ok());
 }
 
-td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(JsonValue &&value) {
+td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(td::JsonValue &&value) {
   td::vector<td::vector<object_ptr<td_api::keyboardButton>>> rows;
   td::vector<td::vector<object_ptr<td_api::inlineKeyboardButton>>> inline_rows;
   td::Slice input_field_placeholder;
@@ -5572,18 +5568,18 @@ td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(Jso
   bool is_personal = false;
   bool force_reply = false;
 
-  if (value.type() != JsonValue::Type::Object) {
+  if (value.type() != td::JsonValue::Type::Object) {
     return td::Status::Error(400, "Object expected as reply markup");
   }
   for (auto &field_value : value.get_object()) {
     if (field_value.first == "keyboard") {
       auto keyboard = std::move(field_value.second);
-      if (keyboard.type() != JsonValue::Type::Array) {
+      if (keyboard.type() != td::JsonValue::Type::Array) {
         return td::Status::Error(400, "Field \"keyboard\" of the ReplyKeyboardMarkup must be an Array");
       }
       for (auto &row : keyboard.get_array()) {
         td::vector<object_ptr<td_api::keyboardButton>> new_row;
-        if (row.type() != JsonValue::Type::Array) {
+        if (row.type() != td::JsonValue::Type::Array) {
           return td::Status::Error(400, "Field \"keyboard\" of the ReplyKeyboardMarkup must be an Array of Arrays");
         }
         for (auto &button : row.get_array()) {
@@ -5598,12 +5594,12 @@ td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(Jso
       }
     } else if (field_value.first == "inline_keyboard") {
       auto inline_keyboard = std::move(field_value.second);
-      if (inline_keyboard.type() != JsonValue::Type::Array) {
+      if (inline_keyboard.type() != td::JsonValue::Type::Array) {
         return td::Status::Error(400, "Field \"inline_keyboard\" of the InlineKeyboardMarkup must be an Array");
       }
       for (auto &inline_row : inline_keyboard.get_array()) {
         td::vector<object_ptr<td_api::inlineKeyboardButton>> new_inline_row;
-        if (inline_row.type() != JsonValue::Type::Array) {
+        if (inline_row.type() != td::JsonValue::Type::Array) {
           return td::Status::Error(400,
                                    "Field \"inline_keyboard\" of the InlineKeyboardMarkup must be an Array of Arrays");
         }
@@ -5619,40 +5615,40 @@ td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(Jso
         inline_rows.push_back(std::move(new_inline_row));
       }
     } else if (field_value.first == "resize_keyboard") {
-      if (field_value.second.type() != JsonValue::Type::Boolean) {
+      if (field_value.second.type() != td::JsonValue::Type::Boolean) {
         return td::Status::Error(400,
                                  "Field \"resize_keyboard\" of the ReplyKeyboardMarkup must be of the type Boolean");
       }
       resize_keyboard = field_value.second.get_boolean();
     } else if (field_value.first == "is_persistent") {
-      if (field_value.second.type() != JsonValue::Type::Boolean) {
+      if (field_value.second.type() != td::JsonValue::Type::Boolean) {
         return td::Status::Error(400, "Field \"is_persistent\" of the ReplyKeyboardMarkup must be of the type Boolean");
       }
       is_persistent = field_value.second.get_boolean();
     } else if (field_value.first == "one_time_keyboard") {
-      if (field_value.second.type() != JsonValue::Type::Boolean) {
+      if (field_value.second.type() != td::JsonValue::Type::Boolean) {
         return td::Status::Error(400,
                                  "Field \"one_time_keyboard\" of the ReplyKeyboardMarkup must be of the type Boolean");
       }
       one_time = field_value.second.get_boolean();
     } else if (field_value.first == "hide_keyboard" || field_value.first == "remove_keyboard") {
-      if (field_value.second.type() != JsonValue::Type::Boolean) {
+      if (field_value.second.type() != td::JsonValue::Type::Boolean) {
         return td::Status::Error(400,
                                  "Field \"remove_keyboard\" of the ReplyKeyboardRemove must be of the type Boolean");
       }
       remove = field_value.second.get_boolean();
     } else if (field_value.first == "personal_keyboard" || field_value.first == "selective") {
-      if (field_value.second.type() != JsonValue::Type::Boolean) {
+      if (field_value.second.type() != td::JsonValue::Type::Boolean) {
         return td::Status::Error(400, "Field \"selective\" of the reply markup must be of the type Boolean");
       }
       is_personal = field_value.second.get_boolean();
     } else if (field_value.first == "force_reply_keyboard" || field_value.first == "force_reply") {
-      if (field_value.second.type() != JsonValue::Type::Boolean) {
+      if (field_value.second.type() != td::JsonValue::Type::Boolean) {
         return td::Status::Error(400, "Field \"force_reply\" of the reply markup must be of the type Boolean");
       }
       force_reply = field_value.second.get_boolean();
     } else if (field_value.first == "input_field_placeholder") {
-      if (field_value.second.type() != JsonValue::Type::String) {
+      if (field_value.second.type() != td::JsonValue::Type::String) {
         return td::Status::Error(400,
                                  "Field \"input_field_placeholder\" of the reply markup must be of the type String");
       }
@@ -5678,8 +5674,8 @@ td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(Jso
   return std::move(result);
 }
 
-td::Result<td_api::object_ptr<td_api::labeledPricePart>> Client::get_labeled_price_part(JsonValue &value) {
-  if (value.type() != JsonValue::Type::Object) {
+td::Result<td_api::object_ptr<td_api::labeledPricePart>> Client::get_labeled_price_part(td::JsonValue &value) {
+  if (value.type() != td::JsonValue::Type::Object) {
     return td::Status::Error(400, "LabeledPrice must be an Object");
   }
 
@@ -5690,11 +5686,11 @@ td::Result<td_api::object_ptr<td_api::labeledPricePart>> Client::get_labeled_pri
     return td::Status::Error(400, "LabeledPrice label must be non-empty");
   }
 
-  TRY_RESULT(amount, get_json_object_field(object, "amount", JsonValue::Type::Null, false));
+  TRY_RESULT(amount, get_json_object_field(object, "amount", td::JsonValue::Type::Null, false));
   td::Slice number;
-  if (amount.type() == JsonValue::Type::Number) {
+  if (amount.type() == td::JsonValue::Type::Number) {
     number = amount.get_number();
-  } else if (amount.type() == JsonValue::Type::String) {
+  } else if (amount.type() == td::JsonValue::Type::String) {
     number = amount.get_string();
   } else {
     return td::Status::Error(400, "Field \"amount\" must be of type Number or String");
@@ -5706,8 +5702,9 @@ td::Result<td_api::object_ptr<td_api::labeledPricePart>> Client::get_labeled_pri
   return make_object<td_api::labeledPricePart>(label, parsed_amount.ok());
 }
 
-td::Result<td::vector<td_api::object_ptr<td_api::labeledPricePart>>> Client::get_labeled_price_parts(JsonValue &value) {
-  if (value.type() != JsonValue::Type::Array) {
+td::Result<td::vector<td_api::object_ptr<td_api::labeledPricePart>>> Client::get_labeled_price_parts(
+    td::JsonValue &value) {
+  if (value.type() != td::JsonValue::Type::Array) {
     return td::Status::Error(400, "Expected an Array of labeled prices");
   }
 
@@ -5726,17 +5723,17 @@ td::Result<td::vector<td_api::object_ptr<td_api::labeledPricePart>>> Client::get
   return std::move(prices);
 }
 
-td::Result<td::vector<td::int64>> Client::get_suggested_tip_amounts(JsonValue &value) {
-  if (value.type() != JsonValue::Type::Array) {
+td::Result<td::vector<td::int64>> Client::get_suggested_tip_amounts(td::JsonValue &value) {
+  if (value.type() != td::JsonValue::Type::Array) {
     return td::Status::Error(400, "Expected an Array of suggested tip amounts");
   }
 
   td::vector<int64> suggested_tip_amounts;
   for (auto &amount : value.get_array()) {
     td::Slice number;
-    if (amount.type() == JsonValue::Type::Number) {
+    if (amount.type() == td::JsonValue::Type::Number) {
       number = amount.get_number();
-    } else if (amount.type() == JsonValue::Type::String) {
+    } else if (amount.type() == td::JsonValue::Type::String) {
       number = amount.get_string();
     } else {
       return td::Status::Error(400, "Suggested tip amount must be of type Number or String");
@@ -5750,8 +5747,8 @@ td::Result<td::vector<td::int64>> Client::get_suggested_tip_amounts(JsonValue &v
   return std::move(suggested_tip_amounts);
 }
 
-td::Result<td_api::object_ptr<td_api::shippingOption>> Client::get_shipping_option(JsonValue &option) {
-  if (option.type() != JsonValue::Type::Object) {
+td::Result<td_api::object_ptr<td_api::shippingOption>> Client::get_shipping_option(td::JsonValue &option) {
+  if (option.type() != td::JsonValue::Type::Object) {
     return td::Status::Error(400, "ShippingOption must be an Object");
   }
 
@@ -5767,7 +5764,7 @@ td::Result<td_api::object_ptr<td_api::shippingOption>> Client::get_shipping_opti
     return td::Status::Error(400, "ShippingOption title must be non-empty");
   }
 
-  TRY_RESULT(prices_json, get_json_object_field(object, "prices", JsonValue::Type::Array, false));
+  TRY_RESULT(prices_json, get_json_object_field(object, "prices", td::JsonValue::Type::Array, false));
 
   auto r_prices = get_labeled_price_parts(prices_json);
   if (r_prices.is_error()) {
@@ -5790,8 +5787,8 @@ td::Result<td::vector<td_api::object_ptr<td_api::shippingOption>>> Client::get_s
   return get_shipping_options(r_value.move_as_ok());
 }
 
-td::Result<td::vector<td_api::object_ptr<td_api::shippingOption>>> Client::get_shipping_options(JsonValue &&value) {
-  if (value.type() != JsonValue::Type::Array) {
+td::Result<td::vector<td_api::object_ptr<td_api::shippingOption>>> Client::get_shipping_options(td::JsonValue &&value) {
+  if (value.type() != td::JsonValue::Type::Array) {
     return td::Status::Error(400, "Expected an Array of shipping options");
   }
 
@@ -5910,8 +5907,8 @@ td_api::object_ptr<td_api::inputThumbnail> Client::get_input_thumbnail(const Que
 }
 
 td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_message_content(
-    JsonValue &input_message_content, bool is_input_message_content_required) {
-  CHECK(input_message_content.type() == JsonValue::Type::Object);
+    td::JsonValue &input_message_content, bool is_input_message_content_required) {
+  CHECK(input_message_content.type() == td::JsonValue::Type::Object);
   auto &object = input_message_content.get_object();
 
   TRY_RESULT(message_text, get_json_object_string_field(object, "message_text"));
@@ -5982,14 +5979,14 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
     }
     TRY_RESULT(provider_token, get_json_object_string_field(object, "provider_token", false));
     TRY_RESULT(currency, get_json_object_string_field(object, "currency", false));
-    TRY_RESULT(prices_object, get_json_object_field(object, "prices", JsonValue::Type::Array, false));
+    TRY_RESULT(prices_object, get_json_object_field(object, "prices", td::JsonValue::Type::Array, false));
     TRY_RESULT(prices, get_labeled_price_parts(prices_object));
     TRY_RESULT(provider_data, get_json_object_string_field(object, "provider_data"));
     TRY_RESULT(max_tip_amount, get_json_object_long_field(object, "max_tip_amount"));
     td::vector<int64> suggested_tip_amounts;
     TRY_RESULT(suggested_tip_amounts_array,
-               get_json_object_field(object, "suggested_tip_amounts", JsonValue::Type::Array));
-    if (suggested_tip_amounts_array.type() == JsonValue::Type::Array) {
+               get_json_object_field(object, "suggested_tip_amounts", td::JsonValue::Type::Array));
+    if (suggested_tip_amounts_array.type() == td::JsonValue::Type::Array) {
       TRY_RESULT_ASSIGN(suggested_tip_amounts, get_suggested_tip_amounts(suggested_tip_amounts_array));
     }
     TRY_RESULT(photo_url, get_json_object_string_field(object, "photo_url"));
@@ -6043,10 +6040,10 @@ td::Result<td::vector<td_api::object_ptr<td_api::InputInlineQueryResult>>> Clien
 
 td::Result<td::vector<td_api::object_ptr<td_api::InputInlineQueryResult>>> Client::get_inline_query_results(
     td::JsonValue &&values) {
-  if (values.type() == JsonValue::Type::Null) {
+  if (values.type() == td::JsonValue::Type::Null) {
     return td::vector<object_ptr<td_api::InputInlineQueryResult>>();
   }
-  if (values.type() != JsonValue::Type::Array) {
+  if (values.type() != td::JsonValue::Type::Array) {
     return td::Status::Error(400, "Expected an Array of inline query results");
   }
 
@@ -6080,7 +6077,7 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
 }
 
 td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inline_query_result(td::JsonValue &&value) {
-  if (value.type() != JsonValue::Type::Object) {
+  if (value.type() != td::JsonValue::Type::Object) {
     return td::Status::Error(400, "Inline query result must be an object");
   }
 
@@ -6095,8 +6092,8 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
   object_ptr<td_api::InputMessageContent> input_message_content;
 
   TRY_RESULT(input_message_content_obj,
-             get_json_object_field(object, "input_message_content", JsonValue::Type::Object));
-  if (input_message_content_obj.type() == JsonValue::Type::Null) {
+             get_json_object_field(object, "input_message_content", td::JsonValue::Type::Object));
+  if (input_message_content_obj.type() == td::JsonValue::Type::Null) {
     TRY_RESULT(message_text, get_json_object_string_field(object, "message_text", !is_input_message_content_required));
     TRY_RESULT(disable_web_page_preview, get_json_object_bool_field(object, "disable_web_page_preview"));
     TRY_RESULT(parse_mode, get_json_object_string_field(object, "parse_mode"));
@@ -6117,9 +6114,9 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
   auto entities = get_json_object_field_force(object, "caption_entities");
   TRY_RESULT(caption, get_formatted_text(std::move(input_caption), std::move(parse_mode), std::move(entities)));
 
-  TRY_RESULT(reply_markup_object, get_json_object_field(object, "reply_markup", JsonValue::Type::Object));
+  TRY_RESULT(reply_markup_object, get_json_object_field(object, "reply_markup", td::JsonValue::Type::Object));
   object_ptr<td_api::ReplyMarkup> reply_markup;
-  if (reply_markup_object.type() != JsonValue::Type::Null) {
+  if (reply_markup_object.type() != td::JsonValue::Type::Null) {
     TRY_RESULT_ASSIGN(reply_markup, get_reply_markup(std::move(reply_markup_object)));
   }
 
@@ -6366,8 +6363,8 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
   return td::Status::Error(400, PSLICE() << "type \"" << type << "\" is unsupported for the inline query result");
 }
 
-td::Result<Client::BotCommandScope> Client::get_bot_command_scope(JsonValue &&value) {
-  if (value.type() != JsonValue::Type::Object) {
+td::Result<Client::BotCommandScope> Client::get_bot_command_scope(td::JsonValue &&value) {
+  if (value.type() != td::JsonValue::Type::Object) {
     return td::Status::Error(400, "BotCommandScope must be an Object");
   }
 
@@ -6429,8 +6426,8 @@ td::Result<Client::BotCommandScope> Client::get_bot_command_scope(const Query *q
   return r_scope.move_as_ok();
 }
 
-td::Result<td_api::object_ptr<td_api::botCommand>> Client::get_bot_command(JsonValue &&value) {
-  if (value.type() != JsonValue::Type::Object) {
+td::Result<td_api::object_ptr<td_api::botCommand>> Client::get_bot_command(td::JsonValue &&value) {
+  if (value.type() != td::JsonValue::Type::Object) {
     return td::Status::Error(400, "expected an Object");
   }
 
@@ -6455,7 +6452,7 @@ td::Result<td::vector<td_api::object_ptr<td_api::botCommand>>> Client::get_bot_c
   }
 
   auto value = r_value.move_as_ok();
-  if (value.type() != JsonValue::Type::Array) {
+  if (value.type() != td::JsonValue::Type::Array) {
     return td::Status::Error(400, "Expected an Array of BotCommand");
   }
 
@@ -6470,8 +6467,8 @@ td::Result<td::vector<td_api::object_ptr<td_api::botCommand>>> Client::get_bot_c
   return std::move(bot_commands);
 }
 
-td::Result<td_api::object_ptr<td_api::botMenuButton>> Client::get_bot_menu_button(JsonValue &&value) {
-  if (value.type() != JsonValue::Type::Object) {
+td::Result<td_api::object_ptr<td_api::botMenuButton>> Client::get_bot_menu_button(td::JsonValue &&value) {
+  if (value.type() != td::JsonValue::Type::Object) {
     return td::Status::Error(400, "MenuButton must be an Object");
   }
 
@@ -6486,7 +6483,7 @@ td::Result<td_api::object_ptr<td_api::botMenuButton>> Client::get_bot_menu_butto
   }
   if (type == "web_app") {
     TRY_RESULT(text, get_json_object_string_field(object, "text", false));
-    TRY_RESULT(web_app, get_json_object_field(object, "web_app", JsonValue::Type::Object, false));
+    TRY_RESULT(web_app, get_json_object_field(object, "web_app", td::JsonValue::Type::Object, false));
     auto &web_app_object = web_app.get_object();
     TRY_RESULT(url, get_json_object_string_field(web_app_object, "url", false));
     return td_api::make_object<td_api::botMenuButton>(text, url);
@@ -6516,8 +6513,8 @@ td::Result<td_api::object_ptr<td_api::botMenuButton>> Client::get_bot_menu_butto
 }
 
 td::Result<td_api::object_ptr<td_api::chatAdministratorRights>> Client::get_chat_administrator_rights(
-    JsonValue &&value) {
-  if (value.type() != JsonValue::Type::Object) {
+    td::JsonValue &&value) {
+  if (value.type() != td::JsonValue::Type::Object) {
     return td::Status::Error(400, "ChatAdministratorRights must be an Object");
   }
 
@@ -6561,9 +6558,9 @@ td::Result<td_api::object_ptr<td_api::chatAdministratorRights>> Client::get_chat
   return r_rights.move_as_ok();
 }
 
-td::Result<td_api::object_ptr<td_api::maskPosition>> Client::get_mask_position(JsonValue &&value) {
-  if (value.type() != JsonValue::Type::Object) {
-    if (value.type() == JsonValue::Type::Null) {
+td::Result<td_api::object_ptr<td_api::maskPosition>> Client::get_mask_position(td::JsonValue &&value) {
+  if (value.type() != td::JsonValue::Type::Object) {
+    if (value.type() == td::JsonValue::Type::Null) {
       return nullptr;
     }
     return td::Status::Error(400, "MaskPosition must be an Object");
@@ -6644,8 +6641,8 @@ td::Result<td_api::object_ptr<td_api::maskPosition>> Client::get_mask_position(c
   return r_mask_position.move_as_ok();
 }
 
-td::Result<td::string> Client::get_sticker_emojis(JsonValue &&value) {
-  if (value.type() != JsonValue::Type::Array) {
+td::Result<td::string> Client::get_sticker_emojis(td::JsonValue &&value) {
+  if (value.type() != td::JsonValue::Type::Array) {
     return td::Status::Error(400, "expected an Array of string");
   }
 
@@ -6658,7 +6655,7 @@ td::Result<td::string> Client::get_sticker_emojis(JsonValue &&value) {
     return td::Status::Error(400, "too many emoji specified");
   }
   for (auto &emoji : value.get_array()) {
-    if (emoji.type() != JsonValue::Type::String) {
+    if (emoji.type() != td::JsonValue::Type::String) {
       return td::Status::Error(400, "emoji must be a string");
     }
     if (!td::is_emoji(emoji.get_string())) {
@@ -6698,8 +6695,8 @@ td::Result<td_api::object_ptr<td_api::StickerFormat>> Client::get_sticker_format
 }
 
 td::Result<td_api::object_ptr<td_api::inputSticker>> Client::get_input_sticker(const Query *query,
-                                                                               JsonValue &&value) const {
-  if (value.type() != JsonValue::Type::Object) {
+                                                                               td::JsonValue &&value) const {
+  if (value.type() != td::JsonValue::Type::Object) {
     return td::Status::Error(400, "InputSticker must be an Object");
   }
 
@@ -6710,14 +6707,14 @@ td::Result<td_api::object_ptr<td_api::inputSticker>> Client::get_input_sticker(c
   if (input_file == nullptr) {
     return td::Status::Error("sticker not found");
   }
-  TRY_RESULT(emoji_list, get_json_object_field(object, "emoji_list", JsonValue::Type::Array, false));
+  TRY_RESULT(emoji_list, get_json_object_field(object, "emoji_list", td::JsonValue::Type::Array, false));
   TRY_RESULT(emojis, get_sticker_emojis(std::move(emoji_list)));
   TRY_RESULT(mask_position, get_mask_position(get_json_object_field_force(object, "mask_position")));
   td::vector<td::string> input_keywords;
   if (has_json_object_field(object, "keywords")) {
-    TRY_RESULT(keywords, get_json_object_field(object, "keywords", JsonValue::Type::Array, false));
+    TRY_RESULT(keywords, get_json_object_field(object, "keywords", td::JsonValue::Type::Array, false));
     for (auto &keyword : keywords.get_array()) {
-      if (keyword.type() != JsonValue::Type::String) {
+      if (keyword.type() != td::JsonValue::Type::String) {
         return td::Status::Error(400, "keyword must be a string");
       }
       input_keywords.push_back(keyword.get_string().str());
@@ -6783,7 +6780,7 @@ td::Result<td::vector<td_api::object_ptr<td_api::inputSticker>>> Client::get_inp
     }
     auto value = r_value.move_as_ok();
 
-    if (value.type() != JsonValue::Type::Array) {
+    if (value.type() != td::JsonValue::Type::Array) {
       return td::Status::Error(400, "Expected an Array of InputSticker");
     }
 
@@ -6892,9 +6889,9 @@ td::Result<td_api::object_ptr<td_api::InputPassportElementErrorSource>> Client::
   }
   if (source == "files" || source == "translation_files") {
     td::vector<td::string> input_hashes;
-    TRY_RESULT(file_hashes, get_json_object_field(object, "file_hashes", JsonValue::Type::Array, false));
+    TRY_RESULT(file_hashes, get_json_object_field(object, "file_hashes", td::JsonValue::Type::Array, false));
     for (auto &input_hash : file_hashes.get_array()) {
-      if (input_hash.type() != JsonValue::Type::String) {
+      if (input_hash.type() != td::JsonValue::Type::String) {
         return td::Status::Error(400, "hash must be a string");
       }
       TRY_RESULT(hash, get_passport_element_hash(input_hash.get_string()));
@@ -6912,8 +6909,8 @@ td::Result<td_api::object_ptr<td_api::InputPassportElementErrorSource>> Client::
 }
 
 td::Result<td_api::object_ptr<td_api::inputPassportElementError>> Client::get_passport_element_error(
-    JsonValue &&value) {
-  if (value.type() != JsonValue::Type::Object) {
+    td::JsonValue &&value) {
+  if (value.type() != td::JsonValue::Type::Object) {
     return td::Status::Error(400, "expected an Object");
   }
 
@@ -6941,7 +6938,7 @@ td::Result<td::vector<td_api::object_ptr<td_api::inputPassportElementError>>> Cl
   }
 
   auto value = r_value.move_as_ok();
-  if (value.type() != JsonValue::Type::Array) {
+  if (value.type() != td::JsonValue::Type::Array) {
     return td::Status::Error(400, "Expected an Array of PassportElementError");
   }
 
@@ -6956,7 +6953,7 @@ td::Result<td::vector<td_api::object_ptr<td_api::inputPassportElementError>>> Cl
   return std::move(errors);
 }
 
-JsonValue Client::get_input_entities(const Query *query, td::Slice field_name) {
+td::JsonValue Client::get_input_entities(const Query *query, td::Slice field_name) {
   auto entities = query->arg(field_name);
   if (!entities.empty()) {
     auto r_value = json_decode(entities);
@@ -6967,7 +6964,7 @@ JsonValue Client::get_input_entities(const Query *query, td::Slice field_name) {
     LOG(INFO) << "Can't parse entities JSON object: " << r_value.error();
   }
 
-  return JsonValue();
+  return td::JsonValue();
 }
 
 td::Result<td_api::object_ptr<td_api::formattedText>> Client::get_caption(const Query *query) {
@@ -7011,8 +7008,8 @@ td::Result<td_api::object_ptr<td_api::TextEntityType>> Client::get_text_entity_t
     return make_object<td_api::textEntityTypeTextUrl>(url);
   }
   if (type == "text_mention") {
-    TRY_RESULT(user, get_json_object_field(object, "user", JsonValue::Type::Object, false));
-    CHECK(user.type() == JsonValue::Type::Object);
+    TRY_RESULT(user, get_json_object_field(object, "user", td::JsonValue::Type::Object, false));
+    CHECK(user.type() == td::JsonValue::Type::Object);
     TRY_RESULT(user_id, get_json_object_long_field(user.get_object(), "id", false));
     return make_object<td_api::textEntityTypeMentionName>(user_id);
   }
@@ -7028,8 +7025,8 @@ td::Result<td_api::object_ptr<td_api::TextEntityType>> Client::get_text_entity_t
   return td::Status::Error("Unsupported type specified");
 }
 
-td::Result<td_api::object_ptr<td_api::textEntity>> Client::get_text_entity(JsonValue &&value) {
-  if (value.type() != JsonValue::Type::Object) {
+td::Result<td_api::object_ptr<td_api::textEntity>> Client::get_text_entity(td::JsonValue &&value) {
+  if (value.type() != td::JsonValue::Type::Object) {
     return td::Status::Error(400, "expected an Object");
   }
 
@@ -7046,7 +7043,7 @@ td::Result<td_api::object_ptr<td_api::textEntity>> Client::get_text_entity(JsonV
 }
 
 td::Result<td_api::object_ptr<td_api::formattedText>> Client::get_formatted_text(td::string text, td::string parse_mode,
-                                                                                 JsonValue &&input_entities) {
+                                                                                 td::JsonValue &&input_entities) {
   td::to_lower_inplace(parse_mode);
   if (!text.empty() && !parse_mode.empty() && parse_mode != "none") {
     object_ptr<td_api::TextParseMode> text_parse_mode;
@@ -7071,7 +7068,7 @@ td::Result<td_api::object_ptr<td_api::formattedText>> Client::get_formatted_text
   }
 
   td::vector<object_ptr<td_api::textEntity>> entities;
-  if (input_entities.type() == JsonValue::Type::Array) {
+  if (input_entities.type() == td::JsonValue::Type::Array) {
     for (auto &input_entity : input_entities.get_array()) {
       auto r_entity = get_text_entity(std::move(input_entity));
       if (r_entity.is_error()) {
@@ -7092,10 +7089,8 @@ td::Result<td_api::object_ptr<td_api::inputMessageText>> Client::get_input_messa
                                 query->arg("parse_mode").str(), get_input_entities(query, "entities"));
 }
 
-td::Result<td_api::object_ptr<td_api::inputMessageText>> Client::get_input_message_text(td::string text,
-                                                                                        bool disable_web_page_preview,
-                                                                                        td::string parse_mode,
-                                                                                        JsonValue &&input_entities) {
+td::Result<td_api::object_ptr<td_api::inputMessageText>> Client::get_input_message_text(
+    td::string text, bool disable_web_page_preview, td::string parse_mode, td::JsonValue &&input_entities) {
   if (text.empty()) {
     return td::Status::Error(400, "Message text is empty");
   }
@@ -7147,7 +7142,7 @@ td::Result<td_api::object_ptr<td_api::chatPermissions>> Client::get_chat_permiss
     }
 
     auto value = r_value.move_as_ok();
-    if (value.type() != JsonValue::Type::Object) {
+    if (value.type() != td::JsonValue::Type::Object) {
       return td::Status::Error(400, "Object expected as permissions");
     }
     auto &object = value.get_object();
@@ -7247,9 +7242,9 @@ td::Result<td_api::object_ptr<td_api::chatPermissions>> Client::get_chat_permiss
 }
 
 td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_media(const Query *query,
-                                                                                    JsonValue &&input_media,
+                                                                                    td::JsonValue &&input_media,
                                                                                     bool for_album) const {
-  if (input_media.type() != JsonValue::Type::Object) {
+  if (input_media.type() != td::JsonValue::Type::Object) {
     return td::Status::Error("expected an Object");
   }
 
@@ -7367,8 +7362,8 @@ td::Result<td::vector<td_api::object_ptr<td_api::InputMessageContent>>> Client::
 }
 
 td::Result<td::vector<td_api::object_ptr<td_api::InputMessageContent>>> Client::get_input_message_contents(
-    const Query *query, JsonValue &&value) const {
-  if (value.type() != JsonValue::Type::Array) {
+    const Query *query, td::JsonValue &&value) const {
+  if (value.type() != td::JsonValue::Type::Array) {
     return td::Status::Error(400, "Expected an Array of InputMedia");
   }
 
@@ -7465,13 +7460,13 @@ td::Result<td::vector<td::string>> Client::get_poll_options(const Query *query) 
   }
 
   auto value = r_value.move_as_ok();
-  if (value.type() != JsonValue::Type::Array) {
+  if (value.type() != td::JsonValue::Type::Array) {
     return td::Status::Error(400, "Expected an Array of String as options");
   }
 
   td::vector<td::string> options;
   for (auto &input_option : value.get_array()) {
-    if (input_option.type() != JsonValue::Type::String) {
+    if (input_option.type() != td::JsonValue::Type::String) {
       return td::Status::Error(400, "Expected an option to be of type String");
     }
     options.push_back(input_option.get_string().str());
@@ -9176,13 +9171,13 @@ td::Status Client::process_get_custom_emoji_stickers_query(PromisedQueryPtr &que
     return td::Status::Error(400, "Can't parse custom emoji identifiers JSON object");
   }
   auto value = r_value.move_as_ok();
-  if (value.type() != JsonValue::Type::Array) {
+  if (value.type() != td::JsonValue::Type::Array) {
     return td::Status::Error(400, "Expected an Array of custom emoji identifiers");
   }
 
   td::vector<int64> custom_emoji_ids;
   for (auto &custom_emoji_id : value.get_array()) {
-    if (custom_emoji_id.type() != JsonValue::Type::String) {
+    if (custom_emoji_id.type() != td::JsonValue::Type::String) {
       return td::Status::Error(400, "Custom emoji identifier must be of type String");
     }
     auto parsed_id = td::to_integer_safe<int64>(custom_emoji_id.get_string());
@@ -9332,11 +9327,11 @@ td::Status Client::process_set_sticker_keywords_query(PromisedQueryPtr &query) {
     }
     auto value = r_value.move_as_ok();
 
-    if (value.type() != JsonValue::Type::Array) {
+    if (value.type() != td::JsonValue::Type::Array) {
       return td::Status::Error(400, "Field \"keywords\" must be an Array");
     }
     for (auto &keyword : value.get_array()) {
-      if (keyword.type() != JsonValue::Type::String) {
+      if (keyword.type() != td::JsonValue::Type::String) {
         return td::Status::Error(400, "keyword must be a string");
       }
       input_keywords.push_back(keyword.get_string().str());
@@ -9929,11 +9924,11 @@ Client::ClosingError Client::get_closing_error() {
   return result;
 }
 
-class Client::JsonUpdates final : public Jsonable {
+class Client::JsonUpdates final : public td::Jsonable {
  public:
   explicit JsonUpdates(td::Span<td::TQueue::Event> updates) : updates_(updates) {
   }
-  void store(JsonValueScope *scope) const {
+  void store(td::JsonValueScope *scope) const {
     auto array = scope->enter_array();
     int left_len = 1 << 22;
     for (auto &update : updates_) {
@@ -10471,8 +10466,8 @@ td::uint32 Client::get_allowed_update_types(td::MutableSlice allowed_updates, bo
 
   td::uint32 result = 0;
   auto value = r_value.move_as_ok();
-  if (value.type() != JsonValue::Type::Array) {
-    if (value.type() == JsonValue::Type::Number && is_internal) {
+  if (value.type() != td::JsonValue::Type::Array) {
+    if (value.type() == td::JsonValue::Type::Number && is_internal) {
       auto r_number = td::to_integer_safe<td::uint32>(value.get_number());
       if (r_number.is_ok() && r_number.ok() > 0) {
         return r_number.ok();
@@ -10481,7 +10476,7 @@ td::uint32 Client::get_allowed_update_types(td::MutableSlice allowed_updates, bo
     return 0;
   }
   for (auto &update_type_name : value.get_array()) {
-    if (update_type_name.type() != JsonValue::Type::String) {
+    if (update_type_name.type() != td::JsonValue::Type::String) {
       return 0;
     }
     auto type_name = update_type_name.get_string();
@@ -10521,7 +10516,7 @@ class UpdateJsonable final : public td::VirtuallyJsonable {
  public:
   explicit UpdateJsonable(const T &update) : update(update) {
   }
-  void store(JsonValueScope *scope) const final {
+  void store(td::JsonValueScope *scope) const final {
     *scope << update;
   }
 
