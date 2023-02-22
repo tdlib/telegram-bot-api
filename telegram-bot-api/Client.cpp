@@ -6039,6 +6039,54 @@ td_api::object_ptr<td_api::messageSendOptions> Client::get_message_send_options(
   return make_object<td_api::messageSendOptions>(disable_notification, false, protect_content, false, nullptr, 0);
 }
 
+td::Result<td_api::object_ptr<td_api::inlineQueryResultsButton>> Client::get_inline_query_results_button(
+    td::JsonValue &&value) {
+  if (value.type() != td::JsonValue::Type::Object) {
+    return td::Status::Error(400, "InlineQueryResultsButton must be an Object");
+  }
+
+  auto &object = value.get_object();
+
+  TRY_RESULT(text, get_json_object_string_field(object, "text", false));
+
+  if (has_json_object_field(object, "start_parameter")) {
+    TRY_RESULT(start_parameter, get_json_object_string_field(object, "start_parameter", false));
+    return make_object<td_api::inlineQueryResultsButton>(
+        text, make_object<td_api::inlineQueryResultsButtonTypeStartBot>(start_parameter));
+  }
+
+  if (has_json_object_field(object, "web_app")) {
+    TRY_RESULT(web_app, get_json_object_field(object, "web_app", td::JsonValue::Type::Object, false));
+    auto &web_app_object = web_app.get_object();
+    TRY_RESULT(url, get_json_object_string_field(web_app_object, "url", false));
+    return make_object<td_api::inlineQueryResultsButton>(text,
+                                                         make_object<td_api::inlineQueryResultsButtonTypeWebApp>(url));
+  }
+
+  return td::Status::Error(400, "InlineQueryResultsButton must have exactly one optional field");
+}
+
+td::Result<td_api::object_ptr<td_api::inlineQueryResultsButton>> Client::get_inline_query_results_button(
+    td::MutableSlice button) {
+  if (button.empty()) {
+    return nullptr;
+  }
+
+  LOG(INFO) << "Parsing JSON object: " << button;
+  auto r_value = json_decode(button);
+  if (r_value.is_error()) {
+    LOG(INFO) << "Can't parse JSON object: " << r_value.error();
+    return td::Status::Error(400, "Can't parse inline query results button JSON object");
+  }
+
+  auto r_button = get_inline_query_results_button(r_value.move_as_ok());
+  if (r_button.is_error()) {
+    return td::Status::Error(400, PSLICE()
+                                      << "Can't parse inline query results button: " << r_button.error().message());
+  }
+  return r_button.move_as_ok();
+}
+
 td::Result<td::vector<td_api::object_ptr<td_api::InputInlineQueryResult>>> Client::get_inline_query_results(
     const Query *query) {
   auto results_encoded = query->arg("results");
@@ -8422,14 +8470,15 @@ td::Status Client::process_answer_inline_query_query(PromisedQueryPtr &query) {
   auto is_personal = to_bool(query->arg("is_personal"));
   int32 cache_time = get_integer_arg(query.get(), "cache_time", 300, 0, 24 * 60 * 60);
   auto next_offset = query->arg("next_offset");
-  auto switch_pm_text = query->arg("switch_pm_text");
-  object_ptr<td_api::inlineQueryResultsButton> button;
-  if (!switch_pm_text.empty()) {
-    button = make_object<td_api::inlineQueryResultsButton>(
-        switch_pm_text.str(),
-        make_object<td_api::inlineQueryResultsButtonTypeStartBot>(query->arg("switch_pm_parameter").str()));
+  TRY_RESULT(button, get_inline_query_results_button(query->arg("button")));
+  if (button == nullptr) {
+    auto switch_pm_text = query->arg("switch_pm_text");
+    if (!switch_pm_text.empty()) {
+      button = make_object<td_api::inlineQueryResultsButton>(
+          switch_pm_text.str(),
+          make_object<td_api::inlineQueryResultsButtonTypeStartBot>(query->arg("switch_pm_parameter").str()));
+    }
   }
-
   TRY_RESULT(results, get_inline_query_results(query.get()));
 
   resolve_inline_query_results_bot_usernames(

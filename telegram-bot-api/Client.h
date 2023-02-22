@@ -358,6 +358,12 @@ class Client final : public WebhookActor::Callback {
 
   object_ptr<td_api::inputThumbnail> get_input_thumbnail(const Query *query) const;
 
+  static td::Result<td_api::object_ptr<td_api::inlineQueryResultsButton>> get_inline_query_results_button(
+      td::JsonValue &&value);
+
+  static td::Result<td_api::object_ptr<td_api::inlineQueryResultsButton>> get_inline_query_results_button(
+      td::MutableSlice value);
+
   td::Result<object_ptr<td_api::InputInlineQueryResult>> get_inline_query_result(const Query *query);
 
   td::Result<object_ptr<td_api::InputInlineQueryResult>> get_inline_query_result(td::JsonValue &&value);
