@@ -368,10 +368,10 @@ class Client final : public WebhookActor::Callback {
   struct BotCommandScope {
     object_ptr<td_api::BotCommandScope> scope_;
     td::string chat_id_;
-    td::int64 user_id_ = 0;
+    int64 user_id_ = 0;
 
     explicit BotCommandScope(object_ptr<td_api::BotCommandScope> scope, td::string chat_id = td::string(),
-                             td::int64 user_id = 0)
+                             int64 user_id = 0)
         : scope_(std::move(scope)), chat_id_(std::move(chat_id)), user_id_(user_id) {
     }
   };
@@ -868,8 +868,7 @@ class Client final : public WebhookActor::Callback {
 
   struct FullMessageIdHash {
     td::uint32 operator()(FullMessageId full_message_id) const {
-      return td::Hash<td::int64>()(full_message_id.chat_id) * 2023654985u +
-             td::Hash<td::int64>()(full_message_id.message_id);
+      return td::Hash<int64>()(full_message_id.chat_id) * 2023654985u + td::Hash<int64>()(full_message_id.message_id);
     }
   };
 

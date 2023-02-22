@@ -5417,12 +5417,12 @@ td::Result<td_api::object_ptr<td_api::keyboardButton>> Client::get_keyboard_butt
       auto restrict_chat_has_username = has_json_object_field(request_chat_object, "chat_has_username");
       TRY_RESULT(chat_has_username, get_json_object_bool_field(request_chat_object, "chat_has_username"));
       TRY_RESULT(chat_is_created, get_json_object_bool_field(request_chat_object, "chat_is_created"));
-      td_api::object_ptr<td_api::chatAdministratorRights> user_administrator_rights;
+      object_ptr<td_api::chatAdministratorRights> user_administrator_rights;
       if (has_json_object_field(request_chat_object, "user_administrator_rights")) {
         TRY_RESULT_ASSIGN(user_administrator_rights, get_chat_administrator_rights(get_json_object_field_force(
                                                          request_chat_object, "user_administrator_rights")));
       }
-      td_api::object_ptr<td_api::chatAdministratorRights> bot_administrator_rights;
+      object_ptr<td_api::chatAdministratorRights> bot_administrator_rights;
       if (has_json_object_field(request_chat_object, "bot_administrator_rights")) {
         TRY_RESULT_ASSIGN(bot_administrator_rights, get_chat_administrator_rights(get_json_object_field_force(
                                                         request_chat_object, "bot_administrator_rights")));
@@ -6476,7 +6476,7 @@ td::Result<td_api::object_ptr<td_api::botMenuButton>> Client::get_bot_menu_butto
 
   TRY_RESULT(type, get_json_object_string_field(object, "type", false));
   if (type == "default") {
-    return td_api::make_object<td_api::botMenuButton>("", "default");
+    return make_object<td_api::botMenuButton>("", "default");
   }
   if (type == "commands") {
     return nullptr;
@@ -6486,7 +6486,7 @@ td::Result<td_api::object_ptr<td_api::botMenuButton>> Client::get_bot_menu_butto
     TRY_RESULT(web_app, get_json_object_field(object, "web_app", td::JsonValue::Type::Object, false));
     auto &web_app_object = web_app.get_object();
     TRY_RESULT(url, get_json_object_string_field(web_app_object, "url", false));
-    return td_api::make_object<td_api::botMenuButton>(text, url);
+    return make_object<td_api::botMenuButton>(text, url);
   }
 
   return td::Status::Error(400, "MenuButton has unsupported type");
@@ -6495,7 +6495,7 @@ td::Result<td_api::object_ptr<td_api::botMenuButton>> Client::get_bot_menu_butto
 td::Result<td_api::object_ptr<td_api::botMenuButton>> Client::get_bot_menu_button(const Query *query) {
   auto menu_button = query->arg("menu_button");
   if (menu_button.empty()) {
-    return td_api::make_object<td_api::botMenuButton>("", "default");
+    return make_object<td_api::botMenuButton>("", "default");
   }
 
   LOG(INFO) << "Parsing JSON object: " << menu_button;
@@ -8976,7 +8976,7 @@ td::Status Client::process_set_chat_administrator_custom_title_query(PromisedQue
           if (chat_member->status_->get_id() != td_api::chatMemberStatusAdministrator::ID) {
             return fail_query(400, "Bad Request: user is not an administrator", std::move(query));
           }
-          auto administrator = td_api::move_object_as<td_api::chatMemberStatusAdministrator>(chat_member->status_);
+          auto administrator = move_object_as<td_api::chatMemberStatusAdministrator>(chat_member->status_);
           if (!administrator->can_be_edited_) {
             return fail_query(400, "Bad Request: not enough rights to change custom title of the user",
                               std::move(query));
@@ -9195,7 +9195,7 @@ td::Status Client::process_get_custom_emoji_stickers_query(PromisedQueryPtr &que
 td::Status Client::process_upload_sticker_file_query(PromisedQueryPtr &query) {
   TRY_RESULT(user_id, get_user_id(query.get()));
   object_ptr<td_api::StickerFormat> sticker_format;
-  td_api::object_ptr<td_api::InputFile> sticker;
+  object_ptr<td_api::InputFile> sticker;
   if (query->has_arg("sticker") || query->file("sticker") != nullptr) {
     TRY_RESULT_ASSIGN(sticker_format, get_sticker_format(query->arg("sticker_format")));
     sticker = get_input_file(query.get(), "sticker", true);
