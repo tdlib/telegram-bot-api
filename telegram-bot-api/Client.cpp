@@ -43,8 +43,8 @@ using td::JsonValueScope;
 using td_api::make_object;
 using td_api::move_object_as;
 
-int Client::get_retry_after_time(Slice error_message) {
-  Slice prefix = "Too Many Requests: retry after ";
+int Client::get_retry_after_time(td::Slice error_message) {
+  td::Slice prefix = "Too Many Requests: retry after ";
   if (begins_with(error_message, prefix)) {
     auto r_retry_after = td::to_integer_safe<int>(error_message.substr(prefix.size()));
     if (r_retry_after.is_ok() && r_retry_after.ok() > 0) {
@@ -54,8 +54,8 @@ int Client::get_retry_after_time(Slice error_message) {
   return 0;
 }
 
-void Client::fail_query_with_error(PromisedQueryPtr query, int32 error_code, Slice error_message,
-                                   Slice default_message) {
+void Client::fail_query_with_error(PromisedQueryPtr query, int32 error_code, td::Slice error_message,
+                                   td::Slice default_message) {
   if (error_code == 429) {
     auto retry_after_time = get_retry_after_time(error_message);
     if (retry_after_time > 0) {
@@ -65,7 +65,7 @@ void Client::fail_query_with_error(PromisedQueryPtr query, int32 error_code, Sli
     return fail_query(500, error_message, std::move(query));
   }
   int32 real_error_code = error_code;
-  Slice real_error_message = error_message;
+  td::Slice real_error_message = error_message;
   if (error_code < 400 || error_code == 404) {
     if (error_code < 200) {
       LOG(ERROR) << "Receive error \"" << real_error_message << "\" with code " << error_code << " from " << *query;
@@ -91,7 +91,7 @@ void Client::fail_query_with_error(PromisedQueryPtr query, int32 error_code, Sli
       error_message = default_message;
     }
     if (error_message == "MESSAGE_NOT_MODIFIED") {
-      error_message = Slice(
+      error_message = td::Slice(
           "message is not modified: specified new message content and reply markup are exactly the same as a current "
           "content and reply markup of the message");
     } else if (error_message == "WC_CONVERT_URL_INVALID" || error_message == "EXTERNAL_URL_INVALID") {
@@ -103,53 +103,53 @@ void Client::fail_query_with_error(PromisedQueryPtr query, int32 error_code, Sli
     } else if (error_message == "MEDIA_GROUPED_INVALID") {
       error_message = "Can't use the media of the specified type in the album";
     } else if (error_message == "REPLY_MARKUP_TOO_LONG") {
-      error_message = Slice("reply markup is too long");
+      error_message = td::Slice("reply markup is too long");
     } else if (error_message == "INPUT_USER_DEACTIVATED") {
       error_code = 403;
-      error_message = Slice("Forbidden: user is deactivated");
+      error_message = td::Slice("Forbidden: user is deactivated");
     } else if (error_message == "USER_IS_BLOCKED") {
       error_code = 403;
-      error_message = Slice("bot was blocked by the user");
+      error_message = td::Slice("bot was blocked by the user");
     } else if (error_message == "USER_ADMIN_INVALID") {
       error_code = 400;
-      error_message = Slice("user is an administrator of the chat");
+      error_message = td::Slice("user is an administrator of the chat");
     } else if (error_message == "File generation failed") {
       error_code = 400;
-      error_message = Slice("can't upload file by URL");
+      error_message = td::Slice("can't upload file by URL");
     } else if (error_message == "CHAT_ABOUT_NOT_MODIFIED") {
       error_code = 400;
-      error_message = Slice("chat description is not modified");
+      error_message = td::Slice("chat description is not modified");
     } else if (error_message == "PACK_SHORT_NAME_INVALID") {
       error_code = 400;
-      error_message = Slice("invalid sticker set name is specified");
+      error_message = td::Slice("invalid sticker set name is specified");
     } else if (error_message == "PACK_SHORT_NAME_OCCUPIED") {
       error_code = 400;
-      error_message = Slice("sticker set name is already occupied");
+      error_message = td::Slice("sticker set name is already occupied");
     } else if (error_message == "STICKER_EMOJI_INVALID") {
       error_code = 400;
-      error_message = Slice("invalid sticker emojis");
+      error_message = td::Slice("invalid sticker emojis");
     } else if (error_message == "QUERY_ID_INVALID") {
       error_code = 400;
-      error_message = Slice("query is too old and response timeout expired or query ID is invalid");
+      error_message = td::Slice("query is too old and response timeout expired or query ID is invalid");
     } else if (error_message == "MESSAGE_DELETE_FORBIDDEN") {
       error_code = 400;
-      error_message = Slice("message can't be deleted");
+      error_message = td::Slice("message can't be deleted");
     }
   }
-  Slice prefix;
+  td::Slice prefix;
   switch (error_code) {
     case 400:
-      prefix = Slice("Bad Request");
+      prefix = td::Slice("Bad Request");
       break;
     case 401:
-      prefix = Slice("Unauthorized");
+      prefix = td::Slice("Unauthorized");
       break;
     case 403:
-      prefix = Slice("Forbidden");
+      prefix = td::Slice("Forbidden");
       break;
     case 500:
-      prefix = Slice("Internal Server Error");
-      if (real_error_message != Slice("Request aborted")) {
+      prefix = td::Slice("Internal Server Error");
+      if (real_error_message != td::Slice("Request aborted")) {
         LOG(ERROR) << "Receive Internal Server Error \"" << real_error_message << "\" from " << *query;
       }
       break;
@@ -178,7 +178,8 @@ void Client::fail_query_with_error(PromisedQueryPtr query, int32 error_code, Sli
   }
 }
 
-void Client::fail_query_with_error(PromisedQueryPtr &&query, object_ptr<td_api::error> error, Slice default_message) {
+void Client::fail_query_with_error(PromisedQueryPtr &&query, object_ptr<td_api::error> error,
+                                   td::Slice default_message) {
   fail_query_with_error(std::move(query), error->code_, error->message_, default_message);
 }
 
@@ -315,7 +316,7 @@ bool Client::init_methods() {
   return true;
 }
 
-bool Client::is_local_method(Slice method) {
+bool Client::is_local_method(td::Slice method) {
   return method == "close" || method == "logout" || method == "getme" || method == "getupdates" ||
          method == "setwebhook" || method == "deletewebhook" || method == "getwebhookinfo";
 }
@@ -707,7 +708,7 @@ class Client::JsonChat final : public Jsonable {
         if (is_full_) {
           if (!user_info->active_usernames.empty()) {
             object("active_usernames", td::json_array(user_info->active_usernames,
-                                                      [](Slice username) { return td::JsonString(username); }));
+                                                      [](td::Slice username) { return td::JsonString(username); }));
           }
           if (user_info->emoji_status_custom_emoji_id != 0) {
             object("emoji_status_custom_emoji_id", td::to_string(user_info->emoji_status_custom_emoji_id));
@@ -772,7 +773,7 @@ class Client::JsonChat final : public Jsonable {
         if (is_full_) {
           if (!supergroup_info->active_usernames.empty()) {
             object("active_usernames", td::json_array(supergroup_info->active_usernames,
-                                                      [](Slice username) { return td::JsonString(username); }));
+                                                      [](td::Slice username) { return td::JsonString(username); }));
           }
           if (!supergroup_info->description.empty()) {
             object("description", supergroup_info->description);
@@ -3286,7 +3287,7 @@ class Client::TdOnResolveBotUsernameCallback final : public TdQueryCallback {
 template <class OnSuccess>
 class Client::TdOnCheckMessageCallback final : public TdQueryCallback {
  public:
-  TdOnCheckMessageCallback(Client *client, int64 chat_id, int64 message_id, bool allow_empty, Slice message_type,
+  TdOnCheckMessageCallback(Client *client, int64 chat_id, int64 message_id, bool allow_empty, td::Slice message_type,
                            PromisedQueryPtr query, OnSuccess on_success)
       : client_(client)
       , chat_id_(chat_id)
@@ -3321,7 +3322,7 @@ class Client::TdOnCheckMessageCallback final : public TdQueryCallback {
   int64 chat_id_;
   int64 message_id_;
   bool allow_empty_;
-  Slice message_type_;
+  td::Slice message_type_;
   PromisedQueryPtr query_;
   OnSuccess on_success_;
 };
@@ -3425,7 +3426,7 @@ class Client::TdOnDownloadFileCallback final : public TdQueryCallback {
   void on_result(object_ptr<td_api::Object> result) final {
     if (result->get_id() == td_api::error::ID) {
       auto error = move_object_as<td_api::error>(result);
-      return client_->on_file_download(file_id_, Status::Error(error->code_, error->message_));
+      return client_->on_file_download(file_id_, td::Status::Error(error->code_, error->message_));
     }
     CHECK(result->get_id() == td_api::file::ID);
     if (client_->is_file_being_downloaded(file_id_)) {  // if download is yet not finished
@@ -3993,7 +3994,7 @@ class Client::TdOnGetStickerSetPromiseCallback final : public TdQueryCallback {
   void on_result(object_ptr<td_api::Object> result) final {
     if (result->get_id() == td_api::error::ID) {
       auto error = move_object_as<td_api::error>(result);
-      return promise_.set_error(Status::Error(error->code_, error->message_));
+      return promise_.set_error(td::Status::Error(error->code_, error->message_));
     }
 
     CHECK(result->get_id() == td_api::stickerSet::ID);
@@ -4074,7 +4075,7 @@ void Client::close() {
   }
 }
 
-void Client::log_out(int32 error_code, Slice error_message) {
+void Client::log_out(int32 error_code, td::Slice error_message) {
   LOG(WARNING) << "Logging out due to error " << error_code << ": " << error_message;
   if (error_message == "API_ID_INVALID") {
     is_api_id_invalid_ = true;
@@ -4446,7 +4447,8 @@ void Client::check_chat_access(int64 chat_id, AccessRights access_rights, const 
 }
 
 template <class OnSuccess>
-void Client::check_chat(Slice chat_id_str, AccessRights access_rights, PromisedQueryPtr query, OnSuccess on_success) {
+void Client::check_chat(td::Slice chat_id_str, AccessRights access_rights, PromisedQueryPtr query,
+                        OnSuccess on_success) {
   if (chat_id_str.empty()) {
     return fail_query(400, "Bad Request: chat_id is empty", std::move(query));
   }
@@ -4468,7 +4470,7 @@ void Client::check_chat(Slice chat_id_str, AccessRights access_rights, PromisedQ
 }
 
 template <class OnSuccess>
-void Client::check_chat_no_fail(Slice chat_id_str, PromisedQueryPtr query, OnSuccess on_success) {
+void Client::check_chat_no_fail(td::Slice chat_id_str, PromisedQueryPtr query, OnSuccess on_success) {
   if (chat_id_str.empty()) {
     return fail_query(400, "Bad Request: sender_chat_id is empty", std::move(query));
   }
@@ -4560,8 +4562,8 @@ bool Client::have_message_access(int64 chat_id) const {
 }
 
 template <class OnSuccess>
-void Client::check_message(Slice chat_id_str, int64 message_id, bool allow_empty, AccessRights access_rights,
-                           Slice message_type, PromisedQueryPtr query, OnSuccess on_success) {
+void Client::check_message(td::Slice chat_id_str, int64 message_id, bool allow_empty, AccessRights access_rights,
+                           td::Slice message_type, PromisedQueryPtr query, OnSuccess on_success) {
   check_chat(chat_id_str, access_rights, std::move(query),
              [this, message_id, allow_empty, message_type, on_success = std::move(on_success)](
                  int64 chat_id, PromisedQueryPtr query) mutable {
@@ -4780,7 +4782,7 @@ void Client::on_update_file(object_ptr<td_api::file> file) {
       send_request(make_object<td_api::cancelDownloadFile>(file_id, false),
                    td::make_unique<TdOnCancelDownloadFileCallback>());
     }
-    return on_file_download(file_id, Status::Error(400, "Bad Request: file is too big"));
+    return on_file_download(file_id, td::Status::Error(400, "Bad Request: file is too big"));
   }
   if (file->local_->is_downloading_completed_) {
     return on_file_download(file_id, std::move(file));
@@ -4789,10 +4791,10 @@ void Client::on_update_file(object_ptr<td_api::file> file) {
     // also includes all 5xx and 429 errors
     if (closing_ || logging_out_) {
       auto error = get_closing_error();
-      return on_file_download(file_id, Status::Error(error.code, error.message));
+      return on_file_download(file_id, td::Status::Error(error.code, error.message));
     }
 
-    auto error = Status::Error(400, "Bad Request: wrong file_id or the file is temporarily unavailable");
+    auto error = td::Status::Error(400, "Bad Request: wrong file_id or the file is temporarily unavailable");
     return on_file_download(file_id, std::move(error));
   }
 }
@@ -4935,7 +4937,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
     case td_api::updateMessageSendFailed::ID: {
       auto update = move_object_as<td_api::updateMessageSendFailed>(result);
       on_message_send_failed(update->message_->chat_id_, update->old_message_id_, update->message_->id_,
-                             Status::Error(update->error_code_, update->error_message_));
+                             td::Status::Error(update->error_code_, update->error_message_));
       break;
     }
     case td_api::updateMessageContent::ID: {
@@ -5443,12 +5445,12 @@ td::Result<td_api::object_ptr<td_api::keyboardButton>> Client::get_keyboard_butt
     return make_object<td_api::keyboardButton>(button.get_string().str(), nullptr);
   }
 
-  return Status::Error(400, "KeyboardButton must be a String or an Object");
+  return td::Status::Error(400, "KeyboardButton must be a String or an Object");
 }
 
 td::Result<td_api::object_ptr<td_api::inlineKeyboardButton>> Client::get_inline_keyboard_button(JsonValue &button) {
   if (button.type() != JsonValue::Type::Object) {
-    return Status::Error(400, "InlineKeyboardButton must be an Object");
+    return td::Status::Error(400, "InlineKeyboardButton must be an Object");
   }
 
   auto &object = button.get_object();
@@ -5506,15 +5508,15 @@ td::Result<td_api::object_ptr<td_api::inlineKeyboardButton>> Client::get_inline_
         bot_username = bot_username.substr(1);
       }
       if (bot_username.empty()) {
-        return Status::Error(400, "LoginUrl bot username is invalid");
+        return td::Status::Error(400, "LoginUrl bot username is invalid");
       }
       for (auto c : bot_username) {
         if (c != '_' && !td::is_alnum(c)) {
-          return Status::Error(400, "LoginUrl bot username is invalid");
+          return td::Status::Error(400, "LoginUrl bot username is invalid");
         }
       }
       if (cur_temp_bot_user_id_ >= 100000) {
-        return Status::Error(400, "Too many different LoginUrl bot usernames");
+        return td::Status::Error(400, "Too many different LoginUrl bot usernames");
       }
       auto &user_id = bot_user_ids_[bot_username];
       if (user_id == 0) {
@@ -5540,7 +5542,7 @@ td::Result<td_api::object_ptr<td_api::inlineKeyboardButton>> Client::get_inline_
     return make_object<td_api::inlineKeyboardButton>(text, make_object<td_api::inlineKeyboardButtonTypeWebApp>(url));
   }
 
-  return Status::Error(400, "Text buttons are unallowed in the inline keyboard");
+  return td::Status::Error(400, "Text buttons are unallowed in the inline keyboard");
 }
 
 td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(const Query *query) {
@@ -5553,7 +5555,7 @@ td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(con
   auto r_value = json_decode(reply_markup);
   if (r_value.is_error()) {
     LOG(INFO) << "Can't parse JSON object: " << r_value.error();
-    return Status::Error(400, "Can't parse reply keyboard markup JSON object");
+    return td::Status::Error(400, "Can't parse reply keyboard markup JSON object");
   }
 
   return get_reply_markup(r_value.move_as_ok());
@@ -5562,7 +5564,7 @@ td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(con
 td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(JsonValue &&value) {
   td::vector<td::vector<object_ptr<td_api::keyboardButton>>> rows;
   td::vector<td::vector<object_ptr<td_api::inlineKeyboardButton>>> inline_rows;
-  Slice input_field_placeholder;
+  td::Slice input_field_placeholder;
   bool resize_keyboard = false;
   bool is_persistent = false;
   bool one_time = false;
@@ -5571,23 +5573,23 @@ td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(Jso
   bool force_reply = false;
 
   if (value.type() != JsonValue::Type::Object) {
-    return Status::Error(400, "Object expected as reply markup");
+    return td::Status::Error(400, "Object expected as reply markup");
   }
   for (auto &field_value : value.get_object()) {
     if (field_value.first == "keyboard") {
       auto keyboard = std::move(field_value.second);
       if (keyboard.type() != JsonValue::Type::Array) {
-        return Status::Error(400, "Field \"keyboard\" of the ReplyKeyboardMarkup must be an Array");
+        return td::Status::Error(400, "Field \"keyboard\" of the ReplyKeyboardMarkup must be an Array");
       }
       for (auto &row : keyboard.get_array()) {
         td::vector<object_ptr<td_api::keyboardButton>> new_row;
         if (row.type() != JsonValue::Type::Array) {
-          return Status::Error(400, "Field \"keyboard\" of the ReplyKeyboardMarkup must be an Array of Arrays");
+          return td::Status::Error(400, "Field \"keyboard\" of the ReplyKeyboardMarkup must be an Array of Arrays");
         }
         for (auto &button : row.get_array()) {
           auto r_button = get_keyboard_button(button);
           if (r_button.is_error()) {
-            return Status::Error(400, PSLICE() << "Can't parse keyboard button: " << r_button.error().message());
+            return td::Status::Error(400, PSLICE() << "Can't parse keyboard button: " << r_button.error().message());
           }
           new_row.push_back(r_button.move_as_ok());
         }
@@ -5597,17 +5599,19 @@ td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(Jso
     } else if (field_value.first == "inline_keyboard") {
       auto inline_keyboard = std::move(field_value.second);
       if (inline_keyboard.type() != JsonValue::Type::Array) {
-        return Status::Error(400, "Field \"inline_keyboard\" of the InlineKeyboardMarkup must be an Array");
+        return td::Status::Error(400, "Field \"inline_keyboard\" of the InlineKeyboardMarkup must be an Array");
       }
       for (auto &inline_row : inline_keyboard.get_array()) {
         td::vector<object_ptr<td_api::inlineKeyboardButton>> new_inline_row;
         if (inline_row.type() != JsonValue::Type::Array) {
-          return Status::Error(400, "Field \"inline_keyboard\" of the InlineKeyboardMarkup must be an Array of Arrays");
+          return td::Status::Error(400,
+                                   "Field \"inline_keyboard\" of the InlineKeyboardMarkup must be an Array of Arrays");
         }
         for (auto &button : inline_row.get_array()) {
           auto r_button = get_inline_keyboard_button(button);
           if (r_button.is_error()) {
-            return Status::Error(400, PSLICE() << "Can't parse inline keyboard button: " << r_button.error().message());
+            return td::Status::Error(400, PSLICE()
+                                              << "Can't parse inline keyboard button: " << r_button.error().message());
           }
           new_inline_row.push_back(r_button.move_as_ok());
         }
@@ -5616,37 +5620,41 @@ td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(Jso
       }
     } else if (field_value.first == "resize_keyboard") {
       if (field_value.second.type() != JsonValue::Type::Boolean) {
-        return Status::Error(400, "Field \"resize_keyboard\" of the ReplyKeyboardMarkup must be of the type Boolean");
+        return td::Status::Error(400,
+                                 "Field \"resize_keyboard\" of the ReplyKeyboardMarkup must be of the type Boolean");
       }
       resize_keyboard = field_value.second.get_boolean();
     } else if (field_value.first == "is_persistent") {
       if (field_value.second.type() != JsonValue::Type::Boolean) {
-        return Status::Error(400, "Field \"is_persistent\" of the ReplyKeyboardMarkup must be of the type Boolean");
+        return td::Status::Error(400, "Field \"is_persistent\" of the ReplyKeyboardMarkup must be of the type Boolean");
       }
       is_persistent = field_value.second.get_boolean();
     } else if (field_value.first == "one_time_keyboard") {
       if (field_value.second.type() != JsonValue::Type::Boolean) {
-        return Status::Error(400, "Field \"one_time_keyboard\" of the ReplyKeyboardMarkup must be of the type Boolean");
+        return td::Status::Error(400,
+                                 "Field \"one_time_keyboard\" of the ReplyKeyboardMarkup must be of the type Boolean");
       }
       one_time = field_value.second.get_boolean();
     } else if (field_value.first == "hide_keyboard" || field_value.first == "remove_keyboard") {
       if (field_value.second.type() != JsonValue::Type::Boolean) {
-        return Status::Error(400, "Field \"remove_keyboard\" of the ReplyKeyboardRemove must be of the type Boolean");
+        return td::Status::Error(400,
+                                 "Field \"remove_keyboard\" of the ReplyKeyboardRemove must be of the type Boolean");
       }
       remove = field_value.second.get_boolean();
     } else if (field_value.first == "personal_keyboard" || field_value.first == "selective") {
       if (field_value.second.type() != JsonValue::Type::Boolean) {
-        return Status::Error(400, "Field \"selective\" of the reply markup must be of the type Boolean");
+        return td::Status::Error(400, "Field \"selective\" of the reply markup must be of the type Boolean");
       }
       is_personal = field_value.second.get_boolean();
     } else if (field_value.first == "force_reply_keyboard" || field_value.first == "force_reply") {
       if (field_value.second.type() != JsonValue::Type::Boolean) {
-        return Status::Error(400, "Field \"force_reply\" of the reply markup must be of the type Boolean");
+        return td::Status::Error(400, "Field \"force_reply\" of the reply markup must be of the type Boolean");
       }
       force_reply = field_value.second.get_boolean();
     } else if (field_value.first == "input_field_placeholder") {
       if (field_value.second.type() != JsonValue::Type::String) {
-        return Status::Error(400, "Field \"input_field_placeholder\" of the reply markup must be of the type String");
+        return td::Status::Error(400,
+                                 "Field \"input_field_placeholder\" of the reply markup must be of the type String");
       }
       input_field_placeholder = field_value.second.get_string();
     }
@@ -5672,47 +5680,47 @@ td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(Jso
 
 td::Result<td_api::object_ptr<td_api::labeledPricePart>> Client::get_labeled_price_part(JsonValue &value) {
   if (value.type() != JsonValue::Type::Object) {
-    return Status::Error(400, "LabeledPrice must be an Object");
+    return td::Status::Error(400, "LabeledPrice must be an Object");
   }
 
   auto &object = value.get_object();
 
   TRY_RESULT(label, get_json_object_string_field(object, "label", false));
   if (label.empty()) {
-    return Status::Error(400, "LabeledPrice label must be non-empty");
+    return td::Status::Error(400, "LabeledPrice label must be non-empty");
   }
 
   TRY_RESULT(amount, get_json_object_field(object, "amount", JsonValue::Type::Null, false));
-  Slice number;
+  td::Slice number;
   if (amount.type() == JsonValue::Type::Number) {
     number = amount.get_number();
   } else if (amount.type() == JsonValue::Type::String) {
     number = amount.get_string();
   } else {
-    return Status::Error(400, "Field \"amount\" must be of type Number or String");
+    return td::Status::Error(400, "Field \"amount\" must be of type Number or String");
   }
   auto parsed_amount = td::to_integer_safe<int64>(number);
   if (parsed_amount.is_error()) {
-    return Status::Error(400, "Can't parse \"amount\" as Number");
+    return td::Status::Error(400, "Can't parse \"amount\" as Number");
   }
   return make_object<td_api::labeledPricePart>(label, parsed_amount.ok());
 }
 
 td::Result<td::vector<td_api::object_ptr<td_api::labeledPricePart>>> Client::get_labeled_price_parts(JsonValue &value) {
   if (value.type() != JsonValue::Type::Array) {
-    return Status::Error(400, "Expected an Array of labeled prices");
+    return td::Status::Error(400, "Expected an Array of labeled prices");
   }
 
   td::vector<object_ptr<td_api::labeledPricePart>> prices;
   for (auto &price : value.get_array()) {
     auto r_labeled_price = get_labeled_price_part(price);
     if (r_labeled_price.is_error()) {
-      return Status::Error(400, PSLICE() << "Can't parse labeled price: " << r_labeled_price.error().message());
+      return td::Status::Error(400, PSLICE() << "Can't parse labeled price: " << r_labeled_price.error().message());
     }
     prices.push_back(r_labeled_price.move_as_ok());
   }
   if (prices.empty()) {
-    return Status::Error(400, "There must be at least one price");
+    return td::Status::Error(400, "There must be at least one price");
   }
 
   return std::move(prices);
@@ -5720,22 +5728,22 @@ td::Result<td::vector<td_api::object_ptr<td_api::labeledPricePart>>> Client::get
 
 td::Result<td::vector<td::int64>> Client::get_suggested_tip_amounts(JsonValue &value) {
   if (value.type() != JsonValue::Type::Array) {
-    return Status::Error(400, "Expected an Array of suggested tip amounts");
+    return td::Status::Error(400, "Expected an Array of suggested tip amounts");
   }
 
   td::vector<int64> suggested_tip_amounts;
   for (auto &amount : value.get_array()) {
-    Slice number;
+    td::Slice number;
     if (amount.type() == JsonValue::Type::Number) {
       number = amount.get_number();
     } else if (amount.type() == JsonValue::Type::String) {
       number = amount.get_string();
     } else {
-      return Status::Error(400, "Suggested tip amount must be of type Number or String");
+      return td::Status::Error(400, "Suggested tip amount must be of type Number or String");
     }
     auto parsed_amount = td::to_integer_safe<int64>(number);
     if (parsed_amount.is_error()) {
-      return Status::Error(400, "Can't parse suggested tip amount as Number");
+      return td::Status::Error(400, "Can't parse suggested tip amount as Number");
     }
     suggested_tip_amounts.push_back(parsed_amount.ok());
   }
@@ -5744,26 +5752,26 @@ td::Result<td::vector<td::int64>> Client::get_suggested_tip_amounts(JsonValue &v
 
 td::Result<td_api::object_ptr<td_api::shippingOption>> Client::get_shipping_option(JsonValue &option) {
   if (option.type() != JsonValue::Type::Object) {
-    return Status::Error(400, "ShippingOption must be an Object");
+    return td::Status::Error(400, "ShippingOption must be an Object");
   }
 
   auto &object = option.get_object();
 
   TRY_RESULT(id, get_json_object_string_field(object, "id", false));
   if (id.empty()) {
-    return Status::Error(400, "ShippingOption identifier must be non-empty");
+    return td::Status::Error(400, "ShippingOption identifier must be non-empty");
   }
 
   TRY_RESULT(title, get_json_object_string_field(object, "title", false));
   if (title.empty()) {
-    return Status::Error(400, "ShippingOption title must be non-empty");
+    return td::Status::Error(400, "ShippingOption title must be non-empty");
   }
 
   TRY_RESULT(prices_json, get_json_object_field(object, "prices", JsonValue::Type::Array, false));
 
   auto r_prices = get_labeled_price_parts(prices_json);
   if (r_prices.is_error()) {
-    return Status::Error(400, PSLICE() << "Can't parse shipping option prices: " << r_prices.error().message());
+    return td::Status::Error(400, PSLICE() << "Can't parse shipping option prices: " << r_prices.error().message());
   }
 
   return make_object<td_api::shippingOption>(id, title, r_prices.move_as_ok());
@@ -5776,7 +5784,7 @@ td::Result<td::vector<td_api::object_ptr<td_api::shippingOption>>> Client::get_s
   auto r_value = json_decode(shipping_options);
   if (r_value.is_error()) {
     LOG(INFO) << "Can't parse JSON object: " << r_value.error();
-    return Status::Error(400, "Can't parse shipping options JSON object");
+    return td::Status::Error(400, "Can't parse shipping options JSON object");
   }
 
   return get_shipping_options(r_value.move_as_ok());
@@ -5784,19 +5792,19 @@ td::Result<td::vector<td_api::object_ptr<td_api::shippingOption>>> Client::get_s
 
 td::Result<td::vector<td_api::object_ptr<td_api::shippingOption>>> Client::get_shipping_options(JsonValue &&value) {
   if (value.type() != JsonValue::Type::Array) {
-    return Status::Error(400, "Expected an Array of shipping options");
+    return td::Status::Error(400, "Expected an Array of shipping options");
   }
 
   td::vector<object_ptr<td_api::shippingOption>> options;
   for (auto &option : value.get_array()) {
     auto r_shipping_option = get_shipping_option(option);
     if (r_shipping_option.is_error()) {
-      return Status::Error(400, PSLICE() << "Can't parse shipping option: " << r_shipping_option.error().message());
+      return td::Status::Error(400, PSLICE() << "Can't parse shipping option: " << r_shipping_option.error().message());
     }
     options.push_back(r_shipping_option.move_as_ok());
   }
   if (options.empty()) {
-    return Status::Error(400, "There must be at least one shipping option");
+    return td::Status::Error(400, "There must be at least one shipping option");
   }
 
   return std::move(options);
@@ -5844,12 +5852,12 @@ td_api::object_ptr<td_api::ChatAction> Client::get_chat_action(const Query *quer
   return nullptr;
 }
 
-td_api::object_ptr<td_api::InputFile> Client::get_input_file(const Query *query, Slice field_name,
+td_api::object_ptr<td_api::InputFile> Client::get_input_file(const Query *query, td::Slice field_name,
                                                              bool force_file) const {
   return get_input_file(query, field_name, query->arg(field_name), force_file);
 }
 
-td::string Client::get_local_file_path(Slice file_uri) {
+td::string Client::get_local_file_path(td::Slice file_uri) {
   if (td::begins_with(file_uri, "/")) {
     file_uri.remove_prefix(td::begins_with(file_uri, "/localhost") ? 10 : 1);
   }
@@ -5864,16 +5872,16 @@ td::string Client::get_local_file_path(Slice file_uri) {
   return result;
 }
 
-td_api::object_ptr<td_api::InputFile> Client::get_input_file(const Query *query, Slice field_name, Slice file_id,
-                                                             bool force_file) const {
+td_api::object_ptr<td_api::InputFile> Client::get_input_file(const Query *query, td::Slice field_name,
+                                                             td::Slice file_id, bool force_file) const {
   if (!file_id.empty()) {
     if (parameters_->local_mode_) {
-      Slice file_protocol{"file:/"};
+      td::Slice file_protocol{"file:/"};
       if (td::begins_with(file_id, file_protocol)) {
         return make_object<td_api::inputFileLocal>(get_local_file_path(file_id.substr(file_protocol.size())));
       }
     }
-    Slice attach_protocol{"attach://"};
+    td::Slice attach_protocol{"attach://"};
     if (td::begins_with(file_id, attach_protocol)) {
       field_name = file_id.substr(attach_protocol.size());
     } else {
@@ -5970,7 +5978,7 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
     TRY_RESULT(description, get_json_object_string_field(object, "description", false));
     TRY_RESULT(payload, get_json_object_string_field(object, "payload", false));
     if (!td::check_utf8(payload)) {
-      return Status::Error(400, "InputInvoiceMessageContent payload must be encoded in UTF-8");
+      return td::Status::Error(400, "InputInvoiceMessageContent payload must be encoded in UTF-8");
     }
     TRY_RESULT(provider_token, get_json_object_string_field(object, "provider_token", false));
     TRY_RESULT(currency, get_json_object_string_field(object, "currency", false));
@@ -6006,7 +6014,7 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
   }
 
   if (is_input_message_content_required) {
-    return Status::Error(400, "Input message content is not specified");
+    return td::Status::Error(400, "Input message content is not specified");
   }
   return nullptr;
 }
@@ -6026,8 +6034,8 @@ td::Result<td::vector<td_api::object_ptr<td_api::InputInlineQueryResult>>> Clien
   LOG(INFO) << "Parsing JSON object: " << results_encoded;
   auto r_values = json_decode(results_encoded);
   if (r_values.is_error()) {
-    return Status::Error(400,
-                         PSLICE() << "Can't parse JSON encoded inline query results: " << r_values.error().message());
+    return td::Status::Error(
+        400, PSLICE() << "Can't parse JSON encoded inline query results: " << r_values.error().message());
   }
 
   return get_inline_query_results(r_values.move_as_ok());
@@ -6039,15 +6047,15 @@ td::Result<td::vector<td_api::object_ptr<td_api::InputInlineQueryResult>>> Clien
     return td::vector<object_ptr<td_api::InputInlineQueryResult>>();
   }
   if (values.type() != JsonValue::Type::Array) {
-    return Status::Error(400, "Expected an Array of inline query results");
+    return td::Status::Error(400, "Expected an Array of inline query results");
   }
 
   td::vector<object_ptr<td_api::InputInlineQueryResult>> inline_query_results;
   for (auto &value : values.get_array()) {
     auto r_inline_query_result = get_inline_query_result(std::move(value));
     if (r_inline_query_result.is_error()) {
-      return Status::Error(400,
-                           PSLICE() << "Can't parse inline query result: " << r_inline_query_result.error().message());
+      return td::Status::Error(
+          400, PSLICE() << "Can't parse inline query result: " << r_inline_query_result.error().message());
     }
     inline_query_results.push_back(r_inline_query_result.move_as_ok());
   }
@@ -6058,14 +6066,14 @@ td::Result<td::vector<td_api::object_ptr<td_api::InputInlineQueryResult>>> Clien
 td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inline_query_result(const Query *query) {
   auto result_encoded = query->arg("result");
   if (result_encoded.empty()) {
-    return Status::Error(400, "Result isn't specified");
+    return td::Status::Error(400, "Result isn't specified");
   }
 
   LOG(INFO) << "Parsing JSON object: " << result_encoded;
   auto r_value = json_decode(result_encoded);
   if (r_value.is_error()) {
-    return Status::Error(400,
-                         PSLICE() << "Can't parse JSON encoded web view query results " << r_value.error().message());
+    return td::Status::Error(
+        400, PSLICE() << "Can't parse JSON encoded web view query results " << r_value.error().message());
   }
 
   return get_inline_query_result(r_value.move_as_ok());
@@ -6073,7 +6081,7 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
 
 td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inline_query_result(td::JsonValue &&value) {
   if (value.type() != JsonValue::Type::Object) {
-    return Status::Error(400, "Inline query result must be an object");
+    return td::Status::Error(400, "Inline query result must be an object");
   }
 
   auto &object = value.get_object();
@@ -6115,15 +6123,15 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
     TRY_RESULT_ASSIGN(reply_markup, get_reply_markup(std::move(reply_markup_object)));
   }
 
-  auto thumbnail_url_field_name = Slice("thumbnail_url");
-  auto thumbnail_width_field_name = Slice("thumbnail_width");
-  auto thumbnail_height_field_name = Slice("thumbnail_height");
+  auto thumbnail_url_field_name = td::Slice("thumbnail_url");
+  auto thumbnail_width_field_name = td::Slice("thumbnail_width");
+  auto thumbnail_height_field_name = td::Slice("thumbnail_height");
   if (!has_json_object_field(object, thumbnail_url_field_name) &&
       !has_json_object_field(object, thumbnail_width_field_name) &&
       !has_json_object_field(object, thumbnail_height_field_name)) {
-    thumbnail_url_field_name = Slice("thumb_url");
-    thumbnail_width_field_name = Slice("thumb_width");
-    thumbnail_height_field_name = Slice("thumb_height");
+    thumbnail_url_field_name = td::Slice("thumb_url");
+    thumbnail_width_field_name = td::Slice("thumb_width");
+    thumbnail_height_field_name = td::Slice("thumb_height");
   }
   TRY_RESULT(thumbnail_url, get_json_object_string_field(object, thumbnail_url_field_name));
   TRY_RESULT(thumbnail_width, get_json_object_int_field(object, thumbnail_width_field_name));
@@ -6194,9 +6202,9 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
   if (type == "gif") {
     TRY_RESULT(title, get_json_object_string_field(object, "title"));
     TRY_RESULT(gif_url, get_json_object_string_field(object, "gif_url"));
-    auto thumbnail_mime_type_field_name = Slice("thumbnail_mime_type");
+    auto thumbnail_mime_type_field_name = td::Slice("thumbnail_mime_type");
     if (!has_json_object_field(object, thumbnail_mime_type_field_name)) {
-      thumbnail_mime_type_field_name = Slice("thumb_mime_type");
+      thumbnail_mime_type_field_name = td::Slice("thumb_mime_type");
     }
     TRY_RESULT(thumbnail_mime_type, get_json_object_string_field(object, thumbnail_mime_type_field_name));
     TRY_RESULT(gif_duration, get_json_object_int_field(object, "gif_duration"));
@@ -6235,9 +6243,9 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
   if (type == "mpeg4_gif") {
     TRY_RESULT(title, get_json_object_string_field(object, "title"));
     TRY_RESULT(mpeg4_url, get_json_object_string_field(object, "mpeg4_url"));
-    auto thumbnail_mime_type_field_name = Slice("thumbnail_mime_type");
+    auto thumbnail_mime_type_field_name = td::Slice("thumbnail_mime_type");
     if (!has_json_object_field(object, thumbnail_mime_type_field_name)) {
-      thumbnail_mime_type_field_name = Slice("thumb_mime_type");
+      thumbnail_mime_type_field_name = td::Slice("thumb_mime_type");
     }
     TRY_RESULT(thumbnail_mime_type, get_json_object_string_field(object, thumbnail_mime_type_field_name));
     TRY_RESULT(mpeg4_duration, get_json_object_int_field(object, "mpeg4_duration"));
@@ -6355,12 +6363,12 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
         id, title, voice_note_url, voice_note_duration, std::move(reply_markup), std::move(input_message_content));
   }
 
-  return Status::Error(400, PSLICE() << "type \"" << type << "\" is unsupported for the inline query result");
+  return td::Status::Error(400, PSLICE() << "type \"" << type << "\" is unsupported for the inline query result");
 }
 
 td::Result<Client::BotCommandScope> Client::get_bot_command_scope(JsonValue &&value) {
   if (value.type() != JsonValue::Type::Object) {
-    return Status::Error(400, "BotCommandScope must be an Object");
+    return td::Status::Error(400, "BotCommandScope must be an Object");
   }
 
   auto &object = value.get_object();
@@ -6379,12 +6387,12 @@ td::Result<Client::BotCommandScope> Client::get_bot_command_scope(JsonValue &&va
     return BotCommandScope(make_object<td_api::botCommandScopeAllChatAdministrators>());
   }
   if (type != "chat" && type != "chat_administrators" && type != "chat_member") {
-    return Status::Error(400, "Unsupported type specified");
+    return td::Status::Error(400, "Unsupported type specified");
   }
 
   TRY_RESULT(chat_id, get_json_object_string_field(object, "chat_id", false));
   if (chat_id.empty()) {
-    return Status::Error(400, "Empty chat_id specified");
+    return td::Status::Error(400, "Empty chat_id specified");
   }
   if (type == "chat") {
     return BotCommandScope(make_object<td_api::botCommandScopeChat>(0), std::move(chat_id));
@@ -6395,7 +6403,7 @@ td::Result<Client::BotCommandScope> Client::get_bot_command_scope(JsonValue &&va
 
   TRY_RESULT(user_id, get_json_object_long_field(object, "user_id", false));
   if (user_id <= 0) {
-    return Status::Error(400, "Invalid user_id specified");
+    return td::Status::Error(400, "Invalid user_id specified");
   }
   CHECK(type == "chat_member");
   return BotCommandScope(make_object<td_api::botCommandScopeChatMember>(0, user_id), std::move(chat_id), user_id);
@@ -6411,19 +6419,19 @@ td::Result<Client::BotCommandScope> Client::get_bot_command_scope(const Query *q
   auto r_value = json_decode(scope);
   if (r_value.is_error()) {
     LOG(INFO) << "Can't parse JSON object: " << r_value.error();
-    return Status::Error(400, "Can't parse BotCommandScope JSON object");
+    return td::Status::Error(400, "Can't parse BotCommandScope JSON object");
   }
 
   auto r_scope = get_bot_command_scope(r_value.move_as_ok());
   if (r_scope.is_error()) {
-    return Status::Error(400, PSLICE() << "Can't parse BotCommandScope: " << r_scope.error().message());
+    return td::Status::Error(400, PSLICE() << "Can't parse BotCommandScope: " << r_scope.error().message());
   }
   return r_scope.move_as_ok();
 }
 
 td::Result<td_api::object_ptr<td_api::botCommand>> Client::get_bot_command(JsonValue &&value) {
   if (value.type() != JsonValue::Type::Object) {
-    return Status::Error(400, "expected an Object");
+    return td::Status::Error(400, "expected an Object");
   }
 
   auto &object = value.get_object();
@@ -6443,19 +6451,19 @@ td::Result<td::vector<td_api::object_ptr<td_api::botCommand>>> Client::get_bot_c
   auto r_value = json_decode(commands);
   if (r_value.is_error()) {
     LOG(INFO) << "Can't parse JSON object: " << r_value.error();
-    return Status::Error(400, "Can't parse commands JSON object");
+    return td::Status::Error(400, "Can't parse commands JSON object");
   }
 
   auto value = r_value.move_as_ok();
   if (value.type() != JsonValue::Type::Array) {
-    return Status::Error(400, "Expected an Array of BotCommand");
+    return td::Status::Error(400, "Expected an Array of BotCommand");
   }
 
   td::vector<object_ptr<td_api::botCommand>> bot_commands;
   for (auto &command : value.get_array()) {
     auto r_bot_command = get_bot_command(std::move(command));
     if (r_bot_command.is_error()) {
-      return Status::Error(400, PSLICE() << "Can't parse BotCommand: " << r_bot_command.error().message());
+      return td::Status::Error(400, PSLICE() << "Can't parse BotCommand: " << r_bot_command.error().message());
     }
     bot_commands.push_back(r_bot_command.move_as_ok());
   }
@@ -6464,7 +6472,7 @@ td::Result<td::vector<td_api::object_ptr<td_api::botCommand>>> Client::get_bot_c
 
 td::Result<td_api::object_ptr<td_api::botMenuButton>> Client::get_bot_menu_button(JsonValue &&value) {
   if (value.type() != JsonValue::Type::Object) {
-    return Status::Error(400, "MenuButton must be an Object");
+    return td::Status::Error(400, "MenuButton must be an Object");
   }
 
   auto &object = value.get_object();
@@ -6484,7 +6492,7 @@ td::Result<td_api::object_ptr<td_api::botMenuButton>> Client::get_bot_menu_butto
     return td_api::make_object<td_api::botMenuButton>(text, url);
   }
 
-  return Status::Error(400, "MenuButton has unsupported type");
+  return td::Status::Error(400, "MenuButton has unsupported type");
 }
 
 td::Result<td_api::object_ptr<td_api::botMenuButton>> Client::get_bot_menu_button(const Query *query) {
@@ -6497,12 +6505,12 @@ td::Result<td_api::object_ptr<td_api::botMenuButton>> Client::get_bot_menu_butto
   auto r_value = json_decode(menu_button);
   if (r_value.is_error()) {
     LOG(INFO) << "Can't parse JSON object: " << r_value.error();
-    return Status::Error(400, "Can't parse menu button JSON object");
+    return td::Status::Error(400, "Can't parse menu button JSON object");
   }
 
   auto r_menu_button = get_bot_menu_button(r_value.move_as_ok());
   if (r_menu_button.is_error()) {
-    return Status::Error(400, PSLICE() << "Can't parse menu button: " << r_menu_button.error().message());
+    return td::Status::Error(400, PSLICE() << "Can't parse menu button: " << r_menu_button.error().message());
   }
   return r_menu_button.move_as_ok();
 }
@@ -6510,7 +6518,7 @@ td::Result<td_api::object_ptr<td_api::botMenuButton>> Client::get_bot_menu_butto
 td::Result<td_api::object_ptr<td_api::chatAdministratorRights>> Client::get_chat_administrator_rights(
     JsonValue &&value) {
   if (value.type() != JsonValue::Type::Object) {
-    return Status::Error(400, "ChatAdministratorRights must be an Object");
+    return td::Status::Error(400, "ChatAdministratorRights must be an Object");
   }
 
   auto &object = value.get_object();
@@ -6543,12 +6551,12 @@ td::Result<td_api::object_ptr<td_api::chatAdministratorRights>> Client::get_chat
   auto r_value = json_decode(rights);
   if (r_value.is_error()) {
     LOG(INFO) << "Can't parse JSON object: " << r_value.error();
-    return Status::Error(400, "Can't parse ChatAdministratorRights JSON object");
+    return td::Status::Error(400, "Can't parse ChatAdministratorRights JSON object");
   }
 
   auto r_rights = get_chat_administrator_rights(r_value.move_as_ok());
   if (r_rights.is_error()) {
-    return Status::Error(400, PSLICE() << "Can't parse ChatAdministratorRights: " << r_rights.error().message());
+    return td::Status::Error(400, PSLICE() << "Can't parse ChatAdministratorRights: " << r_rights.error().message());
   }
   return r_rights.move_as_ok();
 }
@@ -6558,7 +6566,7 @@ td::Result<td_api::object_ptr<td_api::maskPosition>> Client::get_mask_position(J
     if (value.type() == JsonValue::Type::Null) {
       return nullptr;
     }
-    return Status::Error(400, "MaskPosition must be an Object");
+    return td::Status::Error(400, "MaskPosition must be an Object");
   }
 
   auto &object = value.get_object();
@@ -6572,7 +6580,7 @@ td::Result<td_api::object_ptr<td_api::maskPosition>> Client::get_mask_position(J
     }
   }
   if (point == MASK_POINTS_SIZE) {
-    return Status::Error(400, "Wrong point specified in MaskPosition");
+    return td::Status::Error(400, "Wrong point specified in MaskPosition");
   }
 
   TRY_RESULT(x_shift, get_json_object_double_field(object, "x_shift", false));
@@ -6615,7 +6623,8 @@ td_api::object_ptr<td_api::MaskPoint> Client::mask_index_to_point(int32 index) {
   }
 }
 
-td::Result<td_api::object_ptr<td_api::maskPosition>> Client::get_mask_position(const Query *query, Slice field_name) {
+td::Result<td_api::object_ptr<td_api::maskPosition>> Client::get_mask_position(const Query *query,
+                                                                               td::Slice field_name) {
   auto mask_position = query->arg(field_name);
   if (mask_position.empty()) {
     return nullptr;
@@ -6625,35 +6634,35 @@ td::Result<td_api::object_ptr<td_api::maskPosition>> Client::get_mask_position(c
   auto r_value = json_decode(mask_position);
   if (r_value.is_error()) {
     LOG(INFO) << "Can't parse JSON object: " << r_value.error();
-    return Status::Error(400, "Can't parse mask position JSON object");
+    return td::Status::Error(400, "Can't parse mask position JSON object");
   }
 
   auto r_mask_position = get_mask_position(r_value.move_as_ok());
   if (r_mask_position.is_error()) {
-    return Status::Error(400, PSLICE() << "Can't parse mask position: " << r_mask_position.error().message());
+    return td::Status::Error(400, PSLICE() << "Can't parse mask position: " << r_mask_position.error().message());
   }
   return r_mask_position.move_as_ok();
 }
 
 td::Result<td::string> Client::get_sticker_emojis(JsonValue &&value) {
   if (value.type() != JsonValue::Type::Array) {
-    return Status::Error(400, "expected an Array of string");
+    return td::Status::Error(400, "expected an Array of string");
   }
 
   td::string result;
   auto emoji_count = value.get_array().size();
   if (emoji_count == 0) {
-    return Status::Error(400, "emoji list must be non-empty");
+    return td::Status::Error(400, "emoji list must be non-empty");
   }
   if (emoji_count > MAX_STICKER_EMOJI_COUNT) {
-    return Status::Error(400, "too many emoji specified");
+    return td::Status::Error(400, "too many emoji specified");
   }
   for (auto &emoji : value.get_array()) {
     if (emoji.type() != JsonValue::Type::String) {
-      return Status::Error(400, "emoji must be a string");
+      return td::Status::Error(400, "emoji must be a string");
     }
     if (!td::is_emoji(emoji.get_string())) {
-      return Status::Error(400, "expected a Unicode emoji");
+      return td::Status::Error(400, "expected a Unicode emoji");
     }
     result += emoji.get_string().str();
   }
@@ -6665,17 +6674,17 @@ td::Result<td::string> Client::get_sticker_emojis(td::MutableSlice emoji_list) {
   auto r_value = json_decode(emoji_list);
   if (r_value.is_error()) {
     LOG(INFO) << "Can't parse JSON object: " << r_value.error();
-    return Status::Error(400, "Can't parse emoji list JSON array");
+    return td::Status::Error(400, "Can't parse emoji list JSON array");
   }
 
   auto r_emojis = get_sticker_emojis(r_value.move_as_ok());
   if (r_emojis.is_error()) {
-    return Status::Error(400, PSLICE() << "Can't parse emoji list: " << r_emojis.error().message());
+    return td::Status::Error(400, PSLICE() << "Can't parse emoji list: " << r_emojis.error().message());
   }
   return r_emojis.move_as_ok();
 }
 
-td::Result<td_api::object_ptr<td_api::StickerFormat>> Client::get_sticker_format(Slice sticker_format) {
+td::Result<td_api::object_ptr<td_api::StickerFormat>> Client::get_sticker_format(td::Slice sticker_format) {
   if (sticker_format == "static") {
     return make_object<td_api::stickerFormatWebp>();
   }
@@ -6685,21 +6694,21 @@ td::Result<td_api::object_ptr<td_api::StickerFormat>> Client::get_sticker_format
   if (sticker_format == "video") {
     return make_object<td_api::stickerFormatWebm>();
   }
-  return Status::Error(400, "Invalid sticker format specified");
+  return td::Status::Error(400, "Invalid sticker format specified");
 }
 
 td::Result<td_api::object_ptr<td_api::inputSticker>> Client::get_input_sticker(const Query *query,
                                                                                JsonValue &&value) const {
   if (value.type() != JsonValue::Type::Object) {
-    return Status::Error(400, "InputSticker must be an Object");
+    return td::Status::Error(400, "InputSticker must be an Object");
   }
 
   auto &object = value.get_object();
 
   TRY_RESULT(sticker, get_json_object_string_field(object, "sticker"));
-  auto input_file = get_input_file(query, Slice(), sticker, false);
+  auto input_file = get_input_file(query, td::Slice(), sticker, false);
   if (input_file == nullptr) {
-    return Status::Error("sticker not found");
+    return td::Status::Error("sticker not found");
   }
   TRY_RESULT(emoji_list, get_json_object_field(object, "emoji_list", JsonValue::Type::Array, false));
   TRY_RESULT(emojis, get_sticker_emojis(std::move(emoji_list)));
@@ -6709,7 +6718,7 @@ td::Result<td_api::object_ptr<td_api::inputSticker>> Client::get_input_sticker(c
     TRY_RESULT(keywords, get_json_object_field(object, "keywords", JsonValue::Type::Array, false));
     for (auto &keyword : keywords.get_array()) {
       if (keyword.type() != JsonValue::Type::String) {
-        return Status::Error(400, "keyword must be a string");
+        return td::Status::Error(400, "keyword must be a string");
       }
       input_keywords.push_back(keyword.get_string().str());
     }
@@ -6725,12 +6734,12 @@ td::Result<td_api::object_ptr<td_api::inputSticker>> Client::get_input_sticker(c
     auto r_value = json_decode(sticker);
     if (r_value.is_error()) {
       LOG(INFO) << "Can't parse JSON object: " << r_value.error();
-      return Status::Error(400, "Can't parse sticker JSON object");
+      return td::Status::Error(400, "Can't parse sticker JSON object");
     }
 
     auto r_sticker = get_input_sticker(query, r_value.move_as_ok());
     if (r_sticker.is_error()) {
-      return Status::Error(400, PSLICE() << "Can't parse sticker: " << r_sticker.error().message());
+      return td::Status::Error(400, PSLICE() << "Can't parse sticker: " << r_sticker.error().message());
     }
     return r_sticker.move_as_ok();
   }
@@ -6747,12 +6756,12 @@ td::Result<td_api::object_ptr<td_api::inputSticker>> Client::get_input_sticker(c
       sticker = get_input_file(query, "webm_sticker", true);
       if (sticker == nullptr) {
         if (!query->arg("tgs_sticker").empty()) {
-          return Status::Error(400, "Bad Request: animated sticker must be uploaded as an InputFile");
+          return td::Status::Error(400, "Bad Request: animated sticker must be uploaded as an InputFile");
         }
         if (!query->arg("webm_sticker").empty()) {
-          return Status::Error(400, "Bad Request: video sticker must be uploaded as an InputFile");
+          return td::Status::Error(400, "Bad Request: video sticker must be uploaded as an InputFile");
         }
-        return Status::Error(400, "Bad Request: there is no sticker file in the request");
+        return td::Status::Error(400, "Bad Request: there is no sticker file in the request");
       }
     }
   }
@@ -6770,24 +6779,24 @@ td::Result<td::vector<td_api::object_ptr<td_api::inputSticker>>> Client::get_inp
     auto r_value = json_decode(stickers);
     if (r_value.is_error()) {
       LOG(INFO) << "Can't parse JSON object: " << r_value.error();
-      return Status::Error(400, "Can't parse stickers JSON object");
+      return td::Status::Error(400, "Can't parse stickers JSON object");
     }
     auto value = r_value.move_as_ok();
 
     if (value.type() != JsonValue::Type::Array) {
-      return Status::Error(400, "Expected an Array of InputSticker");
+      return td::Status::Error(400, "Expected an Array of InputSticker");
     }
 
     constexpr std::size_t MAX_STICKER_COUNT = 50;
     if (value.get_array().size() > MAX_STICKER_COUNT) {
-      return Status::Error(400, "Too many stickers specified");
+      return td::Status::Error(400, "Too many stickers specified");
     }
 
     td::vector<object_ptr<td_api::inputSticker>> input_stickers;
     for (auto &input_sticker : value.get_array()) {
       auto r_input_sticker = get_input_sticker(query, std::move(input_sticker));
       if (r_input_sticker.is_error()) {
-        return Status::Error(400, PSLICE() << "Can't parse InputSticker: " << r_input_sticker.error().message());
+        return td::Status::Error(400, PSLICE() << "Can't parse InputSticker: " << r_input_sticker.error().message());
       }
       input_stickers.push_back(r_input_sticker.move_as_ok());
     }
@@ -6811,12 +6820,12 @@ td::Result<td::vector<td_api::object_ptr<td_api::inputSticker>>> Client::get_inp
         sticker_format = make_object<td_api::stickerFormatWebm>();
       } else {
         if (!query->arg("tgs_sticker").empty()) {
-          return Status::Error(400, "Bad Request: animated sticker must be uploaded as an InputFile");
+          return td::Status::Error(400, "Bad Request: animated sticker must be uploaded as an InputFile");
         }
         if (!query->arg("webm_sticker").empty()) {
-          return Status::Error(400, "Bad Request: video sticker must be uploaded as an InputFile");
+          return td::Status::Error(400, "Bad Request: video sticker must be uploaded as an InputFile");
         }
-        return Status::Error(400, "Bad Request: there is no sticker file in the request");
+        return td::Status::Error(400, "Bad Request: there is no sticker file in the request");
       }
     }
   }
@@ -6830,14 +6839,14 @@ td::Result<td::vector<td_api::object_ptr<td_api::inputSticker>>> Client::get_inp
 td::Result<td_api::object_ptr<td_api::InputFile>> Client::get_sticker_input_file(const Query *query) {
   auto file_id = trim(query->arg("sticker"));
   if (file_id.empty()) {
-    return Status::Error(400, "Sticker is not specified");
+    return td::Status::Error(400, "Sticker is not specified");
   }
   return make_object<td_api::inputFileRemote>(file_id.str());
 }
 
-td::Result<td::string> Client::get_passport_element_hash(Slice encoded_hash) {
+td::Result<td::string> Client::get_passport_element_hash(td::Slice encoded_hash) {
   if (!td::is_base64(encoded_hash)) {
-    return Status::Error(400, "hash isn't a valid base64-encoded string");
+    return td::Status::Error(400, "hash isn't a valid base64-encoded string");
   }
   return td::base64_decode(encoded_hash).move_as_ok();
 }
@@ -6886,7 +6895,7 @@ td::Result<td_api::object_ptr<td_api::InputPassportElementErrorSource>> Client::
     TRY_RESULT(file_hashes, get_json_object_field(object, "file_hashes", JsonValue::Type::Array, false));
     for (auto &input_hash : file_hashes.get_array()) {
       if (input_hash.type() != JsonValue::Type::String) {
-        return Status::Error(400, "hash must be a string");
+        return td::Status::Error(400, "hash must be a string");
       }
       TRY_RESULT(hash, get_passport_element_hash(input_hash.get_string()));
       input_hashes.push_back(std::move(hash));
@@ -6899,13 +6908,13 @@ td::Result<td_api::object_ptr<td_api::InputPassportElementErrorSource>> Client::
     }
     UNREACHABLE();
   }
-  return Status::Error(400, "wrong source specified");
+  return td::Status::Error(400, "wrong source specified");
 }
 
 td::Result<td_api::object_ptr<td_api::inputPassportElementError>> Client::get_passport_element_error(
     JsonValue &&value) {
   if (value.type() != JsonValue::Type::Object) {
-    return Status::Error(400, "expected an Object");
+    return td::Status::Error(400, "expected an Object");
   }
 
   auto &object = value.get_object();
@@ -6913,7 +6922,7 @@ td::Result<td_api::object_ptr<td_api::inputPassportElementError>> Client::get_pa
   TRY_RESULT(input_type, get_json_object_string_field(object, "type", false));
   auto type = get_passport_element_type(input_type);
   if (type == nullptr) {
-    return Status::Error(400, "wrong Telegram Passport element type specified");
+    return td::Status::Error(400, "wrong Telegram Passport element type specified");
   }
   TRY_RESULT(message, get_json_object_string_field(object, "message", false));
   TRY_RESULT(source, get_passport_element_error_source(object));
@@ -6928,26 +6937,26 @@ td::Result<td::vector<td_api::object_ptr<td_api::inputPassportElementError>>> Cl
   auto r_value = json_decode(input_errors);
   if (r_value.is_error()) {
     LOG(INFO) << "Can't parse JSON object: " << r_value.error();
-    return Status::Error(400, "Can't parse errors JSON object");
+    return td::Status::Error(400, "Can't parse errors JSON object");
   }
 
   auto value = r_value.move_as_ok();
   if (value.type() != JsonValue::Type::Array) {
-    return Status::Error(400, "Expected an Array of PassportElementError");
+    return td::Status::Error(400, "Expected an Array of PassportElementError");
   }
 
   td::vector<object_ptr<td_api::inputPassportElementError>> errors;
   for (auto &input_error : value.get_array()) {
     auto r_error = get_passport_element_error(std::move(input_error));
     if (r_error.is_error()) {
-      return Status::Error(400, PSLICE() << "Can't parse PassportElementError: " << r_error.error().message());
+      return td::Status::Error(400, PSLICE() << "Can't parse PassportElementError: " << r_error.error().message());
     }
     errors.push_back(r_error.move_as_ok());
   }
   return std::move(errors);
 }
 
-JsonValue Client::get_input_entities(const Query *query, Slice field_name) {
+JsonValue Client::get_input_entities(const Query *query, td::Slice field_name) {
   auto entities = query->arg(field_name);
   if (!entities.empty()) {
     auto r_value = json_decode(entities);
@@ -6969,7 +6978,7 @@ td::Result<td_api::object_ptr<td_api::formattedText>> Client::get_caption(const 
 td::Result<td_api::object_ptr<td_api::TextEntityType>> Client::get_text_entity_type(td::JsonObject &object) {
   TRY_RESULT(type, get_json_object_string_field(object, "type", false));
   if (type.empty()) {
-    return Status::Error("Type is not specified");
+    return td::Status::Error("Type is not specified");
   }
 
   if (type == "bold") {
@@ -7016,12 +7025,12 @@ td::Result<td_api::object_ptr<td_api::TextEntityType>> Client::get_text_entity_t
     return nullptr;
   }
 
-  return Status::Error("Unsupported type specified");
+  return td::Status::Error("Unsupported type specified");
 }
 
 td::Result<td_api::object_ptr<td_api::textEntity>> Client::get_text_entity(JsonValue &&value) {
   if (value.type() != JsonValue::Type::Object) {
-    return Status::Error(400, "expected an Object");
+    return td::Status::Error(400, "expected an Object");
   }
 
   auto &object = value.get_object();
@@ -7048,13 +7057,13 @@ td::Result<td_api::object_ptr<td_api::formattedText>> Client::get_formatted_text
     } else if (parse_mode == "html") {
       text_parse_mode = make_object<td_api::textParseModeHTML>();
     } else {
-      return Status::Error(400, "Unsupported parse_mode");
+      return td::Status::Error(400, "Unsupported parse_mode");
     }
 
     auto parsed_text = execute(make_object<td_api::parseTextEntities>(text, std::move(text_parse_mode)));
     if (parsed_text->get_id() == td_api::error::ID) {
       auto error = move_object_as<td_api::error>(parsed_text);
-      return Status::Error(error->code_, error->message_);
+      return td::Status::Error(error->code_, error->message_);
     }
 
     CHECK(parsed_text->get_id() == td_api::formattedText::ID);
@@ -7066,7 +7075,7 @@ td::Result<td_api::object_ptr<td_api::formattedText>> Client::get_formatted_text
     for (auto &input_entity : input_entities.get_array()) {
       auto r_entity = get_text_entity(std::move(input_entity));
       if (r_entity.is_error()) {
-        return Status::Error(400, PSLICE() << "Can't parse MessageEntity: " << r_entity.error().message());
+        return td::Status::Error(400, PSLICE() << "Can't parse MessageEntity: " << r_entity.error().message());
       }
       if (r_entity.ok() == nullptr) {
         continue;
@@ -7088,7 +7097,7 @@ td::Result<td_api::object_ptr<td_api::inputMessageText>> Client::get_input_messa
                                                                                         td::string parse_mode,
                                                                                         JsonValue &&input_entities) {
   if (text.empty()) {
-    return Status::Error(400, "Message text is empty");
+    return td::Status::Error(400, "Message text is empty");
   }
 
   TRY_RESULT(formatted_text, get_formatted_text(std::move(text), std::move(parse_mode), std::move(input_entities)));
@@ -7099,11 +7108,11 @@ td::Result<td_api::object_ptr<td_api::inputMessageText>> Client::get_input_messa
 td::Result<td_api::object_ptr<td_api::location>> Client::get_location(const Query *query) {
   auto latitude = trim(query->arg("latitude"));
   if (latitude.empty()) {
-    return Status::Error(400, "Bad Request: latitude is empty");
+    return td::Status::Error(400, "Bad Request: latitude is empty");
   }
   auto longitude = trim(query->arg("longitude"));
   if (longitude.empty()) {
-    return Status::Error(400, "Bad Request: longitude is empty");
+    return td::Status::Error(400, "Bad Request: longitude is empty");
   }
   auto horizontal_accuracy = trim(query->arg("horizontal_accuracy"));
 
@@ -7134,12 +7143,12 @@ td::Result<td_api::object_ptr<td_api::chatPermissions>> Client::get_chat_permiss
     auto r_value = json_decode(query->arg("permissions"));
     if (r_value.is_error()) {
       LOG(INFO) << "Can't parse JSON object: " << r_value.error();
-      return Status::Error(400, "Can't parse permissions JSON object");
+      return td::Status::Error(400, "Can't parse permissions JSON object");
     }
 
     auto value = r_value.move_as_ok();
     if (value.type() != JsonValue::Type::Object) {
-      return Status::Error(400, "Object expected as permissions");
+      return td::Status::Error(400, "Object expected as permissions");
     }
     auto &object = value.get_object();
 
@@ -7178,11 +7187,11 @@ td::Result<td_api::object_ptr<td_api::chatPermissions>> Client::get_chat_permiss
           can_send_messages = true;
         }
       }
-      return Status::OK();
+      return td::Status::OK();
     }();
 
     if (status.is_error()) {
-      return Status::Error(400, PSLICE() << "Can't parse chat permissions: " << status.message());
+      return td::Status::Error(400, PSLICE() << "Can't parse chat permissions: " << status.message());
     }
 
     if ((can_send_other_messages || can_add_web_page_previews) && !use_independent_chat_permissions) {
@@ -7241,7 +7250,7 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
                                                                                     JsonValue &&input_media,
                                                                                     bool for_album) const {
   if (input_media.type() != JsonValue::Type::Object) {
-    return Status::Error("expected an Object");
+    return td::Status::Error("expected an Object");
   }
 
   auto &object = input_media.get_object();
@@ -7255,20 +7264,20 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
   TRY_RESULT(has_spoiler, get_json_object_bool_field(object, "has_spoiler"));
   TRY_RESULT(media, get_json_object_string_field(object, "media"));
 
-  auto input_file = get_input_file(query, Slice(), media, false);
+  auto input_file = get_input_file(query, td::Slice(), media, false);
   if (input_file == nullptr) {
-    return Status::Error("media not found");
+    return td::Status::Error("media not found");
   }
 
   TRY_RESULT(thumbnail, get_json_object_string_field(object, "thumbnail"));
   if (thumbnail.empty()) {
     TRY_RESULT_ASSIGN(thumbnail, get_json_object_string_field(object, "thumb"));
   }
-  auto thumbnail_input_file = get_input_file(query, Slice(), thumbnail, true);
+  auto thumbnail_input_file = get_input_file(query, td::Slice(), thumbnail, true);
   if (thumbnail_input_file == nullptr) {
-    thumbnail_input_file = get_input_file(query, "thumbnail", Slice(), true);
+    thumbnail_input_file = get_input_file(query, "thumbnail", td::Slice(), true);
     if (thumbnail_input_file == nullptr) {
-      thumbnail_input_file = get_input_file(query, "thumb", Slice(), true);
+      thumbnail_input_file = get_input_file(query, "thumb", td::Slice(), true);
     }
   }
   object_ptr<td_api::inputThumbnail> input_thumbnail;
@@ -7295,7 +7304,7 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
                                                   std::move(caption), self_destruct_time, has_spoiler);
   }
   if (for_album && type == "animation") {
-    return Status::Error(PSLICE() << "type \"" << type << "\" can't be used in sendMediaGroup");
+    return td::Status::Error(PSLICE() << "type \"" << type << "\" can't be used in sendMediaGroup");
   }
   if (type == "animation") {
     TRY_RESULT(width, get_json_object_int_field(object, "width"));
@@ -7322,36 +7331,36 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
                                                      disable_content_type_detection || for_album, std::move(caption));
   }
 
-  return Status::Error(PSLICE() << "type \"" << type << "\" is unsupported");
+  return td::Status::Error(PSLICE() << "type \"" << type << "\" is unsupported");
 }
 
 td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_media(const Query *query,
-                                                                                    Slice field_name) const {
+                                                                                    td::Slice field_name) const {
   TRY_RESULT(media, get_required_string_arg(query, field_name));
 
   LOG(INFO) << "Parsing JSON object: " << media;
   auto r_value = json_decode(media);
   if (r_value.is_error()) {
     LOG(INFO) << "Can't parse JSON object: " << r_value.error();
-    return Status::Error(400, "Can't parse input media JSON object");
+    return td::Status::Error(400, "Can't parse input media JSON object");
   }
 
   auto r_input_message_content = get_input_media(query, r_value.move_as_ok(), false);
   if (r_input_message_content.is_error()) {
-    return Status::Error(400, PSLICE() << "Can't parse InputMedia: " << r_input_message_content.error().message());
+    return td::Status::Error(400, PSLICE() << "Can't parse InputMedia: " << r_input_message_content.error().message());
   }
   return r_input_message_content.move_as_ok();
 }
 
 td::Result<td::vector<td_api::object_ptr<td_api::InputMessageContent>>> Client::get_input_message_contents(
-    const Query *query, Slice field_name) const {
+    const Query *query, td::Slice field_name) const {
   TRY_RESULT(media, get_required_string_arg(query, field_name));
 
   LOG(INFO) << "Parsing JSON object: " << media;
   auto r_value = json_decode(media);
   if (r_value.is_error()) {
     LOG(INFO) << "Can't parse JSON object: " << r_value.error();
-    return Status::Error(400, "Can't parse media JSON object");
+    return td::Status::Error(400, "Can't parse media JSON object");
   }
 
   return get_input_message_contents(query, r_value.move_as_ok());
@@ -7360,14 +7369,15 @@ td::Result<td::vector<td_api::object_ptr<td_api::InputMessageContent>>> Client::
 td::Result<td::vector<td_api::object_ptr<td_api::InputMessageContent>>> Client::get_input_message_contents(
     const Query *query, JsonValue &&value) const {
   if (value.type() != JsonValue::Type::Array) {
-    return Status::Error(400, "Expected an Array of InputMedia");
+    return td::Status::Error(400, "Expected an Array of InputMedia");
   }
 
   td::vector<object_ptr<td_api::InputMessageContent>> contents;
   for (auto &input_media : value.get_array()) {
     auto r_input_message_content = get_input_media(query, std::move(input_media), true);
     if (r_input_message_content.is_error()) {
-      return Status::Error(400, PSLICE() << "Can't parse InputMedia: " << r_input_message_content.error().message());
+      return td::Status::Error(400, PSLICE()
+                                        << "Can't parse InputMedia: " << r_input_message_content.error().message());
     }
     contents.push_back(r_input_message_content.move_as_ok());
   }
@@ -7380,7 +7390,7 @@ td::Result<td_api::object_ptr<td_api::inputMessageInvoice>> Client::get_input_me
   TRY_RESULT(description, get_required_string_arg(query, "description"));
   TRY_RESULT(payload, get_required_string_arg(query, "payload"));
   if (!td::check_utf8(payload.str())) {
-    return Status::Error(400, "The payload must be encoded in UTF-8");
+    return td::Status::Error(400, "The payload must be encoded in UTF-8");
   }
   TRY_RESULT(provider_token, get_required_string_arg(query, "provider_token"));
   auto provider_data = query->arg("provider_data");
@@ -7390,7 +7400,7 @@ td::Result<td_api::object_ptr<td_api::inputMessageInvoice>> Client::get_input_me
   TRY_RESULT(labeled_price_parts, get_required_string_arg(query, "prices"));
   auto r_labeled_price_parts_value = json_decode(labeled_price_parts);
   if (r_labeled_price_parts_value.is_error()) {
-    return Status::Error(400, "Can't parse prices JSON object");
+    return td::Status::Error(400, "Can't parse prices JSON object");
   }
 
   TRY_RESULT(prices, get_labeled_price_parts(r_labeled_price_parts_value.ok_ref()));
@@ -7402,7 +7412,7 @@ td::Result<td_api::object_ptr<td_api::inputMessageInvoice>> Client::get_input_me
     if (!max_tip_amount_str.empty()) {
       auto r_max_tip_amount = td::to_integer_safe<int64>(max_tip_amount_str);
       if (r_max_tip_amount.is_error()) {
-        return Status::Error(400, "Can't parse \"max_tip_amount\" as Number");
+        return td::Status::Error(400, "Can't parse \"max_tip_amount\" as Number");
       }
       max_tip_amount = r_max_tip_amount.ok();
     }
@@ -7411,7 +7421,7 @@ td::Result<td_api::object_ptr<td_api::inputMessageInvoice>> Client::get_input_me
     if (!suggested_tip_amounts_str.empty()) {
       auto r_suggested_tip_amounts_value = json_decode(suggested_tip_amounts_str);
       if (r_suggested_tip_amounts_value.is_error()) {
-        return Status::Error(400, "Can't parse suggested_tip_amounts JSON object");
+        return td::Status::Error(400, "Can't parse suggested_tip_amounts JSON object");
       }
 
       TRY_RESULT_ASSIGN(suggested_tip_amounts, get_suggested_tip_amounts(r_suggested_tip_amounts_value.ok_ref()));
@@ -7451,40 +7461,40 @@ td::Result<td::vector<td::string>> Client::get_poll_options(const Query *query) 
   auto r_value = json_decode(input_options);
   if (r_value.is_error()) {
     LOG(INFO) << "Can't parse JSON object: " << r_value.error();
-    return Status::Error(400, "Can't parse options JSON object");
+    return td::Status::Error(400, "Can't parse options JSON object");
   }
 
   auto value = r_value.move_as_ok();
   if (value.type() != JsonValue::Type::Array) {
-    return Status::Error(400, "Expected an Array of String as options");
+    return td::Status::Error(400, "Expected an Array of String as options");
   }
 
   td::vector<td::string> options;
   for (auto &input_option : value.get_array()) {
     if (input_option.type() != JsonValue::Type::String) {
-      return Status::Error(400, "Expected an option to be of type String");
+      return td::Status::Error(400, "Expected an option to be of type String");
     }
     options.push_back(input_option.get_string().str());
   }
   return std::move(options);
 }
 
-td::int32 Client::get_integer_arg(const Query *query, Slice field_name, int32 default_value, int32 min_value,
+td::int32 Client::get_integer_arg(const Query *query, td::Slice field_name, int32 default_value, int32 min_value,
                                   int32 max_value) {
   auto s_arg = query->arg(field_name);
   auto value = s_arg.empty() ? default_value : td::to_integer<int32>(s_arg);
   return td::clamp(value, min_value, max_value);
 }
 
-td::Result<td::MutableSlice> Client::get_required_string_arg(const Query *query, Slice field_name) {
+td::Result<td::MutableSlice> Client::get_required_string_arg(const Query *query, td::Slice field_name) {
   auto s_arg = query->arg(field_name);
   if (s_arg.empty()) {
-    return Status::Error(400, PSLICE() << "Parameter \"" << field_name << "\" is required");
+    return td::Status::Error(400, PSLICE() << "Parameter \"" << field_name << "\" is required");
   }
   return s_arg;
 }
 
-td::int64 Client::get_message_id(const Query *query, Slice field_name) {
+td::int64 Client::get_message_id(const Query *query, td::Slice field_name) {
   auto s_arg = query->arg(field_name);
   if (s_arg.empty()) {
     return 0;
@@ -7498,18 +7508,18 @@ td::int64 Client::get_message_id(const Query *query, Slice field_name) {
   return as_tdlib_message_id(arg);
 }
 
-td::Result<td::Slice> Client::get_inline_message_id(const Query *query, Slice field_name) {
+td::Result<td::Slice> Client::get_inline_message_id(const Query *query, td::Slice field_name) {
   auto s_arg = query->arg(field_name);
   if (s_arg.empty()) {
-    return Status::Error(400, "Message identifier is not specified");
+    return td::Status::Error(400, "Message identifier is not specified");
   }
   return s_arg;
 }
 
-td::Result<td::int64> Client::get_user_id(const Query *query, Slice field_name) {
+td::Result<td::int64> Client::get_user_id(const Query *query, td::Slice field_name) {
   int64 user_id = td::max(td::to_integer<int64>(query->arg(field_name)), static_cast<int64>(0));
   if (user_id == 0) {
-    return Status::Error(400, PSLICE() << "Invalid " << field_name << " specified");
+    return td::Status::Error(400, PSLICE() << "Invalid " << field_name << " specified");
   }
   return user_id;
 }
@@ -7589,7 +7599,7 @@ void Client::on_message_send_succeeded(object_ptr<td_api::message> &&message, in
   }
 }
 
-void Client::on_message_send_failed(int64 chat_id, int64 old_message_id, int64 new_message_id, Status result) {
+void Client::on_message_send_failed(int64 chat_id, int64 old_message_id, int64 new_message_id, td::Status result) {
   auto error = make_object<td_api::error>(result.code(), result.message().str());
 
   auto query_id = extract_yet_unsent_message_query_id(chat_id, old_message_id, nullptr);
@@ -7660,7 +7670,7 @@ void Client::on_cmd(PromisedQueryPtr query) {
 
 td::Status Client::process_get_me_query(PromisedQueryPtr &query) {
   answer_query(JsonUser(my_id_, this, true), std::move(query));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_get_my_commands_query(PromisedQueryPtr &query) {
@@ -7672,7 +7682,7 @@ td::Status Client::process_get_my_commands_query(PromisedQueryPtr &query) {
                             send_request(make_object<td_api::getCommands>(std::move(scope), language_code),
                                          td::make_unique<TdOnGetMyCommandsCallback>(std::move(query)));
                           });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_set_my_commands_query(PromisedQueryPtr &query) {
@@ -7687,7 +7697,7 @@ td::Status Client::process_set_my_commands_query(PromisedQueryPtr &query) {
         send_request(make_object<td_api::setCommands>(std::move(scope), language_code, std::move(bot_commands)),
                      td::make_unique<TdOnOkQueryCallback>(std::move(query)));
       });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_delete_my_commands_query(PromisedQueryPtr &query) {
@@ -7699,14 +7709,14 @@ td::Status Client::process_delete_my_commands_query(PromisedQueryPtr &query) {
                             send_request(make_object<td_api::deleteCommands>(std::move(scope), language_code),
                                          td::make_unique<TdOnOkQueryCallback>(std::move(query)));
                           });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_get_my_default_administrator_rights_query(PromisedQueryPtr &query) {
   bool for_channels = to_bool(query->arg("for_channels"));
   send_request(make_object<td_api::getUserFullInfo>(my_id_),
                td::make_unique<TdOnGetMyDefaultAdministratorRightsCallback>(for_channels, std::move(query)));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_set_my_default_administrator_rights_query(PromisedQueryPtr &query) {
@@ -7720,7 +7730,7 @@ td::Status Client::process_set_my_default_administrator_rights_query(PromisedQue
     send_request(make_object<td_api::setDefaultGroupAdministratorRights>(std::move(rights)),
                  td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   }
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_get_chat_menu_button_query(PromisedQueryPtr &query) {
@@ -7733,7 +7743,7 @@ td::Status Client::process_get_chat_menu_button_query(PromisedQueryPtr &query) {
   } else {
     send_request(make_object<td_api::getMenuButton>(0), td::make_unique<TdOnGetMenuButtonCallback>(std::move(query)));
   }
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_set_chat_menu_button_query(PromisedQueryPtr &query) {
@@ -7749,7 +7759,7 @@ td::Status Client::process_set_chat_menu_button_query(PromisedQueryPtr &query) {
     send_request(make_object<td_api::setMenuButton>(0, std::move(menu_button)),
                  td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   }
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_get_user_profile_photos_query(PromisedQueryPtr &query) {
@@ -7761,7 +7771,7 @@ td::Status Client::process_get_user_profile_photos_query(PromisedQueryPtr &query
     send_request(make_object<td_api::getUserProfilePhotos>(user_id, offset, limit),
                  td::make_unique<TdOnGetUserProfilePhotosCallback>(this, std::move(query)));
   });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_send_message_query(PromisedQueryPtr &query) {
@@ -7771,19 +7781,19 @@ td::Status Client::process_send_message_query(PromisedQueryPtr &query) {
     auto it = yet_unsent_message_count_.find(r_chat_id.ok());
     if (it != yet_unsent_message_count_.end() && it->second >= MAX_CONCURRENTLY_SENT_CHAT_MESSAGES) {
       fail_query_flood_limit_exceeded(std::move(query));
-      return Status::OK();
+      return td::Status::OK();
     }
   }
 
   TRY_RESULT(input_message_text, get_input_message_text(query.get()));
   do_send_message(std::move(input_message_text), std::move(query));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_send_animation_query(PromisedQueryPtr &query) {
   auto animation = get_input_file(query.get(), "animation");
   if (animation == nullptr) {
-    return Status::Error(400, "There is no animation in the request");
+    return td::Status::Error(400, "There is no animation in the request");
   }
   auto thumbnail = get_input_thumbnail(query.get());
   int32 duration = get_integer_arg(query.get(), "duration", 0, 0, MAX_DURATION);
@@ -7795,13 +7805,13 @@ td::Status Client::process_send_animation_query(PromisedQueryPtr &query) {
       make_object<td_api::inputMessageAnimation>(std::move(animation), std::move(thumbnail), td::vector<int32>(),
                                                  duration, width, height, std::move(caption), has_spoiler),
       std::move(query));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_send_audio_query(PromisedQueryPtr &query) {
   auto audio = get_input_file(query.get(), "audio");
   if (audio == nullptr) {
-    return Status::Error(400, "There is no audio in the request");
+    return td::Status::Error(400, "There is no audio in the request");
   }
   auto thumbnail = get_input_thumbnail(query.get());
   int32 duration = get_integer_arg(query.get(), "duration", 0, 0, MAX_DURATION);
@@ -7811,19 +7821,19 @@ td::Status Client::process_send_audio_query(PromisedQueryPtr &query) {
   do_send_message(make_object<td_api::inputMessageAudio>(std::move(audio), std::move(thumbnail), duration, title,
                                                          performer, std::move(caption)),
                   std::move(query));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_send_dice_query(PromisedQueryPtr &query) {
   auto emoji = query->arg("emoji");
   do_send_message(make_object<td_api::inputMessageDice>(emoji.str(), false), std::move(query));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_send_document_query(PromisedQueryPtr &query) {
   auto document = get_input_file(query.get(), "document");
   if (document == nullptr) {
-    return Status::Error(400, "There is no document in the request");
+    return td::Status::Error(400, "There is no document in the request");
   }
   auto thumbnail = get_input_thumbnail(query.get());
   TRY_RESULT(caption, get_caption(query.get()));
@@ -7831,13 +7841,13 @@ td::Status Client::process_send_document_query(PromisedQueryPtr &query) {
   do_send_message(make_object<td_api::inputMessageDocument>(std::move(document), std::move(thumbnail),
                                                             disable_content_type_detection, std::move(caption)),
                   std::move(query));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_send_photo_query(PromisedQueryPtr &query) {
   auto photo = get_input_file(query.get(), "photo");
   if (photo == nullptr) {
-    return Status::Error(400, "There is no photo in the request");
+    return td::Status::Error(400, "There is no photo in the request");
   }
   TRY_RESULT(caption, get_caption(query.get()));
   auto self_destruct_time = 0;
@@ -7845,23 +7855,23 @@ td::Status Client::process_send_photo_query(PromisedQueryPtr &query) {
   do_send_message(make_object<td_api::inputMessagePhoto>(std::move(photo), nullptr, td::vector<int32>(), 0, 0,
                                                          std::move(caption), self_destruct_time, has_spoiler),
                   std::move(query));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_send_sticker_query(PromisedQueryPtr &query) {
   auto sticker = get_input_file(query.get(), "sticker");
   if (sticker == nullptr) {
-    return Status::Error(400, "There is no sticker in the request");
+    return td::Status::Error(400, "There is no sticker in the request");
   }
   do_send_message(make_object<td_api::inputMessageSticker>(std::move(sticker), nullptr, 0, 0, td::string()),
                   std::move(query));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_send_video_query(PromisedQueryPtr &query) {
   auto video = get_input_file(query.get(), "video");
   if (video == nullptr) {
-    return Status::Error(400, "There is no video in the request");
+    return td::Status::Error(400, "There is no video in the request");
   }
   auto thumbnail = get_input_thumbnail(query.get());
   int32 duration = get_integer_arg(query.get(), "duration", 0, 0, MAX_DURATION);
@@ -7875,13 +7885,13 @@ td::Status Client::process_send_video_query(PromisedQueryPtr &query) {
                                                          duration, width, height, supports_streaming,
                                                          std::move(caption), self_destruct_time, has_spoiler),
                   std::move(query));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_send_video_note_query(PromisedQueryPtr &query) {
   auto video_note = get_input_file(query.get(), "video_note");
   if (video_note == nullptr) {
-    return Status::Error(400, "There is no video note in the request");
+    return td::Status::Error(400, "There is no video note in the request");
   }
   auto thumbnail = get_input_thumbnail(query.get());
   int32 duration = get_integer_arg(query.get(), "duration", 0, 0, MAX_DURATION);
@@ -7889,31 +7899,31 @@ td::Status Client::process_send_video_note_query(PromisedQueryPtr &query) {
   do_send_message(
       make_object<td_api::inputMessageVideoNote>(std::move(video_note), std::move(thumbnail), duration, length),
       std::move(query));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_send_voice_query(PromisedQueryPtr &query) {
   auto voice_note = get_input_file(query.get(), "voice");
   if (voice_note == nullptr) {
-    return Status::Error(400, "There is no voice in the request");
+    return td::Status::Error(400, "There is no voice in the request");
   }
   int32 duration = get_integer_arg(query.get(), "duration", 0, 0, MAX_DURATION);
   TRY_RESULT(caption, get_caption(query.get()));
   do_send_message(make_object<td_api::inputMessageVoiceNote>(std::move(voice_note), duration, "", std::move(caption)),
                   std::move(query));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_send_game_query(PromisedQueryPtr &query) {
   TRY_RESULT(game_short_name, get_required_string_arg(query.get(), "game_short_name"));
   do_send_message(make_object<td_api::inputMessageGame>(my_id_, game_short_name.str()), std::move(query));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_send_invoice_query(PromisedQueryPtr &query) {
   TRY_RESULT(input_message_invoice, get_input_message_invoice(query.get()));
   do_send_message(std::move(input_message_invoice), std::move(query));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_send_location_query(PromisedQueryPtr &query) {
@@ -7925,7 +7935,7 @@ td::Status Client::process_send_location_query(PromisedQueryPtr &query) {
   do_send_message(
       make_object<td_api::inputMessageLocation>(std::move(location), live_period, heading, proximity_alert_radius),
       std::move(query));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_send_venue_query(PromisedQueryPtr &query) {
@@ -7955,7 +7965,7 @@ td::Status Client::process_send_venue_query(PromisedQueryPtr &query) {
   do_send_message(make_object<td_api::inputMessageVenue>(make_object<td_api::venue>(
                       std::move(location), title.str(), address.str(), provider, venue_id, venue_type)),
                   std::move(query));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_send_contact_query(PromisedQueryPtr &query) {
@@ -7966,7 +7976,7 @@ td::Status Client::process_send_contact_query(PromisedQueryPtr &query) {
   do_send_message(make_object<td_api::inputMessageContact>(make_object<td_api::contact>(
                       phone_number.str(), first_name.str(), last_name.str(), vcard.str(), 0)),
                   std::move(query));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_send_poll_query(PromisedQueryPtr &query) {
@@ -7989,7 +7999,7 @@ td::Status Client::process_send_poll_query(PromisedQueryPtr &query) {
   } else if (type.empty() || type == "regular") {
     poll_type = make_object<td_api::pollTypeRegular>(to_bool(query->arg("allows_multiple_answers")));
   } else {
-    return Status::Error(400, "Unsupported poll type specified");
+    return td::Status::Error(400, "Unsupported poll type specified");
   }
   int32 open_period = get_integer_arg(query.get(), "open_period", 0, 0, 10 * 60);
   int32 close_date = get_integer_arg(query.get(), "close_date", 0);
@@ -7997,7 +8007,7 @@ td::Status Client::process_send_poll_query(PromisedQueryPtr &query) {
   do_send_message(make_object<td_api::inputMessagePoll>(question.str(), std::move(options), is_anonymous,
                                                         std::move(poll_type), open_period, close_date, is_closed),
                   std::move(query));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_stop_poll_query(PromisedQueryPtr &query) {
@@ -8017,7 +8027,7 @@ td::Status Client::process_stop_poll_query(PromisedQueryPtr &query) {
                             td::make_unique<TdOnStopPollCallback>(this, chat_id, message_id, std::move(query)));
                       });
       });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_copy_message_query(PromisedQueryPtr &query) {
@@ -8036,7 +8046,7 @@ td::Status Client::process_copy_message_query(PromisedQueryPtr &query) {
         do_send_message(make_object<td_api::inputMessageForwarded>(from_chat_id, message_id, false, std::move(options)),
                         std::move(query));
       });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_forward_message_query(PromisedQueryPtr &query) {
@@ -8048,7 +8058,7 @@ td::Status Client::process_forward_message_query(PromisedQueryPtr &query) {
                   do_send_message(make_object<td_api::inputMessageForwarded>(from_chat_id, message_id, false, nullptr),
                                   std::move(query));
                 });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
@@ -8095,7 +8105,7 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
         check_message(chat_id, reply_to_message_id, reply_to_message_id <= 0 || allow_sending_without_reply,
                       AccessRights::Write, "replied message", std::move(query), std::move(on_success));
       });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_send_chat_action_query(PromisedQueryPtr &query) {
@@ -8103,7 +8113,7 @@ td::Status Client::process_send_chat_action_query(PromisedQueryPtr &query) {
   auto message_thread_id = get_message_id(query.get(), "message_thread_id");
   object_ptr<td_api::ChatAction> action = get_chat_action(query.get());
   if (action == nullptr) {
-    return Status::Error(400, "Wrong parameter action in request");
+    return td::Status::Error(400, "Wrong parameter action in request");
   }
 
   check_chat(chat_id, AccessRights::Write, std::move(query),
@@ -8111,7 +8121,7 @@ td::Status Client::process_send_chat_action_query(PromisedQueryPtr &query) {
                send_request(make_object<td_api::sendChatAction>(chat_id, message_thread_id, std::move(action)),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_edit_message_text_query(PromisedQueryPtr &query) {
@@ -8145,7 +8155,7 @@ td::Status Client::process_edit_message_text_query(PromisedQueryPtr &query) {
               });
         });
   }
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_edit_message_live_location_query(PromisedQueryPtr &query) {
@@ -8186,7 +8196,7 @@ td::Status Client::process_edit_message_live_location_query(PromisedQueryPtr &qu
                         });
         });
   }
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_edit_message_media_query(PromisedQueryPtr &query) {
@@ -8220,7 +8230,7 @@ td::Status Client::process_edit_message_media_query(PromisedQueryPtr &query) {
               });
         });
   }
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_edit_message_caption_query(PromisedQueryPtr &query) {
@@ -8253,7 +8263,7 @@ td::Status Client::process_edit_message_caption_query(PromisedQueryPtr &query) {
                         });
         });
   }
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_edit_message_reply_markup_query(PromisedQueryPtr &query) {
@@ -8284,7 +8294,7 @@ td::Status Client::process_edit_message_reply_markup_query(PromisedQueryPtr &que
                         });
         });
   }
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_delete_message_query(PromisedQueryPtr &query) {
@@ -8292,11 +8302,11 @@ td::Status Client::process_delete_message_query(PromisedQueryPtr &query) {
   auto message_id = get_message_id(query.get());
 
   if (chat_id.empty()) {
-    return Status::Error(400, "Chat identifier is not specified");
+    return td::Status::Error(400, "Chat identifier is not specified");
   }
 
   if (message_id == 0) {
-    return Status::Error(400, "Message identifier is not specified");
+    return td::Status::Error(400, "Message identifier is not specified");
   }
 
   check_message(chat_id, message_id, false, AccessRights::Write, "message to delete", std::move(query),
@@ -8304,14 +8314,14 @@ td::Status Client::process_delete_message_query(PromisedQueryPtr &query) {
                   send_request(make_object<td_api::deleteMessages>(chat_id, td::vector<int64>{message_id}, true),
                                td::make_unique<TdOnOkQueryCallback>(std::move(query)));
                 });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_create_invoice_link_query(PromisedQueryPtr &query) {
   TRY_RESULT(input_message_invoice, get_input_message_invoice(query.get()));
   send_request(make_object<td_api::createInvoiceLink>(std::move(input_message_invoice)),
                td::make_unique<TdOnCreateInvoiceLinkCallback>(std::move(query)));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_set_game_score_query(PromisedQueryPtr &query) {
@@ -8348,7 +8358,7 @@ td::Status Client::process_set_game_score_query(PromisedQueryPtr &query) {
                         });
                   });
   }
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_get_game_high_scores_query(PromisedQueryPtr &query) {
@@ -8373,7 +8383,7 @@ td::Status Client::process_get_game_high_scores_query(PromisedQueryPtr &query) {
                         });
                   });
   }
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_answer_web_app_query_query(PromisedQueryPtr &query) {
@@ -8391,7 +8401,7 @@ td::Status Client::process_answer_web_app_query_query(PromisedQueryPtr &query) {
         send_request(make_object<td_api::answerWebAppQuery>(web_app_query_id, std::move(results[0])),
                      td::make_unique<TdOnAnswerWebAppQueryCallback>(std::move(query)));
       });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_answer_inline_query_query(PromisedQueryPtr &query) {
@@ -8417,7 +8427,7 @@ td::Status Client::process_answer_inline_query_query(PromisedQueryPtr &query) {
                                                             std::move(results), cache_time, next_offset),
                      td::make_unique<TdOnOkQueryCallback>(std::move(query)));
       });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_answer_callback_query_query(PromisedQueryPtr &query) {
@@ -8429,7 +8439,7 @@ td::Status Client::process_answer_callback_query_query(PromisedQueryPtr &query) 
 
   send_request(make_object<td_api::answerCallbackQuery>(callback_query_id, text, show_alert, url, cache_time),
                td::make_unique<TdOnOkQueryCallback>(std::move(query)));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_answer_shipping_query_query(PromisedQueryPtr &query) {
@@ -8445,7 +8455,7 @@ td::Status Client::process_answer_shipping_query_query(PromisedQueryPtr &query) 
   send_request(
       make_object<td_api::answerShippingQuery>(shipping_query_id, std::move(shipping_options), error_message.str()),
       td::make_unique<TdOnOkQueryCallback>(std::move(query)));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_answer_pre_checkout_query_query(PromisedQueryPtr &query) {
@@ -8458,7 +8468,7 @@ td::Status Client::process_answer_pre_checkout_query_query(PromisedQueryPtr &que
 
   send_request(make_object<td_api::answerPreCheckoutQuery>(pre_checkout_query_id, error_message.str()),
                td::make_unique<TdOnOkQueryCallback>(std::move(query)));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_export_chat_invite_link_query(PromisedQueryPtr &query) {
@@ -8468,7 +8478,7 @@ td::Status Client::process_export_chat_invite_link_query(PromisedQueryPtr &query
     send_request(make_object<td_api::replacePrimaryChatInviteLink>(chat_id),
                  td::make_unique<TdOnReplacePrimaryChatInviteLinkCallback>(std::move(query)));
   });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_create_chat_invite_link_query(PromisedQueryPtr &query) {
@@ -8485,7 +8495,7 @@ td::Status Client::process_create_chat_invite_link_query(PromisedQueryPtr &query
                                                                       creates_join_request),
                             td::make_unique<TdOnGetChatInviteLinkCallback>(this, std::move(query)));
              });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_edit_chat_invite_link_query(PromisedQueryPtr &query) {
@@ -8503,7 +8513,7 @@ td::Status Client::process_edit_chat_invite_link_query(PromisedQueryPtr &query) 
                                                                     member_limit, creates_join_request),
                             td::make_unique<TdOnGetChatInviteLinkCallback>(this, std::move(query)));
              });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_revoke_chat_invite_link_query(PromisedQueryPtr &query) {
@@ -8515,7 +8525,7 @@ td::Status Client::process_revoke_chat_invite_link_query(PromisedQueryPtr &query
                send_request(make_object<td_api::revokeChatInviteLink>(chat_id, invite_link),
                             td::make_unique<TdOnGetChatInviteLinkCallback>(this, std::move(query)));
              });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_get_chat_query(PromisedQueryPtr &query) {
@@ -8539,7 +8549,7 @@ td::Status Client::process_get_chat_query(PromisedQueryPtr &query) {
         UNREACHABLE();
     }
   });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_set_chat_photo_query(PromisedQueryPtr &query) {
@@ -8547,9 +8557,9 @@ td::Status Client::process_set_chat_photo_query(PromisedQueryPtr &query) {
   auto photo = get_input_file(query.get(), "photo", true);
   if (photo == nullptr) {
     if (query->arg("photo").empty()) {
-      return Status::Error(400, "There is no photo in the request");
+      return td::Status::Error(400, "There is no photo in the request");
     }
-    return Status::Error(400, "Photo must be uploaded as an InputFile");
+    return td::Status::Error(400, "Photo must be uploaded as an InputFile");
   }
 
   check_chat(chat_id, AccessRights::Write, std::move(query),
@@ -8558,7 +8568,7 @@ td::Status Client::process_set_chat_photo_query(PromisedQueryPtr &query) {
                                 chat_id, make_object<td_api::inputChatPhotoStatic>(std::move(photo))),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_delete_chat_photo_query(PromisedQueryPtr &query) {
@@ -8568,7 +8578,7 @@ td::Status Client::process_delete_chat_photo_query(PromisedQueryPtr &query) {
     send_request(make_object<td_api::setChatPhoto>(chat_id, nullptr),
                  td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_set_chat_title_query(PromisedQueryPtr &query) {
@@ -8580,7 +8590,7 @@ td::Status Client::process_set_chat_title_query(PromisedQueryPtr &query) {
                send_request(make_object<td_api::setChatTitle>(chat_id, title),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_set_chat_permissions_query(PromisedQueryPtr &query) {
@@ -8595,7 +8605,7 @@ td::Status Client::process_set_chat_permissions_query(PromisedQueryPtr &query) {
                send_request(make_object<td_api::setChatPermissions>(chat_id, std::move(permissions)),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_set_chat_description_query(PromisedQueryPtr &query) {
@@ -8607,7 +8617,7 @@ td::Status Client::process_set_chat_description_query(PromisedQueryPtr &query) {
                send_request(make_object<td_api::setChatDescription>(chat_id, description),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_pin_chat_message_query(PromisedQueryPtr &query) {
@@ -8620,7 +8630,7 @@ td::Status Client::process_pin_chat_message_query(PromisedQueryPtr &query) {
                   send_request(make_object<td_api::pinChatMessage>(chat_id, message_id, disable_notification, false),
                                td::make_unique<TdOnOkQueryCallback>(std::move(query)));
                 });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_unpin_chat_message_query(PromisedQueryPtr &query) {
@@ -8639,7 +8649,7 @@ td::Status Client::process_unpin_chat_message_query(PromisedQueryPtr &query) {
                                  td::make_unique<TdOnOkQueryCallback>(std::move(query)));
                   });
   }
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_unpin_all_chat_messages_query(PromisedQueryPtr &query) {
@@ -8649,7 +8659,7 @@ td::Status Client::process_unpin_all_chat_messages_query(PromisedQueryPtr &query
     send_request(make_object<td_api::unpinAllChatMessages>(chat_id),
                  td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_set_chat_sticker_set_query(PromisedQueryPtr &query) {
@@ -8672,7 +8682,7 @@ td::Status Client::process_set_chat_sticker_set_query(PromisedQueryPtr &query) {
                          td::make_unique<TdOnOkQueryCallback>(std::move(query)));
                    });
              });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_delete_chat_sticker_set_query(PromisedQueryPtr &query) {
@@ -8689,13 +8699,13 @@ td::Status Client::process_delete_chat_sticker_set_query(PromisedQueryPtr &query
     send_request(make_object<td_api::setSupergroupStickerSet>(chat_info->supergroup_id, 0),
                  td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_get_forum_topic_icon_stickers_query(PromisedQueryPtr &query) {
   send_request(make_object<td_api::getForumTopicDefaultIcons>(),
                td::make_unique<TdOnGetStickersCallback>(this, std::move(query)));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_create_forum_topic_query(PromisedQueryPtr &query) {
@@ -8710,7 +8720,7 @@ td::Status Client::process_create_forum_topic_query(PromisedQueryPtr &query) {
                                 chat_id, name, make_object<td_api::forumTopicIcon>(icon_color, icon_custom_emoji_id)),
                             td::make_unique<TdOnGetForumTopicInfoCallback>(std::move(query)));
              });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_edit_forum_topic_query(PromisedQueryPtr &query) {
@@ -8727,7 +8737,7 @@ td::Status Client::process_edit_forum_topic_query(PromisedQueryPtr &query) {
                                                                 edit_icon_custom_emoji_id, icon_custom_emoji_id),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_close_forum_topic_query(PromisedQueryPtr &query) {
@@ -8739,7 +8749,7 @@ td::Status Client::process_close_forum_topic_query(PromisedQueryPtr &query) {
                send_request(make_object<td_api::toggleForumTopicIsClosed>(chat_id, message_thread_id, true),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_reopen_forum_topic_query(PromisedQueryPtr &query) {
@@ -8751,7 +8761,7 @@ td::Status Client::process_reopen_forum_topic_query(PromisedQueryPtr &query) {
                send_request(make_object<td_api::toggleForumTopicIsClosed>(chat_id, message_thread_id, false),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_delete_forum_topic_query(PromisedQueryPtr &query) {
@@ -8763,7 +8773,7 @@ td::Status Client::process_delete_forum_topic_query(PromisedQueryPtr &query) {
                send_request(make_object<td_api::deleteForumTopic>(chat_id, message_thread_id),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_unpin_all_forum_topic_messages_query(PromisedQueryPtr &query) {
@@ -8775,7 +8785,7 @@ td::Status Client::process_unpin_all_forum_topic_messages_query(PromisedQueryPtr
                send_request(make_object<td_api::unpinAllMessageThreadMessages>(chat_id, message_thread_id),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_edit_general_forum_topic_query(PromisedQueryPtr &query) {
@@ -8787,7 +8797,7 @@ td::Status Client::process_edit_general_forum_topic_query(PromisedQueryPtr &quer
                send_request(make_object<td_api::editForumTopic>(chat_id, GENERAL_MESSAGE_THREAD_ID, name, false, 0),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_close_general_forum_topic_query(PromisedQueryPtr &query) {
@@ -8797,7 +8807,7 @@ td::Status Client::process_close_general_forum_topic_query(PromisedQueryPtr &que
     send_request(make_object<td_api::toggleForumTopicIsClosed>(chat_id, GENERAL_MESSAGE_THREAD_ID, true),
                  td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_reopen_general_forum_topic_query(PromisedQueryPtr &query) {
@@ -8807,7 +8817,7 @@ td::Status Client::process_reopen_general_forum_topic_query(PromisedQueryPtr &qu
     send_request(make_object<td_api::toggleForumTopicIsClosed>(chat_id, GENERAL_MESSAGE_THREAD_ID, false),
                  td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_hide_general_forum_topic_query(PromisedQueryPtr &query) {
@@ -8817,7 +8827,7 @@ td::Status Client::process_hide_general_forum_topic_query(PromisedQueryPtr &quer
     send_request(make_object<td_api::toggleGeneralForumTopicIsHidden>(chat_id, true),
                  td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_unhide_general_forum_topic_query(PromisedQueryPtr &query) {
@@ -8827,7 +8837,7 @@ td::Status Client::process_unhide_general_forum_topic_query(PromisedQueryPtr &qu
     send_request(make_object<td_api::toggleGeneralForumTopicIsHidden>(chat_id, false),
                  td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_get_chat_member_query(PromisedQueryPtr &query) {
@@ -8842,7 +8852,7 @@ td::Status Client::process_get_chat_member_query(PromisedQueryPtr &query) {
                                  answer_query(JsonChatMember(chat_member.get(), chat_type, this), std::move(query));
                                });
              });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_get_chat_administrators_query(PromisedQueryPtr &query) {
@@ -8867,7 +8877,7 @@ td::Status Client::process_get_chat_administrators_query(PromisedQueryPtr &query
         UNREACHABLE();
     }
   });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_get_chat_member_count_query(PromisedQueryPtr &query) {
@@ -8892,7 +8902,7 @@ td::Status Client::process_get_chat_member_count_query(PromisedQueryPtr &query) 
         UNREACHABLE();
     }
   });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_leave_chat_query(PromisedQueryPtr &query) {
@@ -8901,7 +8911,7 @@ td::Status Client::process_leave_chat_query(PromisedQueryPtr &query) {
   check_chat(chat_id, AccessRights::Read, std::move(query), [this](int64 chat_id, PromisedQueryPtr query) {
     send_request(make_object<td_api::leaveChat>(chat_id), td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_promote_chat_member_query(PromisedQueryPtr &query) {
@@ -8950,7 +8960,7 @@ td::Status Client::process_promote_chat_member_query(PromisedQueryPtr &query) {
                                   td::make_unique<TdOnOkQueryCallback>(std::move(query)));
                    });
              });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_set_chat_administrator_custom_title_query(PromisedQueryPtr &query) {
@@ -8983,7 +8993,7 @@ td::Status Client::process_set_chat_administrator_custom_title_query(PromisedQue
                        td::make_unique<TdOnOkQueryCallback>(std::move(query)));
         });
   });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_ban_chat_member_query(PromisedQueryPtr &query) {
@@ -9002,7 +9012,7 @@ td::Status Client::process_ban_chat_member_query(PromisedQueryPtr &query) {
                            td::make_unique<TdOnOkQueryCallback>(std::move(query)));
             });
       });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_restrict_chat_member_query(PromisedQueryPtr &query) {
@@ -9042,7 +9052,7 @@ td::Status Client::process_restrict_chat_member_query(PromisedQueryPtr &query) {
                                   td::make_unique<TdOnOkQueryCallback>(std::move(query)));
                    });
              });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_unban_chat_member_query(PromisedQueryPtr &query) {
@@ -9081,7 +9091,7 @@ td::Status Client::process_unban_chat_member_query(PromisedQueryPtr &query) {
                  });
                }
              });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_ban_chat_sender_chat_query(PromisedQueryPtr &query) {
@@ -9099,7 +9109,7 @@ td::Status Client::process_ban_chat_sender_chat_query(PromisedQueryPtr &query) {
                                                  td::make_unique<TdOnOkQueryCallback>(std::move(query)));
                                   });
              });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_unban_chat_sender_chat_query(PromisedQueryPtr &query) {
@@ -9116,7 +9126,7 @@ td::Status Client::process_unban_chat_sender_chat_query(PromisedQueryPtr &query)
                                                  td::make_unique<TdOnOkQueryCallback>(std::move(query)));
                                   });
              });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_approve_chat_join_request_query(PromisedQueryPtr &query) {
@@ -9129,7 +9139,7 @@ td::Status Client::process_approve_chat_join_request_query(PromisedQueryPtr &que
                    td::make_unique<TdOnOkQueryCallback>(std::move(query)));
     });
   });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_decline_chat_join_request_query(PromisedQueryPtr &query) {
@@ -9142,7 +9152,7 @@ td::Status Client::process_decline_chat_join_request_query(PromisedQueryPtr &que
                    td::make_unique<TdOnOkQueryCallback>(std::move(query)));
     });
   });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_get_sticker_set_query(PromisedQueryPtr &query) {
@@ -9154,7 +9164,7 @@ td::Status Client::process_get_sticker_set_query(PromisedQueryPtr &query) {
     send_request(make_object<td_api::searchStickerSet>(name.str()),
                  td::make_unique<TdOnReturnStickerSetCallback>(this, true, std::move(query)));
   }
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_get_custom_emoji_stickers_query(PromisedQueryPtr &query) {
@@ -9163,28 +9173,28 @@ td::Status Client::process_get_custom_emoji_stickers_query(PromisedQueryPtr &que
   LOG(INFO) << "Parsing JSON object: " << custom_emoji_ids_json;
   auto r_value = json_decode(custom_emoji_ids_json);
   if (r_value.is_error()) {
-    return Status::Error(400, "Can't parse custom emoji identifiers JSON object");
+    return td::Status::Error(400, "Can't parse custom emoji identifiers JSON object");
   }
   auto value = r_value.move_as_ok();
   if (value.type() != JsonValue::Type::Array) {
-    return Status::Error(400, "Expected an Array of custom emoji identifiers");
+    return td::Status::Error(400, "Expected an Array of custom emoji identifiers");
   }
 
   td::vector<int64> custom_emoji_ids;
   for (auto &custom_emoji_id : value.get_array()) {
     if (custom_emoji_id.type() != JsonValue::Type::String) {
-      return Status::Error(400, "Custom emoji identifier must be of type String");
+      return td::Status::Error(400, "Custom emoji identifier must be of type String");
     }
     auto parsed_id = td::to_integer_safe<int64>(custom_emoji_id.get_string());
     if (parsed_id.is_error()) {
-      return Status::Error(400, "Invalid custom emoji identifier specified");
+      return td::Status::Error(400, "Invalid custom emoji identifier specified");
     }
     custom_emoji_ids.push_back(parsed_id.ok());
   }
 
   send_request(make_object<td_api::getCustomEmojiStickers>(std::move(custom_emoji_ids)),
                td::make_unique<TdOnGetStickersCallback>(this, std::move(query)));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_upload_sticker_file_query(PromisedQueryPtr &query) {
@@ -9206,7 +9216,7 @@ td::Status Client::process_upload_sticker_file_query(PromisedQueryPtr &query) {
                    make_object<td_api::uploadStickerFile>(user_id, std::move(sticker_format), std::move(sticker)),
                    td::make_unique<TdOnReturnFileCallback>(this, std::move(query)));
              });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_create_new_sticker_set_query(PromisedQueryPtr &query) {
@@ -9231,7 +9241,7 @@ td::Status Client::process_create_new_sticker_set_query(PromisedQueryPtr &query)
                          needs_repainting, std::move(stickers), PSTRING() << "bot" << my_id_),
                      td::make_unique<TdOnReturnStickerSetCallback>(this, false, std::move(query)));
       });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_add_sticker_to_set_query(PromisedQueryPtr &query) {
@@ -9244,7 +9254,7 @@ td::Status Client::process_add_sticker_to_set_query(PromisedQueryPtr &query) {
                send_request(make_object<td_api::addStickerToSet>(user_id, name.str(), std::move(sticker)),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_set_sticker_set_title_query(PromisedQueryPtr &query) {
@@ -9252,7 +9262,7 @@ td::Status Client::process_set_sticker_set_title_query(PromisedQueryPtr &query) 
   auto title = query->arg("title");
   send_request(make_object<td_api::setStickerSetTitle>(name.str(), title.str()),
                td::make_unique<TdOnOkQueryCallback>(std::move(query)));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_set_sticker_set_thumbnail_query(PromisedQueryPtr &query) {
@@ -9267,7 +9277,7 @@ td::Status Client::process_set_sticker_set_thumbnail_query(PromisedQueryPtr &que
                send_request(make_object<td_api::setStickerSetThumbnail>(user_id, name.str(), std::move(thumbnail)),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_set_custom_emoji_sticker_set_thumbnail_query(PromisedQueryPtr &query) {
@@ -9275,14 +9285,14 @@ td::Status Client::process_set_custom_emoji_sticker_set_thumbnail_query(Promised
   auto custom_emoji_id = td::to_integer<int64>(query->arg("custom_emoji_id"));
   send_request(make_object<td_api::setCustomEmojiStickerSetThumbnail>(name.str(), custom_emoji_id),
                td::make_unique<TdOnOkQueryCallback>(std::move(query)));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_delete_sticker_set_query(PromisedQueryPtr &query) {
   auto name = query->arg("name");
   send_request(make_object<td_api::deleteStickerSet>(name.str()),
                td::make_unique<TdOnOkQueryCallback>(std::move(query)));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_set_sticker_position_in_set_query(PromisedQueryPtr &query) {
@@ -9291,7 +9301,7 @@ td::Status Client::process_set_sticker_position_in_set_query(PromisedQueryPtr &q
 
   send_request(make_object<td_api::setStickerPositionInSet>(std::move(input_file), position),
                td::make_unique<TdOnOkQueryCallback>(std::move(query)));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_delete_sticker_from_set_query(PromisedQueryPtr &query) {
@@ -9299,7 +9309,7 @@ td::Status Client::process_delete_sticker_from_set_query(PromisedQueryPtr &query
 
   send_request(make_object<td_api::removeStickerFromSet>(std::move(input_file)),
                td::make_unique<TdOnOkQueryCallback>(std::move(query)));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_set_sticker_emoji_list_query(PromisedQueryPtr &query) {
@@ -9308,7 +9318,7 @@ td::Status Client::process_set_sticker_emoji_list_query(PromisedQueryPtr &query)
 
   send_request(make_object<td_api::setStickerEmojis>(std::move(input_file), emojis),
                td::make_unique<TdOnOkQueryCallback>(std::move(query)));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_set_sticker_keywords_query(PromisedQueryPtr &query) {
@@ -9318,16 +9328,16 @@ td::Status Client::process_set_sticker_keywords_query(PromisedQueryPtr &query) {
     auto r_value = json_decode(query->arg("keywords"));
     if (r_value.is_error()) {
       LOG(INFO) << "Can't parse JSON object: " << r_value.error();
-      return Status::Error(400, "Can't parse keywords JSON object");
+      return td::Status::Error(400, "Can't parse keywords JSON object");
     }
     auto value = r_value.move_as_ok();
 
     if (value.type() != JsonValue::Type::Array) {
-      return Status::Error(400, "Field \"keywords\" must be an Array");
+      return td::Status::Error(400, "Field \"keywords\" must be an Array");
     }
     for (auto &keyword : value.get_array()) {
       if (keyword.type() != JsonValue::Type::String) {
-        return Status::Error(400, "keyword must be a string");
+        return td::Status::Error(400, "keyword must be a string");
       }
       input_keywords.push_back(keyword.get_string().str());
     }
@@ -9335,7 +9345,7 @@ td::Status Client::process_set_sticker_keywords_query(PromisedQueryPtr &query) {
 
   send_request(make_object<td_api::setStickerKeywords>(std::move(input_file), std::move(input_keywords)),
                td::make_unique<TdOnOkQueryCallback>(std::move(query)));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_set_sticker_mask_position_query(PromisedQueryPtr &query) {
@@ -9344,7 +9354,7 @@ td::Status Client::process_set_sticker_mask_position_query(PromisedQueryPtr &que
 
   send_request(make_object<td_api::setStickerMaskPosition>(std::move(input_file), std::move(mask_position)),
                td::make_unique<TdOnOkQueryCallback>(std::move(query)));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_set_passport_data_errors_query(PromisedQueryPtr &query) {
@@ -9356,7 +9366,7 @@ td::Status Client::process_set_passport_data_errors_query(PromisedQueryPtr &quer
                send_request(make_object<td_api::setPassportElementErrors>(user_id, std::move(errors)),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_send_custom_request_query(PromisedQueryPtr &query) {
@@ -9364,7 +9374,7 @@ td::Status Client::process_send_custom_request_query(PromisedQueryPtr &query) {
   auto parameters = query->arg("parameters");
   send_request(make_object<td_api::sendCustomRequest>(method.str(), parameters.str()),
                td::make_unique<TdOnSendCustomRequestCallback>(std::move(query)));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_answer_custom_query_query(PromisedQueryPtr &query) {
@@ -9372,7 +9382,7 @@ td::Status Client::process_answer_custom_query_query(PromisedQueryPtr &query) {
   auto data = query->arg("data");
   send_request(make_object<td_api::answerCustomQuery>(custom_query_id, data.str()),
                td::make_unique<TdOnOkQueryCallback>(std::move(query)));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_get_updates_query(PromisedQueryPtr &query) {
@@ -9380,7 +9390,7 @@ td::Status Client::process_get_updates_query(PromisedQueryPtr &query) {
     fail_query_conflict(
         "Conflict: can't use getUpdates method while webhook is active; use deleteWebhook to delete the webhook first",
         std::move(query));
-    return Status::OK();
+    return td::Status::OK();
   }
   int32 offset = get_integer_arg(query.get(), "offset", 0);
   int32 limit = get_integer_arg(query.get(), "limit", 100, 1, 100);
@@ -9398,11 +9408,11 @@ td::Status Client::process_get_updates_query(PromisedQueryPtr &query) {
   previous_get_updates_offset_ = offset;
   previous_get_updates_start_time_ = now;
   do_get_updates(offset, limit, timeout, std::move(query));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_set_webhook_query(PromisedQueryPtr &query) {
-  Slice new_url;
+  td::Slice new_url;
   if (query->method() == "setwebhook") {
     new_url = query->arg("url");
   }
@@ -9411,7 +9421,7 @@ td::Status Client::process_set_webhook_query(PromisedQueryPtr &query) {
   if (!new_url.empty() && !query->is_internal()) {
     if (now < next_allowed_set_webhook_time_) {
       query->set_retry_after_error(1);
-      return Status::OK();
+      return td::Status::OK();
     }
     next_allowed_set_webhook_time_ = now + 1;
   }
@@ -9423,16 +9433,16 @@ td::Status Client::process_set_webhook_query(PromisedQueryPtr &query) {
                                              : (get_webhook_certificate(query.get()) != nullptr ||
                                                 (query->is_internal() && query->arg("certificate") == "previous"));
   int32 new_max_connections = new_url.empty() ? 0 : get_webhook_max_connections(query.get());
-  Slice new_ip_address = new_url.empty() ? Slice() : query->arg("ip_address");
+  td::Slice new_ip_address = new_url.empty() ? td::Slice() : query->arg("ip_address");
   bool new_fix_ip_address = new_url.empty() ? false : get_webhook_fix_ip_address(query.get());
-  Slice new_secret_token = new_url.empty() ? Slice() : query->arg("secret_token");
+  td::Slice new_secret_token = new_url.empty() ? td::Slice() : query->arg("secret_token");
   bool drop_pending_updates = to_bool(query->arg("drop_pending_updates"));
   if (webhook_set_query_) {
     // already updating webhook. Cancel previous request
     fail_query_conflict("Conflict: terminated by other setWebhook", std::move(webhook_set_query_));
   } else if (active_webhook_set_query_) {
     query->set_retry_after_error(1);
-    return Status::OK();
+    return td::Status::OK();
   } else if (webhook_url_ == new_url && !has_webhook_certificate_ && !new_has_certificate &&
              new_max_connections == webhook_max_connections_ && new_fix_ip_address == webhook_fix_ip_address_ &&
              new_secret_token == webhook_secret_token_ &&
@@ -9444,8 +9454,8 @@ td::Status Client::process_set_webhook_query(PromisedQueryPtr &query) {
       LOG(WARNING) << "Webhook is not modified: \"" << new_url << '"';
     }
     answer_query(td::JsonTrue(), std::move(query),
-                 new_url.empty() ? Slice("Webhook is already deleted") : Slice("Webhook is already set"));
-    return Status::OK();
+                 new_url.empty() ? td::Slice("Webhook is already deleted") : td::Slice("Webhook is already set"));
+    return td::Status::OK();
   }
 
   if (now > next_set_webhook_logging_time_ || webhook_url_ != new_url) {
@@ -9469,16 +9479,16 @@ td::Status Client::process_set_webhook_query(PromisedQueryPtr &query) {
     webhook_query_type_ = WebhookQueryType::Cancel;
     CHECK(!active_webhook_set_query_);
     webhook_set_query_ = std::move(query);
-    return Status::OK();
+    return td::Status::OK();
   }
   do_set_webhook(std::move(query), false);
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_get_webhook_info_query(PromisedQueryPtr &query) {
   update_last_synchronization_error_date();
   answer_query(JsonWebhookInfo(this), std::move(query));
-  return Status::OK();
+  return td::Status::OK();
 }
 
 td::Status Client::process_get_file_query(PromisedQueryPtr &query) {
@@ -9486,7 +9496,7 @@ td::Status Client::process_get_file_query(PromisedQueryPtr &query) {
   check_remote_file_id(file_id, std::move(query), [this](object_ptr<td_api::file> file, PromisedQueryPtr query) {
     do_get_file(std::move(file), std::move(query));
   });
-  return Status::OK();
+  return td::Status::OK();
 }
 
 void Client::do_get_file(object_ptr<td_api::file> file, PromisedQueryPtr query) {
@@ -9573,7 +9583,7 @@ void Client::webhook_success() {
   }
 }
 
-void Client::webhook_error(Status status) {
+void Client::webhook_error(td::Status status) {
   CHECK(status.is_error());
   last_webhook_error_date_ = get_unix_time();
   last_webhook_error_ = std::move(status);
@@ -9588,7 +9598,7 @@ void Client::webhook_error(Status status) {
   }
 }
 
-void Client::webhook_closed(Status status) {
+void Client::webhook_closed(td::Status status) {
   if (has_webhook_certificate_) {
     td::Scheduler::instance()->run_on_scheduler(SharedData::get_database_scheduler_id(),
                                                 [actor_id = actor_id(this), path = get_webhook_certificate_path(),
@@ -9602,7 +9612,7 @@ void Client::webhook_closed(Status status) {
   on_webhook_closed(std::move(status));
 }
 
-void Client::on_webhook_closed(Status status) {
+void Client::on_webhook_closed(td::Status status) {
   LOG(WARNING) << "Webhook closed: " << status
                << ", webhook_query_type = " << (webhook_query_type_ == WebhookQueryType::Verify ? "verify" : "change");
   webhook_id_.release();
@@ -9614,7 +9624,7 @@ void Client::on_webhook_closed(Status status) {
   webhook_secret_token_ = td::string();
   webhook_set_time_ = td::Time::now();
   last_webhook_error_date_ = 0;
-  last_webhook_error_ = Status::OK();
+  last_webhook_error_ = td::Status::OK();
   parameters_->shared_data_->webhook_db_->erase(bot_token_with_dc_);
 
   if (webhook_set_query_) {
@@ -9627,7 +9637,7 @@ void Client::on_webhook_closed(Status status) {
 }
 
 void Client::hangup_shared() {
-  webhook_closed(Status::Error("Unknown"));
+  webhook_closed(td::Status::Error("Unknown"));
 }
 
 td::string Client::get_webhook_certificate_path() const {
@@ -9638,7 +9648,7 @@ const td::HttpFile *Client::get_webhook_certificate(const Query *query) const {
   auto file = query->file("certificate");
   if (file == nullptr) {
     auto attach_name = query->arg("certificate");
-    Slice attach_protocol{"attach://"};
+    td::Slice attach_protocol{"attach://"};
     if (td::begins_with(attach_name, attach_protocol)) {
       file = query->file(attach_name.substr(attach_protocol.size()));
     }
@@ -9667,7 +9677,7 @@ void Client::do_set_webhook(PromisedQueryPtr query, bool was_deleted) {
   if (to_bool(query->arg("drop_pending_updates"))) {
     clear_tqueue();
   }
-  Slice new_url;
+  td::Slice new_url;
   if (query->method() == "setwebhook") {
     new_url = query->arg("url");
   }
@@ -9716,11 +9726,11 @@ void Client::do_set_webhook(PromisedQueryPtr query, bool was_deleted) {
     finish_set_webhook(std::move(query));
   } else {
     answer_query(td::JsonTrue(), std::move(query),
-                 was_deleted ? Slice("Webhook was deleted") : Slice("Webhook is already deleted"));
+                 was_deleted ? td::Slice("Webhook was deleted") : td::Slice("Webhook is already deleted"));
   }
 }
 
-void Client::on_webhook_certificate_copied(Status status) {
+void Client::on_webhook_certificate_copied(td::Status status) {
   CHECK(active_webhook_set_query_);
   if (status.is_error()) {
     return fail_query(500, "Internal Server Error: failed to save certificate", std::move(active_webhook_set_query_));
@@ -9736,7 +9746,7 @@ void Client::finish_set_webhook(PromisedQueryPtr query) {
   if (logging_out_ || closing_) {
     return fail_query_closing(std::move(query));
   }
-  Slice new_url = query->arg("url");
+  td::Slice new_url = query->arg("url");
   CHECK(!new_url.empty());
   webhook_url_ = new_url.str();
   webhook_set_time_ = td::Time::now();
@@ -9745,7 +9755,7 @@ void Client::finish_set_webhook(PromisedQueryPtr query) {
   webhook_ip_address_ = query->arg("ip_address").str();
   webhook_fix_ip_address_ = get_webhook_fix_ip_address(query.get());
   last_webhook_error_date_ = 0;
-  last_webhook_error_ = Status::OK();
+  last_webhook_error_ = td::Status::OK();
 
   update_allowed_update_types(query.get());
 
@@ -9845,18 +9855,18 @@ void Client::on_sent_message(object_ptr<td_api::message> &&message, int64 query_
 
 void Client::abort_long_poll(bool from_set_webhook) {
   if (long_poll_query_) {
-    Slice message;
+    td::Slice message;
     if (from_set_webhook) {
-      message = Slice("Conflict: terminated by setWebhook request");
+      message = td::Slice("Conflict: terminated by setWebhook request");
     } else {
-      message =
-          Slice("Conflict: terminated by other getUpdates request; make sure that only one bot instance is running");
+      message = td::Slice(
+          "Conflict: terminated by other getUpdates request; make sure that only one bot instance is running");
     }
     fail_query_conflict(message, std::move(long_poll_query_));
   }
 }
 
-void Client::fail_query_conflict(Slice message, PromisedQueryPtr &&query) {
+void Client::fail_query_conflict(td::Slice message, PromisedQueryPtr &&query) {
   auto now = td::Time::now_cached();
   if (now >= next_get_updates_conflict_time_) {
     fail_query(409, message, std::move(query));
@@ -9895,7 +9905,7 @@ Client::ClosingError Client::get_closing_error() {
   if (logging_out_) {
     if (is_api_id_invalid_) {
       result.code = 401;
-      result.message = Slice("Unauthorized: invalid api-id/api-hash");
+      result.message = td::Slice("Unauthorized: invalid api-id/api-hash");
     } else if (next_authorization_time_ > 0.0) {
       result.code = 429;
       result.retry_after = td::max(static_cast<int>(next_authorization_time_ - td::Time::now()), 0) + 1;
@@ -9906,15 +9916,15 @@ Client::ClosingError Client::get_closing_error() {
       result.message = retry_after_error_message;
     } else if (clear_tqueue_) {
       result.code = 400;
-      result.message = Slice("Logged out");
+      result.message = td::Slice("Logged out");
     } else {
       result.code = 401;
-      result.message = Slice("Unauthorized");
+      result.message = td::Slice("Unauthorized");
     }
   } else {
     CHECK(closing_);
     result.code = 500;
-    result.message = Slice("Internal Server Error: restart");
+    result.message = td::Slice("Internal Server Error: restart");
   }
   return result;
 }
@@ -10321,7 +10331,7 @@ void Client::json_store_file(td::JsonObjectScope &object, const td_api::file *fi
         object("file_path", td::JsonRawString(file->local_->path_));
       }
     } else {
-      Slice relative_path = td::PathView::relative(file->local_->path_, dir_, true);
+      td::Slice relative_path = td::PathView::relative(file->local_->path_, dir_, true);
       if (!relative_path.empty() && file->local_->downloaded_size_ <= MAX_DOWNLOAD_FILE_SIZE) {
         object("file_path", relative_path);
       }
@@ -10407,43 +10417,43 @@ void Client::json_store_permissions(td::JsonObjectScope &object, const td_api::c
   object("can_manage_topics", td::JsonBool(permissions->can_manage_topics_));
 }
 
-Client::Slice Client::get_update_type_name(UpdateType update_type) {
+td::Slice Client::get_update_type_name(UpdateType update_type) {
   switch (update_type) {
     case UpdateType::Message:
-      return Slice("message");
+      return td::Slice("message");
     case UpdateType::EditedMessage:
-      return Slice("edited_message");
+      return td::Slice("edited_message");
     case UpdateType::ChannelPost:
-      return Slice("channel_post");
+      return td::Slice("channel_post");
     case UpdateType::EditedChannelPost:
-      return Slice("edited_channel_post");
+      return td::Slice("edited_channel_post");
     case UpdateType::InlineQuery:
-      return Slice("inline_query");
+      return td::Slice("inline_query");
     case UpdateType::ChosenInlineResult:
-      return Slice("chosen_inline_result");
+      return td::Slice("chosen_inline_result");
     case UpdateType::CallbackQuery:
-      return Slice("callback_query");
+      return td::Slice("callback_query");
     case UpdateType::CustomEvent:
-      return Slice("custom_event");
+      return td::Slice("custom_event");
     case UpdateType::CustomQuery:
-      return Slice("custom_query");
+      return td::Slice("custom_query");
     case UpdateType::ShippingQuery:
-      return Slice("shipping_query");
+      return td::Slice("shipping_query");
     case UpdateType::PreCheckoutQuery:
-      return Slice("pre_checkout_query");
+      return td::Slice("pre_checkout_query");
     case UpdateType::Poll:
-      return Slice("poll");
+      return td::Slice("poll");
     case UpdateType::PollAnswer:
-      return Slice("poll_answer");
+      return td::Slice("poll_answer");
     case UpdateType::MyChatMember:
-      return Slice("my_chat_member");
+      return td::Slice("my_chat_member");
     case UpdateType::ChatMember:
-      return Slice("chat_member");
+      return td::Slice("chat_member");
     case UpdateType::ChatJoinRequest:
-      return Slice("chat_join_request");
+      return td::Slice("chat_join_request");
     default:
       UNREACHABLE();
-      return Slice();
+      return td::Slice();
   }
 }
 
@@ -10931,18 +10941,18 @@ td::Slice Client::get_sticker_type(const object_ptr<td_api::StickerType> &type) 
   CHECK(type != nullptr);
   switch (type->get_id()) {
     case td_api::stickerTypeRegular::ID:
-      return Slice("regular");
+      return td::Slice("regular");
     case td_api::stickerTypeMask::ID:
-      return Slice("mask");
+      return td::Slice("mask");
     case td_api::stickerTypeCustomEmoji::ID:
-      return Slice("custom_emoji");
+      return td::Slice("custom_emoji");
     default:
       UNREACHABLE();
-      return Slice();
+      return td::Slice();
   }
 }
 
-td::Result<td_api::object_ptr<td_api::StickerType>> Client::get_sticker_type(Slice type) {
+td::Result<td_api::object_ptr<td_api::StickerType>> Client::get_sticker_type(td::Slice type) {
   if (type.empty() || type == "regular") {
     return make_object<td_api::stickerTypeRegular>();
   }
@@ -10952,7 +10962,7 @@ td::Result<td_api::object_ptr<td_api::StickerType>> Client::get_sticker_type(Sli
   if (type == "custom_emoji") {
     return make_object<td_api::stickerTypeCustomEmoji>();
   }
-  return Status::Error(400, "Unsupported sticker type specified");
+  return td::Status::Error(400, "Unsupported sticker type specified");
 }
 
 td::CSlice Client::get_callback_data(const object_ptr<td_api::InlineKeyboardButtonType> &type) {
@@ -11213,17 +11223,17 @@ td::unique_ptr<Client::MessageInfo> Client::delete_message(int64 chat_id, int64 
       auto chat_info = get_chat(chat_id);
       CHECK(chat_info != nullptr);
 
-      Status error =
-          Status::Error(500, "Internal Server Error: sent message was immediately deleted and can't be returned");
+      td::Status error =
+          td::Status::Error(500, "Internal Server Error: sent message was immediately deleted and can't be returned");
       if (chat_info->type == ChatInfo::Type::Supergroup) {
         auto supergroup_info = get_supergroup_info(chat_info->supergroup_id);
         CHECK(supergroup_info != nullptr);
         if (supergroup_info->status->get_id() == td_api::chatMemberStatusBanned::ID ||
             supergroup_info->status->get_id() == td_api::chatMemberStatusLeft::ID) {
           if (supergroup_info->is_supergroup) {
-            error = Status::Error(403, "Forbidden: bot is not a member of the supergroup chat");
+            error = td::Status::Error(403, "Forbidden: bot is not a member of the supergroup chat");
           } else {
-            error = Status::Error(403, "Forbidden: bot is not a member of the channel chat");
+            error = td::Status::Error(403, "Forbidden: bot is not a member of the channel chat");
           }
         }
       }
@@ -11467,7 +11477,7 @@ td::string Client::get_passport_element_type(int32 id) {
   }
 }
 
-td_api::object_ptr<td_api::PassportElementType> Client::get_passport_element_type(Slice type) {
+td_api::object_ptr<td_api::PassportElementType> Client::get_passport_element_type(td::Slice type) {
   if (type == "personal_details") {
     return make_object<td_api::passportElementTypePersonalDetails>();
   }
@@ -11536,9 +11546,9 @@ td::int64 Client::get_basic_group_chat_id(int64 basic_group_id) {
 constexpr Client::int64 Client::GENERAL_MESSAGE_THREAD_ID;
 
 constexpr Client::int64 Client::GREAT_MINDS_SET_ID;
-constexpr Client::Slice Client::GREAT_MINDS_SET_NAME;
+constexpr td::Slice Client::GREAT_MINDS_SET_NAME;
 
-constexpr Client::Slice Client::MASK_POINTS[MASK_POINTS_SIZE];
+constexpr td::Slice Client::MASK_POINTS[MASK_POINTS_SIZE];
 
 td::FlatHashMap<td::string, td::Status (Client::*)(PromisedQueryPtr &query)> Client::methods_;
 
