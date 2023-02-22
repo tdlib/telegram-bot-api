@@ -1732,6 +1732,22 @@ class Client::JsonChatSetMessageAutoDeleteTime final : public td::Jsonable {
   const td_api::messageChatSetMessageAutoDeleteTime *chat_set_message_auto_delete_time_;
 };
 
+class Client::JsonWriteAccessAllowed final : public td::Jsonable {
+ public:
+  explicit JsonWriteAccessAllowed(const td_api::messageBotWriteAccessAllowed *write_access_allowed)
+      : write_access_allowed_(write_access_allowed) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    if (write_access_allowed_->web_app_ != nullptr) {
+      object("web_app_name", write_access_allowed_->web_app_->short_name_);
+    }
+  }
+
+ private:
+  const td_api::messageBotWriteAccessAllowed *write_access_allowed_;
+};
+
 class Client::JsonUserShared final : public td::Jsonable {
  public:
   explicit JsonUserShared(const td_api::messageUserShared *user_shared) : user_shared_(user_shared) {
@@ -2231,9 +2247,11 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       break;
     case td_api::messageSuggestProfilePhoto::ID:
       break;
-    case td_api::messageBotWriteAccessAllowed::ID:
-      object("write_access_allowed", JsonEmptyObject());
+    case td_api::messageBotWriteAccessAllowed::ID: {
+      auto content = static_cast<const td_api::messageBotWriteAccessAllowed *>(message_->content.get());
+      object("write_access_allowed", JsonWriteAccessAllowed(content));
       break;
+    }
     case td_api::messageUserShared::ID: {
       auto content = static_cast<const td_api::messageUserShared *>(message_->content.get());
       object("user_shared", JsonUserShared(content));
