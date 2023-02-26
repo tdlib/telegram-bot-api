@@ -205,6 +205,7 @@ bool Client::init_methods() {
   methods_.emplace("deletemycommands", &Client::process_delete_my_commands_query);
   methods_.emplace("getmydefaultadministratorrights", &Client::process_get_my_default_administrator_rights_query);
   methods_.emplace("setmydefaultadministratorrights", &Client::process_set_my_default_administrator_rights_query);
+  methods_.emplace("setmydescription", &Client::process_set_my_description_query);
   methods_.emplace("getchatmenubutton", &Client::process_get_chat_menu_button_query);
   methods_.emplace("setchatmenubutton", &Client::process_set_chat_menu_button_query);
   methods_.emplace("getuserprofilephotos", &Client::process_get_user_profile_photos_query);
@@ -7791,6 +7792,14 @@ td::Status Client::process_set_my_default_administrator_rights_query(PromisedQue
     send_request(make_object<td_api::setDefaultGroupAdministratorRights>(std::move(rights)),
                  td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   }
+  return td::Status::OK();
+}
+
+td::Status Client::process_set_my_description_query(PromisedQueryPtr &query) {
+  auto language_code = query->arg("language_code");
+  auto description = query->arg("description");
+  send_request(make_object<td_api::setBotInfoDescription>(language_code.str(), description.str()),
+               td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   return td::Status::OK();
 }
 
