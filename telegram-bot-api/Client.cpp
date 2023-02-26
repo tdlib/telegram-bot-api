@@ -7924,7 +7924,8 @@ td::Status Client::process_send_sticker_query(PromisedQueryPtr &query) {
   if (sticker == nullptr) {
     return td::Status::Error(400, "There is no sticker in the request");
   }
-  do_send_message(make_object<td_api::inputMessageSticker>(std::move(sticker), nullptr, 0, 0, td::string()),
+  auto emoji = query->arg("emoji");
+  do_send_message(make_object<td_api::inputMessageSticker>(std::move(sticker), nullptr, 0, 0, emoji.str()),
                   std::move(query));
   return td::Status::OK();
 }
