@@ -151,13 +151,18 @@ td::string BotStatActor::get_description() const {
 
 double BotStatActor::get_score(double now) {
   auto minute_stat = stat_[2].stat_duration(now);
-  double result = minute_stat.first.request_count_ + minute_stat.first.update_count_;
+  double minute_score = minute_stat.first.request_count_ + minute_stat.first.update_count_;
   if (minute_stat.second != 0) {
-    result /= minute_stat.second;
+    minute_score /= minute_stat.second;
   }
-  result += td::max(static_cast<double>(get_active_request_count() - 10), static_cast<double>(0));
-  result += static_cast<double>(get_active_file_upload_bytes()) * 1e-8;
-  return result;
+  auto all_time_stat = stat_[0].stat_duration(now);
+  double all_time_score = 0.01 * (all_time_stat.first.request_count_ + all_time_stat.first.update_count_);
+  if (all_time_stat.second != 0) {
+    all_time_score /= all_time_stat.second;
+  }
+  auto active_request_score = static_cast<double>(td::max(get_active_request_count() - 10, static_cast<td::int64>(0)));
+  auto active_file_upload_score = static_cast<double>(get_active_file_upload_bytes()) * 1e-8;
+  return minute_score + all_time_score + active_request_score + active_file_upload_score;
 }
 
 double BotStatActor::get_minute_update_count(double now) {
