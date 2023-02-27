@@ -137,6 +137,7 @@ class Client final : public WebhookActor::Callback {
   class JsonPreCheckoutQuery;
   class JsonBotCommand;
   class JsonBotMenuButton;
+  class JsonBotInfoDescription;
   class JsonChatAdministratorRights;
   class JsonChatPhotos;
   class JsonChatMember;
@@ -187,6 +188,7 @@ class Client final : public WebhookActor::Callback {
   class TdOnGetMenuButtonCallback;
   class TdOnGetMyCommandsCallback;
   class TdOnGetMyDefaultAdministratorRightsCallback;
+  class TdOnGetMyDescriptionCallback;
   class TdOnGetChatFullInfoCallback;
   class TdOnGetChatStickerSetCallback;
   class TdOnGetChatPinnedMessageCallback;
@@ -505,6 +507,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_delete_my_commands_query(PromisedQueryPtr &query);
   td::Status process_get_my_default_administrator_rights_query(PromisedQueryPtr &query);
   td::Status process_set_my_default_administrator_rights_query(PromisedQueryPtr &query);
+  td::Status process_get_my_description_query(PromisedQueryPtr &query);
   td::Status process_set_my_description_query(PromisedQueryPtr &query);
   td::Status process_get_chat_menu_button_query(PromisedQueryPtr &query);
   td::Status process_set_chat_menu_button_query(PromisedQueryPtr &query);
