@@ -207,6 +207,7 @@ bool Client::init_methods() {
   methods_.emplace("setmydefaultadministratorrights", &Client::process_set_my_default_administrator_rights_query);
   methods_.emplace("getmydescription", &Client::process_get_my_description_query);
   methods_.emplace("setmydescription", &Client::process_set_my_description_query);
+  methods_.emplace("getmyshortdescription", &Client::process_get_my_short_description_query);
   methods_.emplace("getchatmenubutton", &Client::process_get_chat_menu_button_query);
   methods_.emplace("setchatmenubutton", &Client::process_set_chat_menu_button_query);
   methods_.emplace("getuserprofilephotos", &Client::process_get_user_profile_photos_query);
@@ -2595,6 +2596,19 @@ class Client::JsonBotInfoDescription final : public td::Jsonable {
   const td_api::text *text_;
 };
 
+class Client::JsonBotInfoShortDescription final : public td::Jsonable {
+ public:
+  explicit JsonBotInfoShortDescription(const td_api::text *text) : text_(text) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("short_description", text_->text_);
+  }
+
+ private:
+  const td_api::text *text_;
+};
+
 class Client::JsonChatAdministratorRights final : public td::Jsonable {
  public:
   JsonChatAdministratorRights(const td_api::chatAdministratorRights *rights, Client::ChatType chat_type)
@@ -3748,6 +3762,25 @@ class Client::TdOnGetMyDescriptionCallback final : public TdQueryCallback {
     CHECK(result->get_id() == td_api::text::ID);
     auto text = move_object_as<td_api::text>(result);
     answer_query(JsonBotInfoDescription(text.get()), std::move(query_));
+  }
+
+ private:
+  PromisedQueryPtr query_;
+};
+
+class Client::TdOnGetMyShortDescriptionCallback final : public TdQueryCallback {
+ public:
+  explicit TdOnGetMyShortDescriptionCallback(PromisedQueryPtr query) : query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::text::ID);
+    auto text = move_object_as<td_api::text>(result);
+    answer_query(JsonBotInfoShortDescription(text.get()), std::move(query_));
   }
 
  private:
@@ -7840,6 +7873,13 @@ td::Status Client::process_set_my_description_query(PromisedQueryPtr &query) {
   auto description = query->arg("description");
   send_request(make_object<td_api::setBotInfoDescription>(language_code.str(), description.str()),
                td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+  return td::Status::OK();
+}
+
+td::Status Client::process_get_my_short_description_query(PromisedQueryPtr &query) {
+  auto language_code = query->arg("language_code");
+  send_request(make_object<td_api::getBotInfoShortDescription>(language_code.str()),
+               td::make_unique<TdOnGetMyShortDescriptionCallback>(std::move(query)));
   return td::Status::OK();
 }
 
