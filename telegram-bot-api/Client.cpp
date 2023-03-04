@@ -208,6 +208,7 @@ bool Client::init_methods() {
   methods_.emplace("getmydescription", &Client::process_get_my_description_query);
   methods_.emplace("setmydescription", &Client::process_set_my_description_query);
   methods_.emplace("getmyshortdescription", &Client::process_get_my_short_description_query);
+  methods_.emplace("setmyshortdescription", &Client::process_set_my_short_description_query);
   methods_.emplace("getchatmenubutton", &Client::process_get_chat_menu_button_query);
   methods_.emplace("setchatmenubutton", &Client::process_set_chat_menu_button_query);
   methods_.emplace("getuserprofilephotos", &Client::process_get_user_profile_photos_query);
@@ -7880,6 +7881,14 @@ td::Status Client::process_get_my_short_description_query(PromisedQueryPtr &quer
   auto language_code = query->arg("language_code");
   send_request(make_object<td_api::getBotInfoShortDescription>(language_code.str()),
                td::make_unique<TdOnGetMyShortDescriptionCallback>(std::move(query)));
+  return td::Status::OK();
+}
+
+td::Status Client::process_set_my_short_description_query(PromisedQueryPtr &query) {
+  auto language_code = query->arg("language_code");
+  auto short_description = query->arg("short_description");
+  send_request(make_object<td_api::setBotInfoShortDescription>(language_code.str(), short_description.str()),
+               td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   return td::Status::OK();
 }
 
