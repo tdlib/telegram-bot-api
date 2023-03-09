@@ -399,7 +399,7 @@ void WebhookActor::load_updates() {
     CHECK(update.id.is_valid());
     auto &dest_ptr = update_map_[update.id];
     if (dest_ptr != nullptr) {
-      LOG(ERROR) << "Receive duplicated event " << update.id << " from TQueue";
+      LOG(ERROR) << "Receive duplicate event " << update.id << " from TQueue";
       continue;
     }
     dest_ptr = td::make_unique<Update>();

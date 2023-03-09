@@ -6839,7 +6839,7 @@ td::Result<td_api::object_ptr<td_api::inputSticker>> Client::get_input_sticker(c
   TRY_RESULT(sticker, get_json_object_string_field(object, "sticker"));
   auto input_file = get_input_file(query, td::Slice(), sticker, false);
   if (input_file == nullptr) {
-    return td::Status::Error("sticker not found");
+    return td::Status::Error(400, "sticker not found");
   }
   TRY_RESULT(emoji_list, get_json_object_field(object, "emoji_list", td::JsonValue::Type::Array, false));
   TRY_RESULT(emojis, get_sticker_emojis(std::move(emoji_list)));
