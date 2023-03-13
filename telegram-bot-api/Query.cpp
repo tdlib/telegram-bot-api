@@ -26,10 +26,10 @@ td::FlatHashMap<td::string, td::unique_ptr<td::VirtuallyJsonable>> empty_paramet
 Query::Query(td::vector<td::BufferSlice> &&container, td::Slice token, bool is_test_dc, td::MutableSlice method,
              td::vector<std::pair<td::MutableSlice, td::MutableSlice>> &&args,
              td::vector<std::pair<td::MutableSlice, td::MutableSlice>> &&headers, td::vector<td::HttpFile> &&files,
-             std::shared_ptr<SharedData> shared_data, const td::IPAddress &peer_address, bool is_internal)
+             std::shared_ptr<SharedData> shared_data, const td::IPAddress &peer_ip_address, bool is_internal)
     : state_(State::Query)
     , shared_data_(shared_data)
-    , peer_address_(peer_address)
+    , peer_ip_address_(peer_ip_address)
     , container_(std::move(container))
     , token_(token)
     , is_test_dc_(is_test_dc)
@@ -50,6 +50,15 @@ Query::Query(td::vector<td::BufferSlice> &&container, td::Slice token, bool is_t
       shared_data_->query_list_size_.fetch_add(1, std::memory_order_relaxed);
       shared_data_->query_list_.put(this);
     }
+  }
+}
+
+td::string Query::get_peer_ip_address() const {
+  if (peer_ip_address_.is_valid() && !peer_ip_address_.is_reserved()) {  // external connection
+    return peer_ip_address_.get_ip_str().str();
+  } else {
+    // invalid peer IP address or connection from the local network
+    return get_header("x-real-ip").str();
   }
 }
 

@@ -41,7 +41,7 @@ using td_api::move_object_as;
 
 int Client::get_retry_after_time(td::Slice error_message) {
   td::Slice prefix = "Too Many Requests: retry after ";
-  if (begins_with(error_message, prefix)) {
+  if (td::begins_with(error_message, prefix)) {
     auto r_retry_after = td::to_integer_safe<int>(error_message.substr(prefix.size()));
     if (r_retry_after.is_ok() && r_retry_after.ok() > 0) {
       return r_retry_after.ok();
@@ -154,7 +154,7 @@ void Client::fail_query_with_error(PromisedQueryPtr query, int32 error_code, td:
       return fail_query(400, PSLICE() << "Bad Request: " << error_message, std::move(query));
   }
 
-  if (begins_with(error_message, prefix)) {
+  if (td::begins_with(error_message, prefix)) {
     return fail_query(error_code, error_message, std::move(query));
   } else {
     td::string error_str = prefix.str();
@@ -10168,7 +10168,8 @@ void Client::do_get_updates(int32 offset, int32 limit, int32 timeout, PromisedQu
   if (need_warning && previous_get_updates_finish_time_ > 0) {
     LOG(WARNING) << "Found " << updates.size() << " updates out of " << (total_size + updates.size())
                  << " after last getUpdates call " << (query->start_timestamp() - previous_get_updates_finish_time_)
-                 << " seconds ago in " << (td::Time::now() - query->start_timestamp()) << " seconds";
+                 << " seconds ago in " << (td::Time::now() - query->start_timestamp()) << " seconds from "
+                 << query->get_peer_ip_address();
   } else {
     LOG(DEBUG) << "Found " << updates.size() << " updates out of " << total_size << " from " << from;
   }

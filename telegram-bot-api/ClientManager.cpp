@@ -90,13 +90,7 @@ void ClientManager::send(PromisedQueryPtr query) {
 
   auto id_it = token_to_id_.find(token);
   if (id_it == token_to_id_.end()) {
-    td::string ip_address;
-    if (query->peer_address().is_valid() && !query->peer_address().is_reserved()) {  // external connection
-      ip_address = query->peer_address().get_ip_str().str();
-    } else {
-      // invalid peer address or connection from the local network
-      ip_address = query->get_header("x-real-ip").str();
-    }
+    td::string ip_address = query->get_peer_ip_address();
     if (!ip_address.empty()) {
       td::IPAddress tmp;
       tmp.init_host_port(ip_address, 0).ignore();
@@ -105,7 +99,7 @@ void ClientManager::send(PromisedQueryPtr query) {
         ip_address = tmp.get_ip_str().str();
       }
     }
-    LOG(DEBUG) << "Receive incoming query for new bot " << token << " from " << query->peer_address();
+    LOG(DEBUG) << "Receive incoming query for new bot " << token << " from " << ip_address;
     if (!ip_address.empty()) {
       LOG(DEBUG) << "Check Client creation flood control for IP address " << ip_address;
       auto res = flood_controls_.emplace(std::move(ip_address), td::FloodControlFast());

@@ -70,9 +70,7 @@ class Query final : public td::ListNode {
     return files_;
   }
 
-  const td::IPAddress &peer_address() const {
-    return peer_address_;
-  }
+  td::string get_peer_ip_address() const;
 
   td::BufferSlice &answer() {
     return answer_;
@@ -103,7 +101,7 @@ class Query final : public td::ListNode {
   Query(td::vector<td::BufferSlice> &&container, td::Slice token, bool is_test_dc, td::MutableSlice method,
         td::vector<std::pair<td::MutableSlice, td::MutableSlice>> &&args,
         td::vector<std::pair<td::MutableSlice, td::MutableSlice>> &&headers, td::vector<td::HttpFile> &&files,
-        std::shared_ptr<SharedData> shared_data, const td::IPAddress &peer_address, bool is_internal);
+        std::shared_ptr<SharedData> shared_data, const td::IPAddress &peer_ip_address, bool is_internal);
   Query(const Query &) = delete;
   Query &operator=(const Query &) = delete;
   Query(Query &&) = delete;
@@ -129,7 +127,7 @@ class Query final : public td::ListNode {
   State state_;
   std::shared_ptr<SharedData> shared_data_;
   double start_timestamp_;
-  td::IPAddress peer_address_;
+  td::IPAddress peer_ip_address_;
   td::ActorId<BotStatActor> stat_actor_;
 
   // request
