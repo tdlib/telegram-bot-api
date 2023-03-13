@@ -4891,9 +4891,9 @@ void Client::on_update_authorization_state() {
       send_request(make_object<td_api::setOption>("reuse_uploaded_photos_by_hash",
                                                   make_object<td_api::optionValueBoolean>(true)),
                    td::make_unique<TdOnOkCallback>());
-      send_request(make_object<td_api::setOption>("disable_persistent_network_statistics",
-                                                  make_object<td_api::optionValueBoolean>(true)),
-                   td::make_unique<TdOnOkCallback>());
+      send_request(
+          make_object<td_api::setOption>("disable_network_statistics", make_object<td_api::optionValueBoolean>(true)),
+          td::make_unique<TdOnOkCallback>());
       send_request(make_object<td_api::setOption>("disable_time_adjustment_protection",
                                                   make_object<td_api::optionValueBoolean>(true)),
                    td::make_unique<TdOnOkCallback>());
