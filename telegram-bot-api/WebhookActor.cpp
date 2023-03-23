@@ -207,7 +207,7 @@ td::Status WebhookActor::create_webhook_error(td::Slice error_message, td::Statu
     on_webhook_error(error_message);
   }
   on_error(std::move(result));
-  return std::move(error);
+  return error;
 }
 
 td::Result<td::SslStream> WebhookActor::create_ssl_stream() {
