@@ -1,0 +1,37 @@
+import requests
+from bs4 import BeautifulSoup
+import telegram
+import time
+
+# Константы
+MY_PARTS_URL = "https://www.myparts.ge/ru/search/?pr_type_id=3"
+
+# Инициализация Telegram-бота
+bot = telegram.Bot(token="GoDroolbot")
+
+def parse_myparts():
+    # Загрузка страницы
+    page = requests.get(MY_PARTS_URL)
+    soup = BeautifulSoup(page.content, "html.parser")
+
+    # Парсинг объявлений о колесах
+    results = soup.find_all("div", class_="ads-list-item")
+
+    # Отправка объявлений в телеграм-канал
+    for result in results:
+        title = result.find("h3", class_="ads-list-item__title").text.strip()
+        link = result.find("a", class_="ads-list-item__link")["href"]
+        price = result.find("div", class_="ads-list-item__price").text.strip()
+        message = f"{title}\nЦена: {price}\nСсылка: {link}"
+        
+        # Проверка на максимальную длину сообщения
+        if len(message) > 4096:
+            message_parts = [message[i:i+4096] for i in range(0, len(message), 4096)]
+            for part in message_parts:
+                bot.send_message(chat_id="@rollin_ge", text=part)
+        else:
+            bot.send_message(chat_id="@rollin_ge", text=message)
+
+while True:
+    parse_myparts()
+    time.sleep(60*60*24) # Парсинг раз в сутки
