@@ -2787,6 +2787,9 @@ class Client::JsonChatMemberUpdated final : public td::Jsonable {
     if (update_->invite_link_ != nullptr) {
       object("invite_link", JsonChatInviteLink(update_->invite_link_.get(), client_));
     }
+    if (update_->via_chat_folder_invite_link_) {
+      object("via_chat_folder_invite_link", td::JsonTrue());
+    }
   }
 
  private:
