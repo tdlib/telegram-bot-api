@@ -137,6 +137,7 @@ class Client final : public WebhookActor::Callback {
   class JsonPreCheckoutQuery;
   class JsonBotCommand;
   class JsonBotMenuButton;
+  class JsonBotName;
   class JsonBotInfoDescription;
   class JsonBotInfoShortDescription;
   class JsonChatAdministratorRights;
@@ -189,6 +190,7 @@ class Client final : public WebhookActor::Callback {
   class TdOnGetMenuButtonCallback;
   class TdOnGetMyCommandsCallback;
   class TdOnGetMyDefaultAdministratorRightsCallback;
+  class TdOnGetMyNameCallback;
   class TdOnGetMyDescriptionCallback;
   class TdOnGetMyShortDescriptionCallback;
   class TdOnGetChatFullInfoCallback;
@@ -509,6 +511,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_delete_my_commands_query(PromisedQueryPtr &query);
   td::Status process_get_my_default_administrator_rights_query(PromisedQueryPtr &query);
   td::Status process_set_my_default_administrator_rights_query(PromisedQueryPtr &query);
+  td::Status process_get_my_name_query(PromisedQueryPtr &query);
   td::Status process_get_my_description_query(PromisedQueryPtr &query);
   td::Status process_set_my_description_query(PromisedQueryPtr &query);
   td::Status process_get_my_short_description_query(PromisedQueryPtr &query);
