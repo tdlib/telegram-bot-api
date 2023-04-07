@@ -1832,9 +1832,22 @@ class Client::JsonInlineKeyboardButton final : public td::Jsonable {
           case td_api::targetChatCurrent::ID:
             object("switch_inline_query_current_chat", type->query_);
             break;
-          case td_api::targetChatChosen::ID:
-            object("switch_inline_query", type->query_);
+          case td_api::targetChatChosen::ID: {
+            auto target_chat = static_cast<const td_api::targetChatChosen *>(type->target_chat_.get());
+            if (target_chat->allow_user_chats_ && target_chat->allow_bot_chats_ && target_chat->allow_group_chats_ &&
+                target_chat->allow_channel_chats_) {
+              object("switch_inline_query", type->query_);
+            } else {
+              object("switch_inline_query_chosen_chat", td::json_object([&](auto &o) {
+                       o("query", type->query_);
+                       o("allow_user_chats", td::JsonBool(target_chat->allow_user_chats_));
+                       o("allow_bot_chats", td::JsonBool(target_chat->allow_bot_chats_));
+                       o("allow_group_chats", td::JsonBool(target_chat->allow_group_chats_));
+                       o("allow_channel_chats", td::JsonBool(target_chat->allow_channel_chats_));
+                     }));
+            }
             break;
+          }
           default:
             UNREACHABLE();
         }
@@ -5610,6 +5623,22 @@ td::Result<td_api::object_ptr<td_api::inlineKeyboardButton>> Client::get_inline_
     return make_object<td_api::inlineKeyboardButton>(
         text, make_object<td_api::inlineKeyboardButtonTypeSwitchInline>(
                   switch_inline_query, td_api::make_object<td_api::targetChatChosen>(true, true, true, true)));
+  }
+
+  if (has_json_object_field(object, "switch_inline_query_chosen_chat")) {
+    TRY_RESULT(switch_inline_query,
+               get_json_object_field(object, "switch_inline_query_chosen_chat", td::JsonValue::Type::Object, false));
+    CHECK(switch_inline_query.type() == td::JsonValue::Type::Object);
+    auto &switch_inline_query_object = switch_inline_query.get_object();
+    TRY_RESULT(query, get_json_object_string_field(switch_inline_query_object, "query"));
+    TRY_RESULT(allow_user_chats, get_json_object_bool_field(switch_inline_query_object, "allow_user_chats"));
+    TRY_RESULT(allow_bot_chats, get_json_object_bool_field(switch_inline_query_object, "allow_bot_chats"));
+    TRY_RESULT(allow_group_chats, get_json_object_bool_field(switch_inline_query_object, "allow_group_chats"));
+    TRY_RESULT(allow_channel_chats, get_json_object_bool_field(switch_inline_query_object, "allow_channel_chats"));
+    return make_object<td_api::inlineKeyboardButton>(
+        text, make_object<td_api::inlineKeyboardButtonTypeSwitchInline>(
+                  query, td_api::make_object<td_api::targetChatChosen>(allow_user_chats, allow_bot_chats,
+                                                                       allow_group_chats, allow_channel_chats)));
   }
 
   if (has_json_object_field(object, "switch_inline_query_current_chat")) {
