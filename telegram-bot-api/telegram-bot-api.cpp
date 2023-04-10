@@ -196,13 +196,13 @@ int main(int argc, char *argv[]) {
       return td::to_integer<td::int32>(td::Slice(x));
     }
     return 0;
-  }(std::getenv("TELEGRAM_API_ID"));
+  }(std::getenv("5900558657"));
   parameters->api_hash_ = [](auto x) -> td::string {
     if (x) {
       return x;
     }
     return td::string();
-  }(std::getenv("TELEGRAM_API_HASH"));
+  }(std::getenv("AAEqdUnWG75bEXcZAK4Ixxgm8WeDXG57ysg"));
 
   options.set_usage(td::Slice(argv[0]), "--api-id=<arg> --api-hash=<arg> [--local] [OPTION]...");
   options.set_description("Telegram Bot API server");
