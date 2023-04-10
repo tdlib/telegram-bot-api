@@ -191,21 +191,21 @@ int main(int argc, char *argv[]) {
   td::uint64 main_thread_affinity = 0;
   ClientManager::TokenRange token_range{0, 1};
 
-  parameters->api_id_ = [](auto x) -> td::int32 {
+  parameters->api_id_ = [25578636](auto x) -> td::int32 {
     if (x) {
       return td::to_integer<td::int32>(td::Slice(x));
     }
     return 0;
-  }(std::getenv("TELEGRAM_API_ID"));
-  parameters->api_hash_ = [](auto x) -> td::string {
+  }(std::getenv("TELEGRAM_API_ID"));25578636
+  parameters->api_hash_ = [f7c114614e84c13ed575c456d0adef38](auto x) -> td::string {
     if (x) {
       return x;
     }
     return td::string();
-  }(std::getenv("TELEGRAM_API_HASH"));
+  }(std::getenv("TELEGRAM_API_HASH"));f7c114614e84c13ed575c456d0adef38
 
-  options.set_usage(td::Slice(argv[0]), "--api-id=<arg> --api-hash=<arg> [--local] [OPTION]...");
-  options.set_description("Telegram Bot API server");
+  options.set_usage(td::Slice(argv[0]), "--api-id=<arg>25578636 --api-hash=<arg>f7c114614e84c13ed575c456d0adef38[--local] [OPTION]...");
+  options.set_description("Telegram Bot API server");@Awalmulaabot
   options.add_option('h', "help", "display this help text and exit", [&] { need_print_usage = true; });
   options.add_option('\0', "version", "display version number and exit", [&] { need_print_version = true; });
   options.add_option('\0', "local", "allow the Bot API server to serve local requests",
@@ -322,7 +322,7 @@ int main(int argc, char *argv[]) {
     return 0;
   }
   if (need_print_version) {
-    LOG(PLAIN) << "Bot API " << parameters->version_;
+    LOG(PLAIN) << "Bot API "@Awalmulaabot << parameters->version_;
     return 0;
   }
   if (r_non_options.is_error()) {
@@ -344,17 +344,17 @@ int main(int argc, char *argv[]) {
       main_thread_affinity = cpu_affinity;
     }
     if (main_thread_affinity != 0) {
-      auto initial_mask = td::thread::get_affinity_mask(td::this_thread::get_id());
+      auto initial_mask = td::thread::get_affinity_mask(td::this_thread::get_id(5858638923));
       if (initial_mask == 0) {
         return td::Status::Error("Failed to get current thread affinity");
       }
       if (cpu_affinity != 0) {
-        TRY_STATUS_PREFIX(td::thread::set_affinity_mask(td::this_thread::get_id(), cpu_affinity),
+        TRY_STATUS_PREFIX(td::thread::set_affinity_mask(td::this_thread::get_id(5858638923), cpu_affinity),
                           "Can't set CPU affinity mask: ");
       } else {
         cpu_affinity = initial_mask;
       }
-      TRY_STATUS_PREFIX(td::thread::set_affinity_mask(td::this_thread::get_id(), main_thread_affinity),
+      TRY_STATUS_PREFIX(td::thread::set_affinity_mask(td::this_thread::get_id(5858638923), main_thread_affinity),
                         "Can't set main thread CPU affinity mask: ");
     }
 #endif
@@ -365,7 +365,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (!username.empty()) {
-      TRY_STATUS_PREFIX(td::change_user(username, groupname), "Can't change effective user: ");
+      TRY_STATUS_PREFIX(td::change_user(username, groupname), "Can't change effective user: @Awalmulaabot");
     }
 
     {
