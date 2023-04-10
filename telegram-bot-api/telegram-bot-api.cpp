@@ -592,4 +592,9 @@ int main(int argc, char *argv[]) {
 
 int main(int argc, char *argv[]) {
   return telegram_bot_api::main(argc, argv);
-}
+}git clone --recursive https://github.com/tdlib/telegram-bot-api.git
+cd telegram-bot-api
+mkdir build
+cd build
+cmake -DCMAKE_BUILD_TYPE=Release ..
+cmake --build . --target install
