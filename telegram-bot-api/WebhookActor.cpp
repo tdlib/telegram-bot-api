@@ -623,10 +623,12 @@ void WebhookActor::handle(td::unique_ptr<td::HttpQuery> response) {
         if (!method.empty() && method != "deletewebhook" && method != "setwebhook" && method != "close" &&
             method != "logout" && !td::begins_with(method, "get")) {
           VLOG(webhook) << "Receive request " << method << " in response to webhook";
-          auto query = td::make_unique<Query>(std::move(response->container_), td::MutableSlice(), false,
-                                              td::MutableSlice(), std::move(response->args_),
-                                              std::move(response->headers_), std::move(response->files_),
-                                              parameters_->shared_data_, response->peer_address_, false);
+          response->container_.emplace_back(PSLICE() << (tqueue_id_ & ((static_cast<td::int64>(1) << 54) - 1)));
+          auto token = response->container_.back().as_slice();
+          auto query = td::make_unique<Query>(
+              std::move(response->container_), token, tqueue_id_ >= (static_cast<td::int64>(1) << 54),
+              td::MutableSlice(), std::move(response->args_), std::move(response->headers_),
+              std::move(response->files_), parameters_->shared_data_, response->peer_address_, false);
           auto promised_query = PromisedQueryPtr(query.release(), PromiseDeleter(td::Promise<td::unique_ptr<Query>>()));
           send_closure(callback_, &Callback::send, std::move(promised_query));
         }
