@@ -38,37 +38,47 @@ class Query final : public td::ListNode {
   td::Slice token() const {
     return token_;
   }
+
   bool is_test_dc() const {
     return is_test_dc_;
   }
+
   td::Slice method() const {
     return method_;
   }
+
   bool has_arg(td::Slice key) const {
     auto it = std::find_if(args_.begin(), args_.end(),
                            [&key](const std::pair<td::MutableSlice, td::MutableSlice> &s) { return s.first == key; });
     return it != args_.end();
   }
+
   td::MutableSlice arg(td::Slice key) const {
     auto it = std::find_if(args_.begin(), args_.end(),
                            [&key](const std::pair<td::MutableSlice, td::MutableSlice> &s) { return s.first == key; });
     return it == args_.end() ? td::MutableSlice() : it->second;
   }
+
   const td::vector<std::pair<td::MutableSlice, td::MutableSlice>> &args() const {
     return args_;
   }
+
   td::Slice get_header(td::Slice key) const {
     auto it = std::find_if(headers_.begin(), headers_.end(),
                            [&key](const std::pair<td::MutableSlice, td::MutableSlice> &s) { return s.first == key; });
     return it == headers_.end() ? td::Slice() : it->second;
   }
+
   const td::HttpFile *file(td::Slice key) const {
     auto it = std::find_if(files_.begin(), files_.end(), [&key](const td::HttpFile &f) { return f.field_name == key; });
     return it == files_.end() ? nullptr : &*it;
   }
+
   const td::vector<td::HttpFile> &files() const {
     return files_;
   }
+
+  td::int64 files_size() const;
 
   td::string get_peer_ip_address() const;
 
@@ -151,8 +161,6 @@ class Query final : public td::ListNode {
   }
 
   td::int64 query_size() const;
-
-  td::int64 files_size() const;
 
   td::int64 files_max_size() const;
 

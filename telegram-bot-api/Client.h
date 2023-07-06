@@ -639,7 +639,10 @@ class Client final : public WebhookActor::Callback {
 
   void on_webhook_closed(td::Status status);
 
-  void do_send_message(object_ptr<td_api::InputMessageContent> input_message_content, PromisedQueryPtr query);
+  void delete_last_send_message_time(td::int64 file_size, double max_delay);
+
+  void do_send_message(object_ptr<td_api::InputMessageContent> input_message_content, PromisedQueryPtr query,
+                       bool force = false);
 
   int64 get_send_message_query_id(PromisedQueryPtr query, bool is_multisend);
 
@@ -1081,6 +1084,8 @@ class Client final : public WebhookActor::Callback {
   td::FlatHashMap<int64, NewCallbackQueryQueue> new_callback_query_queues_;  // sender_user_id -> queue
 
   td::WaitFreeHashMap<int64, td::string> sticker_set_names_;
+
+  td::WaitFreeHashMap<int64, double> last_send_message_time_;
 
   struct BotUserIds {
     int64 default_bot_user_id_ = 0;
