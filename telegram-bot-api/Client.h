@@ -238,6 +238,7 @@ class Client final : public WebhookActor::Callback {
   struct UserInfo;
   struct ChatInfo;
   struct BotCommandScope;
+  struct BotUserIds;
 
   enum class AccessRights { Read, ReadMembers, Edit, Write };
 
@@ -332,11 +333,12 @@ class Client final : public WebhookActor::Callback {
 
   static td::Result<object_ptr<td_api::keyboardButton>> get_keyboard_button(td::JsonValue &button);
 
-  td::Result<object_ptr<td_api::inlineKeyboardButton>> get_inline_keyboard_button(td::JsonValue &button);
+  static td::Result<object_ptr<td_api::inlineKeyboardButton>> get_inline_keyboard_button(td::JsonValue &button,
+                                                                                         BotUserIds &bot_user_ids);
 
-  td::Result<object_ptr<td_api::ReplyMarkup>> get_reply_markup(const Query *query);
+  static td::Result<object_ptr<td_api::ReplyMarkup>> get_reply_markup(const Query *query, BotUserIds &bot_user_ids);
 
-  td::Result<object_ptr<td_api::ReplyMarkup>> get_reply_markup(td::JsonValue &&value);
+  static td::Result<object_ptr<td_api::ReplyMarkup>> get_reply_markup(td::JsonValue &&value, BotUserIds &bot_user_ids);
 
   static td::Result<object_ptr<td_api::labeledPricePart>> get_labeled_price_part(td::JsonValue &value);
 
@@ -370,13 +372,17 @@ class Client final : public WebhookActor::Callback {
   static td::Result<td_api::object_ptr<td_api::inlineQueryResultsButton>> get_inline_query_results_button(
       td::MutableSlice value);
 
-  td::Result<object_ptr<td_api::InputInlineQueryResult>> get_inline_query_result(const Query *query);
+  static td::Result<object_ptr<td_api::InputInlineQueryResult>> get_inline_query_result(const Query *query,
+                                                                                        BotUserIds &bot_user_ids);
 
-  td::Result<object_ptr<td_api::InputInlineQueryResult>> get_inline_query_result(td::JsonValue &&value);
+  static td::Result<object_ptr<td_api::InputInlineQueryResult>> get_inline_query_result(td::JsonValue &&value,
+                                                                                        BotUserIds &bot_user_ids);
 
-  td::Result<td::vector<object_ptr<td_api::InputInlineQueryResult>>> get_inline_query_results(const Query *query);
+  static td::Result<td::vector<object_ptr<td_api::InputInlineQueryResult>>> get_inline_query_results(
+      const Query *query, BotUserIds &bot_user_ids);
 
-  td::Result<td::vector<object_ptr<td_api::InputInlineQueryResult>>> get_inline_query_results(td::JsonValue &&value);
+  static td::Result<td::vector<object_ptr<td_api::InputInlineQueryResult>>> get_inline_query_results(
+      td::JsonValue &&value, BotUserIds &bot_user_ids);
 
   struct BotCommandScope {
     object_ptr<td_api::BotCommandScope> scope_;
@@ -1076,11 +1082,13 @@ class Client final : public WebhookActor::Callback {
 
   td::WaitFreeHashMap<int64, td::string> sticker_set_names_;
 
-  int64 cur_temp_bot_user_id_ = 1;
-  td::FlatHashMap<td::string, int64> bot_user_ids_;
-  td::FlatHashSet<td::string> unresolved_bot_usernames_;
-  td::FlatHashMap<int64, int64> temp_to_real_bot_user_id_;
-  td::FlatHashMap<td::string, td::vector<int64>> awaiting_bot_resolve_queries_;
+  struct BotUserIds {
+    int64 default_bot_user_id_ = 0;
+    int64 cur_temp_bot_user_id_ = 1;
+    td::FlatHashMap<td::string, int64> bot_user_ids_;
+    td::FlatHashSet<td::string> unresolved_bot_usernames_;
+  };
+  BotUserIds bot_user_ids_;
 
   struct PendingBotResolveQuery {
     std::size_t pending_resolve_count = 0;
@@ -1089,6 +1097,9 @@ class Client final : public WebhookActor::Callback {
   };
   td::FlatHashMap<int64, PendingBotResolveQuery> pending_bot_resolve_queries_;
   int64 current_bot_resolve_query_id_ = 1;
+
+  td::FlatHashMap<td::string, td::vector<int64>> awaiting_bot_resolve_queries_;
+  td::FlatHashMap<int64, int64> temp_to_real_bot_user_id_;
 
   td::string dir_;
   td::ActorOwn<td::ClientActor> td_client_;

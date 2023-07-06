@@ -4795,13 +4795,13 @@ void Client::fix_inline_query_results_bot_user_ids(
 }
 
 void Client::resolve_bot_usernames(PromisedQueryPtr query, td::Promise<PromisedQueryPtr> on_success) {
-  CHECK(!unresolved_bot_usernames_.empty());
+  CHECK(!bot_user_ids_.unresolved_bot_usernames_.empty());
   auto query_id = current_bot_resolve_query_id_++;
   auto &pending_query = pending_bot_resolve_queries_[query_id];
-  pending_query.pending_resolve_count = unresolved_bot_usernames_.size();
+  pending_query.pending_resolve_count = bot_user_ids_.unresolved_bot_usernames_.size();
   pending_query.query = std::move(query);
   pending_query.on_success = std::move(on_success);
-  for (auto &username : unresolved_bot_usernames_) {
+  for (auto &username : bot_user_ids_.unresolved_bot_usernames_) {
     auto &query_ids = awaiting_bot_resolve_queries_[username];
     query_ids.push_back(query_id);
     if (query_ids.size() == 1) {
@@ -4809,13 +4809,13 @@ void Client::resolve_bot_usernames(PromisedQueryPtr query, td::Promise<PromisedQ
                    td::make_unique<TdOnResolveBotUsernameCallback>(this, username));
     }
   }
-  unresolved_bot_usernames_.clear();
+  bot_user_ids_.unresolved_bot_usernames_.clear();
 }
 
 template <class OnSuccess>
 void Client::resolve_reply_markup_bot_usernames(object_ptr<td_api::ReplyMarkup> reply_markup, PromisedQueryPtr query,
                                                 OnSuccess on_success) {
-  if (!unresolved_bot_usernames_.empty()) {
+  if (!bot_user_ids_.unresolved_bot_usernames_.empty()) {
     CHECK(reply_markup != nullptr);
     CHECK(reply_markup->get_id() == td_api::replyMarkupInlineKeyboard::ID);
     return resolve_bot_usernames(
@@ -4834,7 +4834,7 @@ void Client::resolve_reply_markup_bot_usernames(object_ptr<td_api::ReplyMarkup> 
 template <class OnSuccess>
 void Client::resolve_inline_query_results_bot_usernames(td::vector<object_ptr<td_api::InputInlineQueryResult>> results,
                                                         PromisedQueryPtr query, OnSuccess on_success) {
-  if (!unresolved_bot_usernames_.empty()) {
+  if (!bot_user_ids_.unresolved_bot_usernames_.empty()) {
     return resolve_bot_usernames(
         std::move(query),
         td::PromiseCreator::lambda([this, results = std::move(results),
@@ -4856,9 +4856,9 @@ void Client::on_resolve_bot_username(const td::string &username, int64 user_id) 
   awaiting_bot_resolve_queries_.erase(query_ids_it);
 
   if (user_id == 0) {
-    bot_user_ids_.erase(username);
+    bot_user_ids_.bot_user_ids_.erase(username);
   } else {
-    auto &temp_bot_user_id = bot_user_ids_[username];
+    auto &temp_bot_user_id = bot_user_ids_.bot_user_ids_[username];
     temp_to_real_bot_user_id_[temp_bot_user_id] = user_id;
     temp_bot_user_id = user_id;
   }
@@ -5271,6 +5271,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
         } else {
           CHECK(update->value_->get_id() == td_api::optionValueInteger::ID);
           my_id_ = move_object_as<td_api::optionValueInteger>(update->value_)->value_;
+          bot_user_ids_.default_bot_user_id_ = my_id_;
         }
       }
       if (name == "group_anonymous_bot_user_id" && update->value_->get_id() == td_api::optionValueInteger::ID) {
@@ -5587,7 +5588,8 @@ td::Result<td_api::object_ptr<td_api::keyboardButton>> Client::get_keyboard_butt
   return td::Status::Error(400, "KeyboardButton must be a String or an Object");
 }
 
-td::Result<td_api::object_ptr<td_api::inlineKeyboardButton>> Client::get_inline_keyboard_button(td::JsonValue &button) {
+td::Result<td_api::object_ptr<td_api::inlineKeyboardButton>> Client::get_inline_keyboard_button(
+    td::JsonValue &button, BotUserIds &bot_user_ids) {
   if (button.type() != td::JsonValue::Type::Object) {
     return td::Status::Error(400, "InlineKeyboardButton must be an Object");
   }
@@ -5659,7 +5661,7 @@ td::Result<td_api::object_ptr<td_api::inlineKeyboardButton>> Client::get_inline_
 
     int64 bot_user_id = 0;
     if (bot_username.empty()) {
-      bot_user_id = my_id_;
+      bot_user_id = bot_user_ids.default_bot_user_id_;
     } else {
       if (bot_username[0] == '@') {
         bot_username = bot_username.substr(1);
@@ -5672,16 +5674,13 @@ td::Result<td_api::object_ptr<td_api::inlineKeyboardButton>> Client::get_inline_
           return td::Status::Error(400, "LoginUrl bot username is invalid");
         }
       }
-      if (cur_temp_bot_user_id_ >= 100000) {
-        return td::Status::Error(400, "Too many different LoginUrl bot usernames");
-      }
-      auto &user_id = bot_user_ids_[bot_username];
+      auto &user_id = bot_user_ids.bot_user_ids_[bot_username];
       if (user_id == 0) {
-        user_id = cur_temp_bot_user_id_++;
+        user_id = bot_user_ids.cur_temp_bot_user_id_++;
         user_id *= 1000;
       }
       if (user_id % 1000 == 0) {
-        unresolved_bot_usernames_.insert(bot_username);
+        bot_user_ids.unresolved_bot_usernames_.insert(bot_username);
       }
       bot_user_id = user_id;
     }
@@ -5702,7 +5701,8 @@ td::Result<td_api::object_ptr<td_api::inlineKeyboardButton>> Client::get_inline_
   return td::Status::Error(400, "Text buttons are unallowed in the inline keyboard");
 }
 
-td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(const Query *query) {
+td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(const Query *query,
+                                                                             BotUserIds &bot_user_ids) {
   auto reply_markup = query->arg("reply_markup");
   if (reply_markup.empty()) {
     return nullptr;
@@ -5715,10 +5715,11 @@ td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(con
     return td::Status::Error(400, "Can't parse reply keyboard markup JSON object");
   }
 
-  return get_reply_markup(r_value.move_as_ok());
+  return get_reply_markup(r_value.move_as_ok(), bot_user_ids);
 }
 
-td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(td::JsonValue &&value) {
+td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(td::JsonValue &&value,
+                                                                             BotUserIds &bot_user_ids) {
   td::vector<td::vector<object_ptr<td_api::keyboardButton>>> rows;
   td::vector<td::vector<object_ptr<td_api::inlineKeyboardButton>>> inline_rows;
   td::Slice input_field_placeholder;
@@ -5765,7 +5766,7 @@ td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(td:
                                    "Field \"inline_keyboard\" of the InlineKeyboardMarkup must be an Array of Arrays");
         }
         for (auto &button : inline_row.get_array()) {
-          auto r_button = get_inline_keyboard_button(button);
+          auto r_button = get_inline_keyboard_button(button, bot_user_ids);
           if (r_button.is_error()) {
             return td::Status::Error(400, PSLICE()
                                               << "Can't parse inline keyboard button: " << r_button.error().message());
@@ -5829,7 +5830,7 @@ td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(td:
     result = make_object<td_api::replyMarkupForceReply>(is_personal, input_field_placeholder.str());
   }
   if (result == nullptr || result->get_id() != td_api::replyMarkupInlineKeyboard::ID) {
-    unresolved_bot_usernames_.clear();
+    bot_user_ids.unresolved_bot_usernames_.clear();
   }
 
   return std::move(result);
@@ -6231,7 +6232,7 @@ td::Result<td_api::object_ptr<td_api::inlineQueryResultsButton>> Client::get_inl
 }
 
 td::Result<td::vector<td_api::object_ptr<td_api::InputInlineQueryResult>>> Client::get_inline_query_results(
-    const Query *query) {
+    const Query *query, BotUserIds &bot_user_ids) {
   auto results_encoded = query->arg("results");
   if (results_encoded.empty()) {
     return td::vector<object_ptr<td_api::InputInlineQueryResult>>();
@@ -6244,11 +6245,11 @@ td::Result<td::vector<td_api::object_ptr<td_api::InputInlineQueryResult>>> Clien
         400, PSLICE() << "Can't parse JSON encoded inline query results: " << r_values.error().message());
   }
 
-  return get_inline_query_results(r_values.move_as_ok());
+  return get_inline_query_results(r_values.move_as_ok(), bot_user_ids);
 }
 
 td::Result<td::vector<td_api::object_ptr<td_api::InputInlineQueryResult>>> Client::get_inline_query_results(
-    td::JsonValue &&values) {
+    td::JsonValue &&values, BotUserIds &bot_user_ids) {
   if (values.type() == td::JsonValue::Type::Null) {
     return td::vector<object_ptr<td_api::InputInlineQueryResult>>();
   }
@@ -6258,7 +6259,7 @@ td::Result<td::vector<td_api::object_ptr<td_api::InputInlineQueryResult>>> Clien
 
   td::vector<object_ptr<td_api::InputInlineQueryResult>> inline_query_results;
   for (auto &value : values.get_array()) {
-    auto r_inline_query_result = get_inline_query_result(std::move(value));
+    auto r_inline_query_result = get_inline_query_result(std::move(value), bot_user_ids);
     if (r_inline_query_result.is_error()) {
       return td::Status::Error(
           400, PSLICE() << "Can't parse inline query result: " << r_inline_query_result.error().message());
@@ -6269,7 +6270,8 @@ td::Result<td::vector<td_api::object_ptr<td_api::InputInlineQueryResult>>> Clien
   return std::move(inline_query_results);
 }
 
-td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inline_query_result(const Query *query) {
+td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inline_query_result(
+    const Query *query, BotUserIds &bot_user_ids) {
   auto result_encoded = query->arg("result");
   if (result_encoded.empty()) {
     return td::Status::Error(400, "Result isn't specified");
@@ -6282,10 +6284,11 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
         400, PSLICE() << "Can't parse JSON encoded web view query results " << r_value.error().message());
   }
 
-  return get_inline_query_result(r_value.move_as_ok());
+  return get_inline_query_result(r_value.move_as_ok(), bot_user_ids);
 }
 
-td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inline_query_result(td::JsonValue &&value) {
+td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inline_query_result(
+    td::JsonValue &&value, BotUserIds &bot_user_ids) {
   if (value.type() != td::JsonValue::Type::Object) {
     return td::Status::Error(400, "Inline query result must be an object");
   }
@@ -6326,7 +6329,7 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
   TRY_RESULT(reply_markup_object, get_json_object_field(object, "reply_markup", td::JsonValue::Type::Object));
   object_ptr<td_api::ReplyMarkup> reply_markup;
   if (reply_markup_object.type() != td::JsonValue::Type::Null) {
-    TRY_RESULT_ASSIGN(reply_markup, get_reply_markup(std::move(reply_markup_object)));
+    TRY_RESULT_ASSIGN(reply_markup, get_reply_markup(std::move(reply_markup_object), bot_user_ids));
   }
 
   auto thumbnail_url_field_name = td::Slice("thumbnail_url");
@@ -7859,7 +7862,7 @@ void Client::on_cmd(PromisedQueryPtr query) {
   }
   CHECK(was_authorized_);
 
-  unresolved_bot_usernames_.clear();
+  bot_user_ids_.unresolved_bot_usernames_.clear();
 
   auto method_it = methods_.find(query->method().str());
   if (method_it == methods_.end()) {
@@ -8263,7 +8266,7 @@ td::Status Client::process_send_poll_query(PromisedQueryPtr &query) {
 td::Status Client::process_stop_poll_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
   auto message_id = get_message_id(query.get());
-  TRY_RESULT(reply_markup, get_reply_markup(query.get()));
+  TRY_RESULT(reply_markup, get_reply_markup(query.get(), bot_user_ids_));
 
   resolve_reply_markup_bot_usernames(
       std::move(reply_markup), std::move(query),
@@ -8318,7 +8321,7 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
   auto allow_sending_without_reply = to_bool(query->arg("allow_sending_without_reply"));
   auto disable_notification = to_bool(query->arg("disable_notification"));
   auto protect_content = to_bool(query->arg("protect_content"));
-  // TRY_RESULT(reply_markup, get_reply_markup(query.get()));
+  // TRY_RESULT(reply_markup, get_reply_markup(query.get(), bot_user_ids_));
   auto reply_markup = nullptr;
   TRY_RESULT(input_message_contents, get_input_message_contents(query.get(), "media"));
 
@@ -8378,7 +8381,7 @@ td::Status Client::process_edit_message_text_query(PromisedQueryPtr &query) {
   TRY_RESULT(input_message_text, get_input_message_text(query.get()));
   auto chat_id = query->arg("chat_id");
   auto message_id = get_message_id(query.get());
-  TRY_RESULT(reply_markup, get_reply_markup(query.get()));
+  TRY_RESULT(reply_markup, get_reply_markup(query.get(), bot_user_ids_));
 
   if (chat_id.empty() && message_id == 0) {
     TRY_RESULT(inline_message_id, get_inline_message_id(query.get()));
@@ -8417,7 +8420,7 @@ td::Status Client::process_edit_message_live_location_query(PromisedQueryPtr &qu
   }
   auto chat_id = query->arg("chat_id");
   auto message_id = get_message_id(query.get());
-  TRY_RESULT(reply_markup, get_reply_markup(query.get()));
+  TRY_RESULT(reply_markup, get_reply_markup(query.get(), bot_user_ids_));
 
   if (chat_id.empty() && message_id == 0) {
     TRY_RESULT(inline_message_id, get_inline_message_id(query.get()));
@@ -8452,7 +8455,7 @@ td::Status Client::process_edit_message_live_location_query(PromisedQueryPtr &qu
 td::Status Client::process_edit_message_media_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
   auto message_id = get_message_id(query.get());
-  TRY_RESULT(reply_markup, get_reply_markup(query.get()));
+  TRY_RESULT(reply_markup, get_reply_markup(query.get(), bot_user_ids_));
   TRY_RESULT(input_media, get_input_media(query.get(), "media"));
 
   if (chat_id.empty() && message_id == 0) {
@@ -8486,7 +8489,7 @@ td::Status Client::process_edit_message_media_query(PromisedQueryPtr &query) {
 td::Status Client::process_edit_message_caption_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
   auto message_id = get_message_id(query.get());
-  TRY_RESULT(reply_markup, get_reply_markup(query.get()));
+  TRY_RESULT(reply_markup, get_reply_markup(query.get(), bot_user_ids_));
   TRY_RESULT(caption, get_caption(query.get()));
 
   if (chat_id.empty() && message_id == 0) {
@@ -8519,7 +8522,7 @@ td::Status Client::process_edit_message_caption_query(PromisedQueryPtr &query) {
 td::Status Client::process_edit_message_reply_markup_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
   auto message_id = get_message_id(query.get());
-  TRY_RESULT(reply_markup, get_reply_markup(query.get()));
+  TRY_RESULT(reply_markup, get_reply_markup(query.get(), bot_user_ids_));
 
   if (chat_id.empty() && message_id == 0) {
     TRY_RESULT(inline_message_id, get_inline_message_id(query.get()));
@@ -8639,7 +8642,7 @@ td::Status Client::process_get_game_high_scores_query(PromisedQueryPtr &query) {
 td::Status Client::process_answer_web_app_query_query(PromisedQueryPtr &query) {
   auto web_app_query_id = query->arg("web_app_query_id");
 
-  TRY_RESULT(result, get_inline_query_result(query.get()));
+  TRY_RESULT(result, get_inline_query_result(query.get(), bot_user_ids_));
   td::vector<object_ptr<td_api::InputInlineQueryResult>> results;
   results.push_back(std::move(result));
 
@@ -8668,7 +8671,7 @@ td::Status Client::process_answer_inline_query_query(PromisedQueryPtr &query) {
           make_object<td_api::inlineQueryResultsButtonTypeStartBot>(query->arg("switch_pm_parameter").str()));
     }
   }
-  TRY_RESULT(results, get_inline_query_results(query.get()));
+  TRY_RESULT(results, get_inline_query_results(query.get(), bot_user_ids_));
 
   resolve_inline_query_results_bot_usernames(
       std::move(results), std::move(query),
@@ -10032,7 +10035,7 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
   auto allow_sending_without_reply = to_bool(query->arg("allow_sending_without_reply"));
   auto disable_notification = to_bool(query->arg("disable_notification"));
   auto protect_content = to_bool(query->arg("protect_content"));
-  auto r_reply_markup = get_reply_markup(query.get());
+  auto r_reply_markup = get_reply_markup(query.get(), bot_user_ids_);
   if (r_reply_markup.is_error()) {
     return fail_query_with_error(std::move(query), 400, r_reply_markup.error().message());
   }
