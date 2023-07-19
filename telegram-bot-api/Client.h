@@ -832,7 +832,11 @@ class Client final : public WebhookActor::Callback {
     mutable bool is_content_changed = false;
   };
 
-  static int64 &get_reply_to_message_id(object_ptr<td_api::message> &message);
+  static int64 get_reply_to_message_id(const object_ptr<td_api::message> &message);
+
+  static void drop_reply_to_message_id(object_ptr<td_api::message> &message);
+
+  static void drop_reply_to_message_in_another_chat(object_ptr<td_api::message> &message);
 
   void set_message_reply_to_message_id(MessageInfo *message_info, int64 reply_to_message_id);
 

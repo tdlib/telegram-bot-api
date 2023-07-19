@@ -4384,12 +4384,12 @@ void Client::on_get_reply_message(int64 chat_id, object_ptr<td_api::message> rep
   CHECK(!queue.queue_.empty());
   object_ptr<td_api::message> &message = queue.queue_.front().message;
   CHECK(chat_id == message->chat_id_);
-  int64 &reply_to_message_id = get_reply_to_message_id(message);
+  int64 reply_to_message_id = get_reply_to_message_id(message);
   CHECK(reply_to_message_id > 0);
   if (reply_to_message == nullptr) {
     LOG(INFO) << "Can't find message " << reply_to_message_id << " in chat " << chat_id
               << ". It is already deleted or inaccessible because of the chosen privacy mode";
-    reply_to_message_id = 0;
+    drop_reply_to_message_id(message);
   } else {
     CHECK(chat_id == reply_to_message->chat_id_);
     CHECK(reply_to_message_id == reply_to_message->id_);
@@ -11213,18 +11213,29 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
   return false;
 }
 
-td::int64 &Client::get_reply_to_message_id(object_ptr<td_api::message> &message) {
+td::int64 Client::get_reply_to_message_id(const object_ptr<td_api::message> &message) {
   if (message->content_->get_id() == td_api::messagePinMessage::ID) {
     CHECK(message->reply_to_message_id_ == 0);
-    return static_cast<td_api::messagePinMessage *>(message->content_.get())->message_id_;
+    return static_cast<const td_api::messagePinMessage *>(message->content_.get())->message_id_;
   }
+  return message->reply_to_message_id_;
+}
+
+void Client::drop_reply_to_message_id(object_ptr<td_api::message> &message) {
+  if (message->content_->get_id() == td_api::messagePinMessage::ID) {
+    static_cast<td_api::messagePinMessage *>(message->content_.get())->message_id_ = 0;
+    return;
+  }
+  message->reply_to_message_id_ = 0;
+}
+
+void Client::drop_reply_to_message_in_another_chat(object_ptr<td_api::message> &message) {
   if (message->reply_in_chat_id_ != message->chat_id_ && message->reply_to_message_id_ != 0) {
-    LOG(WARNING) << "Drop reply to message " << message->id_ << " in chat " << message->chat_id_
-                 << " from another chat " << message->reply_in_chat_id_;
+    LOG(ERROR) << "Drop reply to message " << message->id_ << " in chat " << message->chat_id_ << " from another chat "
+               << message->reply_in_chat_id_;
     message->reply_in_chat_id_ = 0;
     message->reply_to_message_id_ = 0;
   }
-  return message->reply_to_message_id_;
 }
 
 void Client::set_message_reply_to_message_id(MessageInfo *message_info, int64 reply_to_message_id) {
@@ -11412,6 +11423,9 @@ void Client::process_new_message_queue(int64 chat_id, int state) {
     auto &message_ref = queue.queue_.front().message;
     CHECK(chat_id == message_ref->chat_id_);
     int64 message_id = message_ref->id_;
+
+    drop_reply_to_message_in_another_chat(message_ref);
+
     int64 reply_to_message_id = get_reply_to_message_id(message_ref);
     if (reply_to_message_id > 0 && get_message(chat_id, reply_to_message_id, state > 0) == nullptr) {
       queue.has_active_request_ = true;
@@ -11664,12 +11678,8 @@ Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message,
   message_info->is_topic_message = message->is_topic_message_;
   message_info->author_signature = std::move(message->author_signature_);
 
-  if (message->reply_in_chat_id_ != chat_id && message->reply_to_message_id_ != 0) {
-    LOG(WARNING) << "Drop reply to message " << message_id << " in chat " << chat_id << " from another chat "
-                 << message->reply_in_chat_id_;
-    message->reply_in_chat_id_ = 0;
-    message->reply_to_message_id_ = 0;
-  }
+  drop_reply_to_message_in_another_chat(message);
+
   set_message_reply_to_message_id(message_info.get(), message->reply_to_message_id_);
   if (message_info->content == nullptr || force_update_content) {
     message_info->content = std::move(message->content_);
