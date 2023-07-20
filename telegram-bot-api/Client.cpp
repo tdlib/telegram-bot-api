@@ -1408,7 +1408,21 @@ class Client::JsonPollAnswer final : public td::Jsonable {
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("poll_id", td::to_string(poll_answer_->poll_id_));
-    object("user", JsonUser(poll_answer_->user_id_, client_));
+    switch (poll_answer_->voter_id_->get_id()) {
+      case td_api::messageSenderUser::ID: {
+        auto user_id = static_cast<const td_api::messageSenderUser *>(poll_answer_->voter_id_.get())->user_id_;
+        object("user", JsonUser(user_id, client_));
+        break;
+      }
+      case td_api::messageSenderChat::ID: {
+        auto voter_chat_id = static_cast<const td_api::messageSenderChat *>(poll_answer_->voter_id_.get())->chat_id_;
+        object("user", JsonUser(client_->channel_bot_user_id_, client_));
+        object("voter_chat", JsonChat(voter_chat_id, false, client_));
+        break;
+      }
+      default:
+        UNREACHABLE();
+    }
     object("option_ids", td::json_array(poll_answer_->option_ids_, [](int32 option_id) { return option_id; }));
   }
 
@@ -2286,6 +2300,8 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       break;
     }
     case td_api::messageChatSetBackground::ID:
+      break;
+    case td_api::messageStory::ID:
       break;
     default:
       UNREACHABLE();
@@ -5494,6 +5510,13 @@ bool Client::to_bool(td::MutableSlice value) {
   return value == "true" || value == "yes" || value == "1";
 }
 
+td_api::object_ptr<td_api::MessageReplyTo> Client::get_message_reply_to(int64 reply_to_message_id) {
+  if (reply_to_message_id > 0) {
+    return make_object<td_api::messageReplyToMessage>(0, reply_to_message_id);
+  }
+  return nullptr;
+}
+
 td::Result<td_api::object_ptr<td_api::keyboardButton>> Client::get_keyboard_button(td::JsonValue &button) {
   if (button.type() == td::JsonValue::Type::Object) {
     auto &object = button.get_object();
@@ -5730,7 +5753,7 @@ td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(td:
   if (value.type() != td::JsonValue::Type::Object) {
     return td::Status::Error(400, "Object expected as reply markup");
   }
-  for (auto &field_value : value.get_object()) {
+  for (auto &field_value : value.get_object().field_values_) {
     if (field_value.first == "keyboard") {
       auto keyboard = std::move(field_value.second);
       if (keyboard.type() != td::JsonValue::Type::Array) {
@@ -8327,11 +8350,11 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
             auto message_count = input_message_contents.size();
             count += static_cast<int32>(message_count);
 
-            send_request(
-                make_object<td_api::sendMessageAlbum>(chat_id, message_thread_id, reply_to_message_id,
-                                                      get_message_send_options(disable_notification, protect_content),
-                                                      std::move(input_message_contents), false),
-                td::make_unique<TdOnSendMessageAlbumCallback>(this, chat_id, message_count, std::move(query)));
+            send_request(make_object<td_api::sendMessageAlbum>(
+                             chat_id, message_thread_id, get_message_reply_to(reply_to_message_id),
+                             get_message_send_options(disable_notification, protect_content),
+                             std::move(input_message_contents), false),
+                         td::make_unique<TdOnSendMessageAlbumCallback>(this, chat_id, message_count, std::move(query)));
           };
           check_message_thread(chat_id, message_thread_id, reply_to_message_id, std::move(query),
                                std::move(on_message_thread_checked));
@@ -10098,11 +10121,11 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
                 }
                 count++;
 
-                send_request(
-                    make_object<td_api::sendMessage>(chat_id, message_thread_id, reply_to_message_id,
-                                                     get_message_send_options(disable_notification, protect_content),
-                                                     std::move(reply_markup), std::move(input_message_content)),
-                    td::make_unique<TdOnSendMessageCallback>(this, chat_id, std::move(query)));
+                send_request(make_object<td_api::sendMessage>(
+                                 chat_id, message_thread_id, get_message_reply_to(reply_to_message_id),
+                                 get_message_send_options(disable_notification, protect_content),
+                                 std::move(reply_markup), std::move(input_message_content)),
+                             td::make_unique<TdOnSendMessageCallback>(this, chat_id, std::move(query)));
               };
           check_message_thread(chat_id, message_thread_id, reply_to_message_id, std::move(query),
                                std::move(on_message_thread_checked));
@@ -11172,6 +11195,8 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       return true;
     case td_api::messageChatSetBackground::ID:
       return true;
+    case td_api::messageStory::ID:
+      return true;
     default:
       break;
   }
@@ -11188,18 +11213,35 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
 
 td::int64 Client::get_reply_to_message_id(const object_ptr<td_api::message> &message) {
   if (message->content_->get_id() == td_api::messagePinMessage::ID) {
-    CHECK(message->reply_to_message_id_ == 0);
+    CHECK(message->reply_to_ == nullptr);
     return static_cast<const td_api::messagePinMessage *>(message->content_.get())->message_id_;
   }
-  return message->reply_to_message_id_;
+  if (message->reply_to_ != nullptr) {
+    switch (message->reply_to_->get_id()) {
+      case td_api::messageReplyToMessage::ID: {
+        auto reply_to = static_cast<const td_api::messageReplyToMessage *>(message->reply_to_.get());
+        CHECK(reply_to->message_id_ > 0);
+        CHECK(reply_to->chat_id_ == message->chat_id_);
+        return reply_to->message_id_;
+      }
+      case td_api::messageReplyToStory::ID:
+        break;
+      default:
+        UNREACHABLE();
+        break;
+    }
+  }
+  return 0;
 }
 
 void Client::drop_reply_to_message_in_another_chat(object_ptr<td_api::message> &message) {
-  if (message->reply_in_chat_id_ != message->chat_id_ && message->reply_to_message_id_ != 0) {
-    LOG(ERROR) << "Drop reply to message " << message->id_ << " in chat " << message->chat_id_ << " from another chat "
-               << message->reply_in_chat_id_;
-    message->reply_in_chat_id_ = 0;
-    message->reply_to_message_id_ = 0;
+  if (message->reply_to_ != nullptr && message->reply_to_->get_id() == td_api::messageReplyToMessage::ID) {
+    auto reply_in_chat_id = static_cast<td_api::messageReplyToMessage *>(message->reply_to_.get())->chat_id_;
+    if (reply_in_chat_id != message->chat_id_) {
+      LOG(ERROR) << "Drop reply to message " << message->id_ << " in chat " << message->chat_id_
+                 << " from another chat " << reply_in_chat_id;
+      message->reply_to_ = nullptr;
+    }
   }
 }
 
@@ -11595,7 +11637,12 @@ Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message,
 
   drop_reply_to_message_in_another_chat(message);
 
-  message_info->reply_to_message_id = message->reply_to_message_id_;
+  if (message->reply_to_ != nullptr && message->reply_to_->get_id() == td_api::messageReplyToMessage::ID) {
+    message_info->reply_to_message_id =
+        static_cast<td_api::messageReplyToMessage *>(message->reply_to_.get())->message_id_;
+  } else {
+    message_info->reply_to_message_id = 0;
+  }
 
   if (message_info->content == nullptr || force_update_content) {
     message_info->content = std::move(message->content_);

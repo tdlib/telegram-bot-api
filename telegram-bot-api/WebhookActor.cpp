@@ -73,7 +73,7 @@ WebhookActor::WebhookActor(td::ActorShared<Callback> callback, td::int64 tqueue_
 
 WebhookActor::~WebhookActor() {
   td::Scheduler::instance()->destroy_on_scheduler(SharedData::get_file_gc_scheduler_id(), update_map_, queue_updates_,
-                                                  queues_);
+                                                  queues_, ssl_ctx_);
 }
 
 void WebhookActor::relax_wakeup_at(double wakeup_at, const char *source) {
