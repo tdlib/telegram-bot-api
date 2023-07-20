@@ -837,8 +837,6 @@ class Client final : public WebhookActor::Callback {
 
   static void drop_reply_to_message_in_another_chat(object_ptr<td_api::message> &message);
 
-  void set_message_reply_to_message_id(MessageInfo *message_info, int64 reply_to_message_id);
-
   static td::Slice get_sticker_type(const object_ptr<td_api::StickerType> &type);
 
   static td::Result<object_ptr<td_api::StickerType>> get_sticker_type(td::Slice type);
@@ -874,8 +872,6 @@ class Client final : public WebhookActor::Callback {
                                               const td_api::chatAdministratorRights *rights, ChatType chat_type);
 
   static void json_store_permissions(td::JsonObjectScope &object, const td_api::chatPermissions *permissions);
-
-  void remove_replies_to_message(int64 chat_id, int64 reply_to_message_id, bool only_from_cache);
 
   td::unique_ptr<MessageInfo> delete_message(int64 chat_id, int64 message_id, bool only_from_cache);
 
@@ -1036,9 +1032,6 @@ class Client final : public WebhookActor::Callback {
   td::WaitFreeHashMap<int64, td::unique_ptr<GroupInfo>> groups_;
   td::WaitFreeHashMap<int64, td::unique_ptr<SupergroupInfo>> supergroups_;
   td::WaitFreeHashMap<int64, td::unique_ptr<ChatInfo>> chats_;
-
-  td::FlatHashMap<FullMessageId, td::FlatHashSet<int64>, FullMessageIdHash>
-      reply_message_ids_;  // message -> replies to it
 
   td::FlatHashMap<int32, td::vector<PromisedQueryPtr>> file_download_listeners_;
   td::FlatHashSet<int32> download_started_file_ids_;

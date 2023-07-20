@@ -194,7 +194,7 @@ Client::Client(td::ActorShared<> parent, const td::string &bot_token, bool is_te
 
 Client::~Client() {
   td::Scheduler::instance()->destroy_on_scheduler(SharedData::get_file_gc_scheduler_id(), messages_, users_, groups_,
-                                                  supergroups_, chats_, reply_message_ids_, sticker_set_names_);
+                                                  supergroups_, chats_, sticker_set_names_);
 }
 
 bool Client::init_methods() {
@@ -4431,7 +4431,6 @@ void Client::on_get_callback_query_message(object_ptr<td_api::message> message, 
       }
       LOG(INFO) << "Can't find callback query reply to message " << message_info->reply_to_message_id << " in chat "
                 << chat_id << ". It may be already deleted";
-      message_info->reply_to_message_id = 0;
     }
   } else {
     LOG(INFO) << "Receive callback query " << (state == 1 ? "reply to " : "") << "message " << message_id << " in chat "
@@ -11212,30 +11211,6 @@ void Client::drop_reply_to_message_in_another_chat(object_ptr<td_api::message> &
   }
 }
 
-void Client::set_message_reply_to_message_id(MessageInfo *message_info, int64 reply_to_message_id) {
-  if (message_info->reply_to_message_id == reply_to_message_id) {
-    return;
-  }
-
-  if (message_info->reply_to_message_id > 0) {
-    LOG_IF(ERROR, reply_to_message_id > 0)
-        << "Message " << message_info->id << " in chat " << message_info->chat_id
-        << " has changed reply_to_message from " << message_info->reply_to_message_id << " to " << reply_to_message_id;
-    auto it = reply_message_ids_.find({message_info->chat_id, message_info->reply_to_message_id});
-    if (it != reply_message_ids_.end()) {
-      it->second.erase(message_info->id);
-      if (it->second.empty()) {
-        reply_message_ids_.erase(it);
-      }
-    }
-  }
-  if (reply_to_message_id > 0) {
-    reply_message_ids_[{message_info->chat_id, reply_to_message_id}].insert(message_info->id);
-  }
-
-  message_info->reply_to_message_id = reply_to_message_id;
-}
-
 td::Slice Client::get_sticker_type(const object_ptr<td_api::StickerType> &type) {
   CHECK(type != nullptr);
   switch (type->get_id()) {
@@ -11487,26 +11462,7 @@ void Client::process_new_message_queue(int64 chat_id, int state) {
   new_message_queues_.erase(chat_id);
 }
 
-void Client::remove_replies_to_message(int64 chat_id, int64 reply_to_message_id, bool only_from_cache) {
-  auto it = reply_message_ids_.find({chat_id, reply_to_message_id});
-  if (it == reply_message_ids_.end()) {
-    return;
-  }
-
-  if (!only_from_cache) {
-    for (auto message_id : it->second) {
-      auto message_info = get_message_editable(chat_id, message_id);
-      CHECK(message_info != nullptr);
-      CHECK(message_info->reply_to_message_id == reply_to_message_id);
-      message_info->reply_to_message_id = 0;
-    }
-  }
-  reply_message_ids_.erase(it);
-}
-
 td::unique_ptr<Client::MessageInfo> Client::delete_message(int64 chat_id, int64 message_id, bool only_from_cache) {
-  remove_replies_to_message(chat_id, message_id, only_from_cache);
-
   auto message_info = std::move(messages_[{chat_id, message_id}]);
   if (message_info == nullptr) {
     if (yet_unsent_messages_.count({chat_id, message_id}) > 0) {
@@ -11533,7 +11489,6 @@ td::unique_ptr<Client::MessageInfo> Client::delete_message(int64 chat_id, int64 
       on_message_send_failed(chat_id, message_id, 0, std::move(error));
     }
   } else {
-    set_message_reply_to_message_id(message_info.get(), 0);
     messages_.erase({chat_id, message_id});
   }
   return message_info;
@@ -11643,7 +11598,8 @@ Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message,
 
   drop_reply_to_message_in_another_chat(message);
 
-  set_message_reply_to_message_id(message_info.get(), message->reply_to_message_id_);
+  message_info->reply_to_message_id = message->reply_to_message_id_;
+
   if (message_info->content == nullptr || force_update_content) {
     message_info->content = std::move(message->content_);
     message_info->is_content_changed = true;
