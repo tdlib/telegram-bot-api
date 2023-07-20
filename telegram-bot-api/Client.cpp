@@ -194,8 +194,7 @@ Client::Client(td::ActorShared<> parent, const td::string &bot_token, bool is_te
 
 Client::~Client() {
   td::Scheduler::instance()->destroy_on_scheduler(SharedData::get_file_gc_scheduler_id(), messages_, users_, groups_,
-                                                  supergroups_, chats_, reply_message_ids_,
-                                                  yet_unsent_reply_message_ids_, sticker_set_names_);
+                                                  supergroups_, chats_, reply_message_ids_, sticker_set_names_);
 }
 
 bool Client::init_methods() {
@@ -1952,13 +1951,13 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     }
     object("forward_date", message_->initial_send_date);
   }
-  if (message_->reply_to_message_id > 0 && need_reply_ && !message_->is_reply_to_message_deleted) {
+  if (message_->reply_to_message_id > 0 && need_reply_) {
     const MessageInfo *reply_to_message = client_->get_message(message_->chat_id, message_->reply_to_message_id, true);
     if (reply_to_message != nullptr) {
       object("reply_to_message", JsonMessage(reply_to_message, false, "reply in " + source_, client_));
     } else {
-      LOG(WARNING) << "Replied to unknown or deleted message " << message_->reply_to_message_id << " in chat "
-                   << message_->chat_id << " while storing " << source_ << " " << message_->id;
+      LOG(INFO) << "Replied to unknown or deleted message " << message_->reply_to_message_id << " in chat "
+                << message_->chat_id << " while storing " << source_ << ' ' << message_->id;
     }
   }
   if (message_->media_album_id != 0) {
@@ -4432,7 +4431,7 @@ void Client::on_get_callback_query_message(object_ptr<td_api::message> message, 
       }
       LOG(INFO) << "Can't find callback query reply to message " << message_info->reply_to_message_id << " in chat "
                 << chat_id << ". It may be already deleted";
-      message_info->is_reply_to_message_deleted = true;
+      message_info->reply_to_message_id = 0;
     }
   } else {
     LOG(INFO) << "Receive callback query " << (state == 1 ? "reply to " : "") << "message " << message_id << " in chat "
@@ -7741,30 +7740,15 @@ void Client::decrease_yet_unsent_message_count(int64 chat_id, int32 count) {
   }
 }
 
-td::int64 Client::extract_yet_unsent_message_query_id(int64 chat_id, int64 message_id,
-                                                      bool *is_reply_to_message_deleted) {
+td::int64 Client::extract_yet_unsent_message_query_id(int64 chat_id, int64 message_id) {
   auto yet_unsent_message_it = yet_unsent_messages_.find({chat_id, message_id});
   CHECK(yet_unsent_message_it != yet_unsent_messages_.end());
 
-  auto reply_to_message_id = yet_unsent_message_it->second.reply_to_message_id;
-  if (is_reply_to_message_deleted != nullptr && yet_unsent_message_it->second.is_reply_to_message_deleted) {
-    *is_reply_to_message_deleted = true;
-  }
   auto query_id = yet_unsent_message_it->second.send_message_query_id;
 
   yet_unsent_messages_.erase(yet_unsent_message_it);
 
   decrease_yet_unsent_message_count(chat_id, 1);
-
-  if (reply_to_message_id > 0) {
-    auto it = yet_unsent_reply_message_ids_.find({chat_id, reply_to_message_id});
-    CHECK(it != yet_unsent_reply_message_ids_.end());
-    auto erased_count = it->second.erase(message_id);
-    CHECK(erased_count > 0);
-    if (it->second.empty()) {
-      yet_unsent_reply_message_ids_.erase(it);
-    }
-  }
 
   return query_id;
 }
@@ -7780,8 +7764,7 @@ void Client::on_message_send_succeeded(object_ptr<td_api::message> &&message, in
   CHECK(message_info != nullptr);
   message_info->is_content_changed = false;
 
-  auto query_id =
-      extract_yet_unsent_message_query_id(chat_id, old_message_id, &message_info->is_reply_to_message_deleted);
+  auto query_id = extract_yet_unsent_message_query_id(chat_id, old_message_id);
   auto &query = *pending_send_message_queries_[query_id];
   if (query.is_multisend) {
     query.messages.push_back(td::json_encode<td::string>(JsonMessage(message_info, true, "sent message", this)));
@@ -7809,7 +7792,7 @@ void Client::on_message_send_succeeded(object_ptr<td_api::message> &&message, in
 void Client::on_message_send_failed(int64 chat_id, int64 old_message_id, int64 new_message_id, td::Status result) {
   auto error = make_object<td_api::error>(result.code(), result.message().str());
 
-  auto query_id = extract_yet_unsent_message_query_id(chat_id, old_message_id, nullptr);
+  auto query_id = extract_yet_unsent_message_query_id(chat_id, old_message_id);
   auto &query = *pending_send_message_queries_[query_id];
   if (query.is_multisend) {
     if (query.error == nullptr || query.error->message_ == "Group send failed") {
@@ -10145,16 +10128,9 @@ void Client::on_sent_message(object_ptr<td_api::message> &&message, int64 query_
   CHECK(message != nullptr);
   int64 chat_id = message->chat_id_;
   int64 message_id = message->id_;
-  int64 reply_to_message_id = message->reply_to_message_id_;
-  if (reply_to_message_id > 0) {
-    CHECK(message->reply_in_chat_id_ == chat_id);
-    bool is_inserted = yet_unsent_reply_message_ids_[{chat_id, reply_to_message_id}].insert(message_id).second;
-    CHECK(is_inserted);
-  }
 
   FullMessageId yet_unsent_message_id{chat_id, message_id};
   YetUnsentMessage yet_unsent_message;
-  yet_unsent_message.reply_to_message_id = reply_to_message_id;
   yet_unsent_message.send_message_query_id = query_id;
   auto emplace_result = yet_unsent_messages_.emplace(yet_unsent_message_id, yet_unsent_message);
   CHECK(emplace_result.second);
@@ -10964,8 +10940,7 @@ void Client::process_new_callback_query_queue(int64 user_id, int state) {
       state = 1;
     }
     if (state == 1) {
-      auto reply_to_message_id =
-          message_info == nullptr || message_info->is_reply_to_message_deleted ? 0 : message_info->reply_to_message_id;
+      auto reply_to_message_id = message_info == nullptr ? 0 : message_info->reply_to_message_id;
       if (reply_to_message_id > 0 && get_message(chat_id, reply_to_message_id, false) == nullptr) {
         queue.has_active_request_ = true;
         return send_request(make_object<td_api::getRepliedMessage>(chat_id, message_id),
@@ -10980,8 +10955,7 @@ void Client::process_new_callback_query_queue(int64 user_id, int state) {
         return send_request(make_object<td_api::getStickerSet>(message_sticker_set_id),
                             td::make_unique<TdOnGetStickerSetCallback>(this, message_sticker_set_id, user_id, 0));
       }
-      auto reply_to_message_id =
-          message_info == nullptr || message_info->is_reply_to_message_deleted ? 0 : message_info->reply_to_message_id;
+      auto reply_to_message_id = message_info == nullptr ? 0 : message_info->reply_to_message_id;
       if (reply_to_message_id > 0) {
         auto reply_to_message_info = get_message(chat_id, reply_to_message_id, true);
         auto reply_sticker_set_id =
@@ -11514,17 +11488,6 @@ void Client::process_new_message_queue(int64 chat_id, int state) {
 }
 
 void Client::remove_replies_to_message(int64 chat_id, int64 reply_to_message_id, bool only_from_cache) {
-  if (!only_from_cache) {
-    auto yet_unsent_it = yet_unsent_reply_message_ids_.find({chat_id, reply_to_message_id});
-    if (yet_unsent_it != yet_unsent_reply_message_ids_.end()) {
-      for (auto message_id : yet_unsent_it->second) {
-        auto &message = yet_unsent_messages_[{chat_id, message_id}];
-        CHECK(message.reply_to_message_id == reply_to_message_id);
-        message.is_reply_to_message_deleted = true;
-      }
-    }
-  }
-
   auto it = reply_message_ids_.find({chat_id, reply_to_message_id});
   if (it == reply_message_ids_.end()) {
     return;

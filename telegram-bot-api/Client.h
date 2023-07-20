@@ -500,7 +500,7 @@ class Client final : public WebhookActor::Callback {
 
   void decrease_yet_unsent_message_count(int64 chat_id, int32 count);
 
-  int64 extract_yet_unsent_message_query_id(int64 chat_id, int64 message_id, bool *is_reply_to_message_deleted);
+  int64 extract_yet_unsent_message_query_id(int64 chat_id, int64 message_id);
 
   void on_message_send_succeeded(object_ptr<td_api::message> &&message, int64 old_message_id);
   void on_message_send_failed(int64 chat_id, int64 old_message_id, int64 new_message_id, td::Status result);
@@ -828,7 +828,6 @@ class Client final : public WebhookActor::Callback {
     bool can_be_saved = false;
     bool is_automatic_forward = false;
     bool is_topic_message = false;
-    mutable bool is_reply_to_message_deleted = false;
     mutable bool is_content_changed = false;
   };
 
@@ -1040,15 +1039,11 @@ class Client final : public WebhookActor::Callback {
 
   td::FlatHashMap<FullMessageId, td::FlatHashSet<int64>, FullMessageIdHash>
       reply_message_ids_;  // message -> replies to it
-  td::FlatHashMap<FullMessageId, td::FlatHashSet<int64>, FullMessageIdHash>
-      yet_unsent_reply_message_ids_;  // message -> replies to it
 
   td::FlatHashMap<int32, td::vector<PromisedQueryPtr>> file_download_listeners_;
   td::FlatHashSet<int32> download_started_file_ids_;
 
   struct YetUnsentMessage {
-    int64 reply_to_message_id = 0;
-    bool is_reply_to_message_deleted = false;
     int64 send_message_query_id = 0;
   };
   td::FlatHashMap<FullMessageId, YetUnsentMessage, FullMessageIdHash> yet_unsent_messages_;
