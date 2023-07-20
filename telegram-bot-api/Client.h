@@ -833,8 +833,6 @@ class Client final : public WebhookActor::Callback {
 
   static int64 get_reply_to_message_id(const object_ptr<td_api::message> &message);
 
-  static void drop_reply_to_message_id(object_ptr<td_api::message> &message);
-
   static void drop_reply_to_message_in_another_chat(object_ptr<td_api::message> &message);
 
   static td::Slice get_sticker_type(const object_ptr<td_api::StickerType> &type);

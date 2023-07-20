@@ -861,7 +861,7 @@ class Client::JsonChat final : public td::Jsonable {
         if (pinned_message != nullptr) {
           object("pinned_message", JsonMessage(pinned_message, false, "pin in JsonChat", client_));
         } else {
-          LOG(ERROR) << "Pinned unknown, inaccessible or deleted message " << pinned_message_id_;
+          LOG(INFO) << "Pinned unknown, inaccessible or deleted message " << pinned_message_id_;
         }
       }
       if (chat_info->message_auto_delete_time != 0) {
@@ -2174,8 +2174,8 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
         const MessageInfo *pinned_message = client_->get_message(message_->chat_id, message_id, true);
         if (pinned_message != nullptr) {
           object("pinned_message", JsonMessage(pinned_message, false, "pin in " + source_, client_));
-        } else {
-          LOG_IF(ERROR, need_reply_) << "Pinned unknown, inaccessible or deleted message " << message_id;
+        } else if (need_reply_) {
+          LOG(INFO) << "Pinned unknown, inaccessible or deleted message " << message_id;
         }
       }
       break;
@@ -4388,7 +4388,6 @@ void Client::on_get_reply_message(int64 chat_id, object_ptr<td_api::message> rep
   if (reply_to_message == nullptr) {
     LOG(INFO) << "Can't find message " << reply_to_message_id << " in chat " << chat_id
               << ". It is already deleted or inaccessible because of the chosen privacy mode";
-    drop_reply_to_message_id(message);
   } else {
     CHECK(chat_id == reply_to_message->chat_id_);
     CHECK(reply_to_message_id == reply_to_message->id_);
@@ -4422,7 +4421,7 @@ void Client::on_get_callback_query_message(object_ptr<td_api::message> message, 
                 << ". It may be already deleted";
     } else {
       CHECK(state == 1);
-      auto message_info = get_message_editable(chat_id, message_id);
+      auto message_info = get_message(chat_id, message_id, true);
       if (message_info == nullptr) {
         LOG(INFO) << "Can't find callback query message " << message_id << " in chat " << chat_id
                   << ". It may be already deleted, while searcing for its reply to message";
@@ -10975,6 +10974,7 @@ void Client::process_new_callback_query_queue(int64 user_id, int state) {
                150, user_id + (static_cast<int64>(3) << 33));
 
     queue.queue_.pop();
+    state = 0;
   }
   new_callback_query_queues_.erase(user_id);
 }
@@ -11134,7 +11134,7 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       }
       const MessageInfo *pinned_message = get_message(chat_id, pinned_message_id, true);
       if (pinned_message == nullptr) {
-        LOG(WARNING) << "Pinned unknown, inaccessible or deleted message " << pinned_message_id << " in " << chat_id;
+        LOG(INFO) << "Pinned unknown, inaccessible or deleted message " << pinned_message_id << " in " << chat_id;
         return true;
       }
       break;
@@ -11192,14 +11192,6 @@ td::int64 Client::get_reply_to_message_id(const object_ptr<td_api::message> &mes
     return static_cast<const td_api::messagePinMessage *>(message->content_.get())->message_id_;
   }
   return message->reply_to_message_id_;
-}
-
-void Client::drop_reply_to_message_id(object_ptr<td_api::message> &message) {
-  if (message->content_->get_id() == td_api::messagePinMessage::ID) {
-    static_cast<td_api::messagePinMessage *>(message->content_.get())->message_id_ = 0;
-    return;
-  }
-  message->reply_to_message_id_ = 0;
 }
 
 void Client::drop_reply_to_message_in_another_chat(object_ptr<td_api::message> &message) {
@@ -11376,10 +11368,13 @@ void Client::process_new_message_queue(int64 chat_id, int state) {
     drop_reply_to_message_in_another_chat(message_ref);
 
     int64 reply_to_message_id = get_reply_to_message_id(message_ref);
-    if (reply_to_message_id > 0 && get_message(chat_id, reply_to_message_id, state > 0) == nullptr) {
-      queue.has_active_request_ = true;
-      return send_request(make_object<td_api::getRepliedMessage>(chat_id, message_id),
-                          td::make_unique<TdOnGetReplyMessageCallback>(this, chat_id));
+    if (state == 0) {
+      if (reply_to_message_id > 0 && get_message(chat_id, reply_to_message_id, false) == nullptr) {
+        queue.has_active_request_ = true;
+        return send_request(make_object<td_api::getRepliedMessage>(chat_id, message_id),
+                            td::make_unique<TdOnGetReplyMessageCallback>(this, chat_id));
+      }
+      state = 1;
     }
     auto message_sticker_set_id = get_sticker_set_id(message_ref->content_);
     if (!have_sticker_set_name(message_sticker_set_id)) {
@@ -11389,18 +11384,20 @@ void Client::process_new_message_queue(int64 chat_id, int state) {
     }
     if (reply_to_message_id > 0) {
       auto reply_to_message_info = get_message(chat_id, reply_to_message_id, true);
-      CHECK(reply_to_message_info != nullptr);
-      auto reply_sticker_set_id = get_sticker_set_id(reply_to_message_info->content);
-      if (!have_sticker_set_name(reply_sticker_set_id)) {
-        queue.has_active_request_ = true;
-        return send_request(make_object<td_api::getStickerSet>(reply_sticker_set_id),
-                            td::make_unique<TdOnGetStickerSetCallback>(this, reply_sticker_set_id, 0, chat_id));
+      if (reply_to_message_info != nullptr) {
+        auto reply_sticker_set_id = get_sticker_set_id(reply_to_message_info->content);
+        if (!have_sticker_set_name(reply_sticker_set_id)) {
+          queue.has_active_request_ = true;
+          return send_request(make_object<td_api::getStickerSet>(reply_sticker_set_id),
+                              td::make_unique<TdOnGetStickerSetCallback>(this, reply_sticker_set_id, 0, chat_id));
+        }
       }
     }
 
     auto message = std::move(message_ref);
     auto is_edited = queue.queue_.front().is_edited;
     queue.queue_.pop();
+    state = 0;
     if (need_skip_update_message(chat_id, message, is_edited)) {
       add_message(std::move(message));
       continue;
