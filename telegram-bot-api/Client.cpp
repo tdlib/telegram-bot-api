@@ -713,6 +713,9 @@ class Client::JsonChat final : public td::Jsonable {
           }
           if (user_info->emoji_status_custom_emoji_id != 0) {
             object("emoji_status_custom_emoji_id", td::to_string(user_info->emoji_status_custom_emoji_id));
+            if (user_info->emoji_status_expiration_date != 0) {
+              object("emoji_status_expiration_date", user_info->emoji_status_expiration_date);
+            }
           }
           if (!user_info->bio.empty()) {
             object("bio", user_info->bio);
@@ -10380,6 +10383,7 @@ void Client::add_user(UserInfo *user_info, object_ptr<td_api::user> &&user) {
   }
   user_info->language_code = std::move(user->language_code_);
   user_info->emoji_status_custom_emoji_id = user->emoji_status_ != nullptr ? user->emoji_status_->custom_emoji_id_ : 0;
+  user_info->emoji_status_expiration_date = user->emoji_status_ != nullptr ? user->emoji_status_->expiration_date_ : 0;
 
   user_info->have_access = user->have_access_;
   user_info->is_premium = user->is_premium_;

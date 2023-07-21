@@ -709,6 +709,7 @@ class Client final : public WebhookActor::Callback {
     td::string editable_username;
     td::string language_code;
     int64 emoji_status_custom_emoji_id;
+    int32 emoji_status_expiration_date;
 
     object_ptr<td_api::chatPhoto> photo;
     td::string bio;
