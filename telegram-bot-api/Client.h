@@ -590,6 +590,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_reopen_general_forum_topic_query(PromisedQueryPtr &query);
   td::Status process_hide_general_forum_topic_query(PromisedQueryPtr &query);
   td::Status process_unhide_general_forum_topic_query(PromisedQueryPtr &query);
+  td::Status process_unpin_all_general_forum_topic_messages_query(PromisedQueryPtr &query);
   td::Status process_get_chat_member_query(PromisedQueryPtr &query);
   td::Status process_get_chat_administrators_query(PromisedQueryPtr &query);
   td::Status process_get_chat_member_count_query(PromisedQueryPtr &query);
