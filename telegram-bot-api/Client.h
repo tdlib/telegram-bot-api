@@ -1153,6 +1153,8 @@ class Client final : public WebhookActor::Callback {
   double previous_get_updates_finish_time_ = 0;
   double next_get_updates_conflict_time_ = 0;
 
+  int32 log_in_date_ = 0;
+
   int32 flood_limited_query_count_ = 0;
   double next_flood_limit_warning_time_ = 0;
 

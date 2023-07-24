@@ -5015,6 +5015,7 @@ void Client::on_update_authorization_state() {
           td::reset_to_empty(pending_updates_);
         }
         last_update_creation_time_ = td::Time::now();
+        log_in_date_ = get_unix_time();
       }
       return loop();
     }
@@ -11488,7 +11489,8 @@ void Client::process_new_message_queue(int64 chat_id, int state) {
     auto now = get_unix_time();
     auto update_delay_time = now - td::max(message_date, parameters_->shared_data_->get_unix_time(webhook_set_time_));
     const auto UPDATE_DELAY_WARNING_TIME = 10 * 60;
-    if (update_delay_time > UPDATE_DELAY_WARNING_TIME && message_date > last_synchronization_error_date_ + 60) {
+    if (message_date > log_in_date_ && update_delay_time > UPDATE_DELAY_WARNING_TIME &&
+        message_date > last_synchronization_error_date_ + 60) {
       if (delayed_update_count_ == 0) {
         delayed_update_type_ = update_type;
         delayed_chat_id_ = chat_id;
