@@ -724,11 +724,12 @@ void WebhookActor::start_up() {
 
   if (url_.protocol_ != td::HttpUrl::Protocol::Http && !stop_flag_) {
     // asynchronously create SSL context
-    td::Scheduler::instance()->run_on_scheduler(
-        SharedData::get_database_scheduler_id(), [actor_id = actor_id(this), cert_path = cert_path_](td::Unit) mutable {
-          send_closure(actor_id, &WebhookActor::on_ssl_context_created,
-                       td::SslCtx::create(cert_path, td::SslCtx::VerifyPeer::On));
-        });
+    td::Scheduler::instance()->run_on_scheduler(SharedData::get_webhook_certificate_scheduler_id(),
+                                                [actor_id = actor_id(this), cert_path = cert_path_](td::Unit) mutable {
+                                                  send_closure(
+                                                      actor_id, &WebhookActor::on_ssl_context_created,
+                                                      td::SslCtx::create(cert_path, td::SslCtx::VerifyPeer::On));
+                                                });
   }
 
   yield();

@@ -331,7 +331,7 @@ void ClientManager::start_up() {
     }
 
     auto concurrent_binlog =
-        std::make_shared<td::ConcurrentBinlog>(std::move(binlog), SharedData::get_database_scheduler_id());
+        std::make_shared<td::ConcurrentBinlog>(std::move(binlog), SharedData::get_binlog_scheduler_id());
     auto concurrent_tqueue_binlog = td::make_unique<td::TQueueBinlog<td::BinlogInterface>>();
     concurrent_tqueue_binlog->set_binlog(std::move(concurrent_binlog));
     tqueue->set_callback(std::move(concurrent_tqueue_binlog));
@@ -346,7 +346,7 @@ void ClientManager::start_up() {
   // init webhook_db
   auto concurrent_webhook_db = td::make_unique<td::BinlogKeyValue<td::ConcurrentBinlog>>();
   auto status = concurrent_webhook_db->init(parameters_->working_directory_ + "webhooks_db.binlog", td::DbKey::empty(),
-                                            SharedData::get_database_scheduler_id());
+                                            SharedData::get_binlog_scheduler_id());
   LOG_IF(FATAL, status.is_error()) << "Can't open webhooks_db.binlog " << status;
   parameters_->shared_data_->webhook_db_ = std::move(concurrent_webhook_db);
 

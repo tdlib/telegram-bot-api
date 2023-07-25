@@ -9874,7 +9874,7 @@ void Client::webhook_error(td::Status status) {
 
 void Client::webhook_closed(td::Status status) {
   if (has_webhook_certificate_) {
-    td::Scheduler::instance()->run_on_scheduler(SharedData::get_database_scheduler_id(),
+    td::Scheduler::instance()->run_on_scheduler(SharedData::get_webhook_certificate_scheduler_id(),
                                                 [actor_id = actor_id(this), path = get_webhook_certificate_path(),
                                                  status = std::move(status)](td::Unit) mutable {
                                                   LOG(INFO) << "Unlink certificate " << path;
@@ -9987,7 +9987,7 @@ void Client::do_set_webhook(PromisedQueryPtr query, bool was_deleted) {
         CHECK(!webhook_set_query_);
         active_webhook_set_query_ = std::move(query);
         td::Scheduler::instance()->run_on_scheduler(
-            SharedData::get_database_scheduler_id(),
+            SharedData::get_webhook_certificate_scheduler_id(),
             [actor_id = actor_id(this), from_path = cert_file_ptr->temp_file_name,
              to_path = get_webhook_certificate_path(), size](td::Unit) mutable {
               LOG(INFO) << "Copy certificate to " << to_path;

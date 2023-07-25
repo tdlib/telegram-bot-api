@@ -53,11 +53,6 @@ struct SharedData {
     return static_cast<td::int32>(result);
   }
 
-  static td::int32 get_database_scheduler_id() {
-    // the same scheduler as for database in Td
-    return 1;
-  }
-
   static td::int32 get_file_gc_scheduler_id() {
     // the same scheduler as for file GC in Td
     return 2;
@@ -88,8 +83,18 @@ struct SharedData {
     return 8;
   }
 
-  static td::int32 get_thread_count() {
+  static td::int32 get_binlog_scheduler_id() {
+    // the thread for TQueue and webhook binlogs
     return 9;
+  }
+
+  static td::int32 get_webhook_certificate_scheduler_id() {
+    // the thread for webhook certificate processing
+    return 10;
+  }
+
+  static td::int32 get_thread_count() {
+    return 11;
   }
 };
 
