@@ -47,10 +47,8 @@ WebhookActor::WebhookActor(td::ActorShared<Callback> callback, td::int64 tqueue_
     , fix_ip_address_(fix_ip_address)
     , from_db_flag_(from_db_flag)
     , max_connections_(max_connections)
-    , secret_token_(std::move(secret_token))
-    , slow_scheduler_id_(td::Scheduler::instance()->sched_count() - 2) {
+    , secret_token_(std::move(secret_token)) {
   CHECK(max_connections_ > 0);
-  CHECK(slow_scheduler_id_ > 0);
 
   if (!cached_ip_address.empty()) {
     auto r_ip_address = td::IPAddress::get_ip_address(cached_ip_address);
@@ -230,7 +228,8 @@ td::Status WebhookActor::create_connection(td::BufferedFd<td::SocketFd> fd) {
   auto *conn = connections_.get(id);
   conn->actor_id_ = td::create_actor<td::HttpOutboundConnection>(
       PSLICE() << "Connect:" << id, std::move(fd), std::move(ssl_stream), 0, 50, 60,
-      td::ActorShared<td::HttpOutboundConnection::Callback>(actor_id(this), id), slow_scheduler_id_);
+      td::ActorShared<td::HttpOutboundConnection::Callback>(actor_id(this), id),
+      SharedData::get_slow_outgoing_http_scheduler_id());
   conn->ip_generation_ = ip_generation_;
   conn->event_id_ = {};
   conn->id_ = id;

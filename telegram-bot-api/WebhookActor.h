@@ -177,7 +177,6 @@ class WebhookActor final : public td::HttpOutboundConnection::Callback {
   double last_success_time_ = 0;
   double wakeup_at_ = 0;
   bool last_update_was_successful_ = true;
-  td::int32 slow_scheduler_id_ = -1;
 
   void relax_wakeup_at(double wakeup_at, const char *source);
 

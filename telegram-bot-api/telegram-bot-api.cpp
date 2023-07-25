@@ -459,27 +459,22 @@ int main(int argc, char *argv[]) {
   //              << (td::GitInfo::is_dirty() ? "(dirty)" : "") << " started";
   LOG(WARNING) << "Bot API " << parameters->version_ << " server started";
 
-  // +3 threads for Td
-  // one thread for ClientManager and all Clients
-  // one thread for watchdogs
-  // one thread for slow HTTP connections
-  // one thread for DNS resolving
-  const int thread_count = 7;
-  td::ConcurrentScheduler sched(thread_count, cpu_affinity);
+  td::ConcurrentScheduler sched(SharedData::get_thread_count() - 1, cpu_affinity);
 
   td::GetHostByNameActor::Options get_host_by_name_options;
-  get_host_by_name_options.scheduler_id = thread_count;
+  get_host_by_name_options.scheduler_id = SharedData::get_dns_resolver_scheduler_id();
   parameters->get_host_by_name_actor_id_ =
       sched.create_actor_unsafe<td::GetHostByNameActor>(0, "GetHostByName", std::move(get_host_by_name_options))
           .release();
 
-  auto client_manager =
-      sched.create_actor_unsafe<ClientManager>(thread_count - 3, "ClientManager", std::move(parameters), token_range)
-          .release();
+  auto client_manager = sched
+                            .create_actor_unsafe<ClientManager>(SharedData::get_client_scheduler_id(), "ClientManager",
+                                                                std::move(parameters), token_range)
+                            .release();
 
   sched
       .create_actor_unsafe<HttpServer>(
-          thread_count - 3, "HttpServer", http_ip_address, http_port,
+          SharedData::get_client_scheduler_id(), "HttpServer", http_ip_address, http_port,
           [client_manager, shared_data] {
             return td::ActorOwn<td::HttpInboundConnection::Callback>(
                 td::create_actor<HttpConnection>("HttpConnection", client_manager, shared_data));
@@ -489,7 +484,7 @@ int main(int argc, char *argv[]) {
   if (http_stat_port != 0) {
     sched
         .create_actor_unsafe<HttpServer>(
-            thread_count - 3, "HttpStatsServer", http_stat_ip_address, http_stat_port,
+            SharedData::get_client_scheduler_id(), "HttpStatsServer", http_stat_ip_address, http_stat_port,
             [client_manager] {
               return td::ActorOwn<td::HttpInboundConnection::Callback>(
                   td::create_actor<HttpStatConnection>("HttpStatConnection", client_manager));
@@ -498,8 +493,8 @@ int main(int argc, char *argv[]) {
   }
 
   constexpr double WATCHDOG_TIMEOUT = 0.25;
-  auto watchdog_id =
-      sched.create_actor_unsafe<Watchdog>(thread_count - 2, "Watchdog", td::this_thread::get_id(), WATCHDOG_TIMEOUT);
+  auto watchdog_id = sched.create_actor_unsafe<Watchdog>(SharedData::get_watchdog_scheduler_id(), "Watchdog",
+                                                         td::this_thread::get_id(), WATCHDOG_TIMEOUT);
 
   sched.start();
 

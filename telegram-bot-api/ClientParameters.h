@@ -62,6 +62,35 @@ struct SharedData {
     // the same scheduler as for file GC in Td
     return 2;
   }
+
+  static td::int32 get_client_scheduler_id() {
+    // the thread for ClientManager and all Clients
+    return 4;
+  }
+
+  static td::int32 get_watchdog_scheduler_id() {
+    // the thread for watchdogs
+    return 5;
+  }
+
+  static td::int32 get_slow_incoming_http_scheduler_id() {
+    // the thread for slow incoming HTTP connections
+    return 6;
+  }
+
+  static td::int32 get_slow_outgoing_http_scheduler_id() {
+    // the thread for slow outgoing HTTP connections
+    return 7;
+  }
+
+  static td::int32 get_dns_resolver_scheduler_id() {
+    // the thread for DNS resolving
+    return 8;
+  }
+
+  static td::int32 get_thread_count() {
+    return 9;
+  }
 };
 
 struct ClientParameters {
