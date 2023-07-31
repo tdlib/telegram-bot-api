@@ -5747,114 +5747,75 @@ td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(con
 
 td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(td::JsonValue &&value,
                                                                              BotUserIds &bot_user_ids) {
-  td::vector<td::vector<object_ptr<td_api::keyboardButton>>> rows;
-  td::vector<td::vector<object_ptr<td_api::inlineKeyboardButton>>> inline_rows;
-  td::Slice input_field_placeholder;
-  bool resize_keyboard = false;
-  bool is_persistent = false;
-  bool one_time = false;
-  bool remove = false;
-  bool is_personal = false;
-  bool force_reply = false;
-
   if (value.type() != td::JsonValue::Type::Object) {
     return td::Status::Error(400, "Object expected as reply markup");
   }
-  for (auto &field_value : value.get_object().field_values_) {
-    if (field_value.first == "keyboard") {
-      auto keyboard = std::move(field_value.second);
-      if (keyboard.type() != td::JsonValue::Type::Array) {
-        return td::Status::Error(400, "Field \"keyboard\" of the ReplyKeyboardMarkup must be an Array");
-      }
-      for (auto &row : keyboard.get_array()) {
-        td::vector<object_ptr<td_api::keyboardButton>> new_row;
-        if (row.type() != td::JsonValue::Type::Array) {
-          return td::Status::Error(400, "Field \"keyboard\" of the ReplyKeyboardMarkup must be an Array of Arrays");
-        }
-        for (auto &button : row.get_array()) {
-          auto r_button = get_keyboard_button(button);
-          if (r_button.is_error()) {
-            return td::Status::Error(400, PSLICE() << "Can't parse keyboard button: " << r_button.error().message());
-          }
-          new_row.push_back(r_button.move_as_ok());
-        }
+  auto &object = value.get_object();
 
-        rows.push_back(std::move(new_row));
+  td::vector<td::vector<object_ptr<td_api::keyboardButton>>> rows;
+  TRY_RESULT(keyboard, object.extract_optional_field("keyboard", td::JsonValue::Type::Array));
+  if (keyboard.type() == td::JsonValue::Type::Array) {
+    for (auto &row : keyboard.get_array()) {
+      td::vector<object_ptr<td_api::keyboardButton>> new_row;
+      if (row.type() != td::JsonValue::Type::Array) {
+        return td::Status::Error(400, "Field \"keyboard\" must be an Array of Arrays");
       }
-    } else if (field_value.first == "inline_keyboard") {
-      auto inline_keyboard = std::move(field_value.second);
-      if (inline_keyboard.type() != td::JsonValue::Type::Array) {
-        return td::Status::Error(400, "Field \"inline_keyboard\" of the InlineKeyboardMarkup must be an Array");
+      for (auto &button : row.get_array()) {
+        auto r_button = get_keyboard_button(button);
+        if (r_button.is_error()) {
+          return td::Status::Error(400, PSLICE() << "Can't parse keyboard button: " << r_button.error().message());
+        }
+        new_row.push_back(r_button.move_as_ok());
       }
-      for (auto &inline_row : inline_keyboard.get_array()) {
-        td::vector<object_ptr<td_api::inlineKeyboardButton>> new_inline_row;
-        if (inline_row.type() != td::JsonValue::Type::Array) {
-          return td::Status::Error(400,
-                                   "Field \"inline_keyboard\" of the InlineKeyboardMarkup must be an Array of Arrays");
-        }
-        for (auto &button : inline_row.get_array()) {
-          auto r_button = get_inline_keyboard_button(button, bot_user_ids);
-          if (r_button.is_error()) {
-            return td::Status::Error(400, PSLICE()
-                                              << "Can't parse inline keyboard button: " << r_button.error().message());
-          }
-          new_inline_row.push_back(r_button.move_as_ok());
-        }
 
-        inline_rows.push_back(std::move(new_inline_row));
-      }
-    } else if (field_value.first == "resize_keyboard") {
-      if (field_value.second.type() != td::JsonValue::Type::Boolean) {
-        return td::Status::Error(400,
-                                 "Field \"resize_keyboard\" of the ReplyKeyboardMarkup must be of the type Boolean");
-      }
-      resize_keyboard = field_value.second.get_boolean();
-    } else if (field_value.first == "is_persistent") {
-      if (field_value.second.type() != td::JsonValue::Type::Boolean) {
-        return td::Status::Error(400, "Field \"is_persistent\" of the ReplyKeyboardMarkup must be of the type Boolean");
-      }
-      is_persistent = field_value.second.get_boolean();
-    } else if (field_value.first == "one_time_keyboard") {
-      if (field_value.second.type() != td::JsonValue::Type::Boolean) {
-        return td::Status::Error(400,
-                                 "Field \"one_time_keyboard\" of the ReplyKeyboardMarkup must be of the type Boolean");
-      }
-      one_time = field_value.second.get_boolean();
-    } else if (field_value.first == "hide_keyboard" || field_value.first == "remove_keyboard") {
-      if (field_value.second.type() != td::JsonValue::Type::Boolean) {
-        return td::Status::Error(400,
-                                 "Field \"remove_keyboard\" of the ReplyKeyboardRemove must be of the type Boolean");
-      }
-      remove = field_value.second.get_boolean();
-    } else if (field_value.first == "personal_keyboard" || field_value.first == "selective") {
-      if (field_value.second.type() != td::JsonValue::Type::Boolean) {
-        return td::Status::Error(400, "Field \"selective\" of the reply markup must be of the type Boolean");
-      }
-      is_personal = field_value.second.get_boolean();
-    } else if (field_value.first == "force_reply_keyboard" || field_value.first == "force_reply") {
-      if (field_value.second.type() != td::JsonValue::Type::Boolean) {
-        return td::Status::Error(400, "Field \"force_reply\" of the reply markup must be of the type Boolean");
-      }
-      force_reply = field_value.second.get_boolean();
-    } else if (field_value.first == "input_field_placeholder") {
-      if (field_value.second.type() != td::JsonValue::Type::String) {
-        return td::Status::Error(400,
-                                 "Field \"input_field_placeholder\" of the reply markup must be of the type String");
-      }
-      input_field_placeholder = field_value.second.get_string();
+      rows.push_back(std::move(new_row));
     }
   }
 
+  td::vector<td::vector<object_ptr<td_api::inlineKeyboardButton>>> inline_rows;
+  TRY_RESULT(inline_keyboard, object.extract_optional_field("inline_keyboard", td::JsonValue::Type::Array));
+  if (inline_keyboard.type() == td::JsonValue::Type::Array) {
+    for (auto &inline_row : inline_keyboard.get_array()) {
+      td::vector<object_ptr<td_api::inlineKeyboardButton>> new_inline_row;
+      if (inline_row.type() != td::JsonValue::Type::Array) {
+        return td::Status::Error(400,
+                                 "Field \"inline_keyboard\" of the InlineKeyboardMarkup must be an Array of Arrays");
+      }
+      for (auto &button : inline_row.get_array()) {
+        auto r_button = get_inline_keyboard_button(button, bot_user_ids);
+        if (r_button.is_error()) {
+          return td::Status::Error(400, PSLICE()
+                                            << "Can't parse inline keyboard button: " << r_button.error().message());
+        }
+        new_inline_row.push_back(r_button.move_as_ok());
+      }
+
+      inline_rows.push_back(std::move(new_inline_row));
+    }
+  }
+
+  TRY_RESULT(hide_keyboard, object.get_optional_bool_field("hide_keyboard"));
+  TRY_RESULT(remove_keyboard, object.get_optional_bool_field("remove_keyboard"));
+  TRY_RESULT(personal_keyboard, object.get_optional_bool_field("personal_keyboard"));
+  TRY_RESULT(selective, object.get_optional_bool_field("selective"));
+  TRY_RESULT(force_reply_keyboard, object.get_optional_bool_field("force_reply_keyboard"));
+  TRY_RESULT(force_reply, object.get_optional_bool_field("force_reply"));
+  TRY_RESULT(input_field_placeholder, object.get_optional_string_field("input_field_placeholder"));
+  bool is_personal = personal_keyboard || selective;
+
   object_ptr<td_api::ReplyMarkup> result;
   if (!rows.empty()) {
-    result = make_object<td_api::replyMarkupShowKeyboard>(std::move(rows), is_persistent, resize_keyboard, one_time,
-                                                          is_personal, input_field_placeholder.str());
+    TRY_RESULT(resize_keyboard, object.get_optional_bool_field("resize_keyboard"));
+    TRY_RESULT(one_time_keyboard, object.get_optional_bool_field("one_time_keyboard"));
+    TRY_RESULT(is_persistent, object.get_optional_bool_field("is_persistent"));
+    result = make_object<td_api::replyMarkupShowKeyboard>(std::move(rows), is_persistent, resize_keyboard,
+                                                          one_time_keyboard, is_personal, input_field_placeholder);
   } else if (!inline_rows.empty()) {
     result = make_object<td_api::replyMarkupInlineKeyboard>(std::move(inline_rows));
-  } else if (remove) {
+  } else if (hide_keyboard || remove_keyboard) {
     result = make_object<td_api::replyMarkupRemoveKeyboard>(is_personal);
-  } else if (force_reply) {
-    result = make_object<td_api::replyMarkupForceReply>(is_personal, input_field_placeholder.str());
+  } else if (force_reply || force_reply_keyboard) {
+    result = make_object<td_api::replyMarkupForceReply>(is_personal, input_field_placeholder);
   }
   if (result == nullptr || result->get_id() != td_api::replyMarkupInlineKeyboard::ID) {
     bot_user_ids.unresolved_bot_usernames_.clear();
