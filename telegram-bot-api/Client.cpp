@@ -5874,20 +5874,8 @@ td::Result<td_api::object_ptr<td_api::labeledPricePart>> Client::get_labeled_pri
     return td::Status::Error(400, "LabeledPrice label must be non-empty");
   }
 
-  TRY_RESULT(amount, get_json_object_field(object, "amount", td::JsonValue::Type::Null, false));
-  td::Slice number;
-  if (amount.type() == td::JsonValue::Type::Number) {
-    number = amount.get_number();
-  } else if (amount.type() == td::JsonValue::Type::String) {
-    number = amount.get_string();
-  } else {
-    return td::Status::Error(400, "Field \"amount\" must be of type Number or String");
-  }
-  auto parsed_amount = td::to_integer_safe<int64>(number);
-  if (parsed_amount.is_error()) {
-    return td::Status::Error(400, "Can't parse \"amount\" as Number");
-  }
-  return make_object<td_api::labeledPricePart>(label, parsed_amount.ok());
+  TRY_RESULT(amount, get_json_object_long_field(object, "amount", false));
+  return make_object<td_api::labeledPricePart>(label, amount);
 }
 
 td::Result<td::vector<td_api::object_ptr<td_api::labeledPricePart>>> Client::get_labeled_price_parts(
