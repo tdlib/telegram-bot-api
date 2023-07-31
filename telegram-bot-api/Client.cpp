@@ -5527,26 +5527,26 @@ td::Result<td_api::object_ptr<td_api::keyboardButton>> Client::get_keyboard_butt
   if (button.type() == td::JsonValue::Type::Object) {
     auto &object = button.get_object();
 
-    TRY_RESULT(text, get_json_object_string_field(object, "text", false));
+    TRY_RESULT(text, object.get_required_string_field("text"));
 
-    TRY_RESULT(request_phone_number, get_json_object_bool_field(object, "request_phone_number"));
-    TRY_RESULT(request_contact, get_json_object_bool_field(object, "request_contact"));
+    TRY_RESULT(request_phone_number, object.get_optional_bool_field("request_phone_number"));
+    TRY_RESULT(request_contact, object.get_optional_bool_field("request_contact"));
     if (request_phone_number || request_contact) {
       return make_object<td_api::keyboardButton>(text, make_object<td_api::keyboardButtonTypeRequestPhoneNumber>());
     }
 
-    TRY_RESULT(request_location, get_json_object_bool_field(object, "request_location"));
+    TRY_RESULT(request_location, object.get_optional_bool_field("request_location"));
     if (request_location) {
       return make_object<td_api::keyboardButton>(text, make_object<td_api::keyboardButtonTypeRequestLocation>());
     }
 
-    if (has_json_object_field(object, "request_poll")) {
+    if (object.has_field("request_poll")) {
       bool force_regular = false;
       bool force_quiz = false;
-      TRY_RESULT(request_poll, get_json_object_field(object, "request_poll", td::JsonValue::Type::Object, false));
+      TRY_RESULT(request_poll, object.extract_required_field("request_poll", td::JsonValue::Type::Object));
       auto &request_poll_object = request_poll.get_object();
-      if (has_json_object_field(request_poll_object, "type")) {
-        TRY_RESULT(type, get_json_object_string_field(request_poll_object, "type"));
+      if (request_poll_object.has_field("type")) {
+        TRY_RESULT(type, request_poll_object.get_optional_string_field("type"));
         if (type == "quiz") {
           force_quiz = true;
         } else if (type == "regular") {
@@ -5557,47 +5557,48 @@ td::Result<td_api::object_ptr<td_api::keyboardButton>> Client::get_keyboard_butt
           text, make_object<td_api::keyboardButtonTypeRequestPoll>(force_regular, force_quiz));
     }
 
-    if (has_json_object_field(object, "web_app")) {
-      TRY_RESULT(web_app, get_json_object_field(object, "web_app", td::JsonValue::Type::Object, false));
+    if (object.has_field("web_app")) {
+      TRY_RESULT(web_app, object.extract_required_field("web_app", td::JsonValue::Type::Object));
       auto &web_app_object = web_app.get_object();
-      TRY_RESULT(url, get_json_object_string_field(web_app_object, "url", false));
+      TRY_RESULT(url, web_app_object.get_required_string_field("url"));
       return make_object<td_api::keyboardButton>(text, make_object<td_api::keyboardButtonTypeWebApp>(url));
     }
 
-    if (has_json_object_field(object, "request_user")) {
-      TRY_RESULT(request_user, get_json_object_field(object, "request_user", td::JsonValue::Type::Object, false));
+    if (object.has_field("request_user")) {
+      TRY_RESULT(request_user, object.extract_required_field("request_user", td::JsonValue::Type::Object));
       auto &request_user_object = request_user.get_object();
-      TRY_RESULT(id, get_json_object_int_field(request_user_object, "request_id", false));
-      auto restrict_user_is_bot = has_json_object_field(request_user_object, "user_is_bot");
-      TRY_RESULT(user_is_bot, get_json_object_bool_field(request_user_object, "user_is_bot"));
-      auto restrict_user_is_premium = has_json_object_field(request_user_object, "user_is_premium");
-      TRY_RESULT(user_is_premium, get_json_object_bool_field(request_user_object, "user_is_premium"));
+      TRY_RESULT(id, request_user_object.get_required_int_field("request_id"));
+      auto restrict_user_is_bot = request_user_object.has_field("user_is_bot");
+      TRY_RESULT(user_is_bot, request_user_object.get_optional_bool_field("user_is_bot"));
+      auto restrict_user_is_premium = request_user_object.has_field("user_is_premium");
+      TRY_RESULT(user_is_premium, request_user_object.get_optional_bool_field("user_is_premium"));
       return make_object<td_api::keyboardButton>(
           text, make_object<td_api::keyboardButtonTypeRequestUser>(id, restrict_user_is_bot, user_is_bot,
                                                                    restrict_user_is_premium, user_is_premium));
     }
 
-    if (has_json_object_field(object, "request_chat")) {
-      TRY_RESULT(request_chat, get_json_object_field(object, "request_chat", td::JsonValue::Type::Object, false));
+    if (object.has_field("request_chat")) {
+      TRY_RESULT(request_chat, object.extract_required_field("request_chat", td::JsonValue::Type::Object));
       auto &request_chat_object = request_chat.get_object();
-      TRY_RESULT(id, get_json_object_int_field(request_chat_object, "request_id", false));
-      TRY_RESULT(chat_is_channel, get_json_object_bool_field(request_chat_object, "chat_is_channel"));
-      auto restrict_chat_is_forum = has_json_object_field(request_chat_object, "chat_is_forum");
-      TRY_RESULT(chat_is_forum, get_json_object_bool_field(request_chat_object, "chat_is_forum"));
-      auto restrict_chat_has_username = has_json_object_field(request_chat_object, "chat_has_username");
-      TRY_RESULT(chat_has_username, get_json_object_bool_field(request_chat_object, "chat_has_username"));
-      TRY_RESULT(chat_is_created, get_json_object_bool_field(request_chat_object, "chat_is_created"));
+      TRY_RESULT(id, request_chat_object.get_required_int_field("request_id"));
+      TRY_RESULT(chat_is_channel, request_chat_object.get_optional_bool_field("chat_is_channel"));
+      auto restrict_chat_is_forum = request_chat_object.has_field("chat_is_forum");
+      TRY_RESULT(chat_is_forum, request_chat_object.get_optional_bool_field("chat_is_forum"));
+      auto restrict_chat_has_username = request_chat_object.has_field("chat_has_username");
+      TRY_RESULT(chat_has_username, request_chat_object.get_optional_bool_field("chat_has_username"));
+      TRY_RESULT(chat_is_created, request_chat_object.get_optional_bool_field("chat_is_created"));
       object_ptr<td_api::chatAdministratorRights> user_administrator_rights;
-      if (has_json_object_field(request_chat_object, "user_administrator_rights")) {
-        TRY_RESULT_ASSIGN(user_administrator_rights, get_chat_administrator_rights(get_json_object_field_force(
-                                                         request_chat_object, "user_administrator_rights")));
+      if (request_chat_object.has_field("user_administrator_rights")) {
+        TRY_RESULT_ASSIGN(
+            user_administrator_rights,
+            get_chat_administrator_rights(request_chat_object.extract_field("user_administrator_rights")));
       }
       object_ptr<td_api::chatAdministratorRights> bot_administrator_rights;
-      if (has_json_object_field(request_chat_object, "bot_administrator_rights")) {
-        TRY_RESULT_ASSIGN(bot_administrator_rights, get_chat_administrator_rights(get_json_object_field_force(
-                                                        request_chat_object, "bot_administrator_rights")));
+      if (request_chat_object.has_field("bot_administrator_rights")) {
+        TRY_RESULT_ASSIGN(bot_administrator_rights,
+                          get_chat_administrator_rights(request_chat_object.extract_field("bot_administrator_rights")));
       }
-      TRY_RESULT(bot_is_member, get_json_object_bool_field(request_chat_object, "bot_is_member"));
+      TRY_RESULT(bot_is_member, request_chat_object.get_optional_bool_field("bot_is_member"));
       return make_object<td_api::keyboardButton>(
           text, make_object<td_api::keyboardButtonTypeRequestChat>(
                     id, chat_is_channel, restrict_chat_is_forum, chat_is_forum, restrict_chat_has_username,
@@ -5622,68 +5623,68 @@ td::Result<td_api::object_ptr<td_api::inlineKeyboardButton>> Client::get_inline_
 
   auto &object = button.get_object();
 
-  TRY_RESULT(text, get_json_object_string_field(object, "text", false));
+  TRY_RESULT(text, object.get_required_string_field("text"));
   {
-    TRY_RESULT(url, get_json_object_string_field(object, "url"));
+    TRY_RESULT(url, object.get_optional_string_field("url"));
     if (!url.empty()) {
       return make_object<td_api::inlineKeyboardButton>(text, make_object<td_api::inlineKeyboardButtonTypeUrl>(url));
     }
   }
 
   {
-    TRY_RESULT(callback_data, get_json_object_string_field(object, "callback_data"));
+    TRY_RESULT(callback_data, object.get_optional_string_field("callback_data"));
     if (!callback_data.empty()) {
       return make_object<td_api::inlineKeyboardButton>(
           text, make_object<td_api::inlineKeyboardButtonTypeCallback>(callback_data));
     }
   }
 
-  if (has_json_object_field(object, "callback_game")) {
+  if (object.has_field("callback_game")) {
     return make_object<td_api::inlineKeyboardButton>(text, make_object<td_api::inlineKeyboardButtonTypeCallbackGame>());
   }
 
-  if (has_json_object_field(object, "pay")) {
+  if (object.has_field("pay")) {
     return make_object<td_api::inlineKeyboardButton>(text, make_object<td_api::inlineKeyboardButtonTypeBuy>());
   }
 
-  if (has_json_object_field(object, "switch_inline_query")) {
-    TRY_RESULT(switch_inline_query, get_json_object_string_field(object, "switch_inline_query", false));
+  if (object.has_field("switch_inline_query")) {
+    TRY_RESULT(switch_inline_query, object.get_required_string_field("switch_inline_query"));
     return make_object<td_api::inlineKeyboardButton>(
         text, make_object<td_api::inlineKeyboardButtonTypeSwitchInline>(
                   switch_inline_query, td_api::make_object<td_api::targetChatChosen>(true, true, true, true)));
   }
 
-  if (has_json_object_field(object, "switch_inline_query_chosen_chat")) {
+  if (object.has_field("switch_inline_query_chosen_chat")) {
     TRY_RESULT(switch_inline_query,
-               get_json_object_field(object, "switch_inline_query_chosen_chat", td::JsonValue::Type::Object, false));
+               object.extract_required_field("switch_inline_query_chosen_chat", td::JsonValue::Type::Object));
     CHECK(switch_inline_query.type() == td::JsonValue::Type::Object);
     auto &switch_inline_query_object = switch_inline_query.get_object();
-    TRY_RESULT(query, get_json_object_string_field(switch_inline_query_object, "query"));
-    TRY_RESULT(allow_user_chats, get_json_object_bool_field(switch_inline_query_object, "allow_user_chats"));
-    TRY_RESULT(allow_bot_chats, get_json_object_bool_field(switch_inline_query_object, "allow_bot_chats"));
-    TRY_RESULT(allow_group_chats, get_json_object_bool_field(switch_inline_query_object, "allow_group_chats"));
-    TRY_RESULT(allow_channel_chats, get_json_object_bool_field(switch_inline_query_object, "allow_channel_chats"));
+    TRY_RESULT(query, switch_inline_query_object.get_optional_string_field("query"));
+    TRY_RESULT(allow_user_chats, switch_inline_query_object.get_optional_bool_field("allow_user_chats"));
+    TRY_RESULT(allow_bot_chats, switch_inline_query_object.get_optional_bool_field("allow_bot_chats"));
+    TRY_RESULT(allow_group_chats, switch_inline_query_object.get_optional_bool_field("allow_group_chats"));
+    TRY_RESULT(allow_channel_chats, switch_inline_query_object.get_optional_bool_field("allow_channel_chats"));
     return make_object<td_api::inlineKeyboardButton>(
         text, make_object<td_api::inlineKeyboardButtonTypeSwitchInline>(
                   query, td_api::make_object<td_api::targetChatChosen>(allow_user_chats, allow_bot_chats,
                                                                        allow_group_chats, allow_channel_chats)));
   }
 
-  if (has_json_object_field(object, "switch_inline_query_current_chat")) {
-    TRY_RESULT(switch_inline_query, get_json_object_string_field(object, "switch_inline_query_current_chat", false));
+  if (object.has_field("switch_inline_query_current_chat")) {
+    TRY_RESULT(switch_inline_query, object.get_required_string_field("switch_inline_query_current_chat"));
     return make_object<td_api::inlineKeyboardButton>(
         text, make_object<td_api::inlineKeyboardButtonTypeSwitchInline>(
                   switch_inline_query, td_api::make_object<td_api::targetChatCurrent>()));
   }
 
-  if (has_json_object_field(object, "login_url")) {
-    TRY_RESULT(login_url, get_json_object_field(object, "login_url", td::JsonValue::Type::Object, false));
+  if (object.has_field("login_url")) {
+    TRY_RESULT(login_url, object.extract_required_field("login_url", td::JsonValue::Type::Object));
     CHECK(login_url.type() == td::JsonValue::Type::Object);
     auto &login_url_object = login_url.get_object();
-    TRY_RESULT(url, get_json_object_string_field(login_url_object, "url", false));
-    TRY_RESULT(bot_username, get_json_object_string_field(login_url_object, "bot_username"));
-    TRY_RESULT(request_write_access, get_json_object_bool_field(login_url_object, "request_write_access"));
-    TRY_RESULT(forward_text, get_json_object_string_field(login_url_object, "forward_text"));
+    TRY_RESULT(url, login_url_object.get_required_string_field("url"));
+    TRY_RESULT(bot_username, login_url_object.get_optional_string_field("bot_username"));
+    TRY_RESULT(request_write_access, login_url_object.get_optional_bool_field("request_write_access"));
+    TRY_RESULT(forward_text, login_url_object.get_optional_string_field("forward_text"));
 
     int64 bot_user_id = 0;
     if (bot_username.empty()) {
@@ -5717,10 +5718,10 @@ td::Result<td_api::object_ptr<td_api::inlineKeyboardButton>> Client::get_inline_
         text, make_object<td_api::inlineKeyboardButtonTypeLoginUrl>(url, bot_user_id, forward_text));
   }
 
-  if (has_json_object_field(object, "web_app")) {
-    TRY_RESULT(web_app, get_json_object_field(object, "web_app", td::JsonValue::Type::Object, false));
+  if (object.has_field("web_app")) {
+    TRY_RESULT(web_app, object.extract_required_field("web_app", td::JsonValue::Type::Object));
     auto &web_app_object = web_app.get_object();
-    TRY_RESULT(url, get_json_object_string_field(web_app_object, "url", false));
+    TRY_RESULT(url, web_app_object.get_required_string_field("url"));
     return make_object<td_api::inlineKeyboardButton>(text, make_object<td_api::inlineKeyboardButtonTypeWebApp>(url));
   }
 
@@ -5869,12 +5870,12 @@ td::Result<td_api::object_ptr<td_api::labeledPricePart>> Client::get_labeled_pri
 
   auto &object = value.get_object();
 
-  TRY_RESULT(label, get_json_object_string_field(object, "label", false));
+  TRY_RESULT(label, object.get_required_string_field("label"));
   if (label.empty()) {
     return td::Status::Error(400, "LabeledPrice label must be non-empty");
   }
 
-  TRY_RESULT(amount, get_json_object_long_field(object, "amount", false));
+  TRY_RESULT(amount, object.get_required_long_field("amount"));
   return make_object<td_api::labeledPricePart>(label, amount);
 }
 
@@ -5930,17 +5931,17 @@ td::Result<td_api::object_ptr<td_api::shippingOption>> Client::get_shipping_opti
 
   auto &object = option.get_object();
 
-  TRY_RESULT(id, get_json_object_string_field(object, "id", false));
+  TRY_RESULT(id, object.get_required_string_field("id"));
   if (id.empty()) {
     return td::Status::Error(400, "ShippingOption identifier must be non-empty");
   }
 
-  TRY_RESULT(title, get_json_object_string_field(object, "title", false));
+  TRY_RESULT(title, object.get_required_string_field("title"));
   if (title.empty()) {
     return td::Status::Error(400, "ShippingOption title must be non-empty");
   }
 
-  TRY_RESULT(prices_json, get_json_object_field(object, "prices", td::JsonValue::Type::Array, false));
+  TRY_RESULT(prices_json, object.extract_required_field("prices", td::JsonValue::Type::Array));
 
   auto r_prices = get_labeled_price_parts(prices_json);
   if (r_prices.is_error()) {
@@ -6087,42 +6088,42 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
   CHECK(input_message_content.type() == td::JsonValue::Type::Object);
   auto &object = input_message_content.get_object();
 
-  TRY_RESULT(message_text, get_json_object_string_field(object, "message_text"));
+  TRY_RESULT(message_text, object.get_optional_string_field("message_text"));
 
   if (!message_text.empty()) {
-    TRY_RESULT(disable_web_page_preview, get_json_object_bool_field(object, "disable_web_page_preview"));
-    TRY_RESULT(parse_mode, get_json_object_string_field(object, "parse_mode"));
-    auto entities = get_json_object_field_force(object, "entities");
+    TRY_RESULT(disable_web_page_preview, object.get_optional_bool_field("disable_web_page_preview"));
+    TRY_RESULT(parse_mode, object.get_optional_string_field("parse_mode"));
+    auto entities = object.extract_field("entities");
     TRY_RESULT(input_message_text, get_input_message_text(std::move(message_text), disable_web_page_preview,
                                                           std::move(parse_mode), std::move(entities)));
     return std::move(input_message_text);
   }
 
-  if (has_json_object_field(object, "latitude") && has_json_object_field(object, "longitude")) {
-    TRY_RESULT(latitude, get_json_object_double_field(object, "latitude", false));
-    TRY_RESULT(longitude, get_json_object_double_field(object, "longitude", false));
-    TRY_RESULT(horizontal_accuracy, get_json_object_double_field(object, "horizontal_accuracy"));
-    TRY_RESULT(live_period, get_json_object_int_field(object, "live_period"));
-    TRY_RESULT(heading, get_json_object_int_field(object, "heading"));
-    TRY_RESULT(proximity_alert_radius, get_json_object_int_field(object, "proximity_alert_radius"));
+  if (object.has_field("latitude") && object.has_field("longitude")) {
+    TRY_RESULT(latitude, object.get_required_double_field("latitude"));
+    TRY_RESULT(longitude, object.get_required_double_field("longitude"));
+    TRY_RESULT(horizontal_accuracy, object.get_optional_double_field("horizontal_accuracy"));
+    TRY_RESULT(live_period, object.get_optional_int_field("live_period"));
+    TRY_RESULT(heading, object.get_optional_int_field("heading"));
+    TRY_RESULT(proximity_alert_radius, object.get_optional_int_field("proximity_alert_radius"));
     auto location = make_object<td_api::location>(latitude, longitude, horizontal_accuracy);
 
-    if (has_json_object_field(object, "title") && has_json_object_field(object, "address")) {
-      TRY_RESULT(title, get_json_object_string_field(object, "title", false));
-      TRY_RESULT(address, get_json_object_string_field(object, "address", false));
+    if (object.has_field("title") && object.has_field("address")) {
+      TRY_RESULT(title, object.get_required_string_field("title"));
+      TRY_RESULT(address, object.get_required_string_field("address"));
       td::string provider;
       td::string venue_id;
       td::string venue_type;
 
-      TRY_RESULT(google_place_id, get_json_object_string_field(object, "google_place_id"));
-      TRY_RESULT(google_place_type, get_json_object_string_field(object, "google_place_type"));
+      TRY_RESULT(google_place_id, object.get_optional_string_field("google_place_id"));
+      TRY_RESULT(google_place_type, object.get_optional_string_field("google_place_type"));
       if (!google_place_id.empty() || !google_place_type.empty()) {
         provider = "gplaces";
         venue_id = std::move(google_place_id);
         venue_type = std::move(google_place_type);
       }
-      TRY_RESULT(foursquare_id, get_json_object_string_field(object, "foursquare_id"));
-      TRY_RESULT(foursquare_type, get_json_object_string_field(object, "foursquare_type"));
+      TRY_RESULT(foursquare_id, object.get_optional_string_field("foursquare_id"));
+      TRY_RESULT(foursquare_type, object.get_optional_string_field("foursquare_type"));
       if (!foursquare_id.empty() || !foursquare_type.empty()) {
         provider = "foursquare";
         venue_id = std::move(foursquare_id);
@@ -6136,46 +6137,46 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
     return make_object<td_api::inputMessageLocation>(std::move(location), live_period, heading, proximity_alert_radius);
   }
 
-  if (has_json_object_field(object, "phone_number")) {
-    TRY_RESULT(phone_number, get_json_object_string_field(object, "phone_number", false));
-    TRY_RESULT(first_name, get_json_object_string_field(object, "first_name", false));
-    TRY_RESULT(last_name, get_json_object_string_field(object, "last_name"));
-    TRY_RESULT(vcard, get_json_object_string_field(object, "vcard"));
+  if (object.has_field("phone_number")) {
+    TRY_RESULT(phone_number, object.get_required_string_field("phone_number"));
+    TRY_RESULT(first_name, object.get_required_string_field("first_name"));
+    TRY_RESULT(last_name, object.get_optional_string_field("last_name"));
+    TRY_RESULT(vcard, object.get_optional_string_field("vcard"));
 
     return make_object<td_api::inputMessageContact>(
         make_object<td_api::contact>(phone_number, first_name, last_name, vcard, 0));
   }
 
-  if (has_json_object_field(object, "payload")) {
-    TRY_RESULT(title, get_json_object_string_field(object, "title", false));
-    TRY_RESULT(description, get_json_object_string_field(object, "description", false));
-    TRY_RESULT(payload, get_json_object_string_field(object, "payload", false));
+  if (object.has_field("payload")) {
+    TRY_RESULT(title, object.get_required_string_field("title"));
+    TRY_RESULT(description, object.get_required_string_field("description"));
+    TRY_RESULT(payload, object.get_required_string_field("payload"));
     if (!td::check_utf8(payload)) {
       return td::Status::Error(400, "InputInvoiceMessageContent payload must be encoded in UTF-8");
     }
-    TRY_RESULT(provider_token, get_json_object_string_field(object, "provider_token", false));
-    TRY_RESULT(currency, get_json_object_string_field(object, "currency", false));
-    TRY_RESULT(prices_object, get_json_object_field(object, "prices", td::JsonValue::Type::Array, false));
+    TRY_RESULT(provider_token, object.get_required_string_field("provider_token"));
+    TRY_RESULT(currency, object.get_required_string_field("currency"));
+    TRY_RESULT(prices_object, object.extract_required_field("prices", td::JsonValue::Type::Array));
     TRY_RESULT(prices, get_labeled_price_parts(prices_object));
-    TRY_RESULT(provider_data, get_json_object_string_field(object, "provider_data"));
-    TRY_RESULT(max_tip_amount, get_json_object_long_field(object, "max_tip_amount"));
+    TRY_RESULT(provider_data, object.get_optional_string_field("provider_data"));
+    TRY_RESULT(max_tip_amount, object.get_optional_long_field("max_tip_amount"));
     td::vector<int64> suggested_tip_amounts;
     TRY_RESULT(suggested_tip_amounts_array,
-               get_json_object_field(object, "suggested_tip_amounts", td::JsonValue::Type::Array));
+               object.extract_optional_field("suggested_tip_amounts", td::JsonValue::Type::Array));
     if (suggested_tip_amounts_array.type() == td::JsonValue::Type::Array) {
       TRY_RESULT_ASSIGN(suggested_tip_amounts, get_suggested_tip_amounts(suggested_tip_amounts_array));
     }
-    TRY_RESULT(photo_url, get_json_object_string_field(object, "photo_url"));
-    TRY_RESULT(photo_size, get_json_object_int_field(object, "photo_size"));
-    TRY_RESULT(photo_width, get_json_object_int_field(object, "photo_width"));
-    TRY_RESULT(photo_height, get_json_object_int_field(object, "photo_height"));
-    TRY_RESULT(need_name, get_json_object_bool_field(object, "need_name"));
-    TRY_RESULT(need_phone_number, get_json_object_bool_field(object, "need_phone_number"));
-    TRY_RESULT(need_email_address, get_json_object_bool_field(object, "need_email"));
-    TRY_RESULT(need_shipping_address, get_json_object_bool_field(object, "need_shipping_address"));
-    TRY_RESULT(send_phone_number_to_provider, get_json_object_bool_field(object, "send_phone_number_to_provider"));
-    TRY_RESULT(send_email_address_to_provider, get_json_object_bool_field(object, "send_email_to_provider"));
-    TRY_RESULT(is_flexible, get_json_object_bool_field(object, "is_flexible"));
+    TRY_RESULT(photo_url, object.get_optional_string_field("photo_url"));
+    TRY_RESULT(photo_size, object.get_optional_int_field("photo_size"));
+    TRY_RESULT(photo_width, object.get_optional_int_field("photo_width"));
+    TRY_RESULT(photo_height, object.get_optional_int_field("photo_height"));
+    TRY_RESULT(need_name, object.get_optional_bool_field("need_name"));
+    TRY_RESULT(need_phone_number, object.get_optional_bool_field("need_phone_number"));
+    TRY_RESULT(need_email_address, object.get_optional_bool_field("need_email"));
+    TRY_RESULT(need_shipping_address, object.get_optional_bool_field("need_shipping_address"));
+    TRY_RESULT(send_phone_number_to_provider, object.get_optional_bool_field("send_phone_number_to_provider"));
+    TRY_RESULT(send_email_address_to_provider, object.get_optional_bool_field("send_email_to_provider"));
+    TRY_RESULT(is_flexible, object.get_optional_bool_field("is_flexible"));
 
     return make_object<td_api::inputMessageInvoice>(
         make_object<td_api::invoice>(currency, std::move(prices), max_tip_amount, std::move(suggested_tip_amounts),
@@ -6205,18 +6206,18 @@ td::Result<td_api::object_ptr<td_api::inlineQueryResultsButton>> Client::get_inl
 
   auto &object = value.get_object();
 
-  TRY_RESULT(text, get_json_object_string_field(object, "text", false));
+  TRY_RESULT(text, object.get_required_string_field("text"));
 
-  if (has_json_object_field(object, "start_parameter")) {
-    TRY_RESULT(start_parameter, get_json_object_string_field(object, "start_parameter", false));
+  if (object.has_field("start_parameter")) {
+    TRY_RESULT(start_parameter, object.get_required_string_field("start_parameter"));
     return make_object<td_api::inlineQueryResultsButton>(
         text, make_object<td_api::inlineQueryResultsButtonTypeStartBot>(start_parameter));
   }
 
-  if (has_json_object_field(object, "web_app")) {
-    TRY_RESULT(web_app, get_json_object_field(object, "web_app", td::JsonValue::Type::Object, false));
+  if (object.has_field("web_app")) {
+    TRY_RESULT(web_app, object.extract_required_field("web_app", td::JsonValue::Type::Object));
     auto &web_app_object = web_app.get_object();
-    TRY_RESULT(url, get_json_object_string_field(web_app_object, "url", false));
+    TRY_RESULT(url, web_app_object.get_required_string_field("url"));
     return make_object<td_api::inlineQueryResultsButton>(text,
                                                          make_object<td_api::inlineQueryResultsButtonTypeWebApp>(url));
   }
@@ -6309,21 +6310,22 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
 
   auto &object = value.get_object();
 
-  TRY_RESULT(type, get_json_object_string_field(object, "type", false));
+  TRY_RESULT(type, object.get_required_string_field("type"));
   td::to_lower_inplace(type);
 
-  TRY_RESULT(id, get_json_object_string_field(object, "id", false));
+  TRY_RESULT(id, object.get_required_string_field("id"));
 
   bool is_input_message_content_required = (type == "article");
   object_ptr<td_api::InputMessageContent> input_message_content;
 
   TRY_RESULT(input_message_content_obj,
-             get_json_object_field(object, "input_message_content", td::JsonValue::Type::Object));
+             object.extract_optional_field("input_message_content", td::JsonValue::Type::Object));
   if (input_message_content_obj.type() == td::JsonValue::Type::Null) {
-    TRY_RESULT(message_text, get_json_object_string_field(object, "message_text", !is_input_message_content_required));
-    TRY_RESULT(disable_web_page_preview, get_json_object_bool_field(object, "disable_web_page_preview"));
-    TRY_RESULT(parse_mode, get_json_object_string_field(object, "parse_mode"));
-    auto entities = get_json_object_field_force(object, "entities");
+    TRY_RESULT(message_text, is_input_message_content_required ? object.get_required_string_field("message_text")
+                                                               : object.get_optional_string_field("message_text"));
+    TRY_RESULT(disable_web_page_preview, object.get_optional_bool_field("disable_web_page_preview"));
+    TRY_RESULT(parse_mode, object.get_optional_string_field("parse_mode"));
+    auto entities = object.extract_field("entities");
 
     if (is_input_message_content_required || !message_text.empty()) {
       TRY_RESULT(input_message_text, get_input_message_text(std::move(message_text), disable_web_page_preview,
@@ -6335,12 +6337,12 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
                get_input_message_content(input_message_content_obj, is_input_message_content_required));
     input_message_content = std::move(input_message_content_result);
   }
-  TRY_RESULT(input_caption, get_json_object_string_field(object, "caption"));
-  TRY_RESULT(parse_mode, get_json_object_string_field(object, "parse_mode"));
-  auto entities = get_json_object_field_force(object, "caption_entities");
+  TRY_RESULT(input_caption, object.get_optional_string_field("caption"));
+  TRY_RESULT(parse_mode, object.get_optional_string_field("parse_mode"));
+  auto entities = object.extract_field("caption_entities");
   TRY_RESULT(caption, get_formatted_text(std::move(input_caption), std::move(parse_mode), std::move(entities)));
 
-  TRY_RESULT(reply_markup_object, get_json_object_field(object, "reply_markup", td::JsonValue::Type::Object));
+  TRY_RESULT(reply_markup_object, object.extract_optional_field("reply_markup", td::JsonValue::Type::Object));
   object_ptr<td_api::ReplyMarkup> reply_markup;
   if (reply_markup_object.type() != td::JsonValue::Type::Null) {
     TRY_RESULT_ASSIGN(reply_markup, get_reply_markup(std::move(reply_markup_object), bot_user_ids));
@@ -6349,23 +6351,22 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
   auto thumbnail_url_field_name = td::Slice("thumbnail_url");
   auto thumbnail_width_field_name = td::Slice("thumbnail_width");
   auto thumbnail_height_field_name = td::Slice("thumbnail_height");
-  if (!has_json_object_field(object, thumbnail_url_field_name) &&
-      !has_json_object_field(object, thumbnail_width_field_name) &&
-      !has_json_object_field(object, thumbnail_height_field_name)) {
+  if (!object.has_field(thumbnail_url_field_name) && !object.has_field(thumbnail_width_field_name) &&
+      !object.has_field(thumbnail_height_field_name)) {
     thumbnail_url_field_name = td::Slice("thumb_url");
     thumbnail_width_field_name = td::Slice("thumb_width");
     thumbnail_height_field_name = td::Slice("thumb_height");
   }
-  TRY_RESULT(thumbnail_url, get_json_object_string_field(object, thumbnail_url_field_name));
-  TRY_RESULT(thumbnail_width, get_json_object_int_field(object, thumbnail_width_field_name));
-  TRY_RESULT(thumbnail_height, get_json_object_int_field(object, thumbnail_height_field_name));
+  TRY_RESULT(thumbnail_url, object.get_optional_string_field(thumbnail_url_field_name));
+  TRY_RESULT(thumbnail_width, object.get_optional_int_field(thumbnail_width_field_name));
+  TRY_RESULT(thumbnail_height, object.get_optional_int_field(thumbnail_height_field_name));
 
   object_ptr<td_api::InputInlineQueryResult> result;
   if (type == "article") {
-    TRY_RESULT(url, get_json_object_string_field(object, "url"));
-    TRY_RESULT(hide_url, get_json_object_bool_field(object, "hide_url"));
-    TRY_RESULT(title, get_json_object_string_field(object, "title", false));
-    TRY_RESULT(description, get_json_object_string_field(object, "description"));
+    TRY_RESULT(url, object.get_optional_string_field("url"));
+    TRY_RESULT(hide_url, object.get_optional_bool_field("hide_url"));
+    TRY_RESULT(title, object.get_required_string_field("title"));
+    TRY_RESULT(description, object.get_optional_string_field("description"));
 
     CHECK(input_message_content != nullptr);
     return make_object<td_api::inputInlineQueryResultArticle>(
@@ -6373,12 +6374,13 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
         std::move(reply_markup), std::move(input_message_content));
   }
   if (type == "audio") {
-    TRY_RESULT(audio_url, get_json_object_string_field(object, "audio_url"));
-    TRY_RESULT(audio_duration, get_json_object_int_field(object, "audio_duration"));
-    TRY_RESULT(title, get_json_object_string_field(object, "title", audio_url.empty()));
-    TRY_RESULT(performer, get_json_object_string_field(object, "performer"));
+    TRY_RESULT(audio_url, object.get_optional_string_field("audio_url"));
+    TRY_RESULT(audio_duration, object.get_optional_int_field("audio_duration"));
+    TRY_RESULT(title, audio_url.empty() ? object.get_optional_string_field("title")
+                                        : object.get_required_string_field("title"));
+    TRY_RESULT(performer, object.get_optional_string_field("performer"));
     if (audio_url.empty()) {
-      TRY_RESULT_ASSIGN(audio_url, get_json_object_string_field(object, "audio_file_id", false));
+      TRY_RESULT_ASSIGN(audio_url, object.get_required_string_field("audio_file_id"));
     }
 
     if (input_message_content == nullptr) {
@@ -6389,10 +6391,10 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
                                                             std::move(reply_markup), std::move(input_message_content));
   }
   if (type == "contact") {
-    TRY_RESULT(phone_number, get_json_object_string_field(object, "phone_number", false));
-    TRY_RESULT(first_name, get_json_object_string_field(object, "first_name", false));
-    TRY_RESULT(last_name, get_json_object_string_field(object, "last_name"));
-    TRY_RESULT(vcard, get_json_object_string_field(object, "vcard"));
+    TRY_RESULT(phone_number, object.get_required_string_field("phone_number"));
+    TRY_RESULT(first_name, object.get_required_string_field("first_name"));
+    TRY_RESULT(last_name, object.get_optional_string_field("last_name"));
+    TRY_RESULT(vcard, object.get_optional_string_field("vcard"));
 
     if (input_message_content == nullptr) {
       input_message_content = make_object<td_api::inputMessageContact>(
@@ -6403,12 +6405,13 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
         thumbnail_height, std::move(reply_markup), std::move(input_message_content));
   }
   if (type == "document") {
-    TRY_RESULT(title, get_json_object_string_field(object, "title", false));
-    TRY_RESULT(description, get_json_object_string_field(object, "description"));
-    TRY_RESULT(document_url, get_json_object_string_field(object, "document_url"));
-    TRY_RESULT(mime_type, get_json_object_string_field(object, "mime_type", document_url.empty()));
+    TRY_RESULT(title, object.get_required_string_field("title"));
+    TRY_RESULT(description, object.get_optional_string_field("description"));
+    TRY_RESULT(document_url, object.get_optional_string_field("document_url"));
+    TRY_RESULT(mime_type, document_url.empty() ? object.get_optional_string_field("mime_type")
+                                               : object.get_required_string_field("mime_type"));
     if (document_url.empty()) {
-      TRY_RESULT_ASSIGN(document_url, get_json_object_string_field(object, "document_file_id", false));
+      TRY_RESULT_ASSIGN(document_url, object.get_required_string_field("document_file_id"));
     }
 
     if (input_message_content == nullptr) {
@@ -6419,22 +6422,22 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
         std::move(reply_markup), std::move(input_message_content));
   }
   if (type == "game") {
-    TRY_RESULT(game_short_name, get_json_object_string_field(object, "game_short_name", false));
+    TRY_RESULT(game_short_name, object.get_required_string_field("game_short_name"));
     return make_object<td_api::inputInlineQueryResultGame>(id, game_short_name, std::move(reply_markup));
   }
   if (type == "gif") {
-    TRY_RESULT(title, get_json_object_string_field(object, "title"));
-    TRY_RESULT(gif_url, get_json_object_string_field(object, "gif_url"));
+    TRY_RESULT(title, object.get_optional_string_field("title"));
+    TRY_RESULT(gif_url, object.get_optional_string_field("gif_url"));
     auto thumbnail_mime_type_field_name = td::Slice("thumbnail_mime_type");
-    if (!has_json_object_field(object, thumbnail_mime_type_field_name)) {
+    if (!object.has_field(thumbnail_mime_type_field_name)) {
       thumbnail_mime_type_field_name = td::Slice("thumb_mime_type");
     }
-    TRY_RESULT(thumbnail_mime_type, get_json_object_string_field(object, thumbnail_mime_type_field_name));
-    TRY_RESULT(gif_duration, get_json_object_int_field(object, "gif_duration"));
-    TRY_RESULT(gif_width, get_json_object_int_field(object, "gif_width"));
-    TRY_RESULT(gif_height, get_json_object_int_field(object, "gif_height"));
+    TRY_RESULT(thumbnail_mime_type, object.get_optional_string_field(thumbnail_mime_type_field_name));
+    TRY_RESULT(gif_duration, object.get_optional_int_field("gif_duration"));
+    TRY_RESULT(gif_width, object.get_optional_int_field("gif_width"));
+    TRY_RESULT(gif_height, object.get_optional_int_field("gif_height"));
     if (gif_url.empty()) {
-      TRY_RESULT_ASSIGN(gif_url, get_json_object_string_field(object, "gif_file_id", false));
+      TRY_RESULT_ASSIGN(gif_url, object.get_required_string_field("gif_file_id"));
     }
 
     if (input_message_content == nullptr) {
@@ -6446,13 +6449,13 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
         std::move(reply_markup), std::move(input_message_content));
   }
   if (type == "location") {
-    TRY_RESULT(latitude, get_json_object_double_field(object, "latitude", false));
-    TRY_RESULT(longitude, get_json_object_double_field(object, "longitude", false));
-    TRY_RESULT(horizontal_accuracy, get_json_object_double_field(object, "horizontal_accuracy"));
-    TRY_RESULT(live_period, get_json_object_int_field(object, "live_period"));
-    TRY_RESULT(heading, get_json_object_int_field(object, "heading"));
-    TRY_RESULT(proximity_alert_radius, get_json_object_int_field(object, "proximity_alert_radius"));
-    TRY_RESULT(title, get_json_object_string_field(object, "title", false));
+    TRY_RESULT(latitude, object.get_required_double_field("latitude"));
+    TRY_RESULT(longitude, object.get_required_double_field("longitude"));
+    TRY_RESULT(horizontal_accuracy, object.get_optional_double_field("horizontal_accuracy"));
+    TRY_RESULT(live_period, object.get_optional_int_field("live_period"));
+    TRY_RESULT(heading, object.get_optional_int_field("heading"));
+    TRY_RESULT(proximity_alert_radius, object.get_optional_int_field("proximity_alert_radius"));
+    TRY_RESULT(title, object.get_required_string_field("title"));
 
     if (input_message_content == nullptr) {
       auto location = make_object<td_api::location>(latitude, longitude, horizontal_accuracy);
@@ -6464,18 +6467,18 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
         thumbnail_width, thumbnail_height, std::move(reply_markup), std::move(input_message_content));
   }
   if (type == "mpeg4_gif") {
-    TRY_RESULT(title, get_json_object_string_field(object, "title"));
-    TRY_RESULT(mpeg4_url, get_json_object_string_field(object, "mpeg4_url"));
+    TRY_RESULT(title, object.get_optional_string_field("title"));
+    TRY_RESULT(mpeg4_url, object.get_optional_string_field("mpeg4_url"));
     auto thumbnail_mime_type_field_name = td::Slice("thumbnail_mime_type");
-    if (!has_json_object_field(object, thumbnail_mime_type_field_name)) {
+    if (!object.has_field(thumbnail_mime_type_field_name)) {
       thumbnail_mime_type_field_name = td::Slice("thumb_mime_type");
     }
-    TRY_RESULT(thumbnail_mime_type, get_json_object_string_field(object, thumbnail_mime_type_field_name));
-    TRY_RESULT(mpeg4_duration, get_json_object_int_field(object, "mpeg4_duration"));
-    TRY_RESULT(mpeg4_width, get_json_object_int_field(object, "mpeg4_width"));
-    TRY_RESULT(mpeg4_height, get_json_object_int_field(object, "mpeg4_height"));
+    TRY_RESULT(thumbnail_mime_type, object.get_optional_string_field(thumbnail_mime_type_field_name));
+    TRY_RESULT(mpeg4_duration, object.get_optional_int_field("mpeg4_duration"));
+    TRY_RESULT(mpeg4_width, object.get_optional_int_field("mpeg4_width"));
+    TRY_RESULT(mpeg4_height, object.get_optional_int_field("mpeg4_height"));
     if (mpeg4_url.empty()) {
-      TRY_RESULT_ASSIGN(mpeg4_url, get_json_object_string_field(object, "mpeg4_file_id", false));
+      TRY_RESULT_ASSIGN(mpeg4_url, object.get_required_string_field("mpeg4_file_id"));
     }
 
     if (input_message_content == nullptr) {
@@ -6487,13 +6490,13 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
         mpeg4_height, std::move(reply_markup), std::move(input_message_content));
   }
   if (type == "photo") {
-    TRY_RESULT(title, get_json_object_string_field(object, "title"));
-    TRY_RESULT(description, get_json_object_string_field(object, "description"));
-    TRY_RESULT(photo_url, get_json_object_string_field(object, "photo_url"));
-    TRY_RESULT(photo_width, get_json_object_int_field(object, "photo_width"));
-    TRY_RESULT(photo_height, get_json_object_int_field(object, "photo_height"));
+    TRY_RESULT(title, object.get_optional_string_field("title"));
+    TRY_RESULT(description, object.get_optional_string_field("description"));
+    TRY_RESULT(photo_url, object.get_optional_string_field("photo_url"));
+    TRY_RESULT(photo_width, object.get_optional_int_field("photo_width"));
+    TRY_RESULT(photo_height, object.get_optional_int_field("photo_height"));
     if (photo_url.empty()) {
-      TRY_RESULT_ASSIGN(photo_url, get_json_object_string_field(object, "photo_file_id", false));
+      TRY_RESULT_ASSIGN(photo_url, object.get_required_string_field("photo_file_id"));
     }
 
     if (input_message_content == nullptr) {
@@ -6505,7 +6508,7 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
                                                             std::move(input_message_content));
   }
   if (type == "sticker") {
-    TRY_RESULT(sticker_file_id, get_json_object_string_field(object, "sticker_file_id", false));
+    TRY_RESULT(sticker_file_id, object.get_required_string_field("sticker_file_id"));
 
     if (input_message_content == nullptr) {
       input_message_content = make_object<td_api::inputMessageSticker>(nullptr, nullptr, 0, 0, td::string());
@@ -6514,15 +6517,15 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
                                                               std::move(input_message_content));
   }
   if (type == "venue") {
-    TRY_RESULT(latitude, get_json_object_double_field(object, "latitude", false));
-    TRY_RESULT(longitude, get_json_object_double_field(object, "longitude", false));
-    TRY_RESULT(horizontal_accuracy, get_json_object_double_field(object, "horizontal_accuracy"));
-    TRY_RESULT(title, get_json_object_string_field(object, "title", false));
-    TRY_RESULT(address, get_json_object_string_field(object, "address", false));
-    TRY_RESULT(foursquare_id, get_json_object_string_field(object, "foursquare_id"));
-    TRY_RESULT(foursquare_type, get_json_object_string_field(object, "foursquare_type"));
-    TRY_RESULT(google_place_id, get_json_object_string_field(object, "google_place_id"));
-    TRY_RESULT(google_place_type, get_json_object_string_field(object, "google_place_type"));
+    TRY_RESULT(latitude, object.get_required_double_field("latitude"));
+    TRY_RESULT(longitude, object.get_required_double_field("longitude"));
+    TRY_RESULT(horizontal_accuracy, object.get_optional_double_field("horizontal_accuracy"));
+    TRY_RESULT(title, object.get_required_string_field("title"));
+    TRY_RESULT(address, object.get_required_string_field("address"));
+    TRY_RESULT(foursquare_id, object.get_optional_string_field("foursquare_id"));
+    TRY_RESULT(foursquare_type, object.get_optional_string_field("foursquare_type"));
+    TRY_RESULT(google_place_id, object.get_optional_string_field("google_place_id"));
+    TRY_RESULT(google_place_type, object.get_optional_string_field("google_place_type"));
 
     td::string provider;
     td::string venue_id;
@@ -6550,15 +6553,16 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
         thumbnail_url, thumbnail_width, thumbnail_height, std::move(reply_markup), std::move(input_message_content));
   }
   if (type == "video") {
-    TRY_RESULT(title, get_json_object_string_field(object, "title", false));
-    TRY_RESULT(description, get_json_object_string_field(object, "description"));
-    TRY_RESULT(video_url, get_json_object_string_field(object, "video_url"));
-    TRY_RESULT(mime_type, get_json_object_string_field(object, "mime_type", video_url.empty()));
-    TRY_RESULT(video_width, get_json_object_int_field(object, "video_width"));
-    TRY_RESULT(video_height, get_json_object_int_field(object, "video_height"));
-    TRY_RESULT(video_duration, get_json_object_int_field(object, "video_duration"));
+    TRY_RESULT(title, object.get_required_string_field("title"));
+    TRY_RESULT(description, object.get_optional_string_field("description"));
+    TRY_RESULT(video_url, object.get_optional_string_field("video_url"));
+    TRY_RESULT(mime_type, video_url.empty() ? object.get_optional_string_field("mime_type")
+                                            : object.get_required_string_field("mime_type"));
+    TRY_RESULT(video_width, object.get_optional_int_field("video_width"));
+    TRY_RESULT(video_height, object.get_optional_int_field("video_height"));
+    TRY_RESULT(video_duration, object.get_optional_int_field("video_duration"));
     if (video_url.empty()) {
-      TRY_RESULT_ASSIGN(video_url, get_json_object_string_field(object, "video_file_id", false));
+      TRY_RESULT_ASSIGN(video_url, object.get_required_string_field("video_file_id"));
     }
 
     if (input_message_content == nullptr) {
@@ -6571,11 +6575,11 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
                                                             std::move(reply_markup), std::move(input_message_content));
   }
   if (type == "voice") {
-    TRY_RESULT(title, get_json_object_string_field(object, "title", false));
-    TRY_RESULT(voice_note_url, get_json_object_string_field(object, "voice_url"));
-    TRY_RESULT(voice_note_duration, get_json_object_int_field(object, "voice_duration"));
+    TRY_RESULT(title, object.get_required_string_field("title"));
+    TRY_RESULT(voice_note_url, object.get_optional_string_field("voice_url"));
+    TRY_RESULT(voice_note_duration, object.get_optional_int_field("voice_duration"));
     if (voice_note_url.empty()) {
-      TRY_RESULT_ASSIGN(voice_note_url, get_json_object_string_field(object, "voice_file_id", false));
+      TRY_RESULT_ASSIGN(voice_note_url, object.get_required_string_field("voice_file_id"));
     }
 
     if (input_message_content == nullptr) {
@@ -6596,7 +6600,7 @@ td::Result<Client::BotCommandScope> Client::get_bot_command_scope(td::JsonValue 
 
   auto &object = value.get_object();
 
-  TRY_RESULT(type, get_json_object_string_field(object, "type", false));
+  TRY_RESULT(type, object.get_required_string_field("type"));
   if (type == "default") {
     return BotCommandScope(make_object<td_api::botCommandScopeDefault>());
   }
@@ -6613,7 +6617,7 @@ td::Result<Client::BotCommandScope> Client::get_bot_command_scope(td::JsonValue 
     return td::Status::Error(400, "Unsupported type specified");
   }
 
-  TRY_RESULT(chat_id, get_json_object_string_field(object, "chat_id", false));
+  TRY_RESULT(chat_id, object.get_required_string_field("chat_id"));
   if (chat_id.empty()) {
     return td::Status::Error(400, "Empty chat_id specified");
   }
@@ -6624,7 +6628,7 @@ td::Result<Client::BotCommandScope> Client::get_bot_command_scope(td::JsonValue 
     return BotCommandScope(make_object<td_api::botCommandScopeChatAdministrators>(0), std::move(chat_id));
   }
 
-  TRY_RESULT(user_id, get_json_object_long_field(object, "user_id", false));
+  TRY_RESULT(user_id, object.get_required_long_field("user_id"));
   if (user_id <= 0) {
     return td::Status::Error(400, "Invalid user_id specified");
   }
@@ -6659,8 +6663,8 @@ td::Result<td_api::object_ptr<td_api::botCommand>> Client::get_bot_command(td::J
 
   auto &object = value.get_object();
 
-  TRY_RESULT(command, get_json_object_string_field(object, "command", false));
-  TRY_RESULT(description, get_json_object_string_field(object, "description", false));
+  TRY_RESULT(command, object.get_required_string_field("command"));
+  TRY_RESULT(description, object.get_required_string_field("description"));
 
   return make_object<td_api::botCommand>(command, description);
 }
@@ -6700,7 +6704,7 @@ td::Result<td_api::object_ptr<td_api::botMenuButton>> Client::get_bot_menu_butto
 
   auto &object = value.get_object();
 
-  TRY_RESULT(type, get_json_object_string_field(object, "type", false));
+  TRY_RESULT(type, object.get_required_string_field("type"));
   if (type == "default") {
     return make_object<td_api::botMenuButton>("", "default");
   }
@@ -6708,10 +6712,10 @@ td::Result<td_api::object_ptr<td_api::botMenuButton>> Client::get_bot_menu_butto
     return nullptr;
   }
   if (type == "web_app") {
-    TRY_RESULT(text, get_json_object_string_field(object, "text", false));
-    TRY_RESULT(web_app, get_json_object_field(object, "web_app", td::JsonValue::Type::Object, false));
+    TRY_RESULT(text, object.get_required_string_field("text"));
+    TRY_RESULT(web_app, object.extract_required_field("web_app", td::JsonValue::Type::Object));
     auto &web_app_object = web_app.get_object();
-    TRY_RESULT(url, get_json_object_string_field(web_app_object, "url", false));
+    TRY_RESULT(url, web_app_object.get_required_string_field("url"));
     return make_object<td_api::botMenuButton>(text, url);
   }
 
@@ -6745,18 +6749,18 @@ td::Result<td_api::object_ptr<td_api::chatAdministratorRights>> Client::get_chat
   }
 
   auto &object = value.get_object();
-  TRY_RESULT(can_manage_chat, get_json_object_bool_field(object, "can_manage_chat"));
-  TRY_RESULT(can_change_info, get_json_object_bool_field(object, "can_change_info"));
-  TRY_RESULT(can_post_messages, get_json_object_bool_field(object, "can_post_messages"));
-  TRY_RESULT(can_edit_messages, get_json_object_bool_field(object, "can_edit_messages"));
-  TRY_RESULT(can_delete_messages, get_json_object_bool_field(object, "can_delete_messages"));
-  TRY_RESULT(can_invite_users, get_json_object_bool_field(object, "can_invite_users"));
-  TRY_RESULT(can_restrict_members, get_json_object_bool_field(object, "can_restrict_members"));
-  TRY_RESULT(can_pin_messages, get_json_object_bool_field(object, "can_pin_messages"));
-  TRY_RESULT(can_manage_topics, get_json_object_bool_field(object, "can_manage_topics"));
-  TRY_RESULT(can_promote_members, get_json_object_bool_field(object, "can_promote_members"));
-  TRY_RESULT(can_manage_video_chats, get_json_object_bool_field(object, "can_manage_video_chats"));
-  TRY_RESULT(is_anonymous, get_json_object_bool_field(object, "is_anonymous"));
+  TRY_RESULT(can_manage_chat, object.get_optional_bool_field("can_manage_chat"));
+  TRY_RESULT(can_change_info, object.get_optional_bool_field("can_change_info"));
+  TRY_RESULT(can_post_messages, object.get_optional_bool_field("can_post_messages"));
+  TRY_RESULT(can_edit_messages, object.get_optional_bool_field("can_edit_messages"));
+  TRY_RESULT(can_delete_messages, object.get_optional_bool_field("can_delete_messages"));
+  TRY_RESULT(can_invite_users, object.get_optional_bool_field("can_invite_users"));
+  TRY_RESULT(can_restrict_members, object.get_optional_bool_field("can_restrict_members"));
+  TRY_RESULT(can_pin_messages, object.get_optional_bool_field("can_pin_messages"));
+  TRY_RESULT(can_manage_topics, object.get_optional_bool_field("can_manage_topics"));
+  TRY_RESULT(can_promote_members, object.get_optional_bool_field("can_promote_members"));
+  TRY_RESULT(can_manage_video_chats, object.get_optional_bool_field("can_manage_video_chats"));
+  TRY_RESULT(is_anonymous, object.get_optional_bool_field("is_anonymous"));
   return make_object<td_api::chatAdministratorRights>(can_manage_chat, can_change_info, can_post_messages,
                                                       can_edit_messages, can_delete_messages, can_invite_users,
                                                       can_restrict_members, can_pin_messages, can_manage_topics,
@@ -6794,7 +6798,7 @@ td::Result<td_api::object_ptr<td_api::maskPosition>> Client::get_mask_position(t
 
   auto &object = value.get_object();
 
-  TRY_RESULT(point_str, get_json_object_string_field(object, "point", false));
+  TRY_RESULT(point_str, object.get_required_string_field("point"));
   point_str = td::trim(td::to_lower(point_str));
   int32 point;
   for (point = 0; point < MASK_POINTS_SIZE; point++) {
@@ -6806,9 +6810,9 @@ td::Result<td_api::object_ptr<td_api::maskPosition>> Client::get_mask_position(t
     return td::Status::Error(400, "Wrong point specified in MaskPosition");
   }
 
-  TRY_RESULT(x_shift, get_json_object_double_field(object, "x_shift", false));
-  TRY_RESULT(y_shift, get_json_object_double_field(object, "y_shift", false));
-  TRY_RESULT(scale, get_json_object_double_field(object, "scale", false));
+  TRY_RESULT(x_shift, object.get_required_double_field("x_shift"));
+  TRY_RESULT(y_shift, object.get_required_double_field("y_shift"));
+  TRY_RESULT(scale, object.get_required_double_field("scale"));
 
   return make_object<td_api::maskPosition>(mask_index_to_point(point), x_shift, y_shift, scale);
 }
@@ -6928,17 +6932,17 @@ td::Result<td_api::object_ptr<td_api::inputSticker>> Client::get_input_sticker(c
 
   auto &object = value.get_object();
 
-  TRY_RESULT(sticker, get_json_object_string_field(object, "sticker"));
+  TRY_RESULT(sticker, object.get_optional_string_field("sticker"));
   auto input_file = get_input_file(query, td::Slice(), sticker, false);
   if (input_file == nullptr) {
     return td::Status::Error(400, "sticker not found");
   }
-  TRY_RESULT(emoji_list, get_json_object_field(object, "emoji_list", td::JsonValue::Type::Array, false));
+  TRY_RESULT(emoji_list, object.extract_required_field("emoji_list", td::JsonValue::Type::Array));
   TRY_RESULT(emojis, get_sticker_emojis(std::move(emoji_list)));
-  TRY_RESULT(mask_position, get_mask_position(get_json_object_field_force(object, "mask_position")));
+  TRY_RESULT(mask_position, get_mask_position(object.extract_field("mask_position")));
   td::vector<td::string> input_keywords;
-  if (has_json_object_field(object, "keywords")) {
-    TRY_RESULT(keywords, get_json_object_field(object, "keywords", td::JsonValue::Type::Array, false));
+  if (object.has_field("keywords")) {
+    TRY_RESULT(keywords, object.extract_required_field("keywords", td::JsonValue::Type::Array));
     for (auto &keyword : keywords.get_array()) {
       if (keyword.type() != td::JsonValue::Type::String) {
         return td::Status::Error(400, "keyword must be a string");
@@ -7076,24 +7080,24 @@ td::Result<td::string> Client::get_passport_element_hash(td::Slice encoded_hash)
 
 td::Result<td_api::object_ptr<td_api::InputPassportElementErrorSource>> Client::get_passport_element_error_source(
     td::JsonObject &object) {
-  TRY_RESULT(source, get_json_object_string_field(object, "source"));
+  TRY_RESULT(source, object.get_optional_string_field("source"));
 
   if (source.empty() || source == "unspecified") {
-    TRY_RESULT(element_hash, get_json_object_string_field(object, "element_hash", false));
+    TRY_RESULT(element_hash, object.get_required_string_field("element_hash"));
     TRY_RESULT(hash, get_passport_element_hash(element_hash));
 
     return make_object<td_api::inputPassportElementErrorSourceUnspecified>(hash);
   }
   if (source == "data") {
-    TRY_RESULT(data_hash, get_json_object_string_field(object, "data_hash", false));
+    TRY_RESULT(data_hash, object.get_required_string_field("data_hash"));
     TRY_RESULT(hash, get_passport_element_hash(data_hash));
 
-    TRY_RESULT(field_name, get_json_object_string_field(object, "field_name", false));
+    TRY_RESULT(field_name, object.get_required_string_field("field_name"));
     return make_object<td_api::inputPassportElementErrorSourceDataField>(field_name, hash);
   }
   if (source == "file" || source == "selfie" || source == "translation_file" || source == "front_side" ||
       source == "reverse_side") {
-    TRY_RESULT(file_hash, get_json_object_string_field(object, "file_hash", false));
+    TRY_RESULT(file_hash, object.get_required_string_field("file_hash"));
     TRY_RESULT(hash, get_passport_element_hash(file_hash));
 
     if (source == "front_side") {
@@ -7115,7 +7119,7 @@ td::Result<td_api::object_ptr<td_api::InputPassportElementErrorSource>> Client::
   }
   if (source == "files" || source == "translation_files") {
     td::vector<td::string> input_hashes;
-    TRY_RESULT(file_hashes, get_json_object_field(object, "file_hashes", td::JsonValue::Type::Array, false));
+    TRY_RESULT(file_hashes, object.extract_required_field("file_hashes", td::JsonValue::Type::Array));
     for (auto &input_hash : file_hashes.get_array()) {
       if (input_hash.type() != td::JsonValue::Type::String) {
         return td::Status::Error(400, "hash must be a string");
@@ -7142,12 +7146,12 @@ td::Result<td_api::object_ptr<td_api::inputPassportElementError>> Client::get_pa
 
   auto &object = value.get_object();
 
-  TRY_RESULT(input_type, get_json_object_string_field(object, "type", false));
+  TRY_RESULT(input_type, object.get_required_string_field("type"));
   auto type = get_passport_element_type(input_type);
   if (type == nullptr) {
     return td::Status::Error(400, "wrong Telegram Passport element type specified");
   }
-  TRY_RESULT(message, get_json_object_string_field(object, "message", false));
+  TRY_RESULT(message, object.get_required_string_field("message"));
   TRY_RESULT(source, get_passport_element_error_source(object));
 
   return make_object<td_api::inputPassportElementError>(std::move(type), message, std::move(source));
@@ -7199,7 +7203,7 @@ td::Result<td_api::object_ptr<td_api::formattedText>> Client::get_caption(const 
 }
 
 td::Result<td_api::object_ptr<td_api::TextEntityType>> Client::get_text_entity_type(td::JsonObject &object) {
-  TRY_RESULT(type, get_json_object_string_field(object, "type", false));
+  TRY_RESULT(type, object.get_required_string_field("type"));
   if (type.empty()) {
     return td::Status::Error("Type is not specified");
   }
@@ -7223,24 +7227,25 @@ td::Result<td_api::object_ptr<td_api::TextEntityType>> Client::get_text_entity_t
     return make_object<td_api::textEntityTypeCode>();
   }
   if (type == "pre") {
-    TRY_RESULT(language, get_json_object_string_field(object, "language"));
+    TRY_RESULT(language, object.get_optional_string_field("language"));
     if (language.empty()) {
       return make_object<td_api::textEntityTypePre>();
     }
     return make_object<td_api::textEntityTypePreCode>(language);
   }
   if (type == "text_link") {
-    TRY_RESULT(url, get_json_object_string_field(object, "url", false));
+    TRY_RESULT(url, object.get_required_string_field("url"));
     return make_object<td_api::textEntityTypeTextUrl>(url);
   }
   if (type == "text_mention") {
-    TRY_RESULT(user, get_json_object_field(object, "user", td::JsonValue::Type::Object, false));
+    TRY_RESULT(user, object.extract_required_field("user", td::JsonValue::Type::Object));
     CHECK(user.type() == td::JsonValue::Type::Object);
-    TRY_RESULT(user_id, get_json_object_long_field(user.get_object(), "id", false));
+    const auto &user_object = user.get_object();
+    TRY_RESULT(user_id, user_object.get_required_long_field("id"));
     return make_object<td_api::textEntityTypeMentionName>(user_id);
   }
   if (type == "custom_emoji") {
-    TRY_RESULT(custom_emoji_id, get_json_object_long_field(object, "custom_emoji_id", false));
+    TRY_RESULT(custom_emoji_id, object.get_required_long_field("custom_emoji_id"));
     return make_object<td_api::textEntityTypeCustomEmoji>(custom_emoji_id);
   }
   if (type == "mention" || type == "hashtag" || type == "cashtag" || type == "bot_command" || type == "url" ||
@@ -7257,8 +7262,8 @@ td::Result<td_api::object_ptr<td_api::textEntity>> Client::get_text_entity(td::J
   }
 
   auto &object = value.get_object();
-  TRY_RESULT(offset, get_json_object_int_field(object, "offset", false));
-  TRY_RESULT(length, get_json_object_int_field(object, "length", false));
+  TRY_RESULT(offset, object.get_required_int_field("offset"));
+  TRY_RESULT(length, object.get_required_int_field("length"));
   TRY_RESULT(type, get_text_entity_type(object));
 
   if (type == nullptr) {
@@ -7374,30 +7379,29 @@ td::Result<td_api::object_ptr<td_api::chatPermissions>> Client::get_chat_permiss
     auto &object = value.get_object();
 
     auto status = [&] {
-      TRY_RESULT_ASSIGN(can_send_messages, get_json_object_bool_field(object, "can_send_messages"));
-      TRY_RESULT_ASSIGN(can_send_polls, get_json_object_bool_field(object, "can_send_polls"));
-      TRY_RESULT_ASSIGN(can_send_other_messages, get_json_object_bool_field(object, "can_send_other_messages"));
-      TRY_RESULT_ASSIGN(can_add_web_page_previews, get_json_object_bool_field(object, "can_add_web_page_previews"));
-      TRY_RESULT_ASSIGN(can_change_info, get_json_object_bool_field(object, "can_change_info"));
-      TRY_RESULT_ASSIGN(can_invite_users, get_json_object_bool_field(object, "can_invite_users"));
-      TRY_RESULT_ASSIGN(can_pin_messages, get_json_object_bool_field(object, "can_pin_messages"));
-      if (has_json_object_field(object, "can_manage_topics")) {
-        TRY_RESULT_ASSIGN(can_manage_topics, get_json_object_bool_field(object, "can_manage_topics"));
+      TRY_RESULT_ASSIGN(can_send_messages, object.get_optional_bool_field("can_send_messages"));
+      TRY_RESULT_ASSIGN(can_send_polls, object.get_optional_bool_field("can_send_polls"));
+      TRY_RESULT_ASSIGN(can_send_other_messages, object.get_optional_bool_field("can_send_other_messages"));
+      TRY_RESULT_ASSIGN(can_add_web_page_previews, object.get_optional_bool_field("can_add_web_page_previews"));
+      TRY_RESULT_ASSIGN(can_change_info, object.get_optional_bool_field("can_change_info"));
+      TRY_RESULT_ASSIGN(can_invite_users, object.get_optional_bool_field("can_invite_users"));
+      TRY_RESULT_ASSIGN(can_pin_messages, object.get_optional_bool_field("can_pin_messages"));
+      if (object.has_field("can_manage_topics")) {
+        TRY_RESULT_ASSIGN(can_manage_topics, object.get_optional_bool_field("can_manage_topics"));
       } else {
         can_manage_topics = can_pin_messages;
       }
-      if (has_json_object_field(object, "can_send_audios") || has_json_object_field(object, "can_send_documents") ||
-          has_json_object_field(object, "can_send_photos") || has_json_object_field(object, "can_send_videos") ||
-          has_json_object_field(object, "can_send_video_notes") ||
-          has_json_object_field(object, "can_send_voice_notes")) {
-        TRY_RESULT_ASSIGN(can_send_audios, get_json_object_bool_field(object, "can_send_audios"));
-        TRY_RESULT_ASSIGN(can_send_documents, get_json_object_bool_field(object, "can_send_documents"));
-        TRY_RESULT_ASSIGN(can_send_photos, get_json_object_bool_field(object, "can_send_photos"));
-        TRY_RESULT_ASSIGN(can_send_videos, get_json_object_bool_field(object, "can_send_videos"));
-        TRY_RESULT_ASSIGN(can_send_video_notes, get_json_object_bool_field(object, "can_send_video_notes"));
-        TRY_RESULT_ASSIGN(can_send_voice_notes, get_json_object_bool_field(object, "can_send_voice_notes"));
+      if (object.has_field("can_send_audios") || object.has_field("can_send_documents") ||
+          object.has_field("can_send_photos") || object.has_field("can_send_videos") ||
+          object.has_field("can_send_video_notes") || object.has_field("can_send_voice_notes")) {
+        TRY_RESULT_ASSIGN(can_send_audios, object.get_optional_bool_field("can_send_audios"));
+        TRY_RESULT_ASSIGN(can_send_documents, object.get_optional_bool_field("can_send_documents"));
+        TRY_RESULT_ASSIGN(can_send_photos, object.get_optional_bool_field("can_send_photos"));
+        TRY_RESULT_ASSIGN(can_send_videos, object.get_optional_bool_field("can_send_videos"));
+        TRY_RESULT_ASSIGN(can_send_video_notes, object.get_optional_bool_field("can_send_video_notes"));
+        TRY_RESULT_ASSIGN(can_send_voice_notes, object.get_optional_bool_field("can_send_voice_notes"));
       } else {
-        TRY_RESULT(can_send_media_messages, get_json_object_bool_field(object, "can_send_media_messages"));
+        TRY_RESULT(can_send_media_messages, object.get_optional_bool_field("can_send_media_messages"));
         can_send_audios = can_send_media_messages;
         can_send_documents = can_send_media_messages;
         can_send_photos = can_send_media_messages;
@@ -7476,23 +7480,23 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
 
   auto &object = input_media.get_object();
 
-  TRY_RESULT(input_caption, get_json_object_string_field(object, "caption"));
-  TRY_RESULT(parse_mode, get_json_object_string_field(object, "parse_mode"));
-  auto entities = get_json_object_field_force(object, "caption_entities");
+  TRY_RESULT(input_caption, object.get_optional_string_field("caption"));
+  TRY_RESULT(parse_mode, object.get_optional_string_field("parse_mode"));
+  auto entities = object.extract_field("caption_entities");
   TRY_RESULT(caption, get_formatted_text(std::move(input_caption), std::move(parse_mode), std::move(entities)));
-  // TRY_RESULT(self_destruct_time, get_json_object_int_field(object, "self_destruct_time"));
+  // TRY_RESULT(self_destruct_time, object.get_optional_int_field("self_destruct_time"));
   int32 self_destruct_time = 0;
-  TRY_RESULT(has_spoiler, get_json_object_bool_field(object, "has_spoiler"));
-  TRY_RESULT(media, get_json_object_string_field(object, "media"));
+  TRY_RESULT(has_spoiler, object.get_optional_bool_field("has_spoiler"));
+  TRY_RESULT(media, object.get_optional_string_field("media"));
 
   auto input_file = get_input_file(query, td::Slice(), media, false);
   if (input_file == nullptr) {
     return td::Status::Error("media not found");
   }
 
-  TRY_RESULT(thumbnail, get_json_object_string_field(object, "thumbnail"));
+  TRY_RESULT(thumbnail, object.get_optional_string_field("thumbnail"));
   if (thumbnail.empty()) {
-    TRY_RESULT_ASSIGN(thumbnail, get_json_object_string_field(object, "thumb"));
+    TRY_RESULT_ASSIGN(thumbnail, object.get_optional_string_field("thumb"));
   }
   auto thumbnail_input_file = get_input_file(query, td::Slice(), thumbnail, true);
   if (thumbnail_input_file == nullptr) {
@@ -7506,16 +7510,16 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
     input_thumbnail = make_object<td_api::inputThumbnail>(std::move(thumbnail_input_file), 0, 0);
   }
 
-  TRY_RESULT(type, get_json_object_string_field(object, "type", false));
+  TRY_RESULT(type, object.get_required_string_field("type"));
   if (type == "photo") {
     return make_object<td_api::inputMessagePhoto>(std::move(input_file), nullptr, td::vector<int32>(), 0, 0,
                                                   std::move(caption), self_destruct_time, has_spoiler);
   }
   if (type == "video") {
-    TRY_RESULT(width, get_json_object_int_field(object, "width"));
-    TRY_RESULT(height, get_json_object_int_field(object, "height"));
-    TRY_RESULT(duration, get_json_object_int_field(object, "duration"));
-    TRY_RESULT(supports_streaming, get_json_object_bool_field(object, "supports_streaming"));
+    TRY_RESULT(width, object.get_optional_int_field("width"));
+    TRY_RESULT(height, object.get_optional_int_field("height"));
+    TRY_RESULT(duration, object.get_optional_int_field("duration"));
+    TRY_RESULT(supports_streaming, object.get_optional_bool_field("supports_streaming"));
     width = td::clamp(width, 0, MAX_LENGTH);
     height = td::clamp(height, 0, MAX_LENGTH);
     duration = td::clamp(duration, 0, MAX_DURATION);
@@ -7528,9 +7532,9 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
     return td::Status::Error(PSLICE() << "type \"" << type << "\" can't be used in sendMediaGroup");
   }
   if (type == "animation") {
-    TRY_RESULT(width, get_json_object_int_field(object, "width"));
-    TRY_RESULT(height, get_json_object_int_field(object, "height"));
-    TRY_RESULT(duration, get_json_object_int_field(object, "duration"));
+    TRY_RESULT(width, object.get_optional_int_field("width"));
+    TRY_RESULT(height, object.get_optional_int_field("height"));
+    TRY_RESULT(duration, object.get_optional_int_field("duration"));
     width = td::clamp(width, 0, MAX_LENGTH);
     height = td::clamp(height, 0, MAX_LENGTH);
     duration = td::clamp(duration, 0, MAX_DURATION);
@@ -7539,15 +7543,15 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
                                                       has_spoiler);
   }
   if (type == "audio") {
-    TRY_RESULT(duration, get_json_object_int_field(object, "duration"));
-    TRY_RESULT(title, get_json_object_string_field(object, "title"));
-    TRY_RESULT(performer, get_json_object_string_field(object, "performer"));
+    TRY_RESULT(duration, object.get_optional_int_field("duration"));
+    TRY_RESULT(title, object.get_optional_string_field("title"));
+    TRY_RESULT(performer, object.get_optional_string_field("performer"));
     duration = td::clamp(duration, 0, MAX_DURATION);
     return make_object<td_api::inputMessageAudio>(std::move(input_file), std::move(input_thumbnail), duration, title,
                                                   performer, std::move(caption));
   }
   if (type == "document") {
-    TRY_RESULT(disable_content_type_detection, get_json_object_bool_field(object, "disable_content_type_detection"));
+    TRY_RESULT(disable_content_type_detection, object.get_optional_bool_field("disable_content_type_detection"));
     return make_object<td_api::inputMessageDocument>(std::move(input_file), std::move(input_thumbnail),
                                                      disable_content_type_detection || for_album, std::move(caption));
   }
