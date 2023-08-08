@@ -117,7 +117,23 @@ td::StringBuilder &operator<<(td::StringBuilder &sb, const Query &query) {
   sb << "[bot" << td::rpad(query.token().str(), 46, ' ') << "][time:" << padded_time << ']'
      << td::tag("method", td::lpad(query.method().str(), 20, ' '));
   if (!query.args().empty()) {
-    sb << td::oneline(PSLICE() << query.args());
+    sb << '{';
+    for (const auto &arg : query.args()) {
+      sb << '[';
+      if (arg.first.size() > 128) {
+        sb << '<' << arg.first.size() << '>' << td::oneline(arg.first.substr(0, 128)) << "...";
+      } else {
+        sb << td::oneline(arg.first);
+      }
+      sb << ':';
+      if (arg.second.size() > 4096) {
+        sb << '<' << arg.second.size() << '>' << td::oneline(arg.second.substr(0, 4096)) << "...";
+      } else {
+        sb << td::oneline(arg.second);
+      }
+      sb << ']';
+    }
+    sb << '}';
   }
   if (!query.files().empty()) {
     sb << query.files();
