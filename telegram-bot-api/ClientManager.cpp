@@ -531,7 +531,7 @@ void ClientManager::raw_event(const td::Event::Raw &event) {
 
 void ClientManager::timeout_expired() {
   send_closure(watchdog_id_, &Watchdog::kick);
-  set_timeout_in(WATCHDOG_TIMEOUT / 2);
+  set_timeout_in(WATCHDOG_TIMEOUT / 10);
 
   double now = td::Time::now();
   if (now > next_tqueue_gc_time_) {

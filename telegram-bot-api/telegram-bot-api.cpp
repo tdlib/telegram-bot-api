@@ -562,7 +562,7 @@ int main(int argc, char *argv[]) {
     if (now >= start_time + 600) {
       auto guard = sched.get_main_guard();
       send_closure(watchdog_id, &Watchdog::kick);
-      next_watchdog_kick_time = now + WATCHDOG_TIMEOUT / 2;
+      next_watchdog_kick_time = now + WATCHDOG_TIMEOUT / 10;
     }
 
     if (!need_dump_statistics.test_and_set() || now > last_dump_time + 300.0) {
