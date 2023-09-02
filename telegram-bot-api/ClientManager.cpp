@@ -214,7 +214,7 @@ void ClientManager::get_stats(td::Promise<td::BufferSlice> promise,
 
   auto now = td::Time::now();
   auto top_clients = get_top_clients(50, id_filter);
-  sb << stat_.get_description() << '\n';
+  sb << BotStatActor::get_description() << '\n';
   if (id_filter.empty()) {
     sb << "uptime\t" << now - parameters_->start_time_ << '\n';
     sb << "bot_count\t" << clients_.size() << '\n';
