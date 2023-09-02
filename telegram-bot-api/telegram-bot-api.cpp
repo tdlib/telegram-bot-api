@@ -556,7 +556,9 @@ int main(int argc, char *argv[]) {
         next_cron_time = now;
       }
       next_cron_time += 1.0;
-      ServerCpuStat::update(now);
+      auto guard = sched.get_main_guard();
+      td::Scheduler::instance()->run_on_scheduler(SharedData::get_statistics_thread_id(),
+                                                  [](td::Unit) { ServerCpuStat::update(td::Time::now()); });
     }
 
     if (now >= start_time + 600) {

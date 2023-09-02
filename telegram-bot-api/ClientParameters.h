@@ -93,8 +93,13 @@ struct SharedData {
     return 10;
   }
 
-  static td::int32 get_thread_count() {
+  static td::int32 get_statistics_thread_id() {
+    // the thread for CPU usage updating
     return 11;
+  }
+
+  static td::int32 get_thread_count() {
+    return 12;
   }
 };
 
