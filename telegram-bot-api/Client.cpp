@@ -6232,6 +6232,10 @@ td::Result<td::vector<td_api::object_ptr<td_api::InputInlineQueryResult>>> Clien
   if (values.type() != td::JsonValue::Type::Array) {
     return td::Status::Error(400, "Expected an Array of inline query results");
   }
+  constexpr std::size_t MAX_INLINE_QUERY_RESULT_COUNT = 50;
+  if (values.get_array().size() > MAX_INLINE_QUERY_RESULT_COUNT) {
+    return td::Status::Error(400, "Too many inline query results specified");
+  }
 
   td::vector<object_ptr<td_api::InputInlineQueryResult>> inline_query_results;
   for (auto &value : values.get_array()) {
