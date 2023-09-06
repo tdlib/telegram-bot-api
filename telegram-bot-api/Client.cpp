@@ -11092,6 +11092,11 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       // don't send messages received before join or getting authorization
       return true;
     }
+
+    if (!supergroup_info->is_supergroup && message->content_->get_id() == td_api::messageSupergroupChatCreate::ID) {
+      // don't send message about channel creation, even the bot was added at exactly the same time
+      return true;
+    }
   }
 
   if (message->self_destruct_time_ > 0) {
