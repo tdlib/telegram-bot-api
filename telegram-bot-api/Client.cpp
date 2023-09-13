@@ -6466,7 +6466,7 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
 
     if (input_message_content == nullptr) {
       input_message_content = make_object<td_api::inputMessagePhoto>(nullptr, nullptr, td::vector<int32>(), 0, 0,
-                                                                     std::move(caption), 0, false);
+                                                                     std::move(caption), nullptr, false);
     }
     return make_object<td_api::inputInlineQueryResultPhoto>(id, title, description, thumbnail_url, photo_url,
                                                             photo_width, photo_height, std::move(reply_markup),
@@ -6533,7 +6533,7 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
     if (input_message_content == nullptr) {
       input_message_content =
           make_object<td_api::inputMessageVideo>(nullptr, nullptr, td::vector<int32>(), video_duration, video_width,
-                                                 video_height, false, std::move(caption), 0, false);
+                                                 video_height, false, std::move(caption), nullptr, false);
     }
     return make_object<td_api::inputInlineQueryResultVideo>(id, title, description, thumbnail_url, video_url, mime_type,
                                                             video_width, video_height, video_duration,
@@ -7449,8 +7449,6 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
   TRY_RESULT(parse_mode, object.get_optional_string_field("parse_mode"));
   auto entities = object.extract_field("caption_entities");
   TRY_RESULT(caption, get_formatted_text(std::move(input_caption), std::move(parse_mode), std::move(entities)));
-  // TRY_RESULT(self_destruct_time, object.get_optional_int_field("self_destruct_time"));
-  int32 self_destruct_time = 0;
   TRY_RESULT(has_spoiler, object.get_optional_bool_field("has_spoiler"));
   TRY_RESULT(media, object.get_optional_string_field("media"));
 
@@ -7478,7 +7476,7 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
   TRY_RESULT(type, object.get_required_string_field("type"));
   if (type == "photo") {
     return make_object<td_api::inputMessagePhoto>(std::move(input_file), nullptr, td::vector<int32>(), 0, 0,
-                                                  std::move(caption), self_destruct_time, has_spoiler);
+                                                  std::move(caption), nullptr, has_spoiler);
   }
   if (type == "video") {
     TRY_RESULT(width, object.get_optional_int_field("width"));
@@ -7491,7 +7489,7 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
 
     return make_object<td_api::inputMessageVideo>(std::move(input_file), std::move(input_thumbnail),
                                                   td::vector<int32>(), duration, width, height, supports_streaming,
-                                                  std::move(caption), self_destruct_time, has_spoiler);
+                                                  std::move(caption), nullptr, has_spoiler);
   }
   if (for_album && type == "animation") {
     return td::Status::Error(PSLICE() << "type \"" << type << "\" can't be used in sendMediaGroup");
@@ -8069,10 +8067,9 @@ td::Status Client::process_send_photo_query(PromisedQueryPtr &query) {
     return td::Status::Error(400, "There is no photo in the request");
   }
   TRY_RESULT(caption, get_caption(query.get()));
-  auto self_destruct_time = 0;
   auto has_spoiler = to_bool(query->arg("has_spoiler"));
   do_send_message(make_object<td_api::inputMessagePhoto>(std::move(photo), nullptr, td::vector<int32>(), 0, 0,
-                                                         std::move(caption), self_destruct_time, has_spoiler),
+                                                         std::move(caption), nullptr, has_spoiler),
                   std::move(query));
   return td::Status::OK();
 }
@@ -8099,11 +8096,10 @@ td::Status Client::process_send_video_query(PromisedQueryPtr &query) {
   int32 height = get_integer_arg(query.get(), "height", 0, 0, MAX_LENGTH);
   bool supports_streaming = to_bool(query->arg("supports_streaming"));
   TRY_RESULT(caption, get_caption(query.get()));
-  auto self_destruct_time = 0;
   auto has_spoiler = to_bool(query->arg("has_spoiler"));
   do_send_message(make_object<td_api::inputMessageVideo>(std::move(video), std::move(thumbnail), td::vector<int32>(),
                                                          duration, width, height, supports_streaming,
-                                                         std::move(caption), self_destruct_time, has_spoiler),
+                                                         std::move(caption), nullptr, has_spoiler),
                   std::move(query));
   return td::Status::OK();
 }
@@ -10024,7 +10020,7 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
       if (file_size > 100000) {
         auto &last_send_message_time = last_send_message_time_[file_size];
         auto now = td::Time::now();
-        auto min_delay = td::clamp(static_cast<double>(file_size) * 1e-7, 0.1, 0.5);
+        auto min_delay = td::clamp(static_cast<double>(file_size) * 1e-7, 0.2, 0.9);
         auto max_bucket_volume = 1.0;
         if (last_send_message_time > now + 5.0) {
           return fail_query_flood_limit_exceeded(std::move(query));
@@ -11103,7 +11099,7 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     }
   }
 
-  if (message->self_destruct_time_ > 0) {
+  if (message->self_destruct_type_ != nullptr) {
     return true;
   }
 
