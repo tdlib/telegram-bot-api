@@ -7240,6 +7240,10 @@ td::Result<td_api::object_ptr<td_api::textEntity>> Client::get_text_entity(td::J
 
 td::Result<td_api::object_ptr<td_api::formattedText>> Client::get_formatted_text(td::string text, td::string parse_mode,
                                                                                  td::JsonValue &&input_entities) {
+  if (text.size() > (1 << 15)) {
+    return td::Status::Error(400, "Text is too long");
+  }
+
   td::to_lower_inplace(parse_mode);
   if (!text.empty() && !parse_mode.empty() && parse_mode != "none") {
     object_ptr<td_api::TextParseMode> text_parse_mode;
