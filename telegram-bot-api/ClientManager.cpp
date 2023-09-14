@@ -230,7 +230,6 @@ void ClientManager::get_stats(td::Promise<td::BufferSlice> promise,
       LOG(INFO) << "Failed to get memory statistics: " << r_mem_stat.error();
     }
 
-    ServerCpuStat::update(td::Time::now());
     auto cpu_stats = ServerCpuStat::instance().as_vector(td::Time::now());
     for (auto &stat : cpu_stats) {
       sb << stat.key_ << "\t" << stat.value_ << '\n';
