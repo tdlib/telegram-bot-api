@@ -1764,6 +1764,10 @@ class Client::JsonWriteAccessAllowed final : public td::Jsonable {
     auto object = scope->enter_object();
     if (write_access_allowed_->web_app_ != nullptr) {
       object("web_app_name", write_access_allowed_->web_app_->short_name_);
+    } else if (write_access_allowed_->by_request_) {
+      object("from_request", td::JsonTrue());
+    } else {
+      object("from_attachment_menu", td::JsonTrue());
     }
   }
 
