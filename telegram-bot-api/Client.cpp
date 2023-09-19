@@ -5095,7 +5095,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
     case td_api::updateMessageSendFailed::ID: {
       auto update = move_object_as<td_api::updateMessageSendFailed>(result);
       on_message_send_failed(update->message_->chat_id_, update->old_message_id_, update->message_->id_,
-                             td::Status::Error(update->error_code_, update->error_message_));
+                             std::move(update->error_));
       break;
     }
     case td_api::updateMessageContent::ID: {
@@ -6141,8 +6141,8 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
 
     return make_object<td_api::inputMessageInvoice>(
         make_object<td_api::invoice>(currency, std::move(prices), max_tip_amount, std::move(suggested_tip_amounts),
-                                     td::string(), false, need_name, need_phone_number, need_email_address,
-                                     need_shipping_address, send_phone_number_to_provider,
+                                     td::string(), td::string(), false, need_name, need_phone_number,
+                                     need_email_address, need_shipping_address, send_phone_number_to_provider,
                                      send_email_address_to_provider, is_flexible),
         title, description, photo_url, photo_size, photo_width, photo_height, payload, provider_token, provider_data,
         td::string(), nullptr);
@@ -6726,10 +6726,10 @@ td::Result<td_api::object_ptr<td_api::chatAdministratorRights>> Client::get_chat
   TRY_RESULT(can_promote_members, object.get_optional_bool_field("can_promote_members"));
   TRY_RESULT(can_manage_video_chats, object.get_optional_bool_field("can_manage_video_chats"));
   TRY_RESULT(is_anonymous, object.get_optional_bool_field("is_anonymous"));
-  return make_object<td_api::chatAdministratorRights>(can_manage_chat, can_change_info, can_post_messages,
-                                                      can_edit_messages, can_delete_messages, can_invite_users,
-                                                      can_restrict_members, can_pin_messages, can_manage_topics,
-                                                      can_promote_members, can_manage_video_chats, is_anonymous);
+  return make_object<td_api::chatAdministratorRights>(
+      can_manage_chat, can_change_info, can_post_messages, can_edit_messages, can_delete_messages, can_invite_users,
+      can_restrict_members, can_pin_messages, can_manage_topics, can_promote_members, can_manage_video_chats, false,
+      false, false, is_anonymous);
 }
 
 td::Result<td_api::object_ptr<td_api::chatAdministratorRights>> Client::get_chat_administrator_rights(
@@ -7640,7 +7640,7 @@ td::Result<td_api::object_ptr<td_api::inputMessageInvoice>> Client::get_input_me
 
   return make_object<td_api::inputMessageInvoice>(
       make_object<td_api::invoice>(currency.str(), std::move(prices), max_tip_amount, std::move(suggested_tip_amounts),
-                                   td::string(), false, need_name, need_phone_number, need_email_address,
+                                   td::string(), td::string(), false, need_name, need_phone_number, need_email_address,
                                    need_shipping_address, send_phone_number_to_provider, send_email_address_to_provider,
                                    is_flexible),
       title.str(), description.str(), photo_url.str(), photo_size, photo_width, photo_height, payload.str(),
@@ -7775,9 +7775,8 @@ void Client::on_message_send_succeeded(object_ptr<td_api::message> &&message, in
   }
 }
 
-void Client::on_message_send_failed(int64 chat_id, int64 old_message_id, int64 new_message_id, td::Status result) {
-  auto error = make_object<td_api::error>(result.code(), result.message().str());
-
+void Client::on_message_send_failed(int64 chat_id, int64 old_message_id, int64 new_message_id,
+                                    object_ptr<td_api::error> &&error) {
   auto query_id = extract_yet_unsent_message_query_id(chat_id, old_message_id);
   auto &query = *pending_send_message_queries_[query_id];
   if (query.is_multisend) {
@@ -9163,10 +9162,10 @@ td::Status Client::process_promote_chat_member_query(PromisedQueryPtr &query) {
   auto is_anonymous = to_bool(query->arg("is_anonymous"));
   auto status = make_object<td_api::chatMemberStatusAdministrator>(
       td::string(), true,
-      make_object<td_api::chatAdministratorRights>(can_manage_chat, can_change_info, can_post_messages,
-                                                   can_edit_messages, can_delete_messages, can_invite_users,
-                                                   can_restrict_members, can_pin_messages, can_manage_topics,
-                                                   can_promote_members, can_manage_video_chats, is_anonymous));
+      make_object<td_api::chatAdministratorRights>(
+          can_manage_chat, can_change_info, can_post_messages, can_edit_messages, can_delete_messages, can_invite_users,
+          can_restrict_members, can_pin_messages, can_manage_topics, can_promote_members, can_manage_video_chats, false,
+          false, false, is_anonymous));
   check_chat(chat_id, AccessRights::Write, std::move(query),
              [this, user_id, status = std::move(status)](int64 chat_id, PromisedQueryPtr query) mutable {
                auto chat_info = get_chat(chat_id);
@@ -11488,17 +11487,17 @@ td::unique_ptr<Client::MessageInfo> Client::delete_message(int64 chat_id, int64 
       auto chat_info = get_chat(chat_id);
       CHECK(chat_info != nullptr);
 
-      td::Status error =
-          td::Status::Error(500, "Internal Server Error: sent message was immediately deleted and can't be returned");
+      auto error = make_object<td_api::error>(
+          500, "Internal Server Error: sent message was immediately deleted and can't be returned");
       if (chat_info->type == ChatInfo::Type::Supergroup) {
         auto supergroup_info = get_supergroup_info(chat_info->supergroup_id);
         CHECK(supergroup_info != nullptr);
         if (supergroup_info->status->get_id() == td_api::chatMemberStatusBanned::ID ||
             supergroup_info->status->get_id() == td_api::chatMemberStatusLeft::ID) {
           if (supergroup_info->is_supergroup) {
-            error = td::Status::Error(403, "Forbidden: bot is not a member of the supergroup chat");
+            error = make_object<td_api::error>(403, "Forbidden: bot is not a member of the supergroup chat");
           } else {
-            error = td::Status::Error(403, "Forbidden: bot is not a member of the channel chat");
+            error = make_object<td_api::error>(403, "Forbidden: bot is not a member of the channel chat");
           }
         }
       }

@@ -505,7 +505,9 @@ class Client final : public WebhookActor::Callback {
   int64 extract_yet_unsent_message_query_id(int64 chat_id, int64 message_id);
 
   void on_message_send_succeeded(object_ptr<td_api::message> &&message, int64 old_message_id);
-  void on_message_send_failed(int64 chat_id, int64 old_message_id, int64 new_message_id, td::Status result);
+
+  void on_message_send_failed(int64 chat_id, int64 old_message_id, int64 new_message_id,
+                              object_ptr<td_api::error> &&error);
 
   static bool init_methods();
 
