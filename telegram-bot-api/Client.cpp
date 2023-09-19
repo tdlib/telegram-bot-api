@@ -6725,11 +6725,14 @@ td::Result<td_api::object_ptr<td_api::chatAdministratorRights>> Client::get_chat
   TRY_RESULT(can_manage_topics, object.get_optional_bool_field("can_manage_topics"));
   TRY_RESULT(can_promote_members, object.get_optional_bool_field("can_promote_members"));
   TRY_RESULT(can_manage_video_chats, object.get_optional_bool_field("can_manage_video_chats"));
+  TRY_RESULT(can_post_stories, object.get_optional_bool_field("can_post_stories"));
+  TRY_RESULT(can_edit_stories, object.get_optional_bool_field("can_edit_stories"));
+  TRY_RESULT(can_delete_stories, object.get_optional_bool_field("can_delete_stories"));
   TRY_RESULT(is_anonymous, object.get_optional_bool_field("is_anonymous"));
   return make_object<td_api::chatAdministratorRights>(
       can_manage_chat, can_change_info, can_post_messages, can_edit_messages, can_delete_messages, can_invite_users,
-      can_restrict_members, can_pin_messages, can_manage_topics, can_promote_members, can_manage_video_chats, false,
-      false, false, is_anonymous);
+      can_restrict_members, can_pin_messages, can_manage_topics, can_promote_members, can_manage_video_chats,
+      can_post_stories, can_edit_stories, can_delete_stories, is_anonymous);
 }
 
 td::Result<td_api::object_ptr<td_api::chatAdministratorRights>> Client::get_chat_administrator_rights(
@@ -9159,13 +9162,16 @@ td::Status Client::process_promote_chat_member_query(PromisedQueryPtr &query) {
   auto can_promote_members = to_bool(query->arg("can_promote_members"));
   auto can_manage_video_chats =
       to_bool(query->arg("can_manage_voice_chats")) || to_bool(query->arg("can_manage_video_chats"));
+  auto can_post_stories = to_bool(query->arg("can_post_stories"));
+  auto can_edit_stories = to_bool(query->arg("can_edit_stories"));
+  auto can_delete_stories = to_bool(query->arg("can_delete_stories"));
   auto is_anonymous = to_bool(query->arg("is_anonymous"));
   auto status = make_object<td_api::chatMemberStatusAdministrator>(
       td::string(), true,
       make_object<td_api::chatAdministratorRights>(
           can_manage_chat, can_change_info, can_post_messages, can_edit_messages, can_delete_messages, can_invite_users,
-          can_restrict_members, can_pin_messages, can_manage_topics, can_promote_members, can_manage_video_chats, false,
-          false, false, is_anonymous));
+          can_restrict_members, can_pin_messages, can_manage_topics, can_promote_members, can_manage_video_chats,
+          can_post_stories, can_edit_stories, can_delete_stories, is_anonymous));
   check_chat(chat_id, AccessRights::Write, std::move(query),
              [this, user_id, status = std::move(status)](int64 chat_id, PromisedQueryPtr query) mutable {
                auto chat_info = get_chat(chat_id);
@@ -10675,6 +10681,11 @@ void Client::json_store_administrator_rights(td::JsonObjectScope &object, const 
   }
   object("can_promote_members", td::JsonBool(rights->can_promote_members_));
   object("can_manage_video_chats", td::JsonBool(rights->can_manage_video_chats_));
+  if (chat_type == ChatType::Channel) {
+    object("can_post_stories", td::JsonBool(rights->can_post_stories_));
+    object("can_edit_stories", td::JsonBool(rights->can_edit_stories_));
+    object("can_delete_stories", td::JsonBool(rights->can_delete_stories_));
+  }
   object("is_anonymous", td::JsonBool(rights->is_anonymous_));
 }
 
