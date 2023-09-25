@@ -7815,7 +7815,7 @@ void Client::on_message_send_failed(int64 chat_id, int64 old_message_id, int64 n
   }
 }
 
-void Client::on_cmd(PromisedQueryPtr query) {
+void Client::on_cmd(PromisedQueryPtr query, bool force) {
   LOG(DEBUG) << "Process query " << *query;
   if (!td_client_.empty() && was_authorized_) {
     if (query->method() == "close") {
@@ -7842,6 +7842,42 @@ void Client::on_cmd(PromisedQueryPtr query) {
   auto method_it = methods_.find(query->method().str());
   if (method_it == methods_.end()) {
     return fail_query(404, "Not Found: method not found", std::move(query));
+  }
+
+  if (!query->files().empty() && !parameters_->local_mode_ && !force) {
+    auto file_size = query->files_size();
+    if (file_size > 100000) {
+      auto &last_send_message_time = last_send_message_time_[file_size];
+      auto now = td::Time::now();
+      auto min_delay = td::clamp(static_cast<double>(file_size) * 1e-7, 0.2, 0.9);
+      auto max_bucket_volume = 1.0;
+      if (last_send_message_time > now + 5.0) {
+        return fail_query_flood_limit_exceeded(std::move(query));
+      }
+
+      last_send_message_time = td::max(last_send_message_time + min_delay, now - max_bucket_volume);
+      LOG(DEBUG) << "Query with files of size " << file_size << " can be processed in " << last_send_message_time - now
+                 << " seconds";
+
+      td::create_actor<td::SleepActor>(
+          "DeleteLastSendMessageTimeSleepActor", last_send_message_time + min_delay - (now - max_bucket_volume),
+          td::PromiseCreator::lambda([actor_id = actor_id(this), file_size,
+                                      max_delay = max_bucket_volume + min_delay](td::Result<td::Unit>) mutable {
+            send_closure(actor_id, &Client::delete_last_send_message_time, file_size, max_delay);
+          }))
+          .release();
+
+      if (last_send_message_time > now) {
+        td::create_actor<td::SleepActor>(
+            "DoSendMessageSleepActor", last_send_message_time - now,
+            td::PromiseCreator::lambda(
+                [actor_id = actor_id(this), query = std::move(query)](td::Result<td::Unit>) mutable {
+                  send_closure(actor_id, &Client::on_cmd, std::move(query), true);
+                }))
+            .release();
+        return;
+      }
+    }
   }
 
   auto result = (this->*(method_it->second))(query);
@@ -10027,51 +10063,6 @@ void Client::delete_last_send_message_time(td::int64 file_size, double max_delay
 
 void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_message_content, PromisedQueryPtr query,
                              bool force) {
-  if (!parameters_->local_mode_) {
-    if (!force) {
-      auto file_size = query->files_size();
-      if (file_size > 100000) {
-        auto &last_send_message_time = last_send_message_time_[file_size];
-        auto now = td::Time::now();
-        auto min_delay = td::clamp(static_cast<double>(file_size) * 1e-7, 0.2, 0.9);
-        auto max_bucket_volume = 1.0;
-        if (last_send_message_time > now + 5.0) {
-          return fail_query_flood_limit_exceeded(std::move(query));
-        }
-
-        last_send_message_time = td::max(last_send_message_time + min_delay, now - max_bucket_volume);
-        LOG(DEBUG) << "Query with files of size " << file_size << " can be processed in "
-                   << last_send_message_time - now << " seconds";
-
-        td::create_actor<td::SleepActor>(
-            "DeleteLastSendMessageTimeSleepActor", last_send_message_time + min_delay - (now - max_bucket_volume),
-            td::PromiseCreator::lambda([actor_id = actor_id(this), file_size,
-                                        max_delay = max_bucket_volume + min_delay](td::Result<td::Unit>) mutable {
-              send_closure(actor_id, &Client::delete_last_send_message_time, file_size, max_delay);
-            }))
-            .release();
-
-        if (last_send_message_time > now) {
-          td::create_actor<td::SleepActor>(
-              "DoSendMessageSleepActor", last_send_message_time - now,
-              td::PromiseCreator::lambda([actor_id = actor_id(this),
-                                          input_message_content = std::move(input_message_content),
-                                          query = std::move(query)](td::Result<td::Unit>) mutable {
-                send_closure(actor_id, &Client::do_send_message, std::move(input_message_content), std::move(query),
-                             true);
-              }))
-              .release();
-          return;
-        }
-      }
-    } else {
-      if (logging_out_ || closing_) {
-        return fail_query_closing(std::move(query));
-      }
-      CHECK(was_authorized_);
-    }
-  }
-
   auto chat_id = query->arg("chat_id");
   auto message_thread_id = get_message_id(query.get(), "message_thread_id");
   auto reply_to_message_id = get_message_id(query.get(), "reply_to_message_id");

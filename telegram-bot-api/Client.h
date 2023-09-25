@@ -513,7 +513,7 @@ class Client final : public WebhookActor::Callback {
 
   static bool is_local_method(td::Slice method);
 
-  void on_cmd(PromisedQueryPtr query);
+  void on_cmd(PromisedQueryPtr query, bool force = false);
 
   td::Status process_get_me_query(PromisedQueryPtr &query);
   td::Status process_get_my_commands_query(PromisedQueryPtr &query);
