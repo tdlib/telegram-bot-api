@@ -350,7 +350,7 @@ void ClientManager::start_up() {
   parameters_->shared_data_->webhook_db_ = std::move(concurrent_webhook_db);
 
   auto &webhook_db = *parameters_->shared_data_->webhook_db_;
-  for (auto key_value : webhook_db.get_all()) {
+  for (const auto &key_value : webhook_db.get_all()) {
     if (!token_range_(td::to_integer<td::uint64>(key_value.first))) {
       LOG(WARNING) << "DROP WEBHOOK: " << key_value.first << " ---> " << key_value.second;
       webhook_db.erase(key_value.first);

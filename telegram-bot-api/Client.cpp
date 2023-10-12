@@ -1762,12 +1762,20 @@ class Client::JsonWriteAccessAllowed final : public td::Jsonable {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
-    if (write_access_allowed_->web_app_ != nullptr) {
-      object("web_app_name", write_access_allowed_->web_app_->short_name_);
-    } else if (write_access_allowed_->by_request_) {
-      object("from_request", td::JsonTrue());
-    } else {
-      object("from_attachment_menu", td::JsonTrue());
+    switch (write_access_allowed_->reason_->get_id()) {
+      case td_api::botWriteAccessAllowReasonLaunchedWebApp::ID:
+        object("web_app_name", static_cast<const td_api::botWriteAccessAllowReasonLaunchedWebApp *>(
+                                   write_access_allowed_->reason_.get())
+                                   ->web_app_->short_name_);
+        break;
+      case td_api::botWriteAccessAllowReasonAcceptedRequest::ID:
+        object("from_request", td::JsonTrue());
+        break;
+      case td_api::botWriteAccessAllowReasonAddedToAttachmentMenu::ID:
+        object("from_attachment_menu", td::JsonTrue());
+        break;
+      default:
+        UNREACHABLE();
     }
   }
 
@@ -2235,18 +2243,6 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     case td_api::messageAnimatedEmoji::ID:
       UNREACHABLE();
       break;
-    case td_api::messageWebsiteConnected::ID: {
-      auto chat = client_->get_chat(message_->chat_id);
-      if (chat->type != ChatInfo::Type::Private) {
-        break;
-      }
-
-      auto content = static_cast<const td_api::messageWebsiteConnected *>(message_->content.get());
-      if (!content->domain_name_.empty()) {
-        object("connected_website", content->domain_name_);
-      }
-      break;
-    }
     case td_api::messagePassportDataSent::ID:
       break;
     case td_api::messagePassportDataReceived::ID: {
@@ -2293,8 +2289,20 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     case td_api::messageSuggestProfilePhoto::ID:
       break;
     case td_api::messageBotWriteAccessAllowed::ID: {
+      auto chat = client_->get_chat(message_->chat_id);
+      if (chat->type != ChatInfo::Type::Private) {
+        break;
+      }
+
       auto content = static_cast<const td_api::messageBotWriteAccessAllowed *>(message_->content.get());
-      object("write_access_allowed", JsonWriteAccessAllowed(content));
+      if (content->reason_->get_id() == td_api::botWriteAccessAllowReasonConnectedWebsite::ID) {
+        auto reason = static_cast<const td_api::botWriteAccessAllowReasonConnectedWebsite *>(content->reason_.get());
+        if (!reason->domain_name_.empty()) {
+          object("connected_website", reason->domain_name_);
+        }
+      } else {
+        object("write_access_allowed", JsonWriteAccessAllowed(content));
+      }
       break;
     }
     case td_api::messageUserShared::ID: {
@@ -11112,8 +11120,7 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     return true;
   }
 
-  if (message->forward_info_ != nullptr &&
-      message->forward_info_->origin_->get_id() == td_api::messageForwardOriginMessageImport::ID) {
+  if (message->import_info_ != nullptr) {
     return true;
   }
 
@@ -11544,6 +11551,7 @@ Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message,
   message_info->initial_message_id = 0;
   message_info->initial_author_signature = td::string();
   message_info->initial_sender_name = td::string();
+  message_info->is_automatic_forward = false;
   if (message->forward_info_ != nullptr) {
     message_info->initial_send_date = message->forward_info_->date_;
     auto origin = std::move(message->forward_info_->origin_);
@@ -11571,11 +11579,6 @@ Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message,
         message_info->initial_author_signature = std::move(forward_info->author_signature_);
         break;
       }
-      case td_api::messageForwardOriginMessageImport::ID: {
-        auto forward_info = move_object_as<td_api::messageForwardOriginMessageImport>(origin);
-        message_info->initial_sender_name = std::move(forward_info->sender_name_);
-        break;
-      }
       default:
         UNREACHABLE();
     }
@@ -11583,6 +11586,9 @@ Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message,
     message_info->is_automatic_forward =
         from_chat_id != 0 && from_chat_id != chat_id && message->forward_info_->from_message_id_ != 0 &&
         get_chat_type(chat_id) == ChatType::Supergroup && get_chat_type(from_chat_id) == ChatType::Channel;
+  } else if (message->import_info_ != nullptr) {
+    message_info->initial_send_date = message->import_info_->date_;
+    message_info->initial_sender_name = std::move(message->import_info_->sender_name_);
   }
 
   CHECK(message->sender_id_ != nullptr);
