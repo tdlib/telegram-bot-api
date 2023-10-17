@@ -10448,8 +10448,8 @@ void Client::set_group_photo(int64 group_id, object_ptr<td_api::chatPhoto> &&pho
   add_group_info(group_id)->photo = std::move(photo);
 }
 
-void Client::set_group_description(int64 group_id, td::string &&descripton) {
-  add_group_info(group_id)->description = std::move(descripton);
+void Client::set_group_description(int64 group_id, td::string &&description) {
+  add_group_info(group_id)->description = std::move(description);
 }
 
 void Client::set_group_invite_link(int64 group_id, td::string &&invite_link) {
@@ -10477,8 +10477,8 @@ void Client::set_supergroup_photo(int64 supergroup_id, object_ptr<td_api::chatPh
   add_supergroup_info(supergroup_id)->photo = std::move(photo);
 }
 
-void Client::set_supergroup_description(int64 supergroup_id, td::string &&descripton) {
-  add_supergroup_info(supergroup_id)->description = std::move(descripton);
+void Client::set_supergroup_description(int64 supergroup_id, td::string &&description) {
+  add_supergroup_info(supergroup_id)->description = std::move(description);
 }
 
 void Client::set_supergroup_invite_link(int64 supergroup_id, td::string &&invite_link) {
