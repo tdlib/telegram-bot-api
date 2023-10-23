@@ -10836,6 +10836,8 @@ void Client::add_update_impl(UpdateType update_type, const td::VirtuallyJsonable
   last_update_creation_time_ = td::Time::now();
 
   if (((allowed_update_types_ >> static_cast<int32>(update_type)) & 1) == 0) {
+    LOG(DEBUG) << "Skip unallowed update of the type " << static_cast<int32>(update_type) << ", allowed update mask is "
+               << allowed_update_types_;
     return;
   }
 
@@ -11034,6 +11036,9 @@ void Client::add_update_chat_member(object_ptr<td_api::updateChatMember> &&updat
     auto webhook_queue_id = update->chat_id_ + (static_cast<int64>(is_my ? 5 : 6) << 33);
     auto update_type = is_my ? UpdateType::MyChatMember : UpdateType::ChatMember;
     add_update(update_type, JsonChatMemberUpdated(update.get(), this), left_time, webhook_queue_id);
+  } else {
+    LOG(DEBUG) << "Skip updateChatMember with date " << update->date_ << ", because current date is "
+               << get_unix_time();
   }
 }
 
@@ -11044,6 +11049,9 @@ void Client::add_update_chat_join_request(object_ptr<td_api::updateNewChatJoinRe
   if (left_time > 0) {
     auto webhook_queue_id = update->chat_id_ + (static_cast<int64>(6) << 33);
     add_update(UpdateType::ChatJoinRequest, JsonChatJoinRequest(update.get(), this), left_time, webhook_queue_id);
+  } else {
+    LOG(DEBUG) << "Skip updateNewChatJoinRequest with date " << update->request_->date_ << ", because current date is "
+               << get_unix_time();
   }
 }
 
@@ -11090,6 +11098,8 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
   int32 message_date = message->edit_date_ == 0 ? message->date_ : message->edit_date_;
   if (message_date <= get_unix_time() - 86400) {
     // don't send messages received/edited more than 1 day ago
+    LOG(DEBUG) << "Skip update about message with date " << message_date << ", because current date is "
+               << get_unix_time();
     return true;
   }
 
