@@ -331,7 +331,7 @@ class Client final : public WebhookActor::Callback {
 
   static bool to_bool(td::MutableSlice value);
 
-  static object_ptr<td_api::MessageReplyTo> get_message_reply_to(int64 reply_to_message_id);
+  static object_ptr<td_api::InputMessageReplyTo> get_input_message_reply_to(int64 reply_to_message_id);
 
   static td::Result<object_ptr<td_api::keyboardButton>> get_keyboard_button(td::JsonValue &button);
 

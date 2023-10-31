@@ -532,7 +532,8 @@ class Client::JsonVectorEntities final : public td::Jsonable {
     for (auto &entity : entities_) {
       auto entity_type = entity->type_->get_id();
       if (entity_type != td_api::textEntityTypeBankCardNumber::ID &&
-          entity_type != td_api::textEntityTypeMediaTimestamp::ID) {
+          entity_type != td_api::textEntityTypeMediaTimestamp::ID &&
+          entity_type != td_api::textEntityTypeBlockQuote::ID) {
         array << JsonEntity(entity.get(), client_);
       }
     }
@@ -2316,6 +2317,12 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       break;
     }
     case td_api::messageChatSetBackground::ID:
+      break;
+    case td_api::messagePremiumGiftCode::ID:
+      break;
+    case td_api::messagePremiumGiveawayCreated::ID:
+      break;
+    case td_api::messagePremiumGiveaway::ID:
       break;
     case td_api::messageStory::ID:
       object("story", JsonEmptyObject());
@@ -5528,9 +5535,9 @@ bool Client::to_bool(td::MutableSlice value) {
   return value == "true" || value == "yes" || value == "1";
 }
 
-td_api::object_ptr<td_api::MessageReplyTo> Client::get_message_reply_to(int64 reply_to_message_id) {
+td_api::object_ptr<td_api::InputMessageReplyTo> Client::get_input_message_reply_to(int64 reply_to_message_id) {
   if (reply_to_message_id > 0) {
-    return make_object<td_api::messageReplyToMessage>(0, reply_to_message_id);
+    return make_object<td_api::inputMessageReplyToMessage>(0, reply_to_message_id, nullptr);
   }
   return nullptr;
 }
@@ -6168,7 +6175,8 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
 
 td_api::object_ptr<td_api::messageSendOptions> Client::get_message_send_options(bool disable_notification,
                                                                                 bool protect_content) {
-  return make_object<td_api::messageSendOptions>(disable_notification, false, protect_content, false, nullptr, 0);
+  return make_object<td_api::messageSendOptions>(disable_notification, false, protect_content, false, nullptr, 0,
+                                                 false);
 }
 
 td::Result<td_api::object_ptr<td_api::inlineQueryResultsButton>> Client::get_inline_query_results_button(
@@ -7312,7 +7320,9 @@ td::Result<td_api::object_ptr<td_api::inputMessageText>> Client::get_input_messa
 
   TRY_RESULT(formatted_text, get_formatted_text(std::move(text), std::move(parse_mode), std::move(input_entities)));
 
-  return make_object<td_api::inputMessageText>(std::move(formatted_text), disable_web_page_preview, false);
+  return make_object<td_api::inputMessageText>(
+      std::move(formatted_text),
+      make_object<td_api::linkPreviewOptions>(disable_web_page_preview, td::string(), false, false, false), false);
 }
 
 td::Result<td_api::object_ptr<td_api::location>> Client::get_location(const Query *query) {
@@ -8363,17 +8373,17 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
             auto message_count = input_message_contents.size();
             count += static_cast<int32>(message_count);
 
-            send_request(make_object<td_api::sendMessageAlbum>(
-                             chat_id, message_thread_id, get_message_reply_to(reply_to_message_id),
-                             get_message_send_options(disable_notification, protect_content),
-                             std::move(input_message_contents), false),
-                         td::make_unique<TdOnSendMessageAlbumCallback>(this, chat_id, message_count, std::move(query)));
+            send_request(
+                make_object<td_api::sendMessageAlbum>(
+                    chat_id, message_thread_id, get_input_message_reply_to(reply_to_message_id),
+                    get_message_send_options(disable_notification, protect_content), std::move(input_message_contents)),
+                td::make_unique<TdOnSendMessageAlbumCallback>(this, chat_id, message_count, std::move(query)));
           };
           check_message_thread(chat_id, message_thread_id, reply_to_message_id, std::move(query),
                                std::move(on_message_thread_checked));
         };
         check_message(chat_id, reply_to_message_id, reply_to_message_id <= 0 || allow_sending_without_reply,
-                      AccessRights::Write, "replied message", std::move(query), std::move(on_success));
+                      AccessRights::Write, "message to reply", std::move(query), std::move(on_success));
       });
   return td::Status::OK();
 }
@@ -10103,7 +10113,7 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
                 count++;
 
                 send_request(make_object<td_api::sendMessage>(
-                                 chat_id, message_thread_id, get_message_reply_to(reply_to_message_id),
+                                 chat_id, message_thread_id, get_input_message_reply_to(reply_to_message_id),
                                  get_message_send_options(disable_notification, protect_content),
                                  std::move(reply_markup), std::move(input_message_content)),
                              td::make_unique<TdOnSendMessageCallback>(this, chat_id, std::move(query)));
@@ -10112,7 +10122,7 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
                                std::move(on_message_thread_checked));
         };
         check_message(chat_id, reply_to_message_id, reply_to_message_id <= 0 || allow_sending_without_reply,
-                      AccessRights::Write, "replied message", std::move(query), std::move(on_success));
+                      AccessRights::Write, "message to reply", std::move(query), std::move(on_success));
       });
 }
 
@@ -11196,6 +11206,12 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       return true;
     case td_api::messageChatSetBackground::ID:
       return true;
+    case td_api::messagePremiumGiftCode::ID:
+      return true;
+    case td_api::messagePremiumGiveawayCreated::ID:
+      return true;
+    case td_api::messagePremiumGiveaway::ID:
+      return true;
     default:
       break;
   }
@@ -11211,17 +11227,35 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
 }
 
 td::int64 Client::get_reply_to_message_id(const object_ptr<td_api::message> &message) {
-  if (message->content_->get_id() == td_api::messagePinMessage::ID) {
+  auto content_message_id = [&] {
+    switch (message->content_->get_id()) {
+      case td_api::messagePinMessage::ID:
+        return static_cast<const td_api::messagePinMessage *>(message->content_.get())->message_id_;
+      case td_api::messageGameScore::ID:
+        return static_cast<const td_api::messageGameScore *>(message->content_.get())->game_message_id_;
+      case td_api::messageChatSetBackground::ID:
+        return static_cast<const td_api::messageChatSetBackground *>(message->content_.get())
+            ->old_background_message_id_;
+      case td_api::messagePaymentSuccessful::ID:
+        UNREACHABLE();
+        return static_cast<int64>(0);
+      default:
+        return static_cast<int64>(0);
+    }
+  }();
+  if (content_message_id != 0) {
     CHECK(message->reply_to_ == nullptr);
-    return static_cast<const td_api::messagePinMessage *>(message->content_.get())->message_id_;
+    return content_message_id;
   }
   if (message->reply_to_ != nullptr) {
     switch (message->reply_to_->get_id()) {
       case td_api::messageReplyToMessage::ID: {
         auto reply_to = static_cast<const td_api::messageReplyToMessage *>(message->reply_to_.get());
         CHECK(reply_to->message_id_ > 0);
-        CHECK(reply_to->chat_id_ == message->chat_id_);
-        return reply_to->message_id_;
+        if (reply_to->chat_id_ == message->chat_id_ && reply_to->origin_ == nullptr) {
+          return reply_to->message_id_;
+        }
+        break;
       }
       case td_api::messageReplyToStory::ID:
         break;
@@ -11235,10 +11269,9 @@ td::int64 Client::get_reply_to_message_id(const object_ptr<td_api::message> &mes
 
 void Client::drop_reply_to_message_in_another_chat(object_ptr<td_api::message> &message) {
   if (message->reply_to_ != nullptr && message->reply_to_->get_id() == td_api::messageReplyToMessage::ID) {
-    auto reply_in_chat_id = static_cast<td_api::messageReplyToMessage *>(message->reply_to_.get())->chat_id_;
-    if (reply_in_chat_id != message->chat_id_) {
-      LOG(ERROR) << "Drop reply to message " << message->id_ << " in chat " << message->chat_id_
-                 << " from another chat " << reply_in_chat_id;
+    auto *reply_to = static_cast<td_api::messageReplyToMessage *>(message->reply_to_.get());
+    auto reply_in_chat_id = reply_to->chat_id_;
+    if (reply_in_chat_id != message->chat_id_ || reply_to->origin_ != nullptr) {
       message->reply_to_ = nullptr;
     }
   }
@@ -11566,24 +11599,24 @@ Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message,
     message_info->initial_send_date = message->forward_info_->date_;
     auto origin = std::move(message->forward_info_->origin_);
     switch (origin->get_id()) {
-      case td_api::messageForwardOriginUser::ID: {
-        auto forward_info = move_object_as<td_api::messageForwardOriginUser>(origin);
+      case td_api::messageOriginUser::ID: {
+        auto forward_info = move_object_as<td_api::messageOriginUser>(origin);
         message_info->initial_sender_user_id = forward_info->sender_user_id_;
         break;
       }
-      case td_api::messageForwardOriginChat::ID: {
-        auto forward_info = move_object_as<td_api::messageForwardOriginChat>(origin);
+      case td_api::messageOriginChat::ID: {
+        auto forward_info = move_object_as<td_api::messageOriginChat>(origin);
         message_info->initial_sender_chat_id = forward_info->sender_chat_id_;
         message_info->initial_author_signature = std::move(forward_info->author_signature_);
         break;
       }
-      case td_api::messageForwardOriginHiddenUser::ID: {
-        auto forward_info = move_object_as<td_api::messageForwardOriginHiddenUser>(origin);
+      case td_api::messageOriginHiddenUser::ID: {
+        auto forward_info = move_object_as<td_api::messageOriginHiddenUser>(origin);
         message_info->initial_sender_name = std::move(forward_info->sender_name_);
         break;
       }
-      case td_api::messageForwardOriginChannel::ID: {
-        auto forward_info = move_object_as<td_api::messageForwardOriginChannel>(origin);
+      case td_api::messageOriginChannel::ID: {
+        auto forward_info = move_object_as<td_api::messageOriginChannel>(origin);
         message_info->initial_chat_id = forward_info->chat_id_;
         message_info->initial_message_id = forward_info->message_id_;
         message_info->initial_author_signature = std::move(forward_info->author_signature_);
