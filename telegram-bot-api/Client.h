@@ -746,7 +746,7 @@ class Client final : public WebhookActor::Callback {
   };
   static void add_group(GroupInfo *group_info, object_ptr<td_api::basicGroup> &&group);
   void set_group_photo(int64 group_id, object_ptr<td_api::chatPhoto> &&photo);
-  void set_group_description(int64 group_id, td::string &&descripton);
+  void set_group_description(int64 group_id, td::string &&description);
   void set_group_invite_link(int64 group_id, td::string &&invite_link);
   GroupInfo *add_group_info(int64 group_id);
   const GroupInfo *get_group_info(int64 group_id) const;
@@ -774,7 +774,7 @@ class Client final : public WebhookActor::Callback {
   };
   static void add_supergroup(SupergroupInfo *supergroup_info, object_ptr<td_api::supergroup> &&supergroup);
   void set_supergroup_photo(int64 supergroup_id, object_ptr<td_api::chatPhoto> &&photo);
-  void set_supergroup_description(int64 supergroup_id, td::string &&descripton);
+  void set_supergroup_description(int64 supergroup_id, td::string &&description);
   void set_supergroup_invite_link(int64 supergroup_id, td::string &&invite_link);
   void set_supergroup_sticker_set_id(int64 supergroup_id, int64 sticker_set_id);
   void set_supergroup_can_set_sticker_set(int64 supergroup_id, bool can_set_sticker_set);

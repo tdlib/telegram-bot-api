@@ -5160,14 +5160,12 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       auto update = move_object_as<td_api::updateNewChat>(result);
       auto chat = std::move(update->chat_);
       auto chat_info = add_chat(chat->id_);
-      bool need_warning = false;
       switch (chat->type_->get_id()) {
         case td_api::chatTypePrivate::ID: {
           auto type = move_object_as<td_api::chatTypePrivate>(chat->type_);
           chat_info->type = ChatInfo::Type::Private;
           auto user_id = type->user_id_;
           chat_info->user_id = user_id;
-          need_warning = get_user_info(user_id) == nullptr;
           break;
         }
         case td_api::chatTypeBasicGroup::ID: {
@@ -5175,7 +5173,6 @@ void Client::on_update(object_ptr<td_api::Object> result) {
           chat_info->type = ChatInfo::Type::Group;
           auto group_id = type->basic_group_id_;
           chat_info->group_id = group_id;
-          need_warning = get_group_info(group_id) == nullptr;
           break;
         }
         case td_api::chatTypeSupergroup::ID: {
@@ -5183,7 +5180,6 @@ void Client::on_update(object_ptr<td_api::Object> result) {
           chat_info->type = ChatInfo::Type::Supergroup;
           auto supergroup_id = type->supergroup_id_;
           chat_info->supergroup_id = supergroup_id;
-          need_warning = get_supergroup_info(supergroup_id) == nullptr;
           break;
         }
         case td_api::chatTypeSecret::ID:
@@ -5191,9 +5187,6 @@ void Client::on_update(object_ptr<td_api::Object> result) {
           break;
         default:
           UNREACHABLE();
-      }
-      if (need_warning) {
-        LOG(ERROR) << "Received updateNewChat about chat " << chat->id_ << ", but hadn't received corresponding info";
       }
 
       chat_info->title = std::move(chat->title_);
@@ -10457,8 +10450,8 @@ void Client::set_group_photo(int64 group_id, object_ptr<td_api::chatPhoto> &&pho
   add_group_info(group_id)->photo = std::move(photo);
 }
 
-void Client::set_group_description(int64 group_id, td::string &&descripton) {
-  add_group_info(group_id)->description = std::move(descripton);
+void Client::set_group_description(int64 group_id, td::string &&description) {
+  add_group_info(group_id)->description = std::move(description);
 }
 
 void Client::set_group_invite_link(int64 group_id, td::string &&invite_link) {
@@ -10486,8 +10479,8 @@ void Client::set_supergroup_photo(int64 supergroup_id, object_ptr<td_api::chatPh
   add_supergroup_info(supergroup_id)->photo = std::move(photo);
 }
 
-void Client::set_supergroup_description(int64 supergroup_id, td::string &&descripton) {
-  add_supergroup_info(supergroup_id)->description = std::move(descripton);
+void Client::set_supergroup_description(int64 supergroup_id, td::string &&description) {
+  add_supergroup_info(supergroup_id)->description = std::move(description);
 }
 
 void Client::set_supergroup_invite_link(int64 supergroup_id, td::string &&invite_link) {

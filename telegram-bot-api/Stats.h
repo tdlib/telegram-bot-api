@@ -147,7 +147,7 @@ class BotStatActor final : public td::Actor {
   }
 
   BotStatActor(const BotStatActor &) = delete;
-  BotStatActor &operator=(const BotStatActor &other) = delete;
+  BotStatActor &operator=(const BotStatActor &) = delete;
   BotStatActor(BotStatActor &&) = default;
   BotStatActor &operator=(BotStatActor &&other) noexcept {
     if (!empty()) {
