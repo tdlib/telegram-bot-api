@@ -1982,13 +1982,20 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     }
     object("forward_date", message_->initial_send_date);
   }
-  if (message_->reply_to_message_id > 0 && need_reply_) {
-    const MessageInfo *reply_to_message = client_->get_message(message_->chat_id, message_->reply_to_message_id, true);
-    if (reply_to_message != nullptr) {
-      object("reply_to_message", JsonMessage(reply_to_message, false, "reply in " + source_, client_));
+  if (need_reply_ && message_->reply_to_message != nullptr) {
+    auto reply_to_message_id = get_same_chat_reply_to_message_id(message_->reply_to_message.get());
+    if (reply_to_message_id > 0) {
+      // internal reply
+      CHECK(message_->reply_to_message->chat_id_ == message_->chat_id);
+      const MessageInfo *reply_to_message = client_->get_message(message_->chat_id, reply_to_message_id, true);
+      if (reply_to_message != nullptr) {
+        object("reply_to_message", JsonMessage(reply_to_message, false, "reply in " + source_, client_));
+      } else {
+        LOG(INFO) << "Replied to unknown or deleted message " << reply_to_message_id << " in chat " << message_->chat_id
+                  << " while storing " << source_ << ' ' << message_->id;
+      }
     } else {
-      LOG(INFO) << "Replied to unknown or deleted message " << message_->reply_to_message_id << " in chat "
-                << message_->chat_id << " while storing " << source_ << ' ' << message_->id;
+      // external reply
     }
   }
   if (message_->media_album_id != 0) {
@@ -4423,7 +4430,7 @@ void Client::on_get_reply_message(int64 chat_id, object_ptr<td_api::message> rep
   CHECK(!queue.queue_.empty());
   object_ptr<td_api::message> &message = queue.queue_.front().message;
   CHECK(chat_id == message->chat_id_);
-  int64 reply_to_message_id = get_reply_to_message_id(message);
+  int64 reply_to_message_id = get_same_chat_reply_to_message_id(message);
   CHECK(reply_to_message_id > 0);
   if (reply_to_message == nullptr) {
     LOG(INFO) << "Can't find message " << reply_to_message_id << " in chat " << chat_id
@@ -4468,8 +4475,9 @@ void Client::on_get_callback_query_message(object_ptr<td_api::message> message, 
         process_new_callback_query_queue(user_id, state);
         return;
       }
-      LOG(INFO) << "Can't find callback query reply to message " << message_info->reply_to_message_id << " in chat "
-                << chat_id << ". It may be already deleted";
+      auto reply_to_message_id = get_same_chat_reply_to_message_id(message_info->reply_to_message.get());
+      LOG(INFO) << "Can't find callback query reply to message " << reply_to_message_id << " in chat " << chat_id
+                << ". It may be already deleted";
     }
   } else {
     LOG(INFO) << "Receive callback query " << (state == 1 ? "reply to " : "") << "message " << message_id << " in chat "
@@ -10953,7 +10961,8 @@ void Client::process_new_callback_query_queue(int64 user_id, int state) {
       state = 1;
     }
     if (state == 1) {
-      auto reply_to_message_id = message_info == nullptr ? 0 : message_info->reply_to_message_id;
+      auto reply_to_message_id =
+          message_info == nullptr ? 0 : get_same_chat_reply_to_message_id(message_info->reply_to_message.get());
       if (reply_to_message_id > 0 && get_message(chat_id, reply_to_message_id, false) == nullptr) {
         queue.has_active_request_ = true;
         return send_request(make_object<td_api::getRepliedMessage>(chat_id, message_id),
@@ -10968,7 +10977,8 @@ void Client::process_new_callback_query_queue(int64 user_id, int state) {
         return send_request(make_object<td_api::getStickerSet>(message_sticker_set_id),
                             td::make_unique<TdOnGetStickerSetCallback>(this, message_sticker_set_id, user_id, 0));
       }
-      auto reply_to_message_id = message_info == nullptr ? 0 : message_info->reply_to_message_id;
+      auto reply_to_message_id =
+          message_info == nullptr ? 0 : get_same_chat_reply_to_message_id(message_info->reply_to_message.get());
       if (reply_to_message_id > 0) {
         auto reply_to_message_info = get_message(chat_id, reply_to_message_id, true);
         auto reply_sticker_set_id =
@@ -11219,7 +11229,30 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
   return false;
 }
 
-td::int64 Client::get_reply_to_message_id(const object_ptr<td_api::message> &message) {
+td::int64 Client::get_same_chat_reply_to_message_id(const td_api::messageReplyToMessage *reply_to) {
+  if (reply_to != nullptr && reply_to->origin_ == nullptr) {
+    CHECK(reply_to->message_id_ > 0);
+    return reply_to->message_id_;
+  }
+  return 0;
+}
+
+td::int64 Client::get_same_chat_reply_to_message_id(const object_ptr<td_api::MessageReplyTo> &reply_to) {
+  if (reply_to != nullptr) {
+    switch (reply_to->get_id()) {
+      case td_api::messageReplyToMessage::ID:
+        return get_same_chat_reply_to_message_id(static_cast<const td_api::messageReplyToMessage *>(reply_to.get()));
+      case td_api::messageReplyToStory::ID:
+        break;
+      default:
+        UNREACHABLE();
+        break;
+    }
+  }
+  return 0;
+}
+
+td::int64 Client::get_same_chat_reply_to_message_id(const object_ptr<td_api::message> &message) {
   auto content_message_id = [&] {
     switch (message->content_->get_id()) {
       case td_api::messagePinMessage::ID:
@@ -11241,30 +11274,18 @@ td::int64 Client::get_reply_to_message_id(const object_ptr<td_api::message> &mes
     return content_message_id;
   }
   if (message->reply_to_ != nullptr) {
-    switch (message->reply_to_->get_id()) {
-      case td_api::messageReplyToMessage::ID: {
-        auto reply_to = static_cast<const td_api::messageReplyToMessage *>(message->reply_to_.get());
-        CHECK(reply_to->message_id_ > 0);
-        if (reply_to->chat_id_ == message->chat_id_ && reply_to->origin_ == nullptr) {
-          return reply_to->message_id_;
-        }
-        break;
-      }
-      case td_api::messageReplyToStory::ID:
-        break;
-      default:
-        UNREACHABLE();
-        break;
-    }
+    return get_same_chat_reply_to_message_id(message->reply_to_);
   }
   return 0;
 }
 
-void Client::drop_reply_to_message_in_another_chat(object_ptr<td_api::message> &message) {
+void Client::drop_internal_reply_to_message_in_another_chat(object_ptr<td_api::message> &message) {
   if (message->reply_to_ != nullptr && message->reply_to_->get_id() == td_api::messageReplyToMessage::ID) {
     auto *reply_to = static_cast<td_api::messageReplyToMessage *>(message->reply_to_.get());
     auto reply_in_chat_id = reply_to->chat_id_;
-    if (reply_in_chat_id != message->chat_id_ || reply_to->origin_ != nullptr) {
+    if (reply_in_chat_id != message->chat_id_ && reply_to->origin_ == nullptr) {
+      LOG(ERROR) << "Drop reply to message " << message->id_ << " in chat " << message->chat_id_
+                 << " from another chat " << reply_in_chat_id;
       message->reply_to_ = nullptr;
     }
   }
@@ -11432,9 +11453,9 @@ void Client::process_new_message_queue(int64 chat_id, int state) {
     CHECK(chat_id == message_ref->chat_id_);
     int64 message_id = message_ref->id_;
 
-    drop_reply_to_message_in_another_chat(message_ref);
+    drop_internal_reply_to_message_in_another_chat(message_ref);
 
-    int64 reply_to_message_id = get_reply_to_message_id(message_ref);
+    int64 reply_to_message_id = get_same_chat_reply_to_message_id(message_ref);
     if (state == 0) {
       if (reply_to_message_id > 0 && get_message(chat_id, reply_to_message_id, false) == nullptr) {
         queue.has_active_request_ = true;
@@ -11660,13 +11681,12 @@ Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message,
   message_info->is_topic_message = message->is_topic_message_;
   message_info->author_signature = std::move(message->author_signature_);
 
-  drop_reply_to_message_in_another_chat(message);
+  drop_internal_reply_to_message_in_another_chat(message);
 
   if (message->reply_to_ != nullptr && message->reply_to_->get_id() == td_api::messageReplyToMessage::ID) {
-    message_info->reply_to_message_id =
-        static_cast<td_api::messageReplyToMessage *>(message->reply_to_.get())->message_id_;
+    message_info->reply_to_message = move_object_as<td_api::messageReplyToMessage>(message->reply_to_);
   } else {
-    message_info->reply_to_message_id = 0;
+    message_info->reply_to_message = nullptr;
   }
 
   if (message_info->content == nullptr || force_update_content) {

@@ -825,7 +825,7 @@ class Client final : public WebhookActor::Callback {
     td::string initial_author_signature;
     td::string initial_sender_name;
     td::string author_signature;
-    int64 reply_to_message_id = 0;
+    object_ptr<td_api::messageReplyToMessage> reply_to_message;
     int64 media_album_id = 0;
     int64 via_bot_user_id = 0;
     object_ptr<td_api::MessageContent> content;
@@ -837,9 +837,13 @@ class Client final : public WebhookActor::Callback {
     mutable bool is_content_changed = false;
   };
 
-  static int64 get_reply_to_message_id(const object_ptr<td_api::message> &message);
+  static int64 get_same_chat_reply_to_message_id(const td_api::messageReplyToMessage *reply_to);
 
-  static void drop_reply_to_message_in_another_chat(object_ptr<td_api::message> &message);
+  static int64 get_same_chat_reply_to_message_id(const object_ptr<td_api::MessageReplyTo> &reply_to);
+
+  static int64 get_same_chat_reply_to_message_id(const object_ptr<td_api::message> &message);
+
+  static void drop_internal_reply_to_message_in_another_chat(object_ptr<td_api::message> &message);
 
   static td::Slice get_sticker_type(const object_ptr<td_api::StickerType> &type);
 
