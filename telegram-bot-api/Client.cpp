@@ -512,6 +512,9 @@ class Client::JsonEntity final : public td::Jsonable {
         object("custom_emoji_id", td::to_string(entity->custom_emoji_id_));
         break;
       }
+      case td_api::textEntityTypeBlockQuote::ID:
+        object("type", "blockquote");
+        break;
       default:
         UNREACHABLE();
     }
@@ -532,8 +535,7 @@ class Client::JsonVectorEntities final : public td::Jsonable {
     for (auto &entity : entities_) {
       auto entity_type = entity->type_->get_id();
       if (entity_type != td_api::textEntityTypeBankCardNumber::ID &&
-          entity_type != td_api::textEntityTypeMediaTimestamp::ID &&
-          entity_type != td_api::textEntityTypeBlockQuote::ID) {
+          entity_type != td_api::textEntityTypeMediaTimestamp::ID) {
         array << JsonEntity(entity.get(), client_);
       }
     }
@@ -7238,6 +7240,9 @@ td::Result<td_api::object_ptr<td_api::TextEntityType>> Client::get_text_entity_t
   if (type == "custom_emoji") {
     TRY_RESULT(custom_emoji_id, object.get_required_long_field("custom_emoji_id"));
     return make_object<td_api::textEntityTypeCustomEmoji>(custom_emoji_id);
+  }
+  if (type == "blockquote") {
+    return make_object<td_api::textEntityTypeBlockQuote>();
   }
   if (type == "mention" || type == "hashtag" || type == "cashtag" || type == "bot_command" || type == "url" ||
       type == "email" || type == "phone_number" || type == "bank_card_number") {
