@@ -464,12 +464,17 @@ class Client final : public WebhookActor::Callback {
   static td::Result<object_ptr<td_api::formattedText>> get_formatted_text(td::string text, td::string parse_mode,
                                                                           td::JsonValue &&input_entities);
 
+  static object_ptr<td_api::linkPreviewOptions> get_link_preview_options(bool disable_web_page_preview);
+
+  static td::Result<object_ptr<td_api::linkPreviewOptions>> get_link_preview_options(const Query *query);
+
+  static td::Result<object_ptr<td_api::linkPreviewOptions>> get_link_preview_options(td::JsonValue &&value);
+
   static td::Result<object_ptr<td_api::inputMessageText>> get_input_message_text(const Query *query);
 
-  static td::Result<object_ptr<td_api::inputMessageText>> get_input_message_text(td::string text,
-                                                                                 bool disable_web_page_preview,
-                                                                                 td::string parse_mode,
-                                                                                 td::JsonValue &&input_entities);
+  static td::Result<object_ptr<td_api::inputMessageText>> get_input_message_text(
+      td::string text, object_ptr<td_api::linkPreviewOptions> link_preview_options, td::string parse_mode,
+      td::JsonValue &&input_entities);
 
   static td::Result<object_ptr<td_api::location>> get_location(const Query *query);
 

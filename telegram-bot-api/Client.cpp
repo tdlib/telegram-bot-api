@@ -6267,10 +6267,18 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
   TRY_RESULT(message_text, object.get_optional_string_field("message_text"));
 
   if (!message_text.empty()) {
-    TRY_RESULT(disable_web_page_preview, object.get_optional_bool_field("disable_web_page_preview"));
+    object_ptr<td_api::linkPreviewOptions> link_preview_options;
+    if (object.has_field("link_preview_options")) {
+      TRY_RESULT(options, object.extract_required_field("link_preview_options", td::JsonValue::Type::Object));
+      CHECK(options.type() == td::JsonValue::Type::Object);
+      TRY_RESULT_ASSIGN(link_preview_options, get_link_preview_options(std::move(options)));
+    } else {
+      TRY_RESULT(disable_web_page_preview, object.get_optional_bool_field("disable_web_page_preview"));
+      link_preview_options = get_link_preview_options(disable_web_page_preview);
+    }
     TRY_RESULT(parse_mode, object.get_optional_string_field("parse_mode"));
     auto entities = object.extract_field("entities");
-    TRY_RESULT(input_message_text, get_input_message_text(std::move(message_text), disable_web_page_preview,
+    TRY_RESULT(input_message_text, get_input_message_text(std::move(message_text), std::move(link_preview_options),
                                                           std::move(parse_mode), std::move(entities)));
     return std::move(input_message_text);
   }
@@ -6502,6 +6510,7 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
   TRY_RESULT(input_message_content_obj,
              object.extract_optional_field("input_message_content", td::JsonValue::Type::Object));
   if (input_message_content_obj.type() == td::JsonValue::Type::Null) {
+    // legacy
     TRY_RESULT(message_text, is_input_message_content_required ? object.get_required_string_field("message_text")
                                                                : object.get_optional_string_field("message_text"));
     TRY_RESULT(disable_web_page_preview, object.get_optional_bool_field("disable_web_page_preview"));
@@ -6509,8 +6518,9 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
     auto entities = object.extract_field("entities");
 
     if (is_input_message_content_required || !message_text.empty()) {
-      TRY_RESULT(input_message_text, get_input_message_text(std::move(message_text), disable_web_page_preview,
-                                                            std::move(parse_mode), std::move(entities)));
+      TRY_RESULT(input_message_text,
+                 get_input_message_text(std::move(message_text), get_link_preview_options(disable_web_page_preview),
+                                        std::move(parse_mode), std::move(entities)));
       input_message_content = std::move(input_message_text);
     }
   } else {
@@ -7506,22 +7516,60 @@ td::Result<td_api::object_ptr<td_api::formattedText>> Client::get_formatted_text
   return make_object<td_api::formattedText>(text, std::move(entities));
 }
 
+td_api::object_ptr<td_api::linkPreviewOptions> Client::get_link_preview_options(bool disable_web_page_preview) {
+  // legacy
+  if (!disable_web_page_preview) {
+    return nullptr;
+  }
+  return make_object<td_api::linkPreviewOptions>(true, td::string(), false, false, false);
+}
+
+td::Result<td_api::object_ptr<td_api::linkPreviewOptions>> Client::get_link_preview_options(const Query *query) {
+  auto link_preview_options = query->arg("link_preview_options");
+  if (link_preview_options.empty()) {
+    return get_link_preview_options(to_bool(query->arg("disable_web_page_preview")));
+  }
+
+  LOG(INFO) << "Parsing JSON object: " << link_preview_options;
+  auto r_value = json_decode(link_preview_options);
+  if (r_value.is_error()) {
+    LOG(INFO) << "Can't parse JSON object: " << r_value.error();
+    return td::Status::Error(400, "Can't parse link preview options JSON object");
+  }
+
+  return get_link_preview_options(r_value.move_as_ok());
+}
+
+td::Result<td_api::object_ptr<td_api::linkPreviewOptions>> Client::get_link_preview_options(td::JsonValue &&value) {
+  if (value.type() != td::JsonValue::Type::Object) {
+    return td::Status::Error(400, "Object expected as link preview options");
+  }
+  auto &object = value.get_object();
+  TRY_RESULT(is_disabled, object.get_optional_bool_field("is_disabled"));
+  TRY_RESULT(url, object.get_optional_string_field("url"));
+  TRY_RESULT(prefer_small_media, object.get_optional_bool_field("prefer_small_media"));
+  TRY_RESULT(prefer_large_media, object.get_optional_bool_field("prefer_large_media"));
+  TRY_RESULT(show_above_text, object.get_optional_bool_field("show_above_text"));
+  return make_object<td_api::linkPreviewOptions>(is_disabled, url, prefer_small_media, prefer_large_media,
+                                                 show_above_text);
+}
+
 td::Result<td_api::object_ptr<td_api::inputMessageText>> Client::get_input_message_text(const Query *query) {
-  return get_input_message_text(query->arg("text").str(), to_bool(query->arg("disable_web_page_preview")),
+  TRY_RESULT(link_preview_options, get_link_preview_options(query));
+  return get_input_message_text(query->arg("text").str(), std::move(link_preview_options),
                                 query->arg("parse_mode").str(), get_input_entities(query, "entities"));
 }
 
 td::Result<td_api::object_ptr<td_api::inputMessageText>> Client::get_input_message_text(
-    td::string text, bool disable_web_page_preview, td::string parse_mode, td::JsonValue &&input_entities) {
+    td::string text, object_ptr<td_api::linkPreviewOptions> link_preview_options, td::string parse_mode,
+    td::JsonValue &&input_entities) {
   if (text.empty()) {
     return td::Status::Error(400, "Message text is empty");
   }
 
   TRY_RESULT(formatted_text, get_formatted_text(std::move(text), std::move(parse_mode), std::move(input_entities)));
 
-  return make_object<td_api::inputMessageText>(
-      std::move(formatted_text),
-      make_object<td_api::linkPreviewOptions>(disable_web_page_preview, td::string(), false, false, false), false);
+  return make_object<td_api::inputMessageText>(std::move(formatted_text), std::move(link_preview_options), false);
 }
 
 td::Result<td_api::object_ptr<td_api::location>> Client::get_location(const Query *query) {
