@@ -924,6 +924,59 @@ class Client::JsonMessageSender final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonMessageOrigin final : public td::Jsonable {
+ public:
+  JsonMessageOrigin(const td_api::MessageOrigin *message_origin, int32 initial_send_date, const Client *client)
+      : message_origin_(message_origin), initial_send_date_(initial_send_date), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    switch (message_origin_->get_id()) {
+      case td_api::messageOriginUser::ID: {
+        auto origin = static_cast<const td_api::messageOriginUser *>(message_origin_);
+        object("type", "user");
+        object("sender_user", JsonUser(origin->sender_user_id_, client_));
+        break;
+      }
+      case td_api::messageOriginChat::ID: {
+        auto origin = static_cast<const td_api::messageOriginChat *>(message_origin_);
+        object("type", "chat");
+        object("sender_chat", JsonChat(origin->sender_chat_id_, false, client_));
+        if (!origin->author_signature_.empty()) {
+          object("author_signature", origin->author_signature_);
+        }
+        break;
+      }
+      case td_api::messageOriginHiddenUser::ID: {
+        auto origin = static_cast<const td_api::messageOriginHiddenUser *>(message_origin_);
+        object("type", "hidden_user");
+        if (!origin->sender_name_.empty()) {
+          object("sender_user_name", origin->sender_name_);
+        }
+        break;
+      }
+      case td_api::messageOriginChannel::ID: {
+        auto origin = static_cast<const td_api::messageOriginChannel *>(message_origin_);
+        object("type", "channel");
+        object("chat", JsonChat(origin->chat_id_, false, client_));
+        object("message_id", as_client_message_id(origin->message_id_));
+        if (!origin->author_signature_.empty()) {
+          object("author_signature", origin->author_signature_);
+        }
+        break;
+      }
+      default:
+        UNREACHABLE();
+    }
+    object("date", initial_send_date_);
+  }
+
+ private:
+  const td_api::MessageOrigin *message_origin_;
+  int32 initial_send_date_;
+  const Client *client_;
+};
+
 class Client::JsonMessages final : public td::Jsonable {
  public:
   explicit JsonMessages(const td::vector<td::string> &messages) : messages_(messages) {
@@ -2033,6 +2086,11 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
   }
   if (message_->initial_send_date > 0) {
     CHECK(message_->forward_origin != nullptr);
+    object("forward_origin", JsonMessageOrigin(message_->forward_origin.get(), message_->initial_send_date, client_));
+    if (message_->is_automatic_forward) {
+      object("is_automatic_forward", td::JsonTrue());
+    }
+
     switch (message_->forward_origin->get_id()) {
       case td_api::messageOriginUser::ID: {
         auto forward_info = static_cast<const td_api::messageOriginUser *>(message_->forward_origin.get());
@@ -2065,9 +2123,6 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       }
       default:
         UNREACHABLE();
-    }
-    if (message_->is_automatic_forward) {
-      object("is_automatic_forward", td::JsonTrue());
     }
     object("forward_date", message_->initial_send_date);
   }
