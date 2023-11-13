@@ -939,6 +939,35 @@ class Client::JsonMessages final : public td::Jsonable {
   const td::vector<td::string> &messages_;
 };
 
+class Client::JsonLinkPreviewOptions final : public td::Jsonable {
+ public:
+  JsonLinkPreviewOptions(const td_api::linkPreviewOptions *link_preview_options, const Client *client)
+      : link_preview_options_(link_preview_options), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    if (link_preview_options_->is_disabled_) {
+      object("is_disabled", td::JsonTrue());
+    }
+    if (!link_preview_options_->url_.empty()) {
+      object("url", link_preview_options_->url_);
+    }
+    if (link_preview_options_->force_small_media_) {
+      object("prefer_small_media", td::JsonTrue());
+    }
+    if (link_preview_options_->force_large_media_) {
+      object("prefer_large_media", td::JsonTrue());
+    }
+    if (link_preview_options_->show_above_text_) {
+      object("show_above_text", td::JsonTrue());
+    }
+  }
+
+ private:
+  const td_api::linkPreviewOptions *link_preview_options_;
+  const Client *client_;
+};
+
 class Client::JsonAnimation final : public td::Jsonable {
  public:
   JsonAnimation(const td_api::animation *animation, bool as_document, const Client *client)
@@ -2051,6 +2080,9 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("text", content->text_->text_);
       if (!content->text_->entities_.empty()) {
         object("entities", JsonVectorEntities(content->text_->entities_, client_));
+      }
+      if (content->link_preview_options_ != nullptr) {
+        object("link_preview_options", JsonLinkPreviewOptions(content->link_preview_options_.get(), client_));
       }
       break;
     }
