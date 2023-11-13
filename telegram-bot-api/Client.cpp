@@ -1814,6 +1814,39 @@ class Client::JsonChatShared final : public td::Jsonable {
   const td_api::messageChatShared *chat_shared_;
 };
 
+class Client::JsonGiveaway final : public td::Jsonable {
+ public:
+  JsonGiveaway(const td_api::messagePremiumGiveaway *giveaway, const Client *client)
+      : giveaway_(giveaway), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    td::vector<int64> chat_ids;
+    chat_ids.push_back(giveaway_->parameters_->boosted_chat_id_);
+    for (auto chat_id : giveaway_->parameters_->additional_chat_ids_) {
+      chat_ids.push_back(chat_id);
+    }
+    object("chats",
+           td::json_array(chat_ids, [client = client_](auto &chat_id) { return JsonChat(chat_id, false, client); }));
+    object("winners_selection_date", giveaway_->parameters_->winners_selection_date_);
+    object("winner_count", giveaway_->winner_count_);
+    if (giveaway_->parameters_->only_new_members_) {
+      object("only_new_members", td::JsonTrue());
+    }
+    if (!giveaway_->parameters_->country_codes_.empty()) {
+      object("country_codes", td::json_array(giveaway_->parameters_->country_codes_,
+                                             [](td::Slice country_code) { return td::JsonString(country_code); }));
+    }
+    if (giveaway_->month_count_ > 0) {
+      object("premium_subscription_month_count", giveaway_->month_count_);
+    }
+  }
+
+ private:
+  const td_api::messagePremiumGiveaway *giveaway_;
+  const Client *client_;
+};
+
 class Client::JsonWebAppInfo final : public td::Jsonable {
  public:
   explicit JsonWebAppInfo(const td::string &url) : url_(url) {
@@ -2332,8 +2365,11 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     case td_api::messagePremiumGiveawayCreated::ID:
       object("giveaway_created", JsonEmptyObject());
       break;
-    case td_api::messagePremiumGiveaway::ID:
+    case td_api::messagePremiumGiveaway::ID: {
+      auto content = static_cast<const td_api::messagePremiumGiveaway *>(message_->content.get());
+      object("giveaway", JsonGiveaway(content, client_));
       break;
+    }
     case td_api::messageStory::ID:
       object("story", JsonEmptyObject());
       break;
@@ -11108,6 +11144,7 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       case td_api::messageForumTopicIsClosedToggled::ID:
       case td_api::messageForumTopicIsHiddenToggled::ID:
       case td_api::messagePremiumGiveawayCreated::ID:
+      case td_api::messagePremiumGiveaway::ID:
         // don't skip
         break;
       default:
@@ -11217,8 +11254,6 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageChatSetBackground::ID:
       return true;
     case td_api::messagePremiumGiftCode::ID:
-      return true;
-    case td_api::messagePremiumGiveaway::ID:
       return true;
     default:
       break;
