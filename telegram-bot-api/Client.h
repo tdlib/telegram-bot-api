@@ -150,6 +150,7 @@ class Client final : public WebhookActor::Callback {
   class JsonChatBoost;
   class JsonChatBoostUpdated;
   class JsonChatBoostRemoved;
+  class JsonChatBoosts;
   class JsonForumTopicCreated;
   class JsonForumTopicEdited;
   class JsonForumTopicInfo;
@@ -204,7 +205,8 @@ class Client final : public WebhookActor::Callback {
   class TdOnGetChatPinnedMessageToUnpinCallback;
   class TdOnGetGroupMembersCallback;
   class TdOnGetSupergroupMembersCallback;
-  class TdOnGetSupergroupMembersCountCallback;
+  class TdOnGetSupergroupMemberCountCallback;
+  class TdOnGetUserChatBoostsCallback;
   class TdOnCreateInvoiceLinkCallback;
   class TdOnReplacePrimaryChatInviteLinkCallback;
   class TdOnGetChatInviteLinkCallback;
@@ -611,6 +613,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_unban_chat_sender_chat_query(PromisedQueryPtr &query);
   td::Status process_approve_chat_join_request_query(PromisedQueryPtr &query);
   td::Status process_decline_chat_join_request_query(PromisedQueryPtr &query);
+  td::Status process_get_user_chat_boosts_query(PromisedQueryPtr &query);
   td::Status process_get_sticker_set_query(PromisedQueryPtr &query);
   td::Status process_get_custom_emoji_stickers_query(PromisedQueryPtr &query);
   td::Status process_upload_sticker_file_query(PromisedQueryPtr &query);

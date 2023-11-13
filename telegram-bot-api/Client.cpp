@@ -292,6 +292,7 @@ bool Client::init_methods() {
   methods_.emplace("unbanchatsenderchat", &Client::process_unban_chat_sender_chat_query);
   methods_.emplace("approvechatjoinrequest", &Client::process_approve_chat_join_request_query);
   methods_.emplace("declinechatjoinrequest", &Client::process_decline_chat_join_request_query);
+  methods_.emplace("getuserchatboosts", &Client::process_get_user_chat_boosts_query);
   methods_.emplace("getstickerset", &Client::process_get_sticker_set_query);
   methods_.emplace("getcustomemojistickers", &Client::process_get_custom_emoji_stickers_query);
   methods_.emplace("uploadstickerfile", &Client::process_upload_sticker_file_query);
@@ -3018,6 +3019,22 @@ class Client::JsonChatBoostRemoved final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonChatBoosts final : public td::Jsonable {
+ public:
+  JsonChatBoosts(const td_api::foundChatBoosts *chat_boosts, const Client *client)
+      : chat_boosts_(chat_boosts), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("boosts", td::json_array(chat_boosts_->boosts_,
+                                    [client = client_](auto &boost) { return JsonChatBoost(boost.get(), client); }));
+  }
+
+ private:
+  const td_api::foundChatBoosts *chat_boosts_;
+  const Client *client_;
+};
+
 class Client::JsonGameHighScore final : public td::Jsonable {
  public:
   JsonGameHighScore(const td_api::gameHighScore *score, const Client *client) : score_(score), client_(client) {
@@ -4135,9 +4152,9 @@ class Client::TdOnGetSupergroupMembersCallback final : public TdQueryCallback {
   PromisedQueryPtr query_;
 };
 
-class Client::TdOnGetSupergroupMembersCountCallback final : public TdQueryCallback {
+class Client::TdOnGetSupergroupMemberCountCallback final : public TdQueryCallback {
  public:
-  explicit TdOnGetSupergroupMembersCountCallback(PromisedQueryPtr query) : query_(std::move(query)) {
+  explicit TdOnGetSupergroupMemberCountCallback(PromisedQueryPtr query) : query_(std::move(query)) {
   }
 
   void on_result(object_ptr<td_api::Object> result) final {
@@ -4258,6 +4275,26 @@ class Client::TdOnAnswerWebAppQueryCallback final : public TdQueryCallback {
   }
 
  private:
+  PromisedQueryPtr query_;
+};
+
+class Client::TdOnGetUserChatBoostsCallback final : public TdQueryCallback {
+ public:
+  TdOnGetUserChatBoostsCallback(Client *client, PromisedQueryPtr query) : client_(client), query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::foundChatBoosts::ID);
+    auto chat_boosts = move_object_as<td_api::foundChatBoosts>(result);
+    answer_query(JsonChatBoosts(chat_boosts.get(), client_), std::move(query_));
+  }
+
+ private:
+  Client *client_;
   PromisedQueryPtr query_;
 };
 
@@ -9349,7 +9386,7 @@ td::Status Client::process_get_chat_member_count_query(PromisedQueryPtr &query) 
       }
       case ChatInfo::Type::Supergroup:
         return send_request(make_object<td_api::getSupergroupFullInfo>(chat_info->supergroup_id),
-                            td::make_unique<TdOnGetSupergroupMembersCountCallback>(std::move(query)));
+                            td::make_unique<TdOnGetSupergroupMemberCountCallback>(std::move(query)));
       case ChatInfo::Type::Unknown:
       default:
         UNREACHABLE();
@@ -9606,6 +9643,19 @@ td::Status Client::process_decline_chat_join_request_query(PromisedQueryPtr &que
     check_user_no_fail(user_id, std::move(query), [this, chat_id, user_id](PromisedQueryPtr query) {
       send_request(make_object<td_api::processChatJoinRequest>(chat_id, user_id, false),
                    td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+    });
+  });
+  return td::Status::OK();
+}
+
+td::Status Client::process_get_user_chat_boosts_query(PromisedQueryPtr &query) {
+  auto chat_id = query->arg("chat_id");
+  TRY_RESULT(user_id, get_user_id(query.get()));
+
+  check_chat(chat_id, AccessRights::Write, std::move(query), [this, user_id](int64 chat_id, PromisedQueryPtr query) {
+    check_user_no_fail(user_id, std::move(query), [this, chat_id, user_id](PromisedQueryPtr query) {
+      send_request(make_object<td_api::getUserChatBoosts>(chat_id, user_id),
+                   td::make_unique<TdOnGetUserChatBoostsCallback>(this, std::move(query)));
     });
   });
   return td::Status::OK();
