@@ -3727,7 +3727,7 @@ class Client::TdOnGetChatStickerSetCallback final : public TdQueryCallback {
       auto chat_info = client_->get_chat(chat_id_);
       CHECK(chat_info != nullptr);
       CHECK(chat_info->type == ChatInfo::Type::Supergroup);
-      client_->set_supergroup_sticker_set_id(chat_info->supergroup_id, 0);
+      client_->add_supergroup_info(chat_info->supergroup_id)->sticker_set_id = 0;
     } else {
       CHECK(result->get_id() == td_api::stickerSet::ID);
       auto sticker_set = move_object_as<td_api::stickerSet>(result);
@@ -5290,14 +5290,12 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       auto update = move_object_as<td_api::updateUserFullInfo>(result);
       auto user_id = update->user_id_;
       auto full_info = update->user_full_info_.get();
-      set_user_photo(user_id,
-                     full_info->photo_ == nullptr ? std::move(full_info->public_photo_) : std::move(full_info->photo_));
-      if (full_info->bio_ != nullptr) {
-        set_user_bio(user_id, std::move(full_info->bio_->text_));
-      }
-      set_user_has_private_forwards(user_id, full_info->has_private_forwards_);
-      set_user_has_restricted_voice_and_video_messages(user_id,
-                                                       full_info->has_restricted_voice_and_video_note_messages_);
+      auto user_info = add_user_info(user_id);
+      user_info->photo =
+          full_info->photo_ == nullptr ? std::move(full_info->public_photo_) : std::move(full_info->photo_);
+      user_info->bio = full_info->bio_ != nullptr ? std::move(full_info->bio_->text_) : td::string();
+      user_info->has_private_forwards = full_info->has_private_forwards_;
+      user_info->has_restricted_voice_and_video_messages = full_info->has_restricted_voice_and_video_note_messages_;
       break;
     }
     case td_api::updateBasicGroup::ID: {
@@ -5310,11 +5308,11 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       auto update = move_object_as<td_api::updateBasicGroupFullInfo>(result);
       auto group_id = update->basic_group_id_;
       auto full_info = update->basic_group_full_info_.get();
-      set_group_photo(group_id, std::move(full_info->photo_));
-      set_group_description(group_id, std::move(full_info->description_));
-      set_group_invite_link(group_id, full_info->invite_link_ != nullptr
-                                          ? std::move(full_info->invite_link_->invite_link_)
-                                          : td::string());
+      auto group_info = add_group_info(group_id);
+      group_info->photo = std::move(full_info->photo_);
+      group_info->description = std::move(full_info->description_);
+      group_info->invite_link = std::move(
+          full_info->invite_link_ != nullptr ? std::move(full_info->invite_link_->invite_link_) : td::string());
       break;
     }
     case td_api::updateSupergroup::ID: {
@@ -5327,18 +5325,18 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       auto update = move_object_as<td_api::updateSupergroupFullInfo>(result);
       auto supergroup_id = update->supergroup_id_;
       auto full_info = update->supergroup_full_info_.get();
-      set_supergroup_photo(supergroup_id, std::move(full_info->photo_));
-      set_supergroup_description(supergroup_id, std::move(full_info->description_));
-      set_supergroup_invite_link(supergroup_id, full_info->invite_link_ != nullptr
-                                                    ? std::move(full_info->invite_link_->invite_link_)
-                                                    : td::string());
-      set_supergroup_sticker_set_id(supergroup_id, full_info->sticker_set_id_);
-      set_supergroup_can_set_sticker_set(supergroup_id, full_info->can_set_sticker_set_);
-      set_supergroup_slow_mode_delay(supergroup_id, full_info->slow_mode_delay_);
-      set_supergroup_linked_chat_id(supergroup_id, full_info->linked_chat_id_);
-      set_supergroup_location(supergroup_id, std::move(full_info->location_));
-      set_supergroup_has_hidden_members(supergroup_id, full_info->has_hidden_members_);
-      set_supergroup_has_aggressive_anti_spam_enabled(supergroup_id, full_info->has_aggressive_anti_spam_enabled_);
+      auto supergroup_info = add_supergroup_info(supergroup_id);
+      supergroup_info->photo = std::move(full_info->photo_);
+      supergroup_info->description = std::move(full_info->description_);
+      supergroup_info->invite_link = std::move(
+          full_info->invite_link_ != nullptr ? std::move(full_info->invite_link_->invite_link_) : td::string());
+      supergroup_info->sticker_set_id = full_info->sticker_set_id_;
+      supergroup_info->can_set_sticker_set = full_info->can_set_sticker_set_;
+      supergroup_info->slow_mode_delay = full_info->slow_mode_delay_;
+      supergroup_info->linked_chat_id = full_info->linked_chat_id_;
+      supergroup_info->location = std::move(full_info->location_);
+      supergroup_info->has_hidden_members = full_info->has_hidden_members_;
+      supergroup_info->has_aggressive_anti_spam_enabled = full_info->has_aggressive_anti_spam_enabled_;
       break;
     }
     case td_api::updateOption::ID: {
@@ -10458,23 +10456,6 @@ const Client::UserInfo *Client::get_user_info(int64 user_id) const {
   return users_.get_pointer(user_id);
 }
 
-void Client::set_user_photo(int64 user_id, object_ptr<td_api::chatPhoto> &&photo) {
-  add_user_info(user_id)->photo = std::move(photo);
-}
-
-void Client::set_user_bio(int64 user_id, td::string &&bio) {
-  add_user_info(user_id)->bio = std::move(bio);
-}
-
-void Client::set_user_has_private_forwards(int64 user_id, bool has_private_forwards) {
-  add_user_info(user_id)->has_private_forwards = has_private_forwards;
-}
-
-void Client::set_user_has_restricted_voice_and_video_messages(int64 user_id,
-                                                              bool has_restricted_voice_and_video_messages) {
-  add_user_info(user_id)->has_restricted_voice_and_video_messages = has_restricted_voice_and_video_messages;
-}
-
 void Client::add_group(GroupInfo *group_info, object_ptr<td_api::basicGroup> &&group) {
   group_info->member_count = group->member_count_;
   group_info->left = group->status_->get_id() == td_api::chatMemberStatusLeft::ID;
@@ -10498,18 +10479,6 @@ const Client::GroupInfo *Client::get_group_info(int64 group_id) const {
   return groups_.get_pointer(group_id);
 }
 
-void Client::set_group_photo(int64 group_id, object_ptr<td_api::chatPhoto> &&photo) {
-  add_group_info(group_id)->photo = std::move(photo);
-}
-
-void Client::set_group_description(int64 group_id, td::string &&description) {
-  add_group_info(group_id)->description = std::move(description);
-}
-
-void Client::set_group_invite_link(int64 group_id, td::string &&invite_link) {
-  add_group_info(group_id)->invite_link = std::move(invite_link);
-}
-
 void Client::add_supergroup(SupergroupInfo *supergroup_info, object_ptr<td_api::supergroup> &&supergroup) {
   if (supergroup->usernames_ == nullptr) {
     supergroup_info->active_usernames.clear();
@@ -10525,47 +10494,6 @@ void Client::add_supergroup(SupergroupInfo *supergroup_info, object_ptr<td_api::
   supergroup_info->has_location = supergroup->has_location_;
   supergroup_info->join_to_send_messages = supergroup->join_to_send_messages_;
   supergroup_info->join_by_request = supergroup->join_by_request_;
-}
-
-void Client::set_supergroup_photo(int64 supergroup_id, object_ptr<td_api::chatPhoto> &&photo) {
-  add_supergroup_info(supergroup_id)->photo = std::move(photo);
-}
-
-void Client::set_supergroup_description(int64 supergroup_id, td::string &&description) {
-  add_supergroup_info(supergroup_id)->description = std::move(description);
-}
-
-void Client::set_supergroup_invite_link(int64 supergroup_id, td::string &&invite_link) {
-  add_supergroup_info(supergroup_id)->invite_link = std::move(invite_link);
-}
-
-void Client::set_supergroup_sticker_set_id(int64 supergroup_id, int64 sticker_set_id) {
-  add_supergroup_info(supergroup_id)->sticker_set_id = sticker_set_id;
-}
-
-void Client::set_supergroup_can_set_sticker_set(int64 supergroup_id, bool can_set_sticker_set) {
-  add_supergroup_info(supergroup_id)->can_set_sticker_set = can_set_sticker_set;
-}
-
-void Client::set_supergroup_slow_mode_delay(int64 supergroup_id, int32 slow_mode_delay) {
-  add_supergroup_info(supergroup_id)->slow_mode_delay = slow_mode_delay;
-}
-
-void Client::set_supergroup_linked_chat_id(int64 supergroup_id, int64 linked_chat_id) {
-  add_supergroup_info(supergroup_id)->linked_chat_id = linked_chat_id;
-}
-
-void Client::set_supergroup_location(int64 supergroup_id, object_ptr<td_api::chatLocation> location) {
-  add_supergroup_info(supergroup_id)->location = std::move(location);
-}
-
-void Client::set_supergroup_has_hidden_members(int64 supergroup_id, bool has_hidden_members) {
-  add_supergroup_info(supergroup_id)->has_hidden_members = has_hidden_members;
-}
-
-void Client::set_supergroup_has_aggressive_anti_spam_enabled(int64 supergroup_id,
-                                                             bool has_aggressive_anti_spam_enabled) {
-  add_supergroup_info(supergroup_id)->has_aggressive_anti_spam_enabled = has_aggressive_anti_spam_enabled;
 }
 
 Client::SupergroupInfo *Client::add_supergroup_info(int64 supergroup_id) {

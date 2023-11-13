@@ -728,10 +728,6 @@ class Client final : public WebhookActor::Callback {
     bool added_to_attachment_menu = false;
   };
   static void add_user(UserInfo *user_info, object_ptr<td_api::user> &&user);
-  void set_user_photo(int64 user_id, object_ptr<td_api::chatPhoto> &&photo);
-  void set_user_bio(int64 user_id, td::string &&bio);
-  void set_user_has_private_forwards(int64 user_id, bool has_private_forwards);
-  void set_user_has_restricted_voice_and_video_messages(int64 user_id, bool has_restricted_voice_and_video_messages);
   UserInfo *add_user_info(int64 user_id);
   const UserInfo *get_user_info(int64 user_id) const;
 
@@ -746,9 +742,6 @@ class Client final : public WebhookActor::Callback {
     int64 upgraded_to_supergroup_id = 0;
   };
   static void add_group(GroupInfo *group_info, object_ptr<td_api::basicGroup> &&group);
-  void set_group_photo(int64 group_id, object_ptr<td_api::chatPhoto> &&photo);
-  void set_group_description(int64 group_id, td::string &&description);
-  void set_group_invite_link(int64 group_id, td::string &&invite_link);
   GroupInfo *add_group_info(int64 group_id);
   const GroupInfo *get_group_info(int64 group_id) const;
 
@@ -774,16 +767,6 @@ class Client final : public WebhookActor::Callback {
     bool has_aggressive_anti_spam_enabled = false;
   };
   static void add_supergroup(SupergroupInfo *supergroup_info, object_ptr<td_api::supergroup> &&supergroup);
-  void set_supergroup_photo(int64 supergroup_id, object_ptr<td_api::chatPhoto> &&photo);
-  void set_supergroup_description(int64 supergroup_id, td::string &&description);
-  void set_supergroup_invite_link(int64 supergroup_id, td::string &&invite_link);
-  void set_supergroup_sticker_set_id(int64 supergroup_id, int64 sticker_set_id);
-  void set_supergroup_can_set_sticker_set(int64 supergroup_id, bool can_set_sticker_set);
-  void set_supergroup_slow_mode_delay(int64 supergroup_id, int32 slow_mode_delay);
-  void set_supergroup_linked_chat_id(int64 supergroup_id, int64 linked_chat_id);
-  void set_supergroup_location(int64 supergroup_id, object_ptr<td_api::chatLocation> location);
-  void set_supergroup_has_hidden_members(int64 supergroup_id, bool has_hidden_members);
-  void set_supergroup_has_aggressive_anti_spam_enabled(int64 supergroup_id, bool has_aggressive_anti_spam_enabled);
   SupergroupInfo *add_supergroup_info(int64 supergroup_id);
   const SupergroupInfo *get_supergroup_info(int64 supergroup_id) const;
 
