@@ -2927,6 +2927,97 @@ class Client::JsonChatJoinRequest final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonChatBoostSource final : public td::Jsonable {
+ public:
+  JsonChatBoostSource(const td_api::ChatBoostSource *boost_source, const Client *client)
+      : boost_source_(boost_source), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    CHECK(boost_source_ != nullptr);
+    switch (boost_source_->get_id()) {
+      case td_api::chatBoostSourcePremium::ID: {
+        const auto *source = static_cast<const td_api::chatBoostSourcePremium *>(boost_source_);
+        object("source", "premium");
+        object("user", JsonUser(source->user_id_, client_));
+        break;
+      }
+      case td_api::chatBoostSourceGiftCode::ID: {
+        const auto *source = static_cast<const td_api::chatBoostSourceGiftCode *>(boost_source_);
+        object("source", "gift_code");
+        object("user", JsonUser(source->user_id_, client_));
+        break;
+      }
+      case td_api::chatBoostSourceGiveaway::ID: {
+        const auto *source = static_cast<const td_api::chatBoostSourceGiveaway *>(boost_source_);
+        object("source", "giveaway");
+        object("giveaway_message_id", as_client_message_id_unchecked(source->giveaway_message_id_));
+        if (source->user_id_ != 0) {
+          object("user", JsonUser(source->user_id_, client_));
+        } else if (source->is_unclaimed_) {
+          object("is_unclaimed", td::JsonTrue());
+        }
+        break;
+      }
+      default:
+        UNREACHABLE();
+    }
+  }
+
+ private:
+  const td_api::ChatBoostSource *boost_source_;
+  const Client *client_;
+};
+
+class Client::JsonChatBoost final : public td::Jsonable {
+ public:
+  JsonChatBoost(const td_api::chatBoost *boost, const Client *client) : boost_(boost), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("boost_id", boost_->id_);
+    object("add_date", boost_->start_date_);
+    object("expiration_date", boost_->expiration_date_);
+    object("source", JsonChatBoostSource(boost_->source_.get(), client_));
+  }
+
+ private:
+  const td_api::chatBoost *boost_;
+  const Client *client_;
+};
+
+class Client::JsonChatBoostUpdated final : public td::Jsonable {
+ public:
+  JsonChatBoostUpdated(const td_api::updateChatBoost *update, const Client *client) : update_(update), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("chat", JsonChat(update_->chat_id_, false, client_));
+    object("boost", JsonChatBoost(update_->boost_.get(), client_));
+  }
+
+ private:
+  const td_api::updateChatBoost *update_;
+  const Client *client_;
+};
+
+class Client::JsonChatBoostRemoved final : public td::Jsonable {
+ public:
+  JsonChatBoostRemoved(const td_api::updateChatBoost *update, const Client *client) : update_(update), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("chat", JsonChat(update_->chat_id_, false, client_));
+    object("boost_id", update_->boost_->id_);
+    object("remove_date", update_->boost_->start_date_);
+    object("source", JsonChatBoostSource(update_->boost_->source_.get(), client_));
+  }
+
+ private:
+  const td_api::updateChatBoost *update_;
+  const Client *client_;
+};
+
 class Client::JsonGameHighScore final : public td::Jsonable {
  public:
   JsonGameHighScore(const td_api::gameHighScore *score, const Client *client) : score_(score), client_(client) {
@@ -5455,6 +5546,9 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       break;
     case td_api::updateNewChatJoinRequest::ID:
       add_update_chat_join_request(move_object_as<td_api::updateNewChatJoinRequest>(result));
+      break;
+    case td_api::updateChatBoost::ID:
+      add_update_chat_boost(move_object_as<td_api::updateChatBoost>(result));
       break;
     case td_api::updateConnectionState::ID: {
       auto update = move_object_as<td_api::updateConnectionState>(result);
@@ -10755,6 +10849,10 @@ td::Slice Client::get_update_type_name(UpdateType update_type) {
       return td::Slice("chat_member");
     case UpdateType::ChatJoinRequest:
       return td::Slice("chat_join_request");
+    case UpdateType::ChatBoostUpdated:
+      return td::Slice("chat_boost");
+    case UpdateType::ChatBoostRemoved:
+      return td::Slice("removed_chat_boost");
     default:
       UNREACHABLE();
       return td::Slice();
@@ -11059,6 +11157,22 @@ void Client::add_update_chat_join_request(object_ptr<td_api::updateNewChatJoinRe
     add_update(UpdateType::ChatJoinRequest, JsonChatJoinRequest(update.get(), this), left_time, webhook_queue_id);
   } else {
     LOG(DEBUG) << "Skip updateNewChatJoinRequest with date " << update->request_->date_ << ", because current date is "
+               << get_unix_time();
+  }
+}
+
+void Client::add_update_chat_boost(object_ptr<td_api::updateChatBoost> &&update) {
+  CHECK(update != nullptr);
+  auto left_time = update->boost_->start_date_ + 86400 - get_unix_time();
+  if (left_time > 0) {
+    auto webhook_queue_id = update->chat_id_ + (static_cast<int64>(7) << 33);
+    if (update->boost_->expiration_date_ == 0) {
+      add_update(UpdateType::ChatBoostRemoved, JsonChatBoostRemoved(update.get(), this), left_time, webhook_queue_id);
+    } else {
+      add_update(UpdateType::ChatBoostUpdated, JsonChatBoostUpdated(update.get(), this), left_time, webhook_queue_id);
+    }
+  } else {
+    LOG(DEBUG) << "Skip updateChatBoost with date " << update->boost_->start_date_ << ", because current date is "
                << get_unix_time();
   }
 }
@@ -11867,6 +11981,14 @@ td::int64 Client::as_tdlib_message_id(int32 message_id) {
 td::int32 Client::as_client_message_id(int64 message_id) {
   auto result = static_cast<int32>(message_id >> 20);
   CHECK(as_tdlib_message_id(result) == message_id);
+  return result;
+}
+
+td::int32 Client::as_client_message_id_unchecked(int64 message_id) {
+  auto result = static_cast<int32>(message_id >> 20);
+  if (as_tdlib_message_id(result) != message_id) {
+    return 0;
+  }
   return result;
 }
 
