@@ -777,6 +777,7 @@ class Client final : public WebhookActor::Callback {
     td::string title;
     int32 message_auto_delete_time = 0;
     int32 accent_color_id = -1;
+    int64 background_custom_emoji_id = 0;
     bool has_protected_content = false;
     object_ptr<td_api::chatPhotoInfo> photo_info;
     object_ptr<td_api::chatPermissions> permissions;

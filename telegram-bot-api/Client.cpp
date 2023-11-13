@@ -879,6 +879,9 @@ class Client::JsonChat final : public td::Jsonable {
       }
       CHECK(chat_info->accent_color_id != -1);
       object("accent_color_id", chat_info->accent_color_id);
+      if (chat_info->background_custom_emoji_id != 0) {
+        object("background_custom_emoji_id", td::to_string(chat_info->background_custom_emoji_id));
+      }
       if (chat_info->has_protected_content) {
         object("has_protected_content", td::JsonTrue());
       }
@@ -5248,6 +5251,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       chat_info->permissions = std::move(chat->permissions_);
       chat_info->message_auto_delete_time = chat->message_auto_delete_time_;
       chat_info->accent_color_id = chat->accent_color_id_;
+      chat_info->background_custom_emoji_id = chat->background_custom_emoji_id_;
       chat_info->has_protected_content = chat->has_protected_content_;
       break;
     }
@@ -5284,6 +5288,13 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       auto chat_info = add_chat(update->chat_id_);
       CHECK(chat_info->type != ChatInfo::Type::Unknown);
       chat_info->accent_color_id = update->accent_color_id_;
+      break;
+    }
+    case td_api::updateChatBackgroundCustomEmoji::ID: {
+      auto update = move_object_as<td_api::updateChatBackgroundCustomEmoji>(result);
+      auto chat_info = add_chat(update->chat_id_);
+      CHECK(chat_info->type != ChatInfo::Type::Unknown);
+      chat_info->background_custom_emoji_id = update->background_custom_emoji_id_;
       break;
     }
     case td_api::updateChatHasProtectedContent::ID: {
