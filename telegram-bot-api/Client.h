@@ -817,13 +817,8 @@ class Client final : public WebhookActor::Callback {
     int64 message_thread_id = 0;
     int32 date = 0;
     int32 edit_date = 0;
-    int64 initial_chat_id = 0;
-    int64 initial_sender_user_id = 0;
-    int64 initial_sender_chat_id = 0;
     int32 initial_send_date = 0;
-    int64 initial_message_id = 0;
-    td::string initial_author_signature;
-    td::string initial_sender_name;
+    object_ptr<td_api::MessageOrigin> forward_origin;
     td::string author_signature;
     object_ptr<td_api::messageReplyToMessage> reply_to_message;
     int64 media_album_id = 0;

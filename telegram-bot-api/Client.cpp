@@ -2032,23 +2032,39 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     object("message_thread_id", as_client_message_id(message_->message_thread_id));
   }
   if (message_->initial_send_date > 0) {
-    if (message_->initial_sender_user_id != 0) {
-      object("forward_from", JsonUser(message_->initial_sender_user_id, client_));
-    }
-    if (message_->initial_sender_chat_id != 0) {
-      object("forward_from_chat", JsonChat(message_->initial_sender_chat_id, false, client_));
-    }
-    if (message_->initial_chat_id != 0) {
-      object("forward_from_chat", JsonChat(message_->initial_chat_id, false, client_));
-      if (message_->initial_message_id != 0) {
-        object("forward_from_message_id", as_client_message_id(message_->initial_message_id));
+    CHECK(message_->forward_origin != nullptr);
+    switch (message_->forward_origin->get_id()) {
+      case td_api::messageOriginUser::ID: {
+        auto forward_info = static_cast<const td_api::messageOriginUser *>(message_->forward_origin.get());
+        object("forward_from", JsonUser(forward_info->sender_user_id_, client_));
+        break;
       }
-    }
-    if (!message_->initial_author_signature.empty()) {
-      object("forward_signature", message_->initial_author_signature);
-    }
-    if (!message_->initial_sender_name.empty()) {
-      object("forward_sender_name", message_->initial_sender_name);
+      case td_api::messageOriginChat::ID: {
+        auto forward_info = static_cast<const td_api::messageOriginChat *>(message_->forward_origin.get());
+        object("forward_from_chat", JsonChat(forward_info->sender_chat_id_, false, client_));
+        if (!forward_info->author_signature_.empty()) {
+          object("forward_signature", forward_info->author_signature_);
+        }
+        break;
+      }
+      case td_api::messageOriginHiddenUser::ID: {
+        auto forward_info = static_cast<const td_api::messageOriginHiddenUser *>(message_->forward_origin.get());
+        if (!forward_info->sender_name_.empty()) {
+          object("forward_sender_name", forward_info->sender_name_);
+        }
+        break;
+      }
+      case td_api::messageOriginChannel::ID: {
+        auto forward_info = static_cast<const td_api::messageOriginChannel *>(message_->forward_origin.get());
+        object("forward_from_chat", JsonChat(forward_info->chat_id_, false, client_));
+        object("forward_from_message_id", as_client_message_id(forward_info->message_id_));
+        if (!forward_info->author_signature_.empty()) {
+          object("forward_signature", forward_info->author_signature_);
+        }
+        break;
+      }
+      default:
+        UNREACHABLE();
     }
     if (message_->is_automatic_forward) {
       object("is_automatic_forward", td::JsonTrue());
@@ -11847,51 +11863,20 @@ Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message,
   message_info->media_album_id = message->media_album_id_;
   message_info->via_bot_user_id = message->via_bot_user_id_;
 
-  message_info->initial_chat_id = 0;
-  message_info->initial_sender_user_id = 0;
-  message_info->initial_sender_chat_id = 0;
-  message_info->initial_send_date = 0;
-  message_info->initial_message_id = 0;
-  message_info->initial_author_signature = td::string();
-  message_info->initial_sender_name = td::string();
-  message_info->is_automatic_forward = false;
   if (message->forward_info_ != nullptr) {
     message_info->initial_send_date = message->forward_info_->date_;
-    auto origin = std::move(message->forward_info_->origin_);
-    switch (origin->get_id()) {
-      case td_api::messageOriginUser::ID: {
-        auto forward_info = move_object_as<td_api::messageOriginUser>(origin);
-        message_info->initial_sender_user_id = forward_info->sender_user_id_;
-        break;
-      }
-      case td_api::messageOriginChat::ID: {
-        auto forward_info = move_object_as<td_api::messageOriginChat>(origin);
-        message_info->initial_sender_chat_id = forward_info->sender_chat_id_;
-        message_info->initial_author_signature = std::move(forward_info->author_signature_);
-        break;
-      }
-      case td_api::messageOriginHiddenUser::ID: {
-        auto forward_info = move_object_as<td_api::messageOriginHiddenUser>(origin);
-        message_info->initial_sender_name = std::move(forward_info->sender_name_);
-        break;
-      }
-      case td_api::messageOriginChannel::ID: {
-        auto forward_info = move_object_as<td_api::messageOriginChannel>(origin);
-        message_info->initial_chat_id = forward_info->chat_id_;
-        message_info->initial_message_id = forward_info->message_id_;
-        message_info->initial_author_signature = std::move(forward_info->author_signature_);
-        break;
-      }
-      default:
-        UNREACHABLE();
-    }
+    message_info->forward_origin = std::move(message->forward_info_->origin_);
+
     auto from_chat_id = message->forward_info_->from_chat_id_;
     message_info->is_automatic_forward =
         from_chat_id != 0 && from_chat_id != chat_id && message->forward_info_->from_message_id_ != 0 &&
         get_chat_type(chat_id) == ChatType::Supergroup && get_chat_type(from_chat_id) == ChatType::Channel;
   } else if (message->import_info_ != nullptr) {
     message_info->initial_send_date = message->import_info_->date_;
-    message_info->initial_sender_name = std::move(message->import_info_->sender_name_);
+    message_info->forward_origin = make_object<td_api::messageOriginHiddenUser>(message->import_info_->sender_name_);
+  } else {
+    message_info->initial_send_date = 0;
+    message_info->forward_origin = nullptr;
   }
 
   CHECK(message->sender_id_ != nullptr);
