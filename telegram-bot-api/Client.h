@@ -760,6 +760,7 @@ class Client final : public WebhookActor::Callback {
     bool is_supergroup = false;
     bool is_forum = false;
     bool can_set_sticker_set = false;
+    bool is_all_history_available = false;
     bool has_location = false;
     bool join_to_send_messages = false;
     bool join_by_request = false;

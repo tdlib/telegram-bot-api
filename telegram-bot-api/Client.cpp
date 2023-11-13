@@ -800,6 +800,9 @@ class Client::JsonChat final : public td::Jsonable {
           if (supergroup_info->can_set_sticker_set) {
             object("can_set_sticker_set", td::JsonTrue());
           }
+          if (supergroup_info->is_all_history_available) {
+            object("has_visible_history", td::JsonTrue());
+          }
           if (supergroup_info->is_supergroup) {
             object("permissions", JsonChatPermissions(chat_info->permissions.get()));
           }
@@ -5332,6 +5335,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
           full_info->invite_link_ != nullptr ? std::move(full_info->invite_link_->invite_link_) : td::string());
       supergroup_info->sticker_set_id = full_info->sticker_set_id_;
       supergroup_info->can_set_sticker_set = full_info->can_set_sticker_set_;
+      supergroup_info->is_all_history_available = full_info->is_all_history_available_;
       supergroup_info->slow_mode_delay = full_info->slow_mode_delay_;
       supergroup_info->linked_chat_id = full_info->linked_chat_id_;
       supergroup_info->location = std::move(full_info->location_);
