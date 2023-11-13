@@ -877,6 +877,8 @@ class Client::JsonChat final : public td::Jsonable {
       if (chat_info->message_auto_delete_time != 0) {
         object("message_auto_delete_time", chat_info->message_auto_delete_time);
       }
+      CHECK(chat_info->accent_color_id != -1);
+      object("accent_color_id", chat_info->accent_color_id);
       if (chat_info->has_protected_content) {
         object("has_protected_content", td::JsonTrue());
       }
@@ -5245,6 +5247,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       chat_info->photo_info = std::move(chat->photo_);
       chat_info->permissions = std::move(chat->permissions_);
       chat_info->message_auto_delete_time = chat->message_auto_delete_time_;
+      chat_info->accent_color_id = chat->accent_color_id_;
       chat_info->has_protected_content = chat->has_protected_content_;
       break;
     }
@@ -5274,6 +5277,13 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       auto chat_info = add_chat(update->chat_id_);
       CHECK(chat_info->type != ChatInfo::Type::Unknown);
       chat_info->message_auto_delete_time = update->message_auto_delete_time_;
+      break;
+    }
+    case td_api::updateChatAccentColor::ID: {
+      auto update = move_object_as<td_api::updateChatAccentColor>(result);
+      auto chat_info = add_chat(update->chat_id_);
+      CHECK(chat_info->type != ChatInfo::Type::Unknown);
+      chat_info->accent_color_id = update->accent_color_id_;
       break;
     }
     case td_api::updateChatHasProtectedContent::ID: {
