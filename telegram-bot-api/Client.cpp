@@ -2330,6 +2330,7 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     case td_api::messagePremiumGiftCode::ID:
       break;
     case td_api::messagePremiumGiveawayCreated::ID:
+      object("giveaway_created", JsonEmptyObject());
       break;
     case td_api::messagePremiumGiveaway::ID:
       break;
@@ -11106,6 +11107,7 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       case td_api::messageForumTopicEdited::ID:
       case td_api::messageForumTopicIsClosedToggled::ID:
       case td_api::messageForumTopicIsHiddenToggled::ID:
+      case td_api::messagePremiumGiveawayCreated::ID:
         // don't skip
         break;
       default:
@@ -11215,8 +11217,6 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageChatSetBackground::ID:
       return true;
     case td_api::messagePremiumGiftCode::ID:
-      return true;
-    case td_api::messagePremiumGiveawayCreated::ID:
       return true;
     case td_api::messagePremiumGiveaway::ID:
       return true;
