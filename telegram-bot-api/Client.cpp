@@ -2063,6 +2063,136 @@ class Client::JsonReplyMarkup final : public td::Jsonable {
   const td_api::ReplyMarkup *reply_markup_;
 };
 
+class Client::JsonExternalReplyInfo final : public td::Jsonable {
+ public:
+  JsonExternalReplyInfo(const td_api::messageReplyToMessage *reply, const Client *client)
+      : reply_(reply), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("origin", JsonMessageOrigin(reply_->origin_.get(), reply_->origin_send_date_, client_));
+    if (reply_->chat_id_ != 0) {
+      object("chat", JsonChat(reply_->chat_id_, false, client_));
+      if (reply_->message_id_ != 0) {
+        object("message_id", as_client_message_id(reply_->message_id_));
+      }
+    }
+    if (reply_->content_ != nullptr) {
+      switch (reply_->content_->get_id()) {
+        case td_api::messageText::ID: {
+          auto content = static_cast<const td_api::messageText *>(reply_->content_.get());
+          if (content->link_preview_options_ != nullptr) {
+            object("link_preview_options", JsonLinkPreviewOptions(content->link_preview_options_.get(), client_));
+          }
+          break;
+        }
+        case td_api::messageAnimation::ID: {
+          auto content = static_cast<const td_api::messageAnimation *>(reply_->content_.get());
+          object("animation", JsonAnimation(content->animation_.get(), false, client_));
+          add_media_spoiler(object, content->has_spoiler_);
+          break;
+        }
+        case td_api::messageAudio::ID: {
+          auto content = static_cast<const td_api::messageAudio *>(reply_->content_.get());
+          object("audio", JsonAudio(content->audio_.get(), client_));
+          break;
+        }
+        case td_api::messageDocument::ID: {
+          auto content = static_cast<const td_api::messageDocument *>(reply_->content_.get());
+          object("document", JsonDocument(content->document_.get(), client_));
+          break;
+        }
+        case td_api::messagePhoto::ID: {
+          auto content = static_cast<const td_api::messagePhoto *>(reply_->content_.get());
+          CHECK(content->photo_ != nullptr);
+          object("photo", JsonPhoto(content->photo_.get(), client_));
+          add_media_spoiler(object, content->has_spoiler_);
+          break;
+        }
+        case td_api::messageSticker::ID: {
+          auto content = static_cast<const td_api::messageSticker *>(reply_->content_.get());
+          object("sticker", JsonSticker(content->sticker_.get(), client_));
+          break;
+        }
+        case td_api::messageVideo::ID: {
+          auto content = static_cast<const td_api::messageVideo *>(reply_->content_.get());
+          object("video", JsonVideo(content->video_.get(), client_));
+          add_media_spoiler(object, content->has_spoiler_);
+          break;
+        }
+        case td_api::messageVideoNote::ID: {
+          auto content = static_cast<const td_api::messageVideoNote *>(reply_->content_.get());
+          object("video_note", JsonVideoNote(content->video_note_.get(), client_));
+          break;
+        }
+        case td_api::messageVoiceNote::ID: {
+          auto content = static_cast<const td_api::messageVoiceNote *>(reply_->content_.get());
+          object("voice", JsonVoiceNote(content->voice_note_.get(), client_));
+          break;
+        }
+        case td_api::messageContact::ID: {
+          auto content = static_cast<const td_api::messageContact *>(reply_->content_.get());
+          object("contact", JsonContact(content->contact_.get()));
+          break;
+        }
+        case td_api::messageDice::ID: {
+          auto content = static_cast<const td_api::messageDice *>(reply_->content_.get());
+          object("dice", JsonDice(content->emoji_, content->value_));
+          break;
+        }
+        case td_api::messageGame::ID: {
+          auto content = static_cast<const td_api::messageGame *>(reply_->content_.get());
+          object("game", JsonGame(content->game_.get(), client_));
+          break;
+        }
+        case td_api::messageInvoice::ID: {
+          auto content = static_cast<const td_api::messageInvoice *>(reply_->content_.get());
+          object("invoice", JsonInvoice(content));
+          break;
+        }
+        case td_api::messageLocation::ID: {
+          auto content = static_cast<const td_api::messageLocation *>(reply_->content_.get());
+          object("location", JsonLocation(content->location_.get(), content->expires_in_, content->live_period_,
+                                          content->heading_, content->proximity_alert_radius_));
+          break;
+        }
+        case td_api::messageVenue::ID: {
+          auto content = static_cast<const td_api::messageVenue *>(reply_->content_.get());
+          object("venue", JsonVenue(content->venue_.get()));
+          break;
+        }
+        case td_api::messagePoll::ID: {
+          auto content = static_cast<const td_api::messagePoll *>(reply_->content_.get());
+          object("poll", JsonPoll(content->poll_.get(), client_));
+          break;
+        }
+        case td_api::messageUnsupported::ID:
+          break;
+        case td_api::messagePremiumGiveaway::ID: {
+          auto content = static_cast<const td_api::messagePremiumGiveaway *>(reply_->content_.get());
+          object("giveaway", JsonGiveaway(content, client_));
+          break;
+        }
+        case td_api::messageStory::ID:
+          object("story", JsonEmptyObject());
+          break;
+        default:
+          LOG(ERROR) << "Receive external reply with " << to_string(reply_->content_);
+      }
+    }
+  }
+
+ private:
+  const td_api::messageReplyToMessage *reply_;
+  const Client *client_;
+
+  void add_media_spoiler(td::JsonObjectScope &object, bool has_spoiler) const {
+    if (has_spoiler) {
+      object("has_media_spoiler", td::JsonTrue());
+    }
+  }
+};
+
 void Client::JsonMessage::store(td::JsonValueScope *scope) const {
   CHECK(message_ != nullptr);
   auto object = scope->enter_object();
@@ -2140,7 +2270,7 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     }
   }
   if (message_->reply_to_message != nullptr && message_->reply_to_message->origin_ != nullptr) {
-    // external reply
+    object("external_reply", JsonExternalReplyInfo(message_->reply_to_message.get(), client_));
   }
   if (message_->media_album_id != 0) {
     object("media_group_id", td::to_string(message_->media_album_id));
