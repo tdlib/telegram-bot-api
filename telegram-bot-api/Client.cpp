@@ -11774,7 +11774,9 @@ void Client::drop_internal_reply_to_message_in_another_chat(object_ptr<td_api::m
     auto reply_in_chat_id = reply_to->chat_id_;
     if (reply_in_chat_id != message->chat_id_ && reply_to->origin_ == nullptr) {
       LOG(ERROR) << "Drop reply to message " << message->id_ << " in chat " << message->chat_id_
-                 << " from another chat " << reply_in_chat_id;
+                 << " from another chat " << reply_in_chat_id << " sent at " << message->date_
+                 << " and originally sent at "
+                 << (message->forward_info_ != nullptr ? message->forward_info_->date_ : -1);
       message->reply_to_ = nullptr;
     }
   }
