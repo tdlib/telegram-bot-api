@@ -2272,6 +2272,12 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
   if (message_->reply_to_message != nullptr && message_->reply_to_message->origin_ != nullptr) {
     object("external_reply", JsonExternalReplyInfo(message_->reply_to_message.get(), client_));
   }
+  if (message_->reply_to_message != nullptr && message_->reply_to_message->quote_ != nullptr) {
+    object("quote", message_->reply_to_message->quote_->text_);
+    if (!message_->reply_to_message->quote_->entities_.empty()) {
+      object("quote_entities", JsonVectorEntities(message_->reply_to_message->quote_->entities_, client_));
+    }
+  }
   if (message_->media_album_id != 0) {
     object("media_group_id", td::to_string(message_->media_album_id));
   }
