@@ -304,8 +304,8 @@ class Client final : public WebhookActor::Callback {
                      td::Slice message_type, PromisedQueryPtr query, OnSuccess on_success);
 
   template <class OnSuccess>
-  void check_message_thread(int64 chat_id, int64 message_thread_id, int64 reply_to_message_id, PromisedQueryPtr query,
-                            OnSuccess on_success);
+  void check_reply_parameters(td::Slice chat_id_str, int64 reply_to_message_id, bool allow_sending_without_reply,
+                              int64 message_thread_id, PromisedQueryPtr query, OnSuccess on_success);
 
   template <class OnSuccess>
   void resolve_sticker_set(const td::string &sticker_set_name, PromisedQueryPtr query, OnSuccess on_success);
