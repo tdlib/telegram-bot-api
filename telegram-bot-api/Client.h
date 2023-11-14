@@ -248,10 +248,12 @@ class Client final : public WebhookActor::Callback {
   struct InputReplyParameters {
     int64 reply_to_message_id = 0;
     bool allow_sending_without_reply = false;
+    object_ptr<td_api::formattedText> quote;
   };
 
   struct CheckedReplyParameters {
     int64 reply_to_message_id = 0;
+    object_ptr<td_api::formattedText> quote;
   };
 
   struct UserInfo;
@@ -350,8 +352,7 @@ class Client final : public WebhookActor::Callback {
 
   static bool to_bool(td::MutableSlice value);
 
-  static object_ptr<td_api::InputMessageReplyTo> get_input_message_reply_to(
-      const CheckedReplyParameters &reply_parameters);
+  static object_ptr<td_api::InputMessageReplyTo> get_input_message_reply_to(CheckedReplyParameters &&reply_parameters);
 
   static td::Result<InputReplyParameters> get_reply_parameters(const Query *query);
 
