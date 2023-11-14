@@ -245,6 +245,15 @@ class Client final : public WebhookActor::Callback {
     virtual ~TdQueryCallback() = default;
   };
 
+  struct InputReplyParameters {
+    int64 reply_to_message_id = 0;
+    bool allow_sending_without_reply = false;
+  };
+
+  struct CheckedReplyParameters {
+    int64 reply_to_message_id = 0;
+  };
+
   struct UserInfo;
   struct ChatInfo;
   struct BotCommandScope;
@@ -304,8 +313,8 @@ class Client final : public WebhookActor::Callback {
                      td::Slice message_type, PromisedQueryPtr query, OnSuccess on_success);
 
   template <class OnSuccess>
-  void check_reply_parameters(td::Slice chat_id_str, int64 reply_to_message_id, bool allow_sending_without_reply,
-                              int64 message_thread_id, PromisedQueryPtr query, OnSuccess on_success);
+  void check_reply_parameters(td::Slice chat_id_str, InputReplyParameters &&reply_parameters, int64 message_thread_id,
+                              PromisedQueryPtr query, OnSuccess on_success);
 
   template <class OnSuccess>
   void resolve_sticker_set(const td::string &sticker_set_name, PromisedQueryPtr query, OnSuccess on_success);
@@ -341,7 +350,12 @@ class Client final : public WebhookActor::Callback {
 
   static bool to_bool(td::MutableSlice value);
 
-  static object_ptr<td_api::InputMessageReplyTo> get_input_message_reply_to(int64 reply_to_message_id);
+  static object_ptr<td_api::InputMessageReplyTo> get_input_message_reply_to(
+      const CheckedReplyParameters &reply_parameters);
+
+  static td::Result<InputReplyParameters> get_reply_parameters(const Query *query);
+
+  static td::Result<InputReplyParameters> get_reply_parameters(td::JsonValue &&value);
 
   static td::Result<object_ptr<td_api::keyboardButton>> get_keyboard_button(td::JsonValue &button);
 

@@ -3851,12 +3851,12 @@ class Client::TdOnCheckMessageCallback final : public TdQueryCallback {
 template <class OnSuccess>
 class Client::TdOnCheckMessageThreadCallback final : public TdQueryCallback {
  public:
-  TdOnCheckMessageThreadCallback(Client *client, int64 chat_id, int64 message_thread_id, int64 reply_to_message_id,
-                                 PromisedQueryPtr query, OnSuccess on_success)
+  TdOnCheckMessageThreadCallback(Client *client, int64 chat_id, int64 message_thread_id,
+                                 CheckedReplyParameters reply_parameters, PromisedQueryPtr query, OnSuccess on_success)
       : client_(client)
       , chat_id_(chat_id)
       , message_thread_id_(message_thread_id)
-      , reply_to_message_id_(reply_to_message_id)
+      , reply_parameters_(std::move(reply_parameters))
       , query_(std::move(query))
       , on_success_(std::move(on_success)) {
   }
@@ -3885,14 +3885,14 @@ class Client::TdOnCheckMessageThreadCallback final : public TdQueryCallback {
                                    "Message thread is not a forum topic thread");
     }
 
-    on_success_(chat_id_, message_thread_id_, reply_to_message_id_, std::move(query_));
+    on_success_(chat_id_, message_thread_id_, std::move(reply_parameters_), std::move(query_));
   }
 
  private:
   Client *client_;
   int64 chat_id_;
   int64 message_thread_id_;
-  int64 reply_to_message_id_;
+  CheckedReplyParameters reply_parameters_;
   PromisedQueryPtr query_;
   OnSuccess on_success_;
 };
@@ -5184,14 +5184,18 @@ void Client::check_message(td::Slice chat_id_str, int64 message_id, bool allow_e
 }
 
 template <class OnSuccess>
-void Client::check_reply_parameters(td::Slice chat_id_str, int64 reply_to_message_id, bool allow_sending_without_reply,
+void Client::check_reply_parameters(td::Slice chat_id_str, InputReplyParameters &&reply_parameters,
                                     int64 message_thread_id, PromisedQueryPtr query, OnSuccess on_success) {
-  check_message(chat_id_str, reply_to_message_id, reply_to_message_id <= 0 || allow_sending_without_reply,
+  check_message(chat_id_str, reply_parameters.reply_to_message_id,
+                reply_parameters.reply_to_message_id <= 0 || reply_parameters.allow_sending_without_reply,
                 AccessRights::Write, "message to reply", std::move(query),
                 [this, message_thread_id, on_success = std::move(on_success)](int64 chat_id, int64 reply_to_message_id,
                                                                               PromisedQueryPtr query) mutable {
+                  CheckedReplyParameters reply_parameters;
+                  reply_parameters.reply_to_message_id = reply_to_message_id;
+
                   if (message_thread_id <= 0) {
-                    return on_success(chat_id, 0, reply_to_message_id, std::move(query));
+                    return on_success(chat_id, 0, std::move(reply_parameters), std::move(query));
                   }
 
                   if (reply_to_message_id != 0) {
@@ -5203,12 +5207,12 @@ void Client::check_reply_parameters(td::Slice chat_id_str, int64 reply_to_messag
                     }
                   }
                   if (reply_to_message_id == message_thread_id) {
-                    return on_success(chat_id, message_thread_id, reply_to_message_id, std::move(query));
+                    return on_success(chat_id, message_thread_id, std::move(reply_parameters), std::move(query));
                   }
 
                   send_request(make_object<td_api::getMessage>(chat_id, message_thread_id),
                                td::make_unique<TdOnCheckMessageThreadCallback<OnSuccess>>(
-                                   this, chat_id, message_thread_id, reply_to_message_id, std::move(query),
+                                   this, chat_id, message_thread_id, std::move(reply_parameters), std::move(query),
                                    std::move(on_success)));
                 });
 }
@@ -5975,11 +5979,49 @@ bool Client::to_bool(td::MutableSlice value) {
   return value == "true" || value == "yes" || value == "1";
 }
 
-td_api::object_ptr<td_api::InputMessageReplyTo> Client::get_input_message_reply_to(int64 reply_to_message_id) {
-  if (reply_to_message_id > 0) {
-    return make_object<td_api::inputMessageReplyToMessage>(0, reply_to_message_id, nullptr);
+td_api::object_ptr<td_api::InputMessageReplyTo> Client::get_input_message_reply_to(
+    const CheckedReplyParameters &reply_parameters) {
+  if (reply_parameters.reply_to_message_id > 0) {
+    return make_object<td_api::inputMessageReplyToMessage>(0, reply_parameters.reply_to_message_id, nullptr);
   }
   return nullptr;
+}
+
+td::Result<Client::InputReplyParameters> Client::get_reply_parameters(const Query *query) {
+  if (!query->has_arg("reply_parameters")) {
+    InputReplyParameters result;
+    result.reply_to_message_id = get_message_id(query, "reply_to_message_id");
+    result.allow_sending_without_reply = to_bool(query->arg("allow_sending_without_reply"));
+    return std::move(result);
+  }
+
+  auto reply_parameters = query->arg("reply_parameters");
+  if (reply_parameters.empty()) {
+    return InputReplyParameters();
+  }
+
+  LOG(INFO) << "Parsing JSON object: " << reply_parameters;
+  auto r_value = json_decode(reply_parameters);
+  if (r_value.is_error()) {
+    LOG(INFO) << "Can't parse JSON object: " << r_value.error();
+    return td::Status::Error(400, "Can't parse reply parameters JSON object");
+  }
+
+  return get_reply_parameters(r_value.move_as_ok());
+}
+
+td::Result<Client::InputReplyParameters> Client::get_reply_parameters(td::JsonValue &&value) {
+  if (value.type() != td::JsonValue::Type::Object) {
+    return td::Status::Error(400, "Object expected as reply parameters");
+  }
+  auto &object = value.get_object();
+  TRY_RESULT(message_id, object.get_required_int_field("message_id"));
+  TRY_RESULT(allow_sending_without_reply, object.get_optional_bool_field("allow_sending_without_reply"));
+
+  InputReplyParameters result;
+  result.reply_to_message_id = as_tdlib_message_id(td::max(message_id, 0));
+  result.allow_sending_without_reply = allow_sending_without_reply;
+  return std::move(result);
 }
 
 td::Result<td_api::object_ptr<td_api::keyboardButton>> Client::get_keyboard_button(td::JsonValue &button) {
@@ -8835,8 +8877,7 @@ td::Status Client::process_forward_message_query(PromisedQueryPtr &query) {
 td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
   auto message_thread_id = get_message_id(query.get(), "message_thread_id");
-  auto reply_to_message_id = get_message_id(query.get(), "reply_to_message_id");
-  auto allow_sending_without_reply = to_bool(query->arg("allow_sending_without_reply"));
+  TRY_RESULT(reply_parameters, get_reply_parameters(query.get()));
   auto disable_notification = to_bool(query->arg("disable_notification"));
   auto protect_content = to_bool(query->arg("protect_content"));
   // TRY_RESULT(reply_markup, get_reply_markup(query.get(), bot_user_ids_));
@@ -8845,13 +8886,13 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
 
   resolve_reply_markup_bot_usernames(
       std::move(reply_markup), std::move(query),
-      [this, chat_id = chat_id.str(), message_thread_id, reply_to_message_id, allow_sending_without_reply,
+      [this, chat_id = chat_id.str(), message_thread_id, reply_parameters = std::move(reply_parameters),
        disable_notification, protect_content, input_message_contents = std::move(input_message_contents)](
           object_ptr<td_api::ReplyMarkup> reply_markup, PromisedQueryPtr query) mutable {
         auto on_success = [this, disable_notification, protect_content,
                            input_message_contents = std::move(input_message_contents),
                            reply_markup = std::move(reply_markup)](int64 chat_id, int64 message_thread_id,
-                                                                   int64 reply_to_message_id,
+                                                                   CheckedReplyParameters reply_parameters,
                                                                    PromisedQueryPtr query) mutable {
           auto &count = yet_unsent_message_count_[chat_id];
           if (count >= MAX_CONCURRENTLY_SENT_CHAT_MESSAGES) {
@@ -8862,12 +8903,12 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
 
           send_request(
               make_object<td_api::sendMessageAlbum>(
-                  chat_id, message_thread_id, get_input_message_reply_to(reply_to_message_id),
+                  chat_id, message_thread_id, get_input_message_reply_to(reply_parameters),
                   get_message_send_options(disable_notification, protect_content), std::move(input_message_contents)),
               td::make_unique<TdOnSendMessageAlbumCallback>(this, chat_id, message_count, std::move(query)));
         };
-        check_reply_parameters(chat_id, reply_to_message_id, allow_sending_without_reply, message_thread_id,
-                               std::move(query), std::move(on_success));
+        check_reply_parameters(chat_id, std::move(reply_parameters), message_thread_id, std::move(query),
+                               std::move(on_success));
       });
   return td::Status::OK();
 }
@@ -10580,8 +10621,11 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
                              bool force) {
   auto chat_id = query->arg("chat_id");
   auto message_thread_id = get_message_id(query.get(), "message_thread_id");
-  auto reply_to_message_id = get_message_id(query.get(), "reply_to_message_id");
-  auto allow_sending_without_reply = to_bool(query->arg("allow_sending_without_reply"));
+  auto r_reply_parameters = get_reply_parameters(query.get());
+  if (r_reply_parameters.is_error()) {
+    return fail_query_with_error(std::move(query), 400, r_reply_parameters.error().message());
+  }
+  auto reply_parameters = r_reply_parameters.move_as_ok();
   auto disable_notification = to_bool(query->arg("disable_notification"));
   auto protect_content = to_bool(query->arg("protect_content"));
   auto r_reply_markup = get_reply_markup(query.get(), bot_user_ids_);
@@ -10592,13 +10636,13 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
 
   resolve_reply_markup_bot_usernames(
       std::move(reply_markup), std::move(query),
-      [this, chat_id = chat_id.str(), message_thread_id, reply_to_message_id, allow_sending_without_reply,
+      [this, chat_id = chat_id.str(), message_thread_id, reply_parameters = std::move(reply_parameters),
        disable_notification, protect_content, input_message_content = std::move(input_message_content)](
           object_ptr<td_api::ReplyMarkup> reply_markup, PromisedQueryPtr query) mutable {
         auto on_success = [this, disable_notification, protect_content,
                            input_message_content = std::move(input_message_content),
                            reply_markup = std::move(reply_markup)](int64 chat_id, int64 message_thread_id,
-                                                                   int64 reply_to_message_id,
+                                                                   CheckedReplyParameters reply_parameters,
                                                                    PromisedQueryPtr query) mutable {
           auto &count = yet_unsent_message_count_[chat_id];
           if (count >= MAX_CONCURRENTLY_SENT_CHAT_MESSAGES) {
@@ -10606,14 +10650,14 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
           }
           count++;
 
-          send_request(make_object<td_api::sendMessage>(chat_id, message_thread_id,
-                                                        get_input_message_reply_to(reply_to_message_id),
-                                                        get_message_send_options(disable_notification, protect_content),
-                                                        std::move(reply_markup), std::move(input_message_content)),
-                       td::make_unique<TdOnSendMessageCallback>(this, chat_id, std::move(query)));
+          send_request(
+              make_object<td_api::sendMessage>(chat_id, message_thread_id, get_input_message_reply_to(reply_parameters),
+                                               get_message_send_options(disable_notification, protect_content),
+                                               std::move(reply_markup), std::move(input_message_content)),
+              td::make_unique<TdOnSendMessageCallback>(this, chat_id, std::move(query)));
         };
-        check_reply_parameters(chat_id, reply_to_message_id, allow_sending_without_reply, message_thread_id,
-                               std::move(query), std::move(on_success));
+        check_reply_parameters(chat_id, std::move(reply_parameters), message_thread_id, std::move(query),
+                               std::move(on_success));
       });
 }
 
