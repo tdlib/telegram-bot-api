@@ -246,12 +246,14 @@ class Client final : public WebhookActor::Callback {
   };
 
   struct InputReplyParameters {
+    td::string reply_in_chat_id;
     int64 reply_to_message_id = 0;
     bool allow_sending_without_reply = false;
     object_ptr<td_api::formattedText> quote;
   };
 
   struct CheckedReplyParameters {
+    int64 reply_in_chat_id = 0;
     int64 reply_to_message_id = 0;
     object_ptr<td_api::formattedText> quote;
   };

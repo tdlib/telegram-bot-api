@@ -5020,7 +5020,6 @@ void Client::check_chat_access(int64 chat_id, AccessRights access_rights, const 
     case ChatInfo::Type::Supergroup: {
       auto supergroup_info = get_supergroup_info(chat_info->supergroup_id);
       CHECK(supergroup_info != nullptr);
-      bool is_public = !supergroup_info->active_usernames.empty() || supergroup_info->has_location;
       if (supergroup_info->status->get_id() == td_api::chatMemberStatusBanned::ID) {
         if (supergroup_info->is_supergroup) {
           return fail_query(403, "Forbidden: bot was kicked from the supergroup chat", std::move(query));
@@ -5028,8 +5027,9 @@ void Client::check_chat_access(int64 chat_id, AccessRights access_rights, const 
           return fail_query(403, "Forbidden: bot was kicked from the channel chat", std::move(query));
         }
       }
+      bool is_public = !supergroup_info->active_usernames.empty() || supergroup_info->has_location;
       bool need_more_access_rights = is_public ? need_edit_access : need_read_access;
-      if (supergroup_info->status->get_id() == td_api::chatMemberStatusLeft::ID && need_more_access_rights) {
+      if (!is_chat_member(supergroup_info->status) && need_more_access_rights) {
         if (supergroup_info->is_supergroup) {
           return fail_query(403, "Forbidden: bot is not a member of the supergroup chat", std::move(query));
         } else {
@@ -5186,38 +5186,68 @@ void Client::check_message(td::Slice chat_id_str, int64 message_id, bool allow_e
 template <class OnSuccess>
 void Client::check_reply_parameters(td::Slice chat_id_str, InputReplyParameters &&reply_parameters,
                                     int64 message_thread_id, PromisedQueryPtr query, OnSuccess on_success) {
-  check_message(
-      chat_id_str, reply_parameters.reply_to_message_id,
-      reply_parameters.reply_to_message_id <= 0 || reply_parameters.allow_sending_without_reply, AccessRights::Write,
-      "message to reply", std::move(query),
-      [this, message_thread_id, quote = std::move(reply_parameters.quote), on_success = std::move(on_success)](
-          int64 chat_id, int64 reply_to_message_id, PromisedQueryPtr query) mutable {
-        CheckedReplyParameters reply_parameters;
-        reply_parameters.reply_to_message_id = reply_to_message_id;
-        if (reply_to_message_id > 0) {
-          reply_parameters.quote = std::move(quote);
-        }
-
-        if (message_thread_id <= 0) {
-          return on_success(chat_id, 0, std::move(reply_parameters), std::move(query));
-        }
-
-        if (reply_to_message_id != 0) {
-          const MessageInfo *message_info = get_message(chat_id, reply_to_message_id, true);
-          CHECK(message_info != nullptr);
-          if (message_info->message_thread_id != message_thread_id) {
-            return fail_query_with_error(std::move(query), 400, "MESSAGE_THREAD_INVALID",
-                                         "Replied message is not in the specified message thread");
+  if (chat_id_str == reply_parameters.reply_in_chat_id) {
+    reply_parameters.reply_in_chat_id.clear();
+  }
+  check_chat(
+      chat_id_str, AccessRights::Write, std::move(query),
+      [this, reply_parameters = std::move(reply_parameters), message_thread_id, on_success = std::move(on_success)](
+          int64 chat_id, PromisedQueryPtr query) mutable {
+        auto on_reply_message_resolved = [this, chat_id, message_thread_id, quote = std::move(reply_parameters.quote),
+                                          on_success = std::move(on_success)](int64 reply_in_chat_id,
+                                                                              int64 reply_to_message_id,
+                                                                              PromisedQueryPtr query) mutable {
+          CheckedReplyParameters reply_parameters;
+          reply_parameters.reply_to_message_id = reply_to_message_id;
+          if (reply_to_message_id > 0) {
+            reply_parameters.reply_in_chat_id = reply_in_chat_id;
+            reply_parameters.quote = std::move(quote);
           }
-        }
-        if (reply_to_message_id == message_thread_id) {
-          return on_success(chat_id, message_thread_id, std::move(reply_parameters), std::move(query));
+
+          if (message_thread_id <= 0) {
+            // if message thread isn't specified, then the message to reply can be only from a different chat
+            if (reply_parameters.reply_in_chat_id == chat_id) {
+              reply_parameters.reply_in_chat_id = 0;
+            }
+            return on_success(chat_id, 0, std::move(reply_parameters), std::move(query));
+          }
+
+          // reply_in_chat_id must be non-zero only for replies in different chats or different topics
+          if (reply_to_message_id > 0 && reply_parameters.reply_in_chat_id == chat_id) {
+            const MessageInfo *message_info = get_message(reply_in_chat_id, reply_to_message_id, true);
+            CHECK(message_info != nullptr);
+            if (message_info->message_thread_id == message_thread_id) {
+              reply_parameters.reply_in_chat_id = 0;
+            }
+          }
+
+          send_request(make_object<td_api::getMessage>(chat_id, message_thread_id),
+                       td::make_unique<TdOnCheckMessageThreadCallback<OnSuccess>>(
+                           this, chat_id, message_thread_id, std::move(reply_parameters), std::move(query),
+                           std::move(on_success)));
+        };
+        if (reply_parameters.reply_to_message_id <= 0) {
+          return on_reply_message_resolved(0, 0, std::move(query));
         }
 
-        send_request(make_object<td_api::getMessage>(chat_id, message_thread_id),
-                     td::make_unique<TdOnCheckMessageThreadCallback<OnSuccess>>(
-                         this, chat_id, message_thread_id, std::move(reply_parameters), std::move(query),
-                         std::move(on_success)));
+        auto on_reply_chat_resolved = [this, reply_to_message_id = reply_parameters.reply_to_message_id,
+                                       allow_sending_without_reply = reply_parameters.allow_sending_without_reply,
+                                       on_success = std::move(on_reply_message_resolved)](
+                                          int64 reply_in_chat_id, PromisedQueryPtr query) mutable {
+          if (!have_message_access(reply_in_chat_id)) {
+            return fail_query_with_error(std::move(query), 400, "MESSAGE_NOT_FOUND", "message to reply not found");
+          }
+
+          send_request(make_object<td_api::getMessage>(reply_in_chat_id, reply_to_message_id),
+                       td::make_unique<TdOnCheckMessageCallback<decltype(on_success)>>(
+                           this, reply_in_chat_id, reply_to_message_id, allow_sending_without_reply, "message to reply",
+                           std::move(query), std::move(on_success)));
+        };
+        if (reply_parameters.reply_in_chat_id.empty()) {
+          return on_reply_chat_resolved(chat_id, std::move(query));
+        }
+        check_chat(reply_parameters.reply_in_chat_id, AccessRights::Read, std::move(query),
+                   std::move(on_reply_chat_resolved));
       });
 }
 
@@ -5986,8 +6016,8 @@ bool Client::to_bool(td::MutableSlice value) {
 td_api::object_ptr<td_api::InputMessageReplyTo> Client::get_input_message_reply_to(
     CheckedReplyParameters &&reply_parameters) {
   if (reply_parameters.reply_to_message_id > 0) {
-    return make_object<td_api::inputMessageReplyToMessage>(0, reply_parameters.reply_to_message_id,
-                                                           std::move(reply_parameters.quote));
+    return make_object<td_api::inputMessageReplyToMessage>(
+        reply_parameters.reply_in_chat_id, reply_parameters.reply_to_message_id, std::move(reply_parameters.quote));
   }
   return nullptr;
 }
@@ -6020,6 +6050,7 @@ td::Result<Client::InputReplyParameters> Client::get_reply_parameters(td::JsonVa
     return td::Status::Error(400, "Object expected as reply parameters");
   }
   auto &object = value.get_object();
+  TRY_RESULT(chat_id, object.get_optional_string_field("chat_id"));
   TRY_RESULT(message_id, object.get_required_int_field("message_id"));
   TRY_RESULT(allow_sending_without_reply, object.get_optional_bool_field("allow_sending_without_reply"));
   TRY_RESULT(input_quote, object.get_optional_string_field("quote"));
@@ -6028,6 +6059,7 @@ td::Result<Client::InputReplyParameters> Client::get_reply_parameters(td::JsonVa
              get_formatted_text(std::move(input_quote), std::move(parse_mode), object.extract_field("quote_entities")));
 
   InputReplyParameters result;
+  result.reply_in_chat_id = std::move(chat_id);
   result.reply_to_message_id = as_tdlib_message_id(td::max(message_id, 0));
   result.allow_sending_without_reply = allow_sending_without_reply;
   result.quote = std::move(quote);
