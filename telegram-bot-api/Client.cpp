@@ -6077,12 +6077,13 @@ td::Result<Client::InputReplyParameters> Client::get_reply_parameters(td::JsonVa
   TRY_RESULT(parse_mode, object.get_optional_string_field("quote_parse_mode"));
   TRY_RESULT(quote,
              get_formatted_text(std::move(input_quote), std::move(parse_mode), object.extract_field("quote_entities")));
+  TRY_RESULT(quote_position, object.get_optional_int_field("quote_position"));
 
   InputReplyParameters result;
   result.reply_in_chat_id = std::move(chat_id);
   result.reply_to_message_id = as_tdlib_message_id(td::max(message_id, 0));
   result.allow_sending_without_reply = allow_sending_without_reply;
-  result.quote = td_api::make_object<td_api::inputTextQuote>(std::move(quote), 0);
+  result.quote = td_api::make_object<td_api::inputTextQuote>(std::move(quote), quote_position);
   return std::move(result);
 }
 
