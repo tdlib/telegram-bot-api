@@ -896,9 +896,9 @@ class Client::JsonChat final : public td::Jsonable {
   int64 pinned_message_id_;
 };
 
-class Client::JsonDeletedMessage final : public td::Jsonable {
+class Client::JsonInaccessibleMessage final : public td::Jsonable {
  public:
-  JsonDeletedMessage(int64 chat_id, int64 message_id, const Client *client)
+  JsonInaccessibleMessage(int64 chat_id, int64 message_id, const Client *client)
       : chat_id_(chat_id), message_id_(message_id), client_(client) {
   }
   void store(td::JsonValueScope *scope) const {
@@ -2557,6 +2557,7 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
           object("pinned_message", JsonMessage(pinned_message, false, "pin in " + source_, client_));
         } else if (need_reply_) {
           LOG(INFO) << "Pinned unknown, inaccessible or deleted message " << message_id;
+          object("pinned_message", JsonInaccessibleMessage(message_->chat_id, message_id, client_));
         }
       }
       break;
@@ -2838,7 +2839,7 @@ class Client::JsonCallbackQuery final : public td::Jsonable {
     if (message_info_ != nullptr) {
       object("message", JsonMessage(message_info_, true, "callback query", client_));
     } else {
-      object("message", JsonDeletedMessage(chat_id_, message_id_, client_));
+      object("message", JsonInaccessibleMessage(chat_id_, message_id_, client_));
     }
     object("chat_instance", td::to_string(chat_instance_));
     client_->json_store_callback_query_payload(object, payload_);
@@ -11743,11 +11744,6 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       auto content = static_cast<const td_api::messagePinMessage *>(message->content_.get());
       auto pinned_message_id = content->message_id_;
       if (pinned_message_id <= 0) {
-        return true;
-      }
-      const MessageInfo *pinned_message = get_message(chat_id, pinned_message_id, true);
-      if (pinned_message == nullptr) {
-        LOG(INFO) << "Pinned unknown, inaccessible or deleted message " << pinned_message_id << " in " << chat_id;
         return true;
       }
       break;

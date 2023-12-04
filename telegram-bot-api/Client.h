@@ -131,7 +131,7 @@ class Client final : public WebhookActor::Callback {
   class JsonReplyMarkup;
   class JsonMessage;
   class JsonMessages;
-  class JsonDeletedMessage;
+  class JsonInaccessibleMessage;
   class JsonMessageId;
   class JsonInlineQuery;
   class JsonChosenInlineResult;
