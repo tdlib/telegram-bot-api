@@ -2272,9 +2272,9 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     object("external_reply", JsonExternalReplyInfo(message_->reply_to_message.get(), client_));
   }
   if (message_->reply_to_message != nullptr && message_->reply_to_message->quote_ != nullptr) {
-    object("quote", message_->reply_to_message->quote_->text_);
-    if (!message_->reply_to_message->quote_->entities_.empty()) {
-      object("quote_entities", JsonVectorEntities(message_->reply_to_message->quote_->entities_, client_));
+    object("quote", message_->reply_to_message->quote_->text_->text_);
+    if (!message_->reply_to_message->quote_->text_->entities_.empty()) {
+      object("quote_entities", JsonVectorEntities(message_->reply_to_message->quote_->text_->entities_, client_));
     }
   }
   if (message_->media_album_id != 0) {
@@ -2605,6 +2605,9 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("chat_shared", JsonChatShared(content));
       break;
     }
+    case td_api::messageStory::ID:
+      object("story", JsonEmptyObject());
+      break;
     case td_api::messageChatSetBackground::ID:
       break;
     case td_api::messagePremiumGiftCode::ID:
@@ -2617,8 +2620,7 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("giveaway", JsonGiveaway(content, client_));
       break;
     }
-    case td_api::messageStory::ID:
-      object("story", JsonEmptyObject());
+    case td_api::messagePremiumGiveawayCompleted::ID:
       break;
     default:
       UNREACHABLE();
@@ -6062,7 +6064,7 @@ td::Result<Client::InputReplyParameters> Client::get_reply_parameters(td::JsonVa
   result.reply_in_chat_id = std::move(chat_id);
   result.reply_to_message_id = as_tdlib_message_id(td::max(message_id, 0));
   result.allow_sending_without_reply = allow_sending_without_reply;
-  result.quote = std::move(quote);
+  result.quote = td_api::make_object<td_api::inputTextQuote>(std::move(quote), 0);
   return std::move(result);
 }
 
@@ -11737,6 +11739,8 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       return true;
     case td_api::messagePremiumGiftCode::ID:
       return true;
+    case td_api::messagePremiumGiveawayCompleted::ID:
+      return true;
     default:
       break;
   }
@@ -11787,6 +11791,9 @@ td::int64 Client::get_same_chat_reply_to_message_id(const object_ptr<td_api::mes
       case td_api::messageChatSetBackground::ID:
         return static_cast<const td_api::messageChatSetBackground *>(message->content_.get())
             ->old_background_message_id_;
+      case td_api::messagePremiumGiveawayCompleted::ID:
+        return static_cast<const td_api::messagePremiumGiveawayCompleted *>(message->content_.get())
+            ->giveaway_message_id_;
       case td_api::messagePaymentSuccessful::ID:
         UNREACHABLE();
         return static_cast<int64>(0);
