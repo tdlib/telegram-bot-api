@@ -2192,6 +2192,27 @@ class Client::JsonExternalReplyInfo final : public td::Jsonable {
   }
 };
 
+class Client::JsonTextQuote final : public td::Jsonable {
+ public:
+  JsonTextQuote(const td_api::textQuote *quote, const Client *client) : quote_(quote), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("text", quote_->text_->text_);
+    if (!quote_->text_->entities_.empty()) {
+      object("entities", JsonVectorEntities(quote_->text_->entities_, client_));
+    }
+    object("position", quote_->position_);
+    if (quote_->is_manual_) {
+      object("is_manual", td::JsonTrue());
+    }
+  }
+
+ private:
+  const td_api::textQuote *quote_;
+  const Client *client_;
+};
+
 void Client::JsonMessage::store(td::JsonValueScope *scope) const {
   CHECK(message_ != nullptr);
   auto object = scope->enter_object();
@@ -2272,10 +2293,7 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     object("external_reply", JsonExternalReplyInfo(message_->reply_to_message.get(), client_));
   }
   if (message_->reply_to_message != nullptr && message_->reply_to_message->quote_ != nullptr) {
-    object("quote", message_->reply_to_message->quote_->text_->text_);
-    if (!message_->reply_to_message->quote_->text_->entities_.empty()) {
-      object("quote_entities", JsonVectorEntities(message_->reply_to_message->quote_->text_->entities_, client_));
-    }
+    object("quote", JsonTextQuote(message_->reply_to_message->quote_.get(), client_));
   }
   if (message_->media_album_id != 0) {
     object("media_group_id", td::to_string(message_->media_album_id));
