@@ -175,6 +175,7 @@ class Client final : public WebhookActor::Callback {
   class JsonUserShared;
   class JsonChatShared;
   class JsonGiveaway;
+  class JsonGiveawayCompleted;
   class JsonUpdateTypes;
   class JsonWebhookInfo;
   class JsonStickerSet;

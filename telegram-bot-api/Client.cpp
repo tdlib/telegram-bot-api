@@ -896,6 +896,24 @@ class Client::JsonChat final : public td::Jsonable {
   int64 pinned_message_id_;
 };
 
+class Client::JsonDeletedMessage final : public td::Jsonable {
+ public:
+  JsonDeletedMessage(int64 chat_id, int64 message_id, const Client *client)
+      : chat_id_(chat_id), message_id_(message_id), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("message_id", as_client_message_id(message_id_));
+    object("chat", JsonChat(chat_id_, client_));
+    object("date", 0);
+  }
+
+ private:
+  int64 chat_id_;
+  int64 message_id_;
+  const Client *client_;
+};
+
 class Client::JsonMessageSender final : public td::Jsonable {
  public:
   JsonMessageSender(const td_api::MessageSender *sender_id, const Client *client)
@@ -1937,6 +1955,31 @@ class Client::JsonGiveaway final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonGiveawayCompleted final : public td::Jsonable {
+ public:
+  JsonGiveawayCompleted(const td_api::messagePremiumGiveawayCompleted *giveaway_completed, int64 chat_id,
+                        const Client *client)
+      : giveaway_completed_(giveaway_completed), chat_id_(chat_id), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("winner_count", giveaway_completed_->winner_count_);
+    if (giveaway_completed_->unclaimed_prize_count_ > 0) {
+      object("unclaimed_prize_count", giveaway_completed_->unclaimed_prize_count_);
+    }
+    const MessageInfo *giveaway_message =
+        client_->get_message(chat_id_, giveaway_completed_->giveaway_message_id_, true);
+    if (giveaway_message != nullptr) {
+      object("giveaway_message", JsonMessage(giveaway_message, true, "giveaway completed", client_));
+    }
+  }
+
+ private:
+  const td_api::messagePremiumGiveawayCompleted *giveaway_completed_;
+  int64 chat_id_;
+  const Client *client_;
+};
+
 class Client::JsonWebAppInfo final : public td::Jsonable {
  public:
   explicit JsonWebAppInfo(const td::string &url) : url_(url) {
@@ -2638,8 +2681,11 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("giveaway", JsonGiveaway(content, client_));
       break;
     }
-    case td_api::messagePremiumGiveawayCompleted::ID:
+    case td_api::messagePremiumGiveawayCompleted::ID: {
+      auto content = static_cast<const td_api::messagePremiumGiveawayCompleted *>(message_->content.get());
+      object("giveaway_completed", JsonGiveawayCompleted(content, message_->chat_id, client_));
       break;
+    }
     default:
       UNREACHABLE();
   }
@@ -2656,24 +2702,6 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     object("is_topic_message", td::JsonTrue());
   }
 }
-
-class Client::JsonDeletedMessage final : public td::Jsonable {
- public:
-  JsonDeletedMessage(int64 chat_id, int64 message_id, const Client *client)
-      : chat_id_(chat_id), message_id_(message_id), client_(client) {
-  }
-  void store(td::JsonValueScope *scope) const {
-    auto object = scope->enter_object();
-    object("message_id", as_client_message_id(message_id_));
-    object("chat", JsonChat(chat_id_, client_));
-    object("date", 0);
-  }
-
- private:
-  int64 chat_id_;
-  int64 message_id_;
-  const Client *client_;
-};
 
 class Client::JsonMessageId final : public td::Jsonable {
  public:
@@ -11648,6 +11676,7 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       case td_api::messageForumTopicIsHiddenToggled::ID:
       case td_api::messagePremiumGiveawayCreated::ID:
       case td_api::messagePremiumGiveaway::ID:
+      case td_api::messagePremiumGiveawayCompleted::ID:
         // don't skip
         break;
       default:
@@ -11757,8 +11786,6 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageChatSetBackground::ID:
       return true;
     case td_api::messagePremiumGiftCode::ID:
-      return true;
-    case td_api::messagePremiumGiveawayCompleted::ID:
       return true;
     default:
       break;
