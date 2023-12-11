@@ -241,6 +241,7 @@ bool Client::init_methods() {
   methods_.emplace("editmessagecaption", &Client::process_edit_message_caption_query);
   methods_.emplace("editmessagereplymarkup", &Client::process_edit_message_reply_markup_query);
   methods_.emplace("deletemessage", &Client::process_delete_message_query);
+  methods_.emplace("deletemessages", &Client::process_delete_messages_query);
   methods_.emplace("createinvoicelink", &Client::process_create_invoice_link_query);
   methods_.emplace("setgamescore", &Client::process_set_game_score_query);
   methods_.emplace("getgamehighscores", &Client::process_get_game_high_scores_query);
@@ -3898,6 +3899,57 @@ class Client::TdOnCheckMessageCallback final : public TdQueryCallback {
 };
 
 template <class OnSuccess>
+class Client::TdOnCheckMessagesCallback final : public TdQueryCallback {
+ public:
+  TdOnCheckMessagesCallback(Client *client, int64 chat_id, bool allow_empty, td::Slice message_type,
+                            PromisedQueryPtr query, OnSuccess on_success)
+      : client_(client)
+      , chat_id_(chat_id)
+      , allow_empty_(allow_empty)
+      , message_type_(message_type)
+      , query_(std::move(query))
+      , on_success_(std::move(on_success)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      auto error = move_object_as<td_api::error>(result);
+      if (error->code_ == 429) {
+        LOG(WARNING) << "Failed to get messages in " << chat_id_ << ": " << message_type_;
+      }
+      if (allow_empty_) {
+        return on_success_(chat_id_, td::vector<int64>(), std::move(query_));
+      }
+      return fail_query_with_error(std::move(query_), std::move(error), PSLICE() << message_type_ << " not found");
+    }
+
+    CHECK(result->get_id() == td_api::messages::ID);
+    auto messages = move_object_as<td_api::messages>(result);
+    td::vector<int64> message_ids;
+    for (auto &message : messages->messages_) {
+      if (message == nullptr) {
+        if (!allow_empty_) {
+          return fail_query_with_error(std::move(query_), 400, PSLICE() << message_type_ << " not found");
+        }
+        continue;
+      }
+      auto full_message_id = client_->add_message(std::move(message));
+      CHECK(full_message_id.chat_id == chat_id_);
+      message_ids.push_back(full_message_id.message_id);
+    }
+    on_success_(chat_id_, std::move(message_ids), std::move(query_));
+  }
+
+ private:
+  Client *client_;
+  int64 chat_id_;
+  bool allow_empty_;
+  td::Slice message_type_;
+  PromisedQueryPtr query_;
+  OnSuccess on_success_;
+};
+
+template <class OnSuccess>
 class Client::TdOnCheckMessageThreadCallback final : public TdQueryCallback {
  public:
   TdOnCheckMessageThreadCallback(Client *client, int64 chat_id, int64 message_thread_id,
@@ -5229,6 +5281,24 @@ void Client::check_message(td::Slice chat_id_str, int64 message_id, bool allow_e
                    make_object<td_api::getMessage>(chat_id, message_id),
                    td::make_unique<TdOnCheckMessageCallback<OnSuccess>>(
                        this, chat_id, message_id, allow_empty, message_type, std::move(query), std::move(on_success)));
+             });
+}
+
+template <class OnSuccess>
+void Client::check_messages(td::Slice chat_id_str, td::vector<int64> message_ids, bool allow_empty,
+                            AccessRights access_rights, td::Slice message_type, PromisedQueryPtr query,
+                            OnSuccess on_success) {
+  check_chat(chat_id_str, access_rights, std::move(query),
+             [this, message_ids = std::move(message_ids), allow_empty, message_type,
+              on_success = std::move(on_success)](int64 chat_id, PromisedQueryPtr query) mutable {
+               if (!have_message_access(chat_id)) {
+                 return fail_query_with_error(std::move(query), 400, "MESSAGE_NOT_FOUND",
+                                              PSLICE() << message_type << " not found");
+               }
+
+               send_request(make_object<td_api::getMessages>(chat_id, std::move(message_ids)),
+                            td::make_unique<TdOnCheckMessagesCallback<OnSuccess>>(
+                                this, chat_id, allow_empty, message_type, std::move(query), std::move(on_success)));
              });
 }
 
@@ -8350,6 +8420,46 @@ td::int64 Client::get_message_id(const Query *query, td::Slice field_name) {
   return as_tdlib_message_id(arg);
 }
 
+td::Result<td::vector<td::int64>> Client::get_message_ids(const Query *query, size_t max_count, td::Slice field_name) {
+  auto message_ids_str = query->arg(field_name);
+  if (message_ids_str.empty()) {
+    return td::Status::Error(400, "Message identifiers are not specified");
+  }
+
+  auto r_value = json_decode(message_ids_str);
+  if (r_value.is_error()) {
+    return td::Status::Error(400, PSLICE() << "Can't parse " << field_name << " JSON object");
+  }
+  auto value = r_value.move_as_ok();
+  if (value.type() != td::JsonValue::Type::Array) {
+    return td::Status::Error(400, "Expected an Array of message identifiers");
+  }
+  if (value.get_array().size() > max_count) {
+    return td::Status::Error(400, "Too many message identifiers specified");
+  }
+
+  td::vector<int64> message_ids;
+  for (auto &message_id : value.get_array()) {
+    td::Slice number;
+    if (message_id.type() == td::JsonValue::Type::Number) {
+      number = message_id.get_number();
+    } else if (message_id.type() == td::JsonValue::Type::String) {
+      number = message_id.get_string();
+    } else {
+      return td::Status::Error(400, "Message identifier must be a Number");
+    }
+    auto parsed_message_id = td::to_integer_safe<int32>(number);
+    if (parsed_message_id.is_error()) {
+      return td::Status::Error(400, "Can't parse message identifier as Number");
+    }
+    if (parsed_message_id.ok() <= 0) {
+      return td::Status::Error(400, "Invalid message identifier specified");
+    }
+    message_ids.push_back(as_tdlib_message_id(parsed_message_id.ok()));
+  }
+  return std::move(message_ids);
+}
+
 td::Result<td::Slice> Client::get_inline_message_id(const Query *query, td::Slice field_name) {
   auto s_arg = query->arg(field_name);
   if (s_arg.empty()) {
@@ -9211,6 +9321,20 @@ td::Status Client::process_delete_message_query(PromisedQueryPtr &query) {
                   send_request(make_object<td_api::deleteMessages>(chat_id, td::vector<int64>{message_id}, true),
                                td::make_unique<TdOnOkQueryCallback>(std::move(query)));
                 });
+  return td::Status::OK();
+}
+
+td::Status Client::process_delete_messages_query(PromisedQueryPtr &query) {
+  auto chat_id = query->arg("chat_id");
+  TRY_RESULT(message_ids, get_message_ids(query.get(), 100));
+  if (message_ids.empty()) {
+    return td::Status::Error(400, "Message identifiers are not specified");
+  }
+  check_messages(chat_id, std::move(message_ids), true, AccessRights::Write, "message to delete", std::move(query),
+                 [this](int64 chat_id, td::vector<int64> message_ids, PromisedQueryPtr query) {
+                   send_request(make_object<td_api::deleteMessages>(chat_id, std::move(message_ids), true),
+                                td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+                 });
   return td::Status::OK();
 }
 

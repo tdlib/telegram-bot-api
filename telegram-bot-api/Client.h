@@ -278,6 +278,8 @@ class Client final : public WebhookActor::Callback {
   template <class OnSuccess>
   class TdOnCheckMessageCallback;
   template <class OnSuccess>
+  class TdOnCheckMessagesCallback;
+  template <class OnSuccess>
   class TdOnCheckMessageThreadCallback;
   template <class OnSuccess>
   class TdOnCheckRemoteFileIdCallback;
@@ -317,6 +319,10 @@ class Client final : public WebhookActor::Callback {
   template <class OnSuccess>
   void check_message(td::Slice chat_id_str, int64 message_id, bool allow_empty, AccessRights access_rights,
                      td::Slice message_type, PromisedQueryPtr query, OnSuccess on_success);
+
+  template <class OnSuccess>
+  void check_messages(td::Slice chat_id_str, td::vector<int64> message_ids, bool allow_empty,
+                      AccessRights access_rights, td::Slice message_type, PromisedQueryPtr query, OnSuccess on_success);
 
   template <class OnSuccess>
   void check_reply_parameters(td::Slice chat_id_str, InputReplyParameters &&reply_parameters, int64 message_thread_id,
@@ -529,6 +535,9 @@ class Client final : public WebhookActor::Callback {
 
   static int64 get_message_id(const Query *query, td::Slice field_name = td::Slice("message_id"));
 
+  static td::Result<td::vector<int64>> get_message_ids(const Query *query, size_t max_count,
+                                                       td::Slice field_name = td::Slice("message_ids"));
+
   static td::Result<td::Slice> get_inline_message_id(const Query *query,
                                                      td::Slice field_name = td::Slice("inline_message_id"));
 
@@ -591,6 +600,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_edit_message_caption_query(PromisedQueryPtr &query);
   td::Status process_edit_message_reply_markup_query(PromisedQueryPtr &query);
   td::Status process_delete_message_query(PromisedQueryPtr &query);
+  td::Status process_delete_messages_query(PromisedQueryPtr &query);
   td::Status process_create_invoice_link_query(PromisedQueryPtr &query);
   td::Status process_set_game_score_query(PromisedQueryPtr &query);
   td::Status process_get_game_high_scores_query(PromisedQueryPtr &query);
