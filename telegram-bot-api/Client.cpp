@@ -231,6 +231,7 @@ bool Client::init_methods() {
   methods_.emplace("sendpoll", &Client::process_send_poll_query);
   methods_.emplace("stoppoll", &Client::process_stop_poll_query);
   methods_.emplace("copymessage", &Client::process_copy_message_query);
+  methods_.emplace("copymessages", &Client::process_copy_messages_query);
   methods_.emplace("forwardmessage", &Client::process_forward_message_query);
   methods_.emplace("forwardmessages", &Client::process_forward_messages_query);
   methods_.emplace("sendmediagroup", &Client::process_send_media_group_query);
@@ -8552,7 +8553,7 @@ void Client::on_message_send_succeeded(object_ptr<td_api::message> &&message, in
   auto query_id = extract_yet_unsent_message_query_id(chat_id, old_message_id);
   auto &query = *pending_send_message_queries_[query_id];
   if (query.is_multisend) {
-    if (query.query->method() == "forwardmessages") {
+    if (query.query->method() == "forwardmessages" || query.query->method() == "copymessages") {
       query.messages.push_back(td::json_encode<td::string>(JsonMessageId(new_message_id)));
     } else {
       query.messages.push_back(td::json_encode<td::string>(JsonMessage(message_info, true, "sent message", this)));
@@ -9104,6 +9105,50 @@ td::Status Client::process_copy_message_query(PromisedQueryPtr &query) {
         do_send_message(make_object<td_api::inputMessageForwarded>(from_chat_id, message_id, false, std::move(options)),
                         std::move(query));
       });
+  return td::Status::OK();
+}
+
+td::Status Client::process_copy_messages_query(PromisedQueryPtr &query) {
+  auto chat_id = query->arg("chat_id");
+  auto message_thread_id = get_message_id(query.get(), "message_thread_id");
+  TRY_RESULT(from_chat_id, get_required_string_arg(query.get(), "from_chat_id"));
+  TRY_RESULT(message_ids, get_message_ids(query.get(), 100));
+  if (message_ids.empty()) {
+    return td::Status::Error(400, "Message identifiers are not specified");
+  }
+  auto disable_notification = to_bool(query->arg("disable_notification"));
+  auto protect_content = to_bool(query->arg("protect_content"));
+  auto remove_caption = to_bool(query->arg("remove_caption"));
+
+  auto on_success = [this, from_chat_id = from_chat_id.str(), message_ids = std::move(message_ids),
+                     disable_notification, protect_content,
+                     remove_caption](int64 chat_id, int64 message_thread_id, CheckedReplyParameters,
+                                     PromisedQueryPtr query) mutable {
+    auto it = yet_unsent_message_count_.find(chat_id);
+    if (it != yet_unsent_message_count_.end() && it->second >= MAX_CONCURRENTLY_SENT_CHAT_MESSAGES) {
+      return fail_query_flood_limit_exceeded(std::move(query));
+    }
+
+    check_messages(
+        from_chat_id, std::move(message_ids), true, AccessRights::Read, "message to forward", std::move(query),
+        [this, chat_id, message_thread_id, disable_notification, protect_content, remove_caption](
+            int64 from_chat_id, td::vector<int64> message_ids, PromisedQueryPtr query) {
+          auto &count = yet_unsent_message_count_[chat_id];
+          if (count >= MAX_CONCURRENTLY_SENT_CHAT_MESSAGES) {
+            return fail_query_flood_limit_exceeded(std::move(query));
+          }
+
+          auto message_count = message_ids.size();
+          count += static_cast<int32>(message_count);
+
+          send_request(make_object<td_api::forwardMessages>(
+                           chat_id, message_thread_id, from_chat_id, std::move(message_ids),
+                           get_message_send_options(disable_notification, protect_content), true, remove_caption),
+                       td::make_unique<TdOnForwardMessagesCallback>(this, chat_id, message_count, std::move(query)));
+        });
+  };
+  check_reply_parameters(chat_id, InputReplyParameters(), message_thread_id, std::move(query), std::move(on_success));
+
   return td::Status::OK();
 }
 
