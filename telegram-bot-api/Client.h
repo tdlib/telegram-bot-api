@@ -70,7 +70,7 @@ class Client final : public WebhookActor::Callback {
   static constexpr int32 MAX_CERTIFICATE_FILE_SIZE = 3 << 20;
   static constexpr int32 MAX_DOWNLOAD_FILE_SIZE = 20 << 20;
 
-  static constexpr int32 MAX_CONCURRENTLY_SENT_CHAT_MESSAGES = 250;  // some unreasonably big value
+  static constexpr int32 MAX_CONCURRENTLY_SENT_CHAT_MESSAGES = 310;  // some unreasonably big value
 
   static constexpr std::size_t MIN_PENDING_UPDATES_WARNING = 200;
 
@@ -188,6 +188,7 @@ class Client final : public WebhookActor::Callback {
   class TdOnGetUserProfilePhotosCallback;
   class TdOnSendMessageCallback;
   class TdOnSendMessageAlbumCallback;
+  class TdOnForwardMessagesCallback;
   class TdOnDeleteFailedToSendMessageCallback;
   class TdOnEditMessageCallback;
   class TdOnEditInlineMessageCallback;
@@ -592,6 +593,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_stop_poll_query(PromisedQueryPtr &query);
   td::Status process_copy_message_query(PromisedQueryPtr &query);
   td::Status process_forward_message_query(PromisedQueryPtr &query);
+  td::Status process_forward_messages_query(PromisedQueryPtr &query);
   td::Status process_send_media_group_query(PromisedQueryPtr &query);
   td::Status process_send_chat_action_query(PromisedQueryPtr &query);
   td::Status process_edit_message_text_query(PromisedQueryPtr &query);
