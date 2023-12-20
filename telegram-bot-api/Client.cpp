@@ -1931,16 +1931,16 @@ class Client::JsonWriteAccessAllowed final : public td::Jsonable {
 
 class Client::JsonUserShared final : public td::Jsonable {
  public:
-  explicit JsonUserShared(const td_api::messageUserShared *user_shared) : user_shared_(user_shared) {
+  explicit JsonUserShared(const td_api::messageUsersShared *users_shared) : users_shared_(users_shared) {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
-    object("user_id", user_shared_->user_id_);
-    object("request_id", user_shared_->button_id_);
+    object("user_id", users_shared_->user_ids_[0]);
+    object("request_id", users_shared_->button_id_);
   }
 
  private:
-  const td_api::messageUserShared *user_shared_;
+  const td_api::messageUsersShared *users_shared_;
 };
 
 class Client::JsonChatShared final : public td::Jsonable {
@@ -2691,8 +2691,8 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       }
       break;
     }
-    case td_api::messageUserShared::ID: {
-      auto content = static_cast<const td_api::messageUserShared *>(message_->content.get());
+    case td_api::messageUsersShared::ID: {
+      auto content = static_cast<const td_api::messageUsersShared *>(message_->content.get());
       object("user_shared", JsonUserShared(content));
       break;
     }
@@ -2716,6 +2716,8 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("giveaway", JsonGiveaway(content, client_));
       break;
     }
+    case td_api::messagePremiumGiveawayWinners::ID:
+      break;
     case td_api::messagePremiumGiveawayCompleted::ID: {
       auto content = static_cast<const td_api::messagePremiumGiveawayCompleted *>(message_->content.get());
       object("giveaway_completed", JsonGiveawayCompleted(content, message_->chat_id, client_));
@@ -5898,17 +5900,11 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       }
       break;
     }
-    case td_api::updateChatAccentColor::ID: {
-      auto update = move_object_as<td_api::updateChatAccentColor>(result);
+    case td_api::updateChatAccentColors::ID: {
+      auto update = move_object_as<td_api::updateChatAccentColors>(result);
       auto chat_info = add_chat(update->chat_id_);
       CHECK(chat_info->type != ChatInfo::Type::Unknown);
       chat_info->accent_color_id = update->accent_color_id_;
-      break;
-    }
-    case td_api::updateChatBackgroundCustomEmoji::ID: {
-      auto update = move_object_as<td_api::updateChatBackgroundCustomEmoji>(result);
-      auto chat_info = add_chat(update->chat_id_);
-      CHECK(chat_info->type != ChatInfo::Type::Unknown);
       chat_info->background_custom_emoji_id = update->background_custom_emoji_id_;
       break;
     }
@@ -6322,8 +6318,8 @@ td::Result<td_api::object_ptr<td_api::keyboardButton>> Client::get_keyboard_butt
       auto restrict_user_is_premium = request_user_object.has_field("user_is_premium");
       TRY_RESULT(user_is_premium, request_user_object.get_optional_bool_field("user_is_premium"));
       return make_object<td_api::keyboardButton>(
-          text, make_object<td_api::keyboardButtonTypeRequestUser>(id, restrict_user_is_bot, user_is_bot,
-                                                                   restrict_user_is_premium, user_is_premium));
+          text, make_object<td_api::keyboardButtonTypeRequestUsers>(id, restrict_user_is_bot, user_is_bot,
+                                                                    restrict_user_is_premium, user_is_premium, 1));
     }
 
     if (object.has_field("request_chat")) {
@@ -12082,6 +12078,8 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageChatSetBackground::ID:
       return true;
     case td_api::messagePremiumGiftCode::ID:
+      return true;
+    case td_api::messagePremiumGiveawayWinners::ID:
       return true;
     default:
       break;
