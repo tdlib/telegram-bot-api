@@ -1981,9 +1981,15 @@ class Client::JsonGiveaway final : public td::Jsonable {
     if (giveaway_->parameters_->only_new_members_) {
       object("only_new_members", td::JsonTrue());
     }
+    if (giveaway_->parameters_->has_public_winners_) {
+      object("has_public_winners", td::JsonTrue());
+    }
     if (!giveaway_->parameters_->country_codes_.empty()) {
       object("country_codes", td::json_array(giveaway_->parameters_->country_codes_,
                                              [](td::Slice country_code) { return td::JsonString(country_code); }));
+    }
+    if (!giveaway_->parameters_->prize_description_.empty()) {
+      object("prize_description", giveaway_->parameters_->prize_description_);
     }
     if (giveaway_->month_count_ > 0) {
       object("premium_subscription_month_count", giveaway_->month_count_);
