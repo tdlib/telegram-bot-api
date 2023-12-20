@@ -236,6 +236,7 @@ bool Client::init_methods() {
   methods_.emplace("forwardmessages", &Client::process_forward_messages_query);
   methods_.emplace("sendmediagroup", &Client::process_send_media_group_query);
   methods_.emplace("sendchataction", &Client::process_send_chat_action_query);
+  methods_.emplace("setmessagereaction", &Client::process_set_message_reaction_query);
   methods_.emplace("editmessagetext", &Client::process_edit_message_text_query);
   methods_.emplace("editmessagelivelocation", &Client::process_edit_message_live_location_query);
   methods_.emplace("stopmessagelivelocation", &Client::process_edit_message_live_location_query);
@@ -8608,6 +8609,53 @@ td::Result<td::vector<td::string>> Client::get_poll_options(const Query *query) 
   return std::move(options);
 }
 
+td::Result<td_api::object_ptr<td_api::ReactionType>> Client::get_reaction_type(td::JsonValue &&value) {
+  if (value.type() != td::JsonValue::Type::Object) {
+    return td::Status::Error(400, "expected an Object");
+  }
+
+  auto &object = value.get_object();
+
+  TRY_RESULT(type, object.get_required_string_field("type"));
+  if (type == "emoji") {
+    TRY_RESULT(emoji, object.get_required_string_field("emoji"));
+    return make_object<td_api::reactionTypeEmoji>(emoji);
+  }
+  if (type == "custom_emoji") {
+    TRY_RESULT(custom_emoji_id, object.get_required_long_field("custom_emoji_id"));
+    return make_object<td_api::reactionTypeCustomEmoji>(custom_emoji_id);
+  }
+  return td::Status::Error(400, "invalid reaction type specified");
+}
+
+td::Result<td::vector<td_api::object_ptr<td_api::ReactionType>>> Client::get_reaction_types(const Query *query) {
+  auto types = query->arg("reaction");
+  if (types.empty()) {
+    return td::vector<object_ptr<td_api::ReactionType>>();
+  }
+  LOG(INFO) << "Parsing JSON object: " << types;
+  auto r_value = json_decode(types);
+  if (r_value.is_error()) {
+    LOG(INFO) << "Can't parse JSON object: " << r_value.error();
+    return td::Status::Error(400, "Can't parse reaction types JSON object");
+  }
+
+  auto value = r_value.move_as_ok();
+  if (value.type() != td::JsonValue::Type::Array) {
+    return td::Status::Error(400, "Expected an Array of ReactionType");
+  }
+
+  td::vector<object_ptr<td_api::ReactionType>> reaction_types;
+  for (auto &type : value.get_array()) {
+    auto r_reaction_type = get_reaction_type(std::move(type));
+    if (r_reaction_type.is_error()) {
+      return td::Status::Error(400, PSLICE() << "Can't parse ReactionType: " << r_reaction_type.error().message());
+    }
+    reaction_types.push_back(r_reaction_type.move_as_ok());
+  }
+  return std::move(reaction_types);
+}
+
 td::int32 Client::get_integer_arg(const Query *query, td::Slice field_name, int32 default_value, int32 min_value,
                                   int32 max_value) {
   auto s_arg = query->arg(field_name);
@@ -9435,6 +9483,22 @@ td::Status Client::process_send_chat_action_query(PromisedQueryPtr &query) {
                send_request(make_object<td_api::sendChatAction>(chat_id, message_thread_id, std::move(action)),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
+  return td::Status::OK();
+}
+
+td::Status Client::process_set_message_reaction_query(PromisedQueryPtr &query) {
+  auto chat_id = query->arg("chat_id");
+  auto message_id = get_message_id(query.get());
+  auto is_big = to_bool(query->arg("is_big"));
+  TRY_RESULT(reaction_types, get_reaction_types(query.get()));
+
+  check_message(chat_id, message_id, false, AccessRights::Read, "message to react", std::move(query),
+                [this, reaction_types = std::move(reaction_types), is_big](int64 chat_id, int64 message_id,
+                                                                           PromisedQueryPtr query) mutable {
+                  send_request(
+                      make_object<td_api::setMessageReactions>(chat_id, message_id, std::move(reaction_types), is_big),
+                      td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+                });
   return td::Status::OK();
 }
 

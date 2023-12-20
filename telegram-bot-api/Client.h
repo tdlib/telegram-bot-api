@@ -533,6 +533,10 @@ class Client final : public WebhookActor::Callback {
 
   static td::Result<td::vector<td::string>> get_poll_options(const Query *query);
 
+  static td::Result<object_ptr<td_api::ReactionType>> get_reaction_type(td::JsonValue &&value);
+
+  static td::Result<td::vector<object_ptr<td_api::ReactionType>>> get_reaction_types(const Query *query);
+
   static int32 get_integer_arg(const Query *query, td::Slice field_name, int32 default_value,
                                int32 min_value = std::numeric_limits<int32>::min(),
                                int32 max_value = std::numeric_limits<int32>::max());
@@ -602,6 +606,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_forward_messages_query(PromisedQueryPtr &query);
   td::Status process_send_media_group_query(PromisedQueryPtr &query);
   td::Status process_send_chat_action_query(PromisedQueryPtr &query);
+  td::Status process_set_message_reaction_query(PromisedQueryPtr &query);
   td::Status process_edit_message_text_query(PromisedQueryPtr &query);
   td::Status process_edit_message_live_location_query(PromisedQueryPtr &query);
   td::Status process_edit_message_media_query(PromisedQueryPtr &query);
