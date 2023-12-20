@@ -612,6 +612,20 @@ class Client::JsonReactionType final : public td::Jsonable {
   const td_api::ReactionType *reaction_type_;
 };
 
+class Client::JsonReactionCount final : public td::Jsonable {
+ public:
+  explicit JsonReactionCount(const td_api::messageReaction *message_reaction) : message_reaction_(message_reaction) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("type", JsonReactionType(message_reaction_->type_.get()));
+    object("total_count", message_reaction_->total_count_);
+  }
+
+ private:
+  const td_api::messageReaction *message_reaction_;
+};
+
 class Client::JsonChatPermissions final : public td::Jsonable {
  public:
   explicit JsonChatPermissions(const td_api::chatPermissions *chat_permissions) : chat_permissions_(chat_permissions) {
@@ -3467,6 +3481,25 @@ class Client::JsonMessageReactionUpdated final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonMessageReactionCountUpdated final : public td::Jsonable {
+ public:
+  JsonMessageReactionCountUpdated(const td_api::updateMessageReactions *update, const Client *client)
+      : update_(update), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("chat", JsonChat(update_->chat_id_, client_));
+    object("message_id", as_client_message_id(update_->message_id_));
+    object("date", update_->date_);
+    object("reactions",
+           td::json_array(update_->reactions_, [](const auto &reaction) { return JsonReactionCount(reaction.get()); }));
+  }
+
+ private:
+  const td_api::updateMessageReactions *update_;
+  const Client *client_;
+};
+
 class Client::JsonUpdateTypes final : public td::Jsonable {
  public:
   explicit JsonUpdateTypes(td::uint32 update_types) : update_types_(update_types) {
@@ -6168,6 +6201,9 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       break;
     case td_api::updateMessageReaction::ID:
       add_update_message_reaction(move_object_as<td_api::updateMessageReaction>(result));
+      break;
+    case td_api::updateMessageReactions::ID:
+      add_update_message_reaction_count(move_object_as<td_api::updateMessageReactions>(result));
       break;
     case td_api::updateConnectionState::ID: {
       auto update = move_object_as<td_api::updateConnectionState>(result);
@@ -11715,6 +11751,8 @@ td::Slice Client::get_update_type_name(UpdateType update_type) {
       return td::Slice("removed_chat_boost");
     case UpdateType::MessageReaction:
       return td::Slice("message_reaction");
+    case UpdateType::MessageReactionCount:
+      return td::Slice("message_reaction_count");
     default:
       UNREACHABLE();
       return td::Slice();
@@ -12048,6 +12086,19 @@ void Client::add_update_message_reaction(object_ptr<td_api::updateMessageReactio
                webhook_queue_id);
   } else {
     LOG(DEBUG) << "Skip updateMessageReaction with date " << update->date_ << ", because current date is "
+               << get_unix_time();
+  }
+}
+
+void Client::add_update_message_reaction_count(object_ptr<td_api::updateMessageReactions> &&update) {
+  CHECK(update != nullptr);
+  auto left_time = update->date_ + 86400 - get_unix_time();
+  if (left_time > 0) {
+    auto webhook_queue_id = update->chat_id_ + (static_cast<int64>(9) << 33);
+    add_update(UpdateType::MessageReactionCount, JsonMessageReactionCountUpdated(update.get(), this), left_time,
+               webhook_queue_id);
+  } else {
+    LOG(DEBUG) << "Skip updateMessageReactions with date " << update->date_ << ", because current date is "
                << get_unix_time();
   }
 }
