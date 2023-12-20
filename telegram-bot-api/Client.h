@@ -160,6 +160,7 @@ class Client final : public WebhookActor::Callback {
   class JsonForumTopicEdited;
   class JsonForumTopicInfo;
   class JsonGameHighScore;
+  class JsonMessageReactionUpdated;
   class JsonAddress;
   class JsonOrderInfo;
   class JsonSuccessfulPaymentBot;
@@ -997,6 +998,8 @@ class Client final : public WebhookActor::Callback {
 
   void add_update_chat_boost(object_ptr<td_api::updateChatBoost> &&update);
 
+  void add_update_message_reaction(object_ptr<td_api::updateMessageReaction> &&update);
+
   // append only before Size
   enum class UpdateType : int32 {
     Message,
@@ -1017,6 +1020,7 @@ class Client final : public WebhookActor::Callback {
     ChatJoinRequest,
     ChatBoostUpdated,
     ChatBoostRemoved,
+    MessageReaction,
     Size
   };
 
@@ -1046,9 +1050,10 @@ class Client final : public WebhookActor::Callback {
 
   bool have_message_access(int64 chat_id) const;
 
-  // by default ChatMember updates are disabled
-  static constexpr td::uint32 DEFAULT_ALLOWED_UPDATE_TYPES =
-      (1 << static_cast<int32>(UpdateType::Size)) - 1 - (1 << static_cast<int32>(UpdateType::ChatMember));
+  // by default ChatMember and MessageReaction updates are disabled
+  static constexpr td::uint32 DEFAULT_ALLOWED_UPDATE_TYPES = (1 << static_cast<int32>(UpdateType::Size)) - 1 -
+                                                             (1 << static_cast<int32>(UpdateType::ChatMember)) -
+                                                             (1 << static_cast<int32>(UpdateType::MessageReaction));
 
   object_ptr<td_api::AuthorizationState> authorization_state_;
   bool was_authorized_ = false;
