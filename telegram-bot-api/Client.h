@@ -91,6 +91,7 @@ class Client final : public WebhookActor::Callback {
   class JsonDatedFiles;
   class JsonUser;
   class JsonUsers;
+  class JsonReactionType;
   class JsonChatPermissions;
   class JsonChatPhotoInfo;
   class JsonChatLocation;
@@ -826,6 +827,7 @@ class Client final : public WebhookActor::Callback {
     int32 accent_color_id = -1;
     int64 background_custom_emoji_id = 0;
     bool has_protected_content = false;
+    object_ptr<td_api::chatAvailableReactionsSome> available_reactions;
     object_ptr<td_api::chatPhotoInfo> photo_info;
     object_ptr<td_api::chatPermissions> permissions;
     union {

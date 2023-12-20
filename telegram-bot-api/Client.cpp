@@ -586,6 +586,32 @@ class Client::JsonLocation final : public td::Jsonable {
   int32 proximity_alert_radius_;
 };
 
+class Client::JsonReactionType final : public td::Jsonable {
+ public:
+  explicit JsonReactionType(const td_api::ReactionType *reaction_type) : reaction_type_(reaction_type) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    CHECK(reaction_type_ != nullptr);
+    switch (reaction_type_->get_id()) {
+      case td_api::reactionTypeEmoji::ID:
+        object("type", "emoji");
+        object("emoji", static_cast<const td_api::reactionTypeEmoji *>(reaction_type_)->emoji_);
+        break;
+      case td_api::reactionTypeCustomEmoji::ID:
+        object("type", "custom_emoji");
+        object("custom_emoji_id",
+               td::to_string(static_cast<const td_api::reactionTypeCustomEmoji *>(reaction_type_)->custom_emoji_id_));
+        break;
+      default:
+        UNREACHABLE();
+    }
+  }
+
+ private:
+  const td_api::ReactionType *reaction_type_;
+};
+
 class Client::JsonChatPermissions final : public td::Jsonable {
  public:
   explicit JsonChatPermissions(const td_api::chatPermissions *chat_permissions) : chat_permissions_(chat_permissions) {
@@ -880,6 +906,11 @@ class Client::JsonChat final : public td::Jsonable {
       }
       if (chat_info->message_auto_delete_time != 0) {
         object("message_auto_delete_time", chat_info->message_auto_delete_time);
+      }
+      if (chat_info->available_reactions != nullptr) {
+        object("available_reactions",
+               td::json_array(chat_info->available_reactions->reactions_,
+                              [](const auto &reaction) { return JsonReactionType(reaction.get()); }));
       }
       CHECK(chat_info->accent_color_id != -1);
       object("accent_color_id", chat_info->accent_color_id);
@@ -5819,6 +5850,9 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       chat_info->photo_info = std::move(chat->photo_);
       chat_info->permissions = std::move(chat->permissions_);
       chat_info->message_auto_delete_time = chat->message_auto_delete_time_;
+      if (chat->available_reactions_->get_id() == td_api::chatAvailableReactionsSome::ID) {
+        chat_info->available_reactions = move_object_as<td_api::chatAvailableReactionsSome>(chat->available_reactions_);
+      }
       chat_info->accent_color_id = chat->accent_color_id_;
       chat_info->background_custom_emoji_id = chat->background_custom_emoji_id_;
       chat_info->has_protected_content = chat->has_protected_content_;
@@ -5850,6 +5884,18 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       auto chat_info = add_chat(update->chat_id_);
       CHECK(chat_info->type != ChatInfo::Type::Unknown);
       chat_info->message_auto_delete_time = update->message_auto_delete_time_;
+      break;
+    }
+    case td_api::updateChatAvailableReactions::ID: {
+      auto update = move_object_as<td_api::updateChatAvailableReactions>(result);
+      auto chat_info = add_chat(update->chat_id_);
+      CHECK(chat_info->type != ChatInfo::Type::Unknown);
+      if (update->available_reactions_->get_id() == td_api::chatAvailableReactionsSome::ID) {
+        chat_info->available_reactions =
+            move_object_as<td_api::chatAvailableReactionsSome>(update->available_reactions_);
+      } else {
+        chat_info->available_reactions = nullptr;
+      }
       break;
     }
     case td_api::updateChatAccentColor::ID: {
