@@ -2001,6 +2001,43 @@ class Client::JsonGiveaway final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonGiveawayWinners final : public td::Jsonable {
+ public:
+  JsonGiveawayWinners(const td_api::messagePremiumGiveawayWinners *giveaway_winners, const Client *client)
+      : giveaway_winners_(giveaway_winners), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("chat", JsonChat(giveaway_winners_->boosted_chat_id_, client_));
+    object("giveaway_message_id", as_client_message_id(giveaway_winners_->giveaway_message_id_));
+    if (giveaway_winners_->additional_chat_count_ > 0) {
+      object("additional_chat_count", giveaway_winners_->additional_chat_count_);
+    }
+    object("winners_selection_date", giveaway_winners_->actual_winners_selection_date_);
+    if (giveaway_winners_->only_new_members_) {
+      object("only_new_members", td::JsonTrue());
+    }
+    if (giveaway_winners_->was_refunded_) {
+      object("was_refunded", td::JsonTrue());
+    }
+    if (giveaway_winners_->month_count_ > 0) {
+      object("premium_subscription_month_count", giveaway_winners_->month_count_);
+    }
+    if (!giveaway_winners_->prize_description_.empty()) {
+      object("prize_description", giveaway_winners_->prize_description_);
+    }
+    object("winner_count", giveaway_winners_->winner_count_);
+    if (giveaway_winners_->unclaimed_prize_count_ > 0) {
+      object("unclaimed_prize_count", giveaway_winners_->unclaimed_prize_count_);
+    }
+    object("winners", JsonUsers(giveaway_winners_->winner_user_ids_, client_));
+  }
+
+ private:
+  const td_api::messagePremiumGiveawayWinners *giveaway_winners_;
+  const Client *client_;
+};
+
 class Client::JsonGiveawayCompleted final : public td::Jsonable {
  public:
   JsonGiveawayCompleted(const td_api::messagePremiumGiveawayCompleted *giveaway_completed, int64 chat_id,
@@ -2259,6 +2296,11 @@ class Client::JsonExternalReplyInfo final : public td::Jsonable {
         case td_api::messagePremiumGiveaway::ID: {
           auto content = static_cast<const td_api::messagePremiumGiveaway *>(reply_->content_.get());
           object("giveaway", JsonGiveaway(content, client_));
+          break;
+        }
+        case td_api::messagePremiumGiveawayWinners::ID: {
+          auto content = static_cast<const td_api::messagePremiumGiveawayWinners *>(reply_->content_.get());
+          object("giveaway_winners", JsonGiveawayWinners(content, client_));
           break;
         }
         case td_api::messageStory::ID:
@@ -2728,8 +2770,11 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("giveaway", JsonGiveaway(content, client_));
       break;
     }
-    case td_api::messagePremiumGiveawayWinners::ID:
+    case td_api::messagePremiumGiveawayWinners::ID: {
+      auto content = static_cast<const td_api::messagePremiumGiveawayWinners *>(message_->content.get());
+      object("giveaway_winners", JsonGiveawayWinners(content, client_));
       break;
+    }
     case td_api::messagePremiumGiveawayCompleted::ID: {
       auto content = static_cast<const td_api::messagePremiumGiveawayCompleted *>(message_->content.get());
       object("giveaway_completed", JsonGiveawayCompleted(content, message_->chat_id, client_));
@@ -11989,6 +12034,7 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       case td_api::messageForumTopicIsHiddenToggled::ID:
       case td_api::messagePremiumGiveawayCreated::ID:
       case td_api::messagePremiumGiveaway::ID:
+      case td_api::messagePremiumGiveawayWinners::ID:
       case td_api::messagePremiumGiveawayCompleted::ID:
         // don't skip
         break;
@@ -12094,8 +12140,6 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageChatSetBackground::ID:
       return true;
     case td_api::messagePremiumGiftCode::ID:
-      return true;
-    case td_api::messagePremiumGiveawayWinners::ID:
       return true;
     default:
       break;
