@@ -760,12 +760,6 @@ class Client::JsonChat final : public td::Jsonable {
             object("active_usernames", td::json_array(user_info->active_usernames,
                                                       [](td::Slice username) { return td::JsonString(username); }));
           }
-          if (user_info->emoji_status_custom_emoji_id != 0) {
-            object("emoji_status_custom_emoji_id", td::to_string(user_info->emoji_status_custom_emoji_id));
-            if (user_info->emoji_status_expiration_date != 0) {
-              object("emoji_status_expiration_date", user_info->emoji_status_expiration_date);
-            }
-          }
           if (!user_info->bio.empty()) {
             object("bio", user_info->bio);
           }
@@ -921,6 +915,12 @@ class Client::JsonChat final : public td::Jsonable {
       }
       if (chat_info->message_auto_delete_time != 0) {
         object("message_auto_delete_time", chat_info->message_auto_delete_time);
+      }
+      if (chat_info->emoji_status_custom_emoji_id != 0) {
+        object("emoji_status_custom_emoji_id", td::to_string(chat_info->emoji_status_custom_emoji_id));
+        if (chat_info->emoji_status_expiration_date != 0) {
+          object("emoji_status_expiration_date", chat_info->emoji_status_expiration_date);
+        }
       }
       if (chat_info->available_reactions != nullptr) {
         object("available_reactions",
@@ -5978,6 +5978,10 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       chat_info->photo_info = std::move(chat->photo_);
       chat_info->permissions = std::move(chat->permissions_);
       chat_info->message_auto_delete_time = chat->message_auto_delete_time_;
+      chat_info->emoji_status_custom_emoji_id =
+          chat->emoji_status_ != nullptr ? chat->emoji_status_->custom_emoji_id_ : 0;
+      chat_info->emoji_status_expiration_date =
+          chat->emoji_status_ != nullptr ? chat->emoji_status_->expiration_date_ : 0;
       if (chat->available_reactions_->get_id() == td_api::chatAvailableReactionsSome::ID) {
         chat_info->available_reactions = move_object_as<td_api::chatAvailableReactionsSome>(chat->available_reactions_);
       }
@@ -6014,6 +6018,16 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       auto chat_info = add_chat(update->chat_id_);
       CHECK(chat_info->type != ChatInfo::Type::Unknown);
       chat_info->message_auto_delete_time = update->message_auto_delete_time_;
+      break;
+    }
+    case td_api::updateChatEmojiStatus::ID: {
+      auto update = move_object_as<td_api::updateChatEmojiStatus>(result);
+      auto chat_info = add_chat(update->chat_id_);
+      CHECK(chat_info->type != ChatInfo::Type::Unknown);
+      chat_info->emoji_status_custom_emoji_id =
+          update->emoji_status_ != nullptr ? update->emoji_status_->custom_emoji_id_ : 0;
+      chat_info->emoji_status_expiration_date =
+          update->emoji_status_ != nullptr ? update->emoji_status_->expiration_date_ : 0;
       break;
     }
     case td_api::updateChatAvailableReactions::ID: {
@@ -11492,9 +11506,6 @@ void Client::add_user(UserInfo *user_info, object_ptr<td_api::user> &&user) {
     user_info->editable_username = std::move(user->usernames_->editable_username_);
   }
   user_info->language_code = std::move(user->language_code_);
-  user_info->emoji_status_custom_emoji_id = user->emoji_status_ != nullptr ? user->emoji_status_->custom_emoji_id_ : 0;
-  user_info->emoji_status_expiration_date = user->emoji_status_ != nullptr ? user->emoji_status_->expiration_date_ : 0;
-
   user_info->have_access = user->have_access_;
   user_info->is_premium = user->is_premium_;
   user_info->added_to_attachment_menu = user->added_to_attachment_menu_;

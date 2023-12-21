@@ -769,8 +769,6 @@ class Client final : public WebhookActor::Callback {
     td::vector<td::string> active_usernames;
     td::string editable_username;
     td::string language_code;
-    int64 emoji_status_custom_emoji_id;
-    int32 emoji_status_expiration_date;
 
     object_ptr<td_api::chatPhoto> photo;
     td::string bio;
@@ -833,6 +831,8 @@ class Client final : public WebhookActor::Callback {
     Type type = Type::Unknown;
     td::string title;
     int32 message_auto_delete_time = 0;
+    int64 emoji_status_custom_emoji_id = 0;
+    int32 emoji_status_expiration_date = 0;
     int32 accent_color_id = -1;
     int32 profile_accent_color_id = -1;
     int64 background_custom_emoji_id = 0;
