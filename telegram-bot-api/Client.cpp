@@ -1964,6 +1964,20 @@ class Client::JsonUserShared final : public td::Jsonable {
   const td_api::messageUsersShared *users_shared_;
 };
 
+class Client::JsonUsersShared final : public td::Jsonable {
+ public:
+  explicit JsonUsersShared(const td_api::messageUsersShared *users_shared) : users_shared_(users_shared) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("user_ids", td::json_array(users_shared_->user_ids_, [](int64 user_id) { return user_id; }));
+    object("request_id", users_shared_->button_id_);
+  }
+
+ private:
+  const td_api::messageUsersShared *users_shared_;
+};
+
 class Client::JsonChatShared final : public td::Jsonable {
  public:
   explicit JsonChatShared(const td_api::messageChatShared *chat_shared) : chat_shared_(chat_shared) {
@@ -2762,7 +2776,10 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     }
     case td_api::messageUsersShared::ID: {
       auto content = static_cast<const td_api::messageUsersShared *>(message_->content.get());
-      object("user_shared", JsonUserShared(content));
+      if (content->user_ids_.size() == 1) {
+        object("user_shared", JsonUserShared(content));
+      }
+      object("users_shared", JsonUsersShared(content));
       break;
     }
     case td_api::messageChatShared::ID: {
