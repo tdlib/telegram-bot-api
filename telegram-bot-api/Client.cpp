@@ -6459,17 +6459,23 @@ td::Result<td_api::object_ptr<td_api::keyboardButton>> Client::get_keyboard_butt
       return make_object<td_api::keyboardButton>(text, make_object<td_api::keyboardButtonTypeWebApp>(url));
     }
 
-    if (object.has_field("request_user")) {
-      TRY_RESULT(request_user, object.extract_required_field("request_user", td::JsonValue::Type::Object));
+    if (object.has_field("request_user") || object.has_field("request_users")) {
+      td::JsonValue request_user;
+      if (object.has_field("request_users")) {
+        TRY_RESULT_ASSIGN(request_user, object.extract_required_field("request_users", td::JsonValue::Type::Object));
+      } else {
+        TRY_RESULT_ASSIGN(request_user, object.extract_required_field("request_user", td::JsonValue::Type::Object));
+      }
       auto &request_user_object = request_user.get_object();
       TRY_RESULT(id, request_user_object.get_required_int_field("request_id"));
       auto restrict_user_is_bot = request_user_object.has_field("user_is_bot");
       TRY_RESULT(user_is_bot, request_user_object.get_optional_bool_field("user_is_bot"));
       auto restrict_user_is_premium = request_user_object.has_field("user_is_premium");
       TRY_RESULT(user_is_premium, request_user_object.get_optional_bool_field("user_is_premium"));
+      TRY_RESULT(max_quantity, request_user_object.get_optional_int_field("max_quantity", 1));
       return make_object<td_api::keyboardButton>(
-          text, make_object<td_api::keyboardButtonTypeRequestUsers>(id, restrict_user_is_bot, user_is_bot,
-                                                                    restrict_user_is_premium, user_is_premium, 1));
+          text, make_object<td_api::keyboardButtonTypeRequestUsers>(
+                    id, restrict_user_is_bot, user_is_bot, restrict_user_is_premium, user_is_premium, max_quantity));
     }
 
     if (object.has_field("request_chat")) {
