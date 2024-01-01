@@ -6418,6 +6418,9 @@ td::Result<Client::InputReplyParameters> Client::get_reply_parameters(td::JsonVa
     return td::Status::Error(400, "Object expected as reply parameters");
   }
   auto &object = value.get_object();
+  if (object.field_count() == 0) {
+    return InputReplyParameters();
+  }
   TRY_RESULT(chat_id, object.get_optional_string_field("chat_id"));
   TRY_RESULT(message_id, object.get_required_int_field("message_id"));
   TRY_RESULT(allow_sending_without_reply, object.get_optional_bool_field("allow_sending_without_reply"));
