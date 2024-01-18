@@ -103,6 +103,7 @@ static void dump_stacktrace_signal_handler(int sig) {
 
 static void fail_signal_handler(int sig) {
   has_failed = true;
+  print_log();
   {
     td::LogGuard log_guard;
     td::signal_safe_write_signal_number(sig);
@@ -110,7 +111,6 @@ static void fail_signal_handler(int sig) {
     options.use_gdb = true;
     td::Stacktrace::print_to_stderr(options);
   }
-  print_log();
   _Exit(EXIT_FAILURE);
 }
 
