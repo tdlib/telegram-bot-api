@@ -320,6 +320,7 @@ bool Client::init_methods() {
   methods_.emplace("deletewebhook", &Client::process_set_webhook_query);
   methods_.emplace("getwebhookinfo", &Client::process_get_webhook_info_query);
   methods_.emplace("getfile", &Client::process_get_file_query);
+  methods_.emplace("searchpublicchat", &Client::process_search_public_chat_query);
   return true;
 }
 
@@ -10952,6 +10953,18 @@ td::Status Client::process_get_file_query(PromisedQueryPtr &query) {
   check_remote_file_id(file_id, std::move(query), [this](object_ptr<td_api::file> file, PromisedQueryPtr query) {
     do_get_file(std::move(file), std::move(query));
   });
+  return td::Status::OK();
+}
+
+td::Status Client::process_search_public_chat_query(PromisedQueryPtr &query) {
+  td::string username = query->arg("username").str();
+
+  const auto on_success = [this](int64 chat_id, PromisedQueryPtr query) {
+    answer_query(JsonChat(chat_id, this, false), std::move(query));
+  };
+  send_request(make_object<td_api::searchPublicChat>(username),
+               td::make_unique<TdOnCheckChatCallback<decltype(on_success)>>(this, false, AccessRights::Read,
+                                                                            std::move(query), std::move(on_success)));
   return td::Status::OK();
 }
 
