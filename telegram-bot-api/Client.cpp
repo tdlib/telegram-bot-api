@@ -2705,6 +2705,10 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       break;
     case td_api::messageExpiredVideo::ID:
       break;
+    case td_api::messageExpiredVideoNote::ID:
+      break;
+    case td_api::messageExpiredVoiceNote::ID:
+      break;
     case td_api::messageCustomServiceAction::ID:
       break;
     case td_api::messageChatSetTheme::ID:
@@ -5051,6 +5055,7 @@ ServerBotInfo Client::get_bot_info() const {
 }
 
 void Client::start_up() {
+  CHECK(start_time_ < 1e-10);
   start_time_ = td::Time::now();
   next_bot_updates_warning_time_ = start_time_ + 600;
   webhook_set_time_ = start_time_;
@@ -5781,18 +5786,11 @@ void Client::on_update_authorization_state() {
   CHECK(authorization_state_ != nullptr);
   switch (authorization_state_->get_id()) {
     case td_api::authorizationStateWaitTdlibParameters::ID: {
-      send_request(
-          make_object<td_api::setOption>("ignore_inline_thumbnails", make_object<td_api::optionValueBoolean>(true)),
-          td::make_unique<TdOnOkCallback>());
-      send_request(make_object<td_api::setOption>("reuse_uploaded_photos_by_hash",
-                                                  make_object<td_api::optionValueBoolean>(true)),
-                   td::make_unique<TdOnOkCallback>());
-      send_request(
-          make_object<td_api::setOption>("disable_network_statistics", make_object<td_api::optionValueBoolean>(true)),
-          td::make_unique<TdOnOkCallback>());
-      send_request(make_object<td_api::setOption>("disable_time_adjustment_protection",
-                                                  make_object<td_api::optionValueBoolean>(true)),
-                   td::make_unique<TdOnOkCallback>());
+      for (td::string option : {"disable_network_statistics", "disable_time_adjustment_protection", "ignore_file_names",
+                                "ignore_inline_thumbnails", "reuse_uploaded_photos_by_hash", "use_storage_optimizer"}) {
+        send_request(make_object<td_api::setOption>(option, make_object<td_api::optionValueBoolean>(true)),
+                     td::make_unique<TdOnOkCallback>());
+      }
 
       auto request = make_object<td_api::setTdlibParameters>();
       request->use_test_dc_ = is_test_dc_;
@@ -5806,8 +5804,6 @@ void Client::on_update_authorization_state() {
       request->system_language_code_ = "en";
       request->device_model_ = "server";
       request->application_version_ = parameters_->version_;
-      request->enable_storage_optimizer_ = true;
-      request->ignore_file_names_ = true;
 
       return send_request(std::move(request), td::make_unique<TdOnInitCallback>(this));
     }
@@ -7480,8 +7476,8 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
     }
 
     if (input_message_content == nullptr) {
-      input_message_content = make_object<td_api::inputMessageVoiceNote>(nullptr, voice_note_duration,
-                                                                         "" /* waveform */, std::move(caption));
+      input_message_content = make_object<td_api::inputMessageVoiceNote>(
+          nullptr, voice_note_duration, "" /* waveform */, std::move(caption), nullptr);
     }
     return make_object<td_api::inputInlineQueryResultVoiceNote>(
         id, title, voice_note_url, voice_note_duration, std::move(reply_markup), std::move(input_message_content));
@@ -9220,9 +9216,9 @@ td::Status Client::process_send_video_note_query(PromisedQueryPtr &query) {
   auto thumbnail = get_input_thumbnail(query.get());
   int32 duration = get_integer_arg(query.get(), "duration", 0, 0, MAX_DURATION);
   int32 length = get_integer_arg(query.get(), "length", 0, 0, MAX_LENGTH);
-  do_send_message(
-      make_object<td_api::inputMessageVideoNote>(std::move(video_note), std::move(thumbnail), duration, length),
-      std::move(query));
+  do_send_message(make_object<td_api::inputMessageVideoNote>(std::move(video_note), std::move(thumbnail), duration,
+                                                             length, nullptr),
+                  std::move(query));
   return td::Status::OK();
 }
 
@@ -9233,8 +9229,9 @@ td::Status Client::process_send_voice_query(PromisedQueryPtr &query) {
   }
   int32 duration = get_integer_arg(query.get(), "duration", 0, 0, MAX_DURATION);
   TRY_RESULT(caption, get_caption(query.get()));
-  do_send_message(make_object<td_api::inputMessageVoiceNote>(std::move(voice_note), duration, "", std::move(caption)),
-                  std::move(query));
+  do_send_message(
+      make_object<td_api::inputMessageVoiceNote>(std::move(voice_note), duration, "", std::move(caption), nullptr),
+      std::move(query));
   return td::Status::OK();
 }
 
@@ -10488,7 +10485,7 @@ td::Status Client::process_restrict_chat_member_query(PromisedQueryPtr &query) {
                        permissions->can_change_info_ = old_permissions->can_change_info_;
                        permissions->can_invite_users_ = old_permissions->can_invite_users_;
                        permissions->can_pin_messages_ = old_permissions->can_pin_messages_;
-                       permissions->can_manage_topics_ = old_permissions->can_manage_topics_;
+                       permissions->can_create_topics_ = old_permissions->can_create_topics_;
                      }
 
                      send_request(make_object<td_api::setChatMemberStatus>(
@@ -11809,7 +11806,7 @@ void Client::json_store_permissions(td::JsonObjectScope &object, const td_api::c
   object("can_change_info", td::JsonBool(permissions->can_change_info_));
   object("can_invite_users", td::JsonBool(permissions->can_invite_users_));
   object("can_pin_messages", td::JsonBool(permissions->can_pin_messages_));
-  object("can_manage_topics", td::JsonBool(permissions->can_manage_topics_));
+  object("can_manage_topics", td::JsonBool(permissions->can_create_topics_));
 }
 
 td::Slice Client::get_update_type_name(UpdateType update_type) {
@@ -12332,6 +12329,10 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       return true;
     case td_api::messageExpiredVideo::ID:
       return true;
+    case td_api::messageExpiredVideoNote::ID:
+      return true;
+    case td_api::messageExpiredVoiceNote::ID:
+      return true;
     case td_api::messageCustomServiceAction::ID:
       return true;
     case td_api::messageChatSetTheme::ID:
@@ -12750,10 +12751,9 @@ Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message,
     message_info->initial_send_date = message->forward_info_->date_;
     message_info->forward_origin = std::move(message->forward_info_->origin_);
 
-    auto from_chat_id = message->forward_info_->from_chat_id_;
-    message_info->is_automatic_forward =
-        from_chat_id != 0 && from_chat_id != chat_id && message->forward_info_->from_message_id_ != 0 &&
-        get_chat_type(chat_id) == ChatType::Supergroup && get_chat_type(from_chat_id) == ChatType::Channel;
+    message_info->is_automatic_forward = message->forward_info_->source_ != nullptr &&
+                                         get_chat_type(chat_id) == ChatType::Supergroup &&
+                                         get_chat_type(message->forward_info_->source_->chat_id_) == ChatType::Channel;
   } else if (message->import_info_ != nullptr) {
     message_info->initial_send_date = message->import_info_->date_;
     message_info->forward_origin = make_object<td_api::messageOriginHiddenUser>(message->import_info_->sender_name_);
