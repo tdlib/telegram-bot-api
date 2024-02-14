@@ -860,6 +860,9 @@ class Client::JsonChat final : public td::Jsonable {
           if (supergroup_info->slow_mode_delay != 0) {
             object("slow_mode_delay", supergroup_info->slow_mode_delay);
           }
+          if (supergroup_info->unrestrict_boost_count != 0) {
+            object("unrestrict_boost_count", supergroup_info->unrestrict_boost_count);
+          }
           if (supergroup_info->linked_chat_id != 0) {
             object("linked_chat_id", supergroup_info->linked_chat_id);
           }
@@ -6147,6 +6150,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       supergroup_info->can_set_sticker_set = full_info->can_set_sticker_set_;
       supergroup_info->is_all_history_available = full_info->is_all_history_available_;
       supergroup_info->slow_mode_delay = full_info->slow_mode_delay_;
+      supergroup_info->unrestrict_boost_count = full_info->unrestrict_boost_count_;
       supergroup_info->linked_chat_id = full_info->linked_chat_id_;
       supergroup_info->location = std::move(full_info->location_);
       supergroup_info->has_hidden_members = full_info->has_hidden_members_;

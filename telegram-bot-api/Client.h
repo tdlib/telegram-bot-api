@@ -811,6 +811,7 @@ class Client final : public WebhookActor::Callback {
     int64 sticker_set_id = 0;
     int32 date = 0;
     int32 slow_mode_delay = 0;
+    int32 unrestrict_boost_count = 0;
     int64 linked_chat_id = 0;
     object_ptr<td_api::chatLocation> location;
     object_ptr<td_api::ChatMemberStatus> status;
