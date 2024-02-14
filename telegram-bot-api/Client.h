@@ -867,6 +867,7 @@ class Client final : public WebhookActor::Callback {
     int32 date = 0;
     int32 edit_date = 0;
     int32 initial_send_date = 0;
+    int32 sender_boost_count = 0;
     object_ptr<td_api::MessageOrigin> forward_origin;
     td::string author_signature;
     object_ptr<td_api::messageReplyToMessage> reply_to_message;
