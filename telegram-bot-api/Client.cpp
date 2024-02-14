@@ -2816,6 +2816,8 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("giveaway_completed", JsonGiveawayCompleted(content, message_->chat_id, client_));
       break;
     }
+    case td_api::messageChatBoost::ID:
+      break;
     default:
       UNREACHABLE();
   }
@@ -12346,6 +12348,8 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageChatSetBackground::ID:
       return true;
     case td_api::messagePremiumGiftCode::ID:
+      return true;
+    case td_api::messageChatBoost::ID:
       return true;
     default:
       break;
