@@ -6353,9 +6353,9 @@ void Client::finish_closing() {
 
   auto timeout = [&] {
     if (next_authorization_time_ <= 0.0) {
-      return 600.0;
+      return was_authorized_ && authorization_date_ < get_unix_time() - 1800 ? 1.0 : 1800.0;
     }
-    return td::min(next_authorization_time_ - td::Time::now(), 600.0);
+    return td::min(next_authorization_time_ - td::Time::now(), 1800.0);
   }();
   set_timeout_in(timeout);
   LOG(INFO) << "Keep client opened for " << timeout << " seconds";
