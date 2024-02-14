@@ -11782,11 +11782,9 @@ void Client::json_store_administrator_rights(td::JsonObjectScope &object, const 
   }
   object("can_promote_members", td::JsonBool(rights->can_promote_members_));
   object("can_manage_video_chats", td::JsonBool(rights->can_manage_video_chats_));
-  if (chat_type == ChatType::Channel) {
-    object("can_post_stories", td::JsonBool(rights->can_post_stories_));
-    object("can_edit_stories", td::JsonBool(rights->can_edit_stories_));
-    object("can_delete_stories", td::JsonBool(rights->can_delete_stories_));
-  }
+  object("can_post_stories", td::JsonBool(rights->can_post_stories_));
+  object("can_edit_stories", td::JsonBool(rights->can_edit_stories_));
+  object("can_delete_stories", td::JsonBool(rights->can_delete_stories_));
   object("is_anonymous", td::JsonBool(rights->is_anonymous_));
 }
 
