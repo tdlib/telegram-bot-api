@@ -836,6 +836,14 @@ class Client::JsonChat final : public td::Jsonable {
               LOG(ERROR) << "Not found chat sticker set " << supergroup_info->sticker_set_id;
             }
           }
+          if (supergroup_info->custom_emoji_sticker_set_id != 0) {
+            auto sticker_set_name = client_->get_sticker_set_name(supergroup_info->custom_emoji_sticker_set_id);
+            if (!sticker_set_name.empty()) {
+              object("custom_emoji_sticker_set_name", sticker_set_name);
+            } else {
+              LOG(ERROR) << "Not found chat custom emoji sticker set " << supergroup_info->custom_emoji_sticker_set_id;
+            }
+          }
           if (supergroup_info->can_set_sticker_set) {
             object("can_set_sticker_set", td::JsonTrue());
           }
@@ -1602,6 +1610,23 @@ class Client::JsonPollAnswer final : public td::Jsonable {
 
  private:
   const td_api::updatePollAnswer *poll_answer_;
+  const Client *client_;
+};
+
+class Client::JsonStory final : public td::Jsonable {
+ public:
+  JsonStory(int64 chat_id, int32 story_id, const Client *client)
+      : chat_id_(chat_id), story_id_(story_id), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("chat", JsonChat(chat_id_, client_));
+    object("id", story_id_);
+  }
+
+ private:
+  int64 chat_id_;
+  int32 story_id_;
   const Client *client_;
 };
 
@@ -2810,9 +2835,11 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("chat_shared", JsonChatShared(content));
       break;
     }
-    case td_api::messageStory::ID:
-      object("story", JsonEmptyObject());
+    case td_api::messageStory::ID: {
+      auto content = static_cast<const td_api::messageStory *>(message_->content.get());
+      object("story", JsonStory(content->story_sender_chat_id_, content->story_id_, client_));
       break;
+    }
     case td_api::messageChatSetBackground::ID:
       break;
     case td_api::messagePremiumGiftCode::ID:
@@ -4415,6 +4442,36 @@ class Client::TdOnGetStickerSetCallback final : public TdQueryCallback {
   int64 new_message_chat_id_;
 };
 
+class Client::TdOnGetChatCustomEmojiStickerSetCallback final : public TdQueryCallback {
+ public:
+  TdOnGetChatCustomEmojiStickerSetCallback(Client *client, int64 chat_id, int64 pinned_message_id,
+                                           PromisedQueryPtr query)
+      : client_(client), chat_id_(chat_id), pinned_message_id_(pinned_message_id), query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    auto chat_info = client_->get_chat(chat_id_);
+    CHECK(chat_info != nullptr);
+    CHECK(chat_info->type == ChatInfo::Type::Supergroup);
+    auto supergroup_info = client_->add_supergroup_info(chat_info->supergroup_id);
+    if (result->get_id() == td_api::error::ID) {
+      supergroup_info->custom_emoji_sticker_set_id = 0;
+    } else {
+      CHECK(result->get_id() == td_api::stickerSet::ID);
+      auto sticker_set = move_object_as<td_api::stickerSet>(result);
+      client_->on_get_sticker_set_name(sticker_set->id_, sticker_set->name_);
+    }
+
+    answer_query(JsonChat(chat_id_, client_, true, pinned_message_id_), std::move(query_));
+  }
+
+ private:
+  Client *client_;
+  int64 chat_id_;
+  int64 pinned_message_id_;
+  PromisedQueryPtr query_;
+};
+
 class Client::TdOnGetChatStickerSetCallback final : public TdQueryCallback {
  public:
   TdOnGetChatStickerSetCallback(Client *client, int64 chat_id, int64 pinned_message_id, PromisedQueryPtr query)
@@ -4422,15 +4479,23 @@ class Client::TdOnGetChatStickerSetCallback final : public TdQueryCallback {
   }
 
   void on_result(object_ptr<td_api::Object> result) final {
+    auto chat_info = client_->get_chat(chat_id_);
+    CHECK(chat_info != nullptr);
+    CHECK(chat_info->type == ChatInfo::Type::Supergroup);
+    auto supergroup_info = client_->add_supergroup_info(chat_info->supergroup_id);
     if (result->get_id() == td_api::error::ID) {
-      auto chat_info = client_->get_chat(chat_id_);
-      CHECK(chat_info != nullptr);
-      CHECK(chat_info->type == ChatInfo::Type::Supergroup);
-      client_->add_supergroup_info(chat_info->supergroup_id)->sticker_set_id = 0;
+      supergroup_info->sticker_set_id = 0;
     } else {
       CHECK(result->get_id() == td_api::stickerSet::ID);
       auto sticker_set = move_object_as<td_api::stickerSet>(result);
       client_->on_get_sticker_set_name(sticker_set->id_, sticker_set->name_);
+    }
+
+    auto sticker_set_id = supergroup_info->custom_emoji_sticker_set_id;
+    if (sticker_set_id != 0 && client_->get_sticker_set_name(sticker_set_id).empty()) {
+      return client_->send_request(make_object<td_api::getStickerSet>(sticker_set_id),
+                                   td::make_unique<TdOnGetChatCustomEmojiStickerSetCallback>(
+                                       client_, chat_id_, pinned_message_id_, std::move(query_)));
     }
 
     answer_query(JsonChat(chat_id_, client_, true, pinned_message_id_), std::move(query_));
@@ -4477,6 +4542,13 @@ class Client::TdOnGetChatPinnedMessageCallback final : public TdQueryCallback {
         return client_->send_request(
             make_object<td_api::getStickerSet>(sticker_set_id),
             td::make_unique<TdOnGetChatStickerSetCallback>(client_, chat_id_, pinned_message_id, std::move(query_)));
+      }
+
+      sticker_set_id = supergroup_info->custom_emoji_sticker_set_id;
+      if (sticker_set_id != 0 && client_->get_sticker_set_name(sticker_set_id).empty()) {
+        return client_->send_request(make_object<td_api::getStickerSet>(sticker_set_id),
+                                     td::make_unique<TdOnGetChatCustomEmojiStickerSetCallback>(
+                                         client_, chat_id_, pinned_message_id, std::move(query_)));
       }
     }
 
@@ -6147,6 +6219,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       supergroup_info->invite_link = std::move(
           full_info->invite_link_ != nullptr ? std::move(full_info->invite_link_->invite_link_) : td::string());
       supergroup_info->sticker_set_id = full_info->sticker_set_id_;
+      supergroup_info->custom_emoji_sticker_set_id = full_info->custom_emoji_sticker_set_id_;
       supergroup_info->can_set_sticker_set = full_info->can_set_sticker_set_;
       supergroup_info->is_all_history_available = full_info->is_all_history_available_;
       supergroup_info->slow_mode_delay = full_info->slow_mode_delay_;

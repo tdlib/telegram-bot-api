@@ -165,6 +165,7 @@ class Client final : public WebhookActor::Callback {
   class JsonMessageReactionCountUpdated;
   class JsonAddress;
   class JsonOrderInfo;
+  class JsonStory;
   class JsonSuccessfulPaymentBot;
   class JsonEncryptedPassportElement;
   class JsonEncryptedCredentials;
@@ -214,6 +215,7 @@ class Client final : public WebhookActor::Callback {
   class TdOnGetMyShortDescriptionCallback;
   class TdOnGetChatFullInfoCallback;
   class TdOnGetChatStickerSetCallback;
+  class TdOnGetChatCustomEmojiStickerSetCallback;
   class TdOnGetChatPinnedMessageCallback;
   class TdOnGetChatPinnedMessageToUnpinCallback;
   class TdOnGetGroupMembersCallback;
@@ -809,6 +811,7 @@ class Client final : public WebhookActor::Callback {
     td::string description;
     td::string invite_link;
     int64 sticker_set_id = 0;
+    int64 custom_emoji_sticker_set_id = 0;
     int32 date = 0;
     int32 slow_mode_delay = 0;
     int32 unrestrict_boost_count = 0;
