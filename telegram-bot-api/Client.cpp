@@ -2092,6 +2092,19 @@ class Client::JsonGiveawayCompleted final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonChatBoostAdded final : public td::Jsonable {
+ public:
+  JsonChatBoostAdded(const td_api::messageChatBoost *chat_boost) : chat_boost_(chat_boost) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("boost_count", chat_boost_->boost_count_);
+  }
+
+ private:
+  const td_api::messageChatBoost *chat_boost_;
+};
+
 class Client::JsonWebAppInfo final : public td::Jsonable {
  public:
   explicit JsonWebAppInfo(const td::string &url) : url_(url) {
@@ -2816,8 +2829,11 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("giveaway_completed", JsonGiveawayCompleted(content, message_->chat_id, client_));
       break;
     }
-    case td_api::messageChatBoost::ID:
+    case td_api::messageChatBoost::ID: {
+      auto content = static_cast<const td_api::messageChatBoost *>(message_->content.get());
+      object("boost_added", JsonChatBoostAdded(content));
       break;
+    }
     default:
       UNREACHABLE();
   }
@@ -12346,8 +12362,6 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageChatSetBackground::ID:
       return true;
     case td_api::messagePremiumGiftCode::ID:
-      return true;
-    case td_api::messageChatBoost::ID:
       return true;
     default:
       break;

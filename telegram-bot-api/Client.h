@@ -182,6 +182,7 @@ class Client final : public WebhookActor::Callback {
   class JsonGiveaway;
   class JsonGiveawayWinners;
   class JsonGiveawayCompleted;
+  class JsonChatBoostAdded;
   class JsonUpdateTypes;
   class JsonWebhookInfo;
   class JsonStickerSet;
