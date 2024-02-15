@@ -2499,6 +2499,10 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
   if (message_->reply_to_message != nullptr && message_->reply_to_message->quote_ != nullptr) {
     object("quote", JsonTextQuote(message_->reply_to_message->quote_.get(), client_));
   }
+  if (message_->reply_to_story != nullptr) {
+    object("reply_to_story",
+           JsonStory(message_->reply_to_story->story_sender_chat_id_, message_->reply_to_story->story_id_, client_));
+  }
   if (message_->media_album_id != 0) {
     object("media_group_id", td::to_string(message_->media_album_id));
   }
@@ -12898,6 +12902,11 @@ Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message,
     message_info->reply_to_message = move_object_as<td_api::messageReplyToMessage>(message->reply_to_);
   } else {
     message_info->reply_to_message = nullptr;
+  }
+  if (message->reply_to_ != nullptr && message->reply_to_->get_id() == td_api::messageReplyToStory::ID) {
+    message_info->reply_to_story = move_object_as<td_api::messageReplyToStory>(message->reply_to_);
+  } else {
+    message_info->reply_to_story = nullptr;
   }
 
   if (message_info->content == nullptr || force_update_content) {
