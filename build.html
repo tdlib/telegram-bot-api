@@ -75,7 +75,7 @@
     a:hover {
       text-decoration: underline;
     }
-    select, button {
+    select, button, input {
       border: 1px solid var(--color-select-border);
       background-color: var(--background);
       color: var(--color);
@@ -263,6 +263,14 @@
       <label><input type="checkbox" id="buildRootCheckbox" onchange="onOptionsChanged()"/>Build from root user (unrecommended).</label>
     </div>
 
+    <div id="buildMultiCoreDiv" class="hide">
+        <label><input type="checkbox" id="buildMultiCoreCheckbox" onchange="onOptionsChanged()"/>Build using mulitple cores<span class="hide" id="buildMultiCoreColon">:</span></label>
+        
+        <div id="buildMultiCoreInputDiv" class="hide">
+            <input type="number" id="buildMultiCoreInput" onchange="onOptionsChanged()" placeholder="Cores number" min="1" style="text-align: center;"/>
+        </div>
+    </div>
+
     <p></p>
   </div>
 
@@ -351,6 +359,7 @@ function onOptionsChanged() {
     linux_distro = document.getElementById('linuxSelect').value;
   }
   document.getElementById('buildCommandsDiv').style.display = 'block';
+  document.getElementById('buildMultiCoreDiv').style.display = 'block';
 
   var use_clang = os_freebsd || os_openbsd;
   if (os_linux && linux_distro !== 'Alpine' && !linux_distro.includes('CentOS')) {
@@ -660,6 +669,11 @@ function onOptionsChanged() {
     commands.push('cd ../build');
   }
   let build_command = cmake + ' --build . --target install';
+
+  if (document.getElementById('buildMultiCoreCheckbox').checked && document.getElementById('buildMultiCoreInput').value.toString().length > 0 && !(isNaN(document.getElementById('buildMultiCoreInput').value))) {
+    build_command += ` -j ${ document.getElementById('buildMultiCoreInput').value }`;
+  }
+
   if (use_msvc) {
     if (!is_debug_build) {
       commands.push(build_command + ' --config Release');
@@ -678,6 +692,8 @@ function onOptionsChanged() {
   if (install_dir !== '/usr/local') {
     install_dir = 'telegram-bot-api';
   }
+  document.getElementById('buildMultiCoreInputDiv').style.display = document.getElementById('buildMultiCoreCheckbox').checked ? 'block' : 'none';
+  document.getElementById('buildMultiCoreColon').style.display = document.getElementById('buildMultiCoreCheckbox').checked ? 'inline' : 'none';
   commands.push((use_powershell ? 'dir ' : 'ls -l ') + install_dir + '/bin/telegram-bot-api*');
   document.getElementById('buildCommands').innerHTML = '<ul><li>' + commands.join('</li><li>') + '</li></ul>';
   document.getElementById('copyBuildCommandsButton').style.display = commands.includes('exit') ? 'none' : 'block';
