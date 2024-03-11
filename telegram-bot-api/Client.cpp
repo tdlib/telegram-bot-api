@@ -1078,8 +1078,8 @@ class Client::JsonMessages final : public td::Jsonable {
 
 class Client::JsonLinkPreviewOptions final : public td::Jsonable {
  public:
-  JsonLinkPreviewOptions(const td_api::linkPreviewOptions *link_preview_options, const Client *client)
-      : link_preview_options_(link_preview_options), client_(client) {
+  explicit JsonLinkPreviewOptions(const td_api::linkPreviewOptions *link_preview_options)
+      : link_preview_options_(link_preview_options) {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
@@ -1102,7 +1102,6 @@ class Client::JsonLinkPreviewOptions final : public td::Jsonable {
 
  private:
   const td_api::linkPreviewOptions *link_preview_options_;
-  const Client *client_;
 };
 
 class Client::JsonAnimation final : public td::Jsonable {
@@ -2277,7 +2276,7 @@ class Client::JsonExternalReplyInfo final : public td::Jsonable {
         case td_api::messageText::ID: {
           auto content = static_cast<const td_api::messageText *>(reply_->content_.get());
           if (content->link_preview_options_ != nullptr) {
-            object("link_preview_options", JsonLinkPreviewOptions(content->link_preview_options_.get(), client_));
+            object("link_preview_options", JsonLinkPreviewOptions(content->link_preview_options_.get()));
           }
           break;
         }
@@ -2514,7 +2513,7 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
         object("entities", JsonVectorEntities(content->text_->entities_, client_));
       }
       if (content->link_preview_options_ != nullptr) {
-        object("link_preview_options", JsonLinkPreviewOptions(content->link_preview_options_.get(), client_));
+        object("link_preview_options", JsonLinkPreviewOptions(content->link_preview_options_.get()));
       }
       break;
     }
@@ -6203,8 +6202,8 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       auto group_info = add_group_info(group_id);
       group_info->photo = std::move(full_info->photo_);
       group_info->description = std::move(full_info->description_);
-      group_info->invite_link = std::move(
-          full_info->invite_link_ != nullptr ? std::move(full_info->invite_link_->invite_link_) : td::string());
+      group_info->invite_link =
+          full_info->invite_link_ != nullptr ? std::move(full_info->invite_link_->invite_link_) : td::string();
       break;
     }
     case td_api::updateSupergroup::ID: {
@@ -6220,8 +6219,8 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       auto supergroup_info = add_supergroup_info(supergroup_id);
       supergroup_info->photo = std::move(full_info->photo_);
       supergroup_info->description = std::move(full_info->description_);
-      supergroup_info->invite_link = std::move(
-          full_info->invite_link_ != nullptr ? std::move(full_info->invite_link_->invite_link_) : td::string());
+      supergroup_info->invite_link =
+          full_info->invite_link_ != nullptr ? std::move(full_info->invite_link_->invite_link_) : td::string();
       supergroup_info->sticker_set_id = full_info->sticker_set_id_;
       supergroup_info->custom_emoji_sticker_set_id = full_info->custom_emoji_sticker_set_id_;
       supergroup_info->can_set_sticker_set = full_info->can_set_sticker_set_;
