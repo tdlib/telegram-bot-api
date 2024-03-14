@@ -474,10 +474,10 @@ class Client final : public WebhookActor::Callback {
 
   td::Result<object_ptr<td_api::inputSticker>> get_input_sticker(const Query *query) const;
 
-  td::Result<object_ptr<td_api::inputSticker>> get_input_sticker(const Query *query, td::JsonValue &&value) const;
+  td::Result<object_ptr<td_api::inputSticker>> get_input_sticker(const Query *query, td::JsonValue &&value,
+                                                                 td::Slice default_sticker_format) const;
 
-  td::Result<td::vector<object_ptr<td_api::inputSticker>>> get_input_stickers(
-      const Query *query, object_ptr<td_api::StickerFormat> &sticker_format) const;
+  td::Result<td::vector<object_ptr<td_api::inputSticker>>> get_input_stickers(const Query *query) const;
 
   static td::Result<object_ptr<td_api::InputFile>> get_sticker_input_file(const Query *query);
 
