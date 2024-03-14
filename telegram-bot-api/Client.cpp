@@ -4012,7 +4012,7 @@ class Client::TdOnCheckUserCallback final : public TdQueryCallback {
     auto user_info = client_->get_user_info(user->id_);
     CHECK(user_info != nullptr);  // it must have already been got through updates
 
-    return client_->check_user_read_access(user_info, std::move(query_), std::move(on_success_));
+    client_->check_user_read_access(user_info, std::move(query_), std::move(on_success_));
   }
 
  private:
@@ -4063,7 +4063,7 @@ class Client::TdOnCheckChatCallback final : public TdQueryCallback {
       return fail_query(400, "Bad Request: chat not found", std::move(query_));
     }
 
-    return client_->check_chat_access(chat->id_, access_rights_, chat_info, std::move(query_), std::move(on_success_));
+    client_->check_chat_access(chat->id_, access_rights_, chat_info, std::move(query_), std::move(on_success_));
   }
 
  private:
@@ -4087,6 +4087,30 @@ class Client::TdOnCheckChatNoFailCallback final : public TdQueryCallback {
 
  private:
   int64 chat_id_;
+  PromisedQueryPtr query_;
+  OnSuccess on_success_;
+};
+
+template <class OnSuccess>
+class Client::TdOnCheckBusinessConnectionCallback final : public TdQueryCallback {
+ public:
+  TdOnCheckBusinessConnectionCallback(Client *client, PromisedQueryPtr query, OnSuccess on_success)
+      : client_(client), query_(std::move(query)), on_success_(std::move(on_success)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result),
+                                   "business connection not found");
+    }
+
+    CHECK(result->get_id() == td_api::businessConnection::ID);
+    auto connection = client_->add_business_connection(move_object_as<td_api::businessConnection>(result), false);
+    on_success_(connection->id_, std::move(query_));
+  }
+
+ private:
+  Client *client_;
   PromisedQueryPtr query_;
   OnSuccess on_success_;
 };
@@ -4838,7 +4862,7 @@ class Client::TdOnGetSupergroupMemberCountCallback final : public TdQueryCallbac
 
     CHECK(result->get_id() == td_api::supergroupFullInfo::ID);
     auto supergroup_full_info = move_object_as<td_api::supergroupFullInfo>(result);
-    return answer_query(td::VirtuallyJsonableInt(supergroup_full_info->member_count_), std::move(query_));
+    answer_query(td::VirtuallyJsonableInt(supergroup_full_info->member_count_), std::move(query_));
   }
 
  private:
@@ -4857,7 +4881,7 @@ class Client::TdOnCreateInvoiceLinkCallback final : public TdQueryCallback {
 
     CHECK(result->get_id() == td_api::httpUrl::ID);
     auto http_url = move_object_as<td_api::httpUrl>(result);
-    return answer_query(td::VirtuallyJsonableString(http_url->url_), std::move(query_));
+    answer_query(td::VirtuallyJsonableString(http_url->url_), std::move(query_));
   }
 
  private:
@@ -4876,7 +4900,7 @@ class Client::TdOnReplacePrimaryChatInviteLinkCallback final : public TdQueryCal
 
     CHECK(result->get_id() == td_api::chatInviteLink::ID);
     auto invite_link = move_object_as<td_api::chatInviteLink>(result);
-    return answer_query(td::VirtuallyJsonableString(invite_link->invite_link_), std::move(query_));
+    answer_query(td::VirtuallyJsonableString(invite_link->invite_link_), std::move(query_));
   }
 
  private:
@@ -5523,6 +5547,30 @@ void Client::check_chat_no_fail(td::Slice chat_id_str, PromisedQueryPtr query, O
   }
   send_request(make_object<td_api::getChat>(chat_id), td::make_unique<TdOnCheckChatNoFailCallback<OnSuccess>>(
                                                           chat_id, std::move(query), std::move(on_success)));
+}
+
+td::Result<td::int64> Client::get_business_connection_chat_id(td::Slice chat_id_str) {
+  if (chat_id_str.empty()) {
+    return td::Status::Error(400, "Bad Request: chat_id is empty");
+  }
+
+  auto r_chat_id = td::to_integer_safe<int64>(chat_id_str);
+  if (r_chat_id.is_error()) {
+    return td::Status::Error(400, "Bad Request: chat_id must be a valid Integer");
+  }
+  return r_chat_id.move_as_ok();
+}
+
+template <class OnSuccess>
+void Client::check_business_connection(const td::string &business_connection_id, PromisedQueryPtr query,
+                                       OnSuccess on_success) {
+  auto business_connection = get_business_connection(business_connection_id);
+  if (business_connection != nullptr) {
+    return on_success(business_connection_id, std::move(query));
+  }
+  send_request(
+      make_object<td_api::getBusinessConnection>(business_connection_id),
+      td::make_unique<TdOnCheckBusinessConnectionCallback<OnSuccess>>(this, std::move(query), std::move(on_success)));
 }
 
 template <class OnSuccess>
@@ -9649,14 +9697,26 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
 }
 
 td::Status Client::process_send_chat_action_query(PromisedQueryPtr &query) {
-  auto chat_id = query->arg("chat_id");
+  auto chat_id_str = query->arg("chat_id");
   auto message_thread_id = get_message_id(query.get(), "message_thread_id");
+  auto business_connection_id = query->arg("business_connection_id").str();
   object_ptr<td_api::ChatAction> action = get_chat_action(query.get());
   if (action == nullptr) {
     return td::Status::Error(400, "Wrong parameter action in request");
   }
+  if (!business_connection_id.empty()) {
+    TRY_RESULT(chat_id, get_business_connection_chat_id(chat_id_str));
+    check_business_connection(
+        business_connection_id, std::move(query),
+        [this, chat_id, action = std::move(action)](const td::string &business_connection_id,
+                                                    PromisedQueryPtr query) mutable {
+          send_request(make_object<td_api::sendChatAction>(chat_id, 0, business_connection_id, std::move(action)),
+                       td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+        });
+    return td::Status::OK();
+  }
 
-  check_chat(chat_id, AccessRights::Write, std::move(query),
+  check_chat(chat_id_str, AccessRights::Write, std::move(query),
              [this, message_thread_id, action = std::move(action)](int64 chat_id, PromisedQueryPtr query) mutable {
                send_request(
                    make_object<td_api::sendChatAction>(chat_id, message_thread_id, td::string(), std::move(action)),

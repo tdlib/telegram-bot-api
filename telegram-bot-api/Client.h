@@ -293,6 +293,8 @@ class Client final : public WebhookActor::Callback {
   template <class OnSuccess>
   class TdOnCheckMessageThreadCallback;
   template <class OnSuccess>
+  class TdOnCheckBusinessConnectionCallback;
+  template <class OnSuccess>
   class TdOnCheckRemoteFileIdCallback;
   template <class OnSuccess>
   class TdOnGetChatMemberCallback;
@@ -320,6 +322,12 @@ class Client final : public WebhookActor::Callback {
 
   template <class OnSuccess>
   void check_chat_no_fail(td::Slice chat_id_str, PromisedQueryPtr query, OnSuccess on_success);
+
+  static td::Result<int64> get_business_connection_chat_id(td::Slice chat_id_str);
+
+  template <class OnSuccess>
+  void check_business_connection(const td::string &business_connection_id, PromisedQueryPtr query,
+                                 OnSuccess on_success);
 
   template <class OnSuccess>
   void check_bot_command_scope(BotCommandScope &&scope, PromisedQueryPtr query, OnSuccess on_success);
