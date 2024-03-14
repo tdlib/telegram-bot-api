@@ -888,6 +888,18 @@ class Client final : public WebhookActor::Callback {
     mutable bool is_content_changed = false;
   };
 
+  struct BusinessConnection {
+    td::string id_;
+    int64 user_id_ = 0;
+    int64 user_chat_id_ = 0;
+    int32 date_ = 0;
+    bool can_reply_ = false;
+    bool is_enabled_ = false;
+  };
+  const BusinessConnection *add_business_connection(object_ptr<td_api::businessConnection> &&business_connection,
+                                                    bool from_update);
+  const BusinessConnection *get_business_connection(const td::string &connection_id) const;
+
   static int64 get_same_chat_reply_to_message_id(const td_api::messageReplyToMessage *reply_to,
                                                  int64 message_thread_id);
 
@@ -1112,6 +1124,7 @@ class Client final : public WebhookActor::Callback {
   td::WaitFreeHashMap<int64, td::unique_ptr<GroupInfo>> groups_;
   td::WaitFreeHashMap<int64, td::unique_ptr<SupergroupInfo>> supergroups_;
   td::WaitFreeHashMap<int64, td::unique_ptr<ChatInfo>> chats_;
+  td::WaitFreeHashMap<td::string, td::unique_ptr<BusinessConnection>> business_connections_;
 
   td::FlatHashMap<int32, td::vector<PromisedQueryPtr>> file_download_listeners_;
   td::FlatHashSet<int32> download_started_file_ids_;

@@ -3578,7 +3578,7 @@ class Client::JsonMessageReactionCountUpdated final : public td::Jsonable {
 
 class Client::JsonBusinessConnection final : public td::Jsonable {
  public:
-  JsonBusinessConnection(const td_api::businessConnection *connection, const Client *client)
+  JsonBusinessConnection(const BusinessConnection *connection, const Client *client)
       : connection_(connection), client_(client) {
   }
   void store(td::JsonValueScope *scope) const {
@@ -3592,7 +3592,7 @@ class Client::JsonBusinessConnection final : public td::Jsonable {
   }
 
  private:
-  const td_api::businessConnection *connection_;
+  const BusinessConnection *connection_;
   const Client *client_;
 };
 
@@ -11839,6 +11839,28 @@ td::string Client::get_chat_description(int64 chat_id) const {
   }
 }
 
+const Client::BusinessConnection *Client::add_business_connection(
+    object_ptr<td_api::businessConnection> &&business_connection, bool from_update) {
+  CHECK(business_connection != nullptr);
+  auto &connection = business_connections_[business_connection->id_];
+  if (connection == nullptr) {
+    connection = td::make_unique<BusinessConnection>();
+  } else if (!from_update) {
+    return connection.get();
+  }
+  connection->id_ = std::move(business_connection->id_);
+  connection->user_id_ = business_connection->user_id_;
+  connection->user_chat_id_ = business_connection->user_chat_id_;
+  connection->date_ = business_connection->date_;
+  connection->can_reply_ = business_connection->can_reply_;
+  connection->is_enabled_ = business_connection->is_enabled_;
+  return connection.get();
+}
+
+const Client::BusinessConnection *Client::get_business_connection(const td::string &connection_id) const {
+  return business_connections_.get_pointer(connection_id);
+}
+
 void Client::json_store_file(td::JsonObjectScope &object, const td_api::file *file, bool with_path) const {
   if (file->id_ == 0) {
     return;
@@ -12344,12 +12366,11 @@ void Client::add_update_message_reaction_count(object_ptr<td_api::updateMessageR
 
 void Client::add_update_business_connection(object_ptr<td_api::updateBusinessConnection> &&update) {
   CHECK(update != nullptr);
-  auto connection = std::move(update->connection_);
+  const auto *connection = add_business_connection(std::move(update->connection_), true);
   auto left_time = connection->date_ + 86400 - get_unix_time();
   if (left_time > 0) {
     auto webhook_queue_id = connection->user_id_ + (static_cast<int64>(10) << 33);
-    add_update(UpdateType::BusinessConnection, JsonBusinessConnection(connection.get(), this), left_time,
-               webhook_queue_id);
+    add_update(UpdateType::BusinessConnection, JsonBusinessConnection(connection, this), left_time, webhook_queue_id);
   } else {
     LOG(DEBUG) << "Skip updateBusinessConnection with date " << connection->date_ << ", because current date is "
                << get_unix_time();
