@@ -2416,6 +2416,9 @@ class Client::JsonTextQuote final : public td::Jsonable {
 void Client::JsonMessage::store(td::JsonValueScope *scope) const {
   CHECK(message_ != nullptr);
   auto object = scope->enter_object();
+  if (!message_->business_connection_id.empty()) {
+    object("business_connection_id", message_->business_connection_id);
+  }
   object("message_id", as_client_message_id(message_->id));
   if (message_->sender_user_id != 0) {
     object("from", JsonUser(message_->sender_user_id, client_));
@@ -3794,6 +3797,29 @@ class Client::TdOnSendMessageCallback final : public TdQueryCallback {
  private:
   Client *client_;
   int64 chat_id_;
+  PromisedQueryPtr query_;
+};
+
+class Client::TdOnSendBusinessMessageCallback final : public TdQueryCallback {
+ public:
+  TdOnSendBusinessMessageCallback(Client *client, td::string business_connection_id, PromisedQueryPtr query)
+      : client_(client), business_connection_id_(std::move(business_connection_id)), query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::businessMessage::ID);
+    auto message = client_->create_business_message(std::move(business_connection_id_),
+                                                    move_object_as<td_api::businessMessage>(result));
+    answer_query(JsonMessage(message.get(), false, "sent business message", client_), std::move(query_));
+  }
+
+ private:
+  Client *client_;
+  td::string business_connection_id_;
   PromisedQueryPtr query_;
 };
 
@@ -6550,6 +6576,15 @@ td_api::object_ptr<td_api::InputMessageReplyTo> Client::get_input_message_reply_
   if (reply_parameters.reply_to_message_id > 0) {
     return make_object<td_api::inputMessageReplyToMessage>(
         reply_parameters.reply_in_chat_id, reply_parameters.reply_to_message_id, std::move(reply_parameters.quote));
+  }
+  return nullptr;
+}
+
+td_api::object_ptr<td_api::InputMessageReplyTo> Client::get_input_message_reply_to(
+    InputReplyParameters &&reply_parameters) {
+  if (reply_parameters.reply_in_chat_id.empty() && reply_parameters.reply_to_message_id > 0) {
+    return make_object<td_api::inputMessageReplyToMessage>(0, reply_parameters.reply_to_message_id,
+                                                           std::move(reply_parameters.quote));
   }
   return nullptr;
 }
@@ -11446,6 +11481,7 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
                              bool force) {
   auto chat_id = query->arg("chat_id");
   auto message_thread_id = get_message_id(query.get(), "message_thread_id");
+  auto business_connection_id = query->arg("business_connection_id");
   auto r_reply_parameters = get_reply_parameters(query.get());
   if (r_reply_parameters.is_error()) {
     return fail_query_with_error(std::move(query), 400, r_reply_parameters.error().message());
@@ -11461,9 +11497,30 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
 
   resolve_reply_markup_bot_usernames(
       std::move(reply_markup), std::move(query),
-      [this, chat_id = chat_id.str(), message_thread_id, reply_parameters = std::move(reply_parameters),
-       disable_notification, protect_content, input_message_content = std::move(input_message_content)](
-          object_ptr<td_api::ReplyMarkup> reply_markup, PromisedQueryPtr query) mutable {
+      [this, chat_id_str = chat_id.str(), message_thread_id, business_connection_id = business_connection_id.str(),
+       reply_parameters = std::move(reply_parameters), disable_notification, protect_content,
+       input_message_content = std::move(input_message_content)](object_ptr<td_api::ReplyMarkup> reply_markup,
+                                                                 PromisedQueryPtr query) mutable {
+        if (!business_connection_id.empty()) {
+          auto r_chat_id = get_business_connection_chat_id(chat_id_str);
+          if (r_chat_id.is_error()) {
+            return fail_query_with_error(std::move(query), 400, r_chat_id.error().message());
+          }
+          auto chat_id = r_chat_id.move_as_ok();
+          return check_business_connection(
+              business_connection_id, std::move(query),
+              [this, chat_id, reply_parameters = std::move(reply_parameters), disable_notification, protect_content,
+               reply_markup = std::move(reply_markup), input_message_content = std::move(input_message_content)](
+                  const td::string &business_connection_id, PromisedQueryPtr query) mutable {
+                send_request(
+                    make_object<td_api::sendBusinessMessage>(business_connection_id, chat_id,
+                                                             get_input_message_reply_to(std::move(reply_parameters)),
+                                                             disable_notification, protect_content,
+                                                             std::move(reply_markup), std::move(input_message_content)),
+                    td::make_unique<TdOnSendBusinessMessageCallback>(this, business_connection_id, std::move(query)));
+              });
+        }
+
         auto on_success = [this, disable_notification, protect_content,
                            input_message_content = std::move(input_message_content),
                            reply_markup = std::move(reply_markup)](int64 chat_id, int64 message_thread_id,
@@ -11481,7 +11538,7 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
                                                         std::move(reply_markup), std::move(input_message_content)),
                        td::make_unique<TdOnSendMessageCallback>(this, chat_id, std::move(query)));
         };
-        check_reply_parameters(chat_id, std::move(reply_parameters), message_thread_id, std::move(query),
+        check_reply_parameters(chat_id_str, std::move(reply_parameters), message_thread_id, std::move(query),
                                std::move(on_success));
       });
 }
@@ -13067,6 +13124,15 @@ void Client::init_message(MessageInfo *message_info, object_ptr<td_api::message>
   set_message_reply_markup(message_info, std::move(message->reply_markup_));
 
   message = nullptr;
+}
+
+td::unique_ptr<Client::MessageInfo> Client::create_business_message(td::string business_connection_id,
+                                                                    object_ptr<td_api::businessMessage> &&message) {
+  auto message_info = td::make_unique<MessageInfo>();
+  CHECK(message != nullptr);
+  init_message(message_info.get(), std::move(message->message_), true);
+  message_info->business_connection_id = std::move(business_connection_id);
+  return message_info;
 }
 
 void Client::update_message_content(int64 chat_id, int64 message_id, object_ptr<td_api::MessageContent> &&content) {

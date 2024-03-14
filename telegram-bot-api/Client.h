@@ -196,6 +196,7 @@ class Client final : public WebhookActor::Callback {
   class TdOnInitCallback;
   class TdOnGetUserProfilePhotosCallback;
   class TdOnSendMessageCallback;
+  class TdOnSendBusinessMessageCallback;
   class TdOnSendMessageAlbumCallback;
   class TdOnForwardMessagesCallback;
   class TdOnDeleteFailedToSendMessageCallback;
@@ -382,6 +383,8 @@ class Client final : public WebhookActor::Callback {
   static bool to_bool(td::MutableSlice value);
 
   static object_ptr<td_api::InputMessageReplyTo> get_input_message_reply_to(CheckedReplyParameters &&reply_parameters);
+
+  static object_ptr<td_api::InputMessageReplyTo> get_input_message_reply_to(InputReplyParameters &&reply_parameters);
 
   static td::Result<InputReplyParameters> get_reply_parameters(const Query *query);
 
@@ -889,6 +892,7 @@ class Client final : public WebhookActor::Callback {
     int64 via_bot_user_id = 0;
     object_ptr<td_api::MessageContent> content;
     object_ptr<td_api::ReplyMarkup> reply_markup;
+    td::string business_connection_id;
 
     bool can_be_saved = false;
     bool is_automatic_forward = false;
@@ -986,6 +990,9 @@ class Client final : public WebhookActor::Callback {
   void init_message(MessageInfo *message_info, object_ptr<td_api::message> &&message, bool force_update_content);
   const MessageInfo *get_message(int64 chat_id, int64 message_id, bool force_cache) const;
   MessageInfo *get_message_editable(int64 chat_id, int64 message_id);
+
+  td::unique_ptr<MessageInfo> create_business_message(td::string business_connection_id,
+                                                      object_ptr<td_api::businessMessage> &&message);
 
   void update_message_content(int64 chat_id, int64 message_id, object_ptr<td_api::MessageContent> &&content);
 
