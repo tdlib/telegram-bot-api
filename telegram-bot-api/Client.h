@@ -163,6 +163,7 @@ class Client final : public WebhookActor::Callback {
   class JsonGameHighScore;
   class JsonMessageReactionUpdated;
   class JsonMessageReactionCountUpdated;
+  class JsonBusinessConnection;
   class JsonAddress;
   class JsonOrderInfo;
   class JsonStory;
@@ -1017,6 +1018,8 @@ class Client final : public WebhookActor::Callback {
 
   void add_update_message_reaction_count(object_ptr<td_api::updateMessageReactions> &&update);
 
+  void add_update_business_connection(object_ptr<td_api::updateBusinessConnection> &&update);
+
   // append only before Size
   enum class UpdateType : int32 {
     Message,
@@ -1039,6 +1042,7 @@ class Client final : public WebhookActor::Callback {
     ChatBoostRemoved,
     MessageReaction,
     MessageReactionCount,
+    BusinessConnection,
     Size
   };
 

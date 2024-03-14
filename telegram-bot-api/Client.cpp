@@ -3576,6 +3576,26 @@ class Client::JsonMessageReactionCountUpdated final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonBusinessConnection final : public td::Jsonable {
+ public:
+  JsonBusinessConnection(const td_api::businessConnection *connection, const Client *client)
+      : connection_(connection), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("id", connection_->id_);
+    object("user", JsonUser(connection_->user_id_, client_));
+    object("user_chat_id", connection_->user_chat_id_);
+    object("date", connection_->date_);
+    object("can_reply", td::JsonBool(connection_->can_reply_));
+    object("is_enabled", td::JsonBool(connection_->is_enabled_));
+  }
+
+ private:
+  const td_api::businessConnection *connection_;
+  const Client *client_;
+};
+
 class Client::JsonUpdateTypes final : public td::Jsonable {
  public:
   explicit JsonUpdateTypes(td::uint32 update_types) : update_types_(update_types) {
@@ -6329,6 +6349,9 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       break;
     case td_api::updateMessageReactions::ID:
       add_update_message_reaction_count(move_object_as<td_api::updateMessageReactions>(result));
+      break;
+    case td_api::updateBusinessConnection::ID:
+      add_update_business_connection(move_object_as<td_api::updateBusinessConnection>(result));
       break;
     case td_api::updateConnectionState::ID: {
       auto update = move_object_as<td_api::updateConnectionState>(result);
@@ -11967,6 +11990,8 @@ td::Slice Client::get_update_type_name(UpdateType update_type) {
       return td::Slice("message_reaction");
     case UpdateType::MessageReactionCount:
       return td::Slice("message_reaction_count");
+    case UpdateType::BusinessConnection:
+      return td::Slice("business_connection");
     default:
       UNREACHABLE();
       return td::Slice();
@@ -12313,6 +12338,20 @@ void Client::add_update_message_reaction_count(object_ptr<td_api::updateMessageR
                webhook_queue_id);
   } else {
     LOG(DEBUG) << "Skip updateMessageReactions with date " << update->date_ << ", because current date is "
+               << get_unix_time();
+  }
+}
+
+void Client::add_update_business_connection(object_ptr<td_api::updateBusinessConnection> &&update) {
+  CHECK(update != nullptr);
+  auto connection = std::move(update->connection_);
+  auto left_time = connection->date_ + 86400 - get_unix_time();
+  if (left_time > 0) {
+    auto webhook_queue_id = connection->user_id_ + (static_cast<int64>(10) << 33);
+    add_update(UpdateType::BusinessConnection, JsonBusinessConnection(connection.get(), this), left_time,
+               webhook_queue_id);
+  } else {
+    LOG(DEBUG) << "Skip updateBusinessConnection with date " << connection->date_ << ", because current date is "
                << get_unix_time();
   }
 }
