@@ -924,7 +924,7 @@ class Client final : public WebhookActor::Callback {
   static bool are_equal_inline_keyboards(const td_api::replyMarkupInlineKeyboard *lhs,
                                          const td_api::replyMarkupInlineKeyboard *rhs);
 
-  void set_message_reply_markup(MessageInfo *message_info, object_ptr<td_api::ReplyMarkup> &&reply_markup);
+  static void set_message_reply_markup(MessageInfo *message_info, object_ptr<td_api::ReplyMarkup> &&reply_markup);
 
   static int64 get_sticker_set_id(const object_ptr<td_api::MessageContent> &content);
 
@@ -975,6 +975,7 @@ class Client final : public WebhookActor::Callback {
   };
 
   FullMessageId add_message(object_ptr<td_api::message> &&message, bool force_update_content = false);
+  void init_message(MessageInfo *message_info, object_ptr<td_api::message> &&message, bool force_update_content);
   const MessageInfo *get_message(int64 chat_id, int64 message_id, bool force_cache) const;
   MessageInfo *get_message_editable(int64 chat_id, int64 message_id);
 

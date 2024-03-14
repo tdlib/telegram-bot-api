@@ -12915,7 +12915,14 @@ Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message,
     message_info = td::make_unique<MessageInfo>();
   }
 
-  message_info->id = message_id;
+  init_message(message_info.get(), std::move(message), force_update_content);
+
+  return {chat_id, message_id};
+}
+
+void Client::init_message(MessageInfo *message_info, object_ptr<td_api::message> &&message, bool force_update_content) {
+  int64 chat_id = message->chat_id_;
+  message_info->id = message->id_;
   message_info->chat_id = chat_id;
   message_info->message_thread_id = message->message_thread_id_;
   message_info->date = message->date_;
@@ -12997,11 +13004,9 @@ Client::FullMessageId Client::add_message(object_ptr<td_api::message> &&message,
   } else if (message->content_->get_id() == td_api::messagePoll::ID) {
     message_info->content = std::move(message->content_);
   }
-  set_message_reply_markup(message_info.get(), std::move(message->reply_markup_));
+  set_message_reply_markup(message_info, std::move(message->reply_markup_));
 
   message = nullptr;
-
-  return {chat_id, message_id};
 }
 
 void Client::update_message_content(int64 chat_id, int64 message_id, object_ptr<td_api::MessageContent> &&content) {
