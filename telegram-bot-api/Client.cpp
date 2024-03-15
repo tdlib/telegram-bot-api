@@ -3853,6 +3853,34 @@ class Client::TdOnSendMessageAlbumCallback final : public TdQueryCallback {
   PromisedQueryPtr query_;
 };
 
+class Client::TdOnSendBusinessMessageAlbumCallback final : public TdQueryCallback {
+ public:
+  TdOnSendBusinessMessageAlbumCallback(Client *client, td::string business_connection_id, PromisedQueryPtr query)
+      : client_(client), business_connection_id_(std::move(business_connection_id)), query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::businessMessages::ID);
+    auto messages = move_object_as<td_api::businessMessages>(result);
+    td::vector<td::string> message_strings;
+    for (auto &message : messages->messages_) {
+      auto message_info = client_->create_business_message(business_connection_id_, std::move(message));
+      message_strings.push_back(
+          td::json_encode<td::string>(JsonMessage(message_info.get(), false, "sent business message", client_)));
+    }
+    answer_query(JsonMessages(message_strings), std::move(query_));
+  }
+
+ private:
+  Client *client_;
+  td::string business_connection_id_;
+  PromisedQueryPtr query_;
+};
+
 class Client::TdOnForwardMessagesCallback final : public TdQueryCallback {
  public:
   TdOnForwardMessagesCallback(Client *client, int64 chat_id, std::size_t message_count, PromisedQueryPtr query)
@@ -9696,6 +9724,7 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
   auto message_thread_id = get_message_id(query.get(), "message_thread_id");
   TRY_RESULT(reply_parameters, get_reply_parameters(query.get()));
+  auto business_connection_id = query->arg("business_connection_id");
   auto disable_notification = to_bool(query->arg("disable_notification"));
   auto protect_content = to_bool(query->arg("protect_content"));
   // TRY_RESULT(reply_markup, get_reply_markup(query.get(), bot_user_ids_));
@@ -9704,9 +9733,30 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
 
   resolve_reply_markup_bot_usernames(
       std::move(reply_markup), std::move(query),
-      [this, chat_id = chat_id.str(), message_thread_id, reply_parameters = std::move(reply_parameters),
-       disable_notification, protect_content, input_message_contents = std::move(input_message_contents)](
-          object_ptr<td_api::ReplyMarkup> reply_markup, PromisedQueryPtr query) mutable {
+      [this, chat_id_str = chat_id.str(), message_thread_id, business_connection_id = business_connection_id.str(),
+       reply_parameters = std::move(reply_parameters), disable_notification, protect_content,
+       input_message_contents = std::move(input_message_contents)](object_ptr<td_api::ReplyMarkup> reply_markup,
+                                                                   PromisedQueryPtr query) mutable {
+        if (!business_connection_id.empty()) {
+          auto r_chat_id = get_business_connection_chat_id(chat_id_str);
+          if (r_chat_id.is_error()) {
+            return fail_query_with_error(std::move(query), 400, r_chat_id.error().message());
+          }
+          auto chat_id = r_chat_id.move_as_ok();
+          return check_business_connection(
+              business_connection_id, std::move(query),
+              [this, chat_id, reply_parameters = std::move(reply_parameters), disable_notification, protect_content,
+               input_message_contents = std::move(input_message_contents), reply_markup = std::move(reply_markup)](
+                  const td::string &business_connection_id, PromisedQueryPtr query) mutable {
+                send_request(
+                    make_object<td_api::sendBusinessMessageAlbum>(
+                        business_connection_id, chat_id, get_input_message_reply_to(std::move(reply_parameters)),
+                        disable_notification, protect_content, std::move(input_message_contents)),
+                    td::make_unique<TdOnSendBusinessMessageAlbumCallback>(this, business_connection_id,
+                                                                          std::move(query)));
+              });
+        }
+
         auto on_success = [this, disable_notification, protect_content,
                            input_message_contents = std::move(input_message_contents),
                            reply_markup = std::move(reply_markup)](int64 chat_id, int64 message_thread_id,
@@ -9725,7 +9775,7 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
                   get_message_send_options(disable_notification, protect_content), std::move(input_message_contents)),
               td::make_unique<TdOnSendMessageAlbumCallback>(this, chat_id, message_count, std::move(query)));
         };
-        check_reply_parameters(chat_id, std::move(reply_parameters), message_thread_id, std::move(query),
+        check_reply_parameters(chat_id_str, std::move(reply_parameters), message_thread_id, std::move(query),
                                std::move(on_success));
       });
   return td::Status::OK();

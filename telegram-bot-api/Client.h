@@ -198,6 +198,7 @@ class Client final : public WebhookActor::Callback {
   class TdOnSendMessageCallback;
   class TdOnSendBusinessMessageCallback;
   class TdOnSendMessageAlbumCallback;
+  class TdOnSendBusinessMessageAlbumCallback;
   class TdOnForwardMessagesCallback;
   class TdOnDeleteFailedToSendMessageCallback;
   class TdOnEditMessageCallback;
