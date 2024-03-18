@@ -3603,6 +3603,24 @@ class Client::JsonBusinessConnection final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonBusinessMessagesDeleted final : public td::Jsonable {
+ public:
+  JsonBusinessMessagesDeleted(const td_api::updateBusinessMessagesDeleted *update, const Client *client)
+      : update_(update), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("business_connection_id", update_->connection_id_);
+    object("chat", JsonChat(update_->chat_id_, client_));
+    object("message_ids",
+           td::json_array(update_->message_ids_, [](int64 message_id) { return as_client_message_id(message_id); }));
+  }
+
+ private:
+  const td_api::updateBusinessMessagesDeleted *update_;
+  const Client *client_;
+};
+
 class Client::JsonUpdateTypes final : public td::Jsonable {
  public:
   explicit JsonUpdateTypes(td::uint32 update_types) : update_types_(update_types) {
@@ -6479,6 +6497,9 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       break;
     case td_api::updateBusinessMessageEdited::ID:
       add_business_message_edited(move_object_as<td_api::updateBusinessMessageEdited>(result));
+      break;
+    case td_api::updateBusinessMessagesDeleted::ID:
+      add_update_business_messages_deleted(move_object_as<td_api::updateBusinessMessagesDeleted>(result));
       break;
     case td_api::updateConnectionState::ID: {
       auto update = move_object_as<td_api::updateConnectionState>(result);
@@ -12186,6 +12207,8 @@ td::Slice Client::get_update_type_name(UpdateType update_type) {
       return td::Slice("business_message");
     case UpdateType::EditedBusinessMessage:
       return td::Slice("edited_business_message");
+    case UpdateType::BusinessMessagesDeleted:
+      return td::Slice("deleted_business_messages");
     default:
       UNREACHABLE();
       return td::Slice();
@@ -12549,6 +12572,13 @@ void Client::add_update_business_connection(object_ptr<td_api::updateBusinessCon
     LOG(DEBUG) << "Skip updateBusinessConnection with date " << connection->date_ << ", because current date is "
                << get_unix_time();
   }
+}
+
+void Client::add_update_business_messages_deleted(object_ptr<td_api::updateBusinessMessagesDeleted> &&update) {
+  CHECK(update != nullptr);
+  auto webhook_queue_id = update->chat_id_ + (static_cast<int64>(11) << 33);
+  add_update(UpdateType::BusinessMessagesDeleted, JsonBusinessMessagesDeleted(update.get(), this), 86400,
+             webhook_queue_id);
 }
 
 void Client::add_new_business_message(object_ptr<td_api::updateNewBusinessMessage> &&update) {

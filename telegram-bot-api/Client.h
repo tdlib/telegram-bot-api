@@ -164,6 +164,7 @@ class Client final : public WebhookActor::Callback {
   class JsonMessageReactionUpdated;
   class JsonMessageReactionCountUpdated;
   class JsonBusinessConnection;
+  class JsonBusinessMessagesDeleted;
   class JsonAddress;
   class JsonOrderInfo;
   class JsonStory;
@@ -1059,6 +1060,8 @@ class Client final : public WebhookActor::Callback {
 
   void add_update_business_connection(object_ptr<td_api::updateBusinessConnection> &&update);
 
+  void add_update_business_messages_deleted(object_ptr<td_api::updateBusinessMessagesDeleted> &&update);
+
   // append only before Size
   enum class UpdateType : int32 {
     Message,
@@ -1084,6 +1087,7 @@ class Client final : public WebhookActor::Callback {
     BusinessConnection,
     BusinessMessage,
     EditedBusinessMessage,
+    BusinessMessagesDeleted,
     Size
   };
 
