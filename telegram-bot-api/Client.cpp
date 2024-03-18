@@ -257,6 +257,7 @@ bool Client::init_methods() {
   methods_.emplace("createchatinvitelink", &Client::process_create_chat_invite_link_query);
   methods_.emplace("editchatinvitelink", &Client::process_edit_chat_invite_link_query);
   methods_.emplace("revokechatinvitelink", &Client::process_revoke_chat_invite_link_query);
+  methods_.emplace("getbusinessconnection", &Client::process_get_business_connection_query);
   methods_.emplace("getchat", &Client::process_get_chat_query);
   methods_.emplace("setchatphoto", &Client::process_set_chat_photo_query);
   methods_.emplace("deletechatphoto", &Client::process_delete_chat_photo_query);
@@ -10328,6 +10329,17 @@ td::Status Client::process_revoke_chat_invite_link_query(PromisedQueryPtr &query
                send_request(make_object<td_api::revokeChatInviteLink>(chat_id, invite_link),
                             td::make_unique<TdOnGetChatInviteLinkCallback>(this, std::move(query)));
              });
+  return td::Status::OK();
+}
+
+td::Status Client::process_get_business_connection_query(PromisedQueryPtr &query) {
+  auto business_connection_id = query->arg("business_connection_id");
+  check_business_connection(business_connection_id.str(), std::move(query),
+                            [this](const td::string &business_connection_id, PromisedQueryPtr query) mutable {
+                              const auto *connection = get_business_connection(business_connection_id);
+                              CHECK(connection != nullptr);
+                              answer_query(JsonBusinessConnection(connection, this), std::move(query));
+                            });
   return td::Status::OK();
 }
 
