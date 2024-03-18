@@ -11035,11 +11035,17 @@ td::Status Client::process_set_sticker_set_thumbnail_query(PromisedQueryPtr &que
   if (thumbnail == nullptr) {
     thumbnail = get_input_file(query.get(), "thumb");
   }
+  td::Slice sticker_format_str = query->arg("format");
+  if (sticker_format_str.empty()) {
+    sticker_format_str = td::Slice("auto");
+  }
+  TRY_RESULT(sticker_format, get_sticker_format(sticker_format_str));
   check_user(user_id, std::move(query),
-             [this, user_id, name, thumbnail = std::move(thumbnail)](PromisedQueryPtr query) mutable {
-               send_request(
-                   make_object<td_api::setStickerSetThumbnail>(user_id, name.str(), std::move(thumbnail), nullptr),
-                   td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+             [this, user_id, name, thumbnail = std::move(thumbnail),
+              sticker_format = std::move(sticker_format)](PromisedQueryPtr query) mutable {
+               send_request(make_object<td_api::setStickerSetThumbnail>(user_id, name.str(), std::move(thumbnail),
+                                                                        std::move(sticker_format)),
+                            td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
   return td::Status::OK();
 }
