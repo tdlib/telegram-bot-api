@@ -4239,7 +4239,7 @@ class Client::TdOnCheckBusinessConnectionCallback final : public TdQueryCallback
 
     CHECK(result->get_id() == td_api::businessConnection::ID);
     auto connection = client_->add_business_connection(move_object_as<td_api::businessConnection>(result), false);
-    on_success_(connection->id_, std::move(query_));
+    on_success_(connection, std::move(query_));
   }
 
  private:
@@ -5714,7 +5714,7 @@ void Client::check_business_connection(const td::string &business_connection_id,
                                        OnSuccess on_success) {
   auto business_connection = get_business_connection(business_connection_id);
   if (business_connection != nullptr) {
-    return on_success(business_connection_id, std::move(query));
+    return on_success(business_connection, std::move(query));
   }
   send_request(
       make_object<td_api::getBusinessConnection>(business_connection_id),
@@ -9834,12 +9834,12 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
               business_connection_id, std::move(query),
               [this, chat_id, reply_parameters = std::move(reply_parameters), disable_notification, protect_content,
                input_message_contents = std::move(input_message_contents), reply_markup = std::move(reply_markup)](
-                  const td::string &business_connection_id, PromisedQueryPtr query) mutable {
+                  const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
                 send_request(
                     make_object<td_api::sendBusinessMessageAlbum>(
-                        business_connection_id, chat_id, get_input_message_reply_to(std::move(reply_parameters)),
+                        business_connection->id_, chat_id, get_input_message_reply_to(std::move(reply_parameters)),
                         disable_notification, protect_content, std::move(input_message_contents)),
-                    td::make_unique<TdOnSendBusinessMessageAlbumCallback>(this, business_connection_id,
+                    td::make_unique<TdOnSendBusinessMessageAlbumCallback>(this, business_connection->id_,
                                                                           std::move(query)));
               });
         }
@@ -9880,9 +9880,9 @@ td::Status Client::process_send_chat_action_query(PromisedQueryPtr &query) {
     TRY_RESULT(chat_id, get_business_connection_chat_id(chat_id_str));
     check_business_connection(
         business_connection_id, std::move(query),
-        [this, chat_id, action = std::move(action)](const td::string &business_connection_id,
+        [this, chat_id, action = std::move(action)](const BusinessConnection *business_connection,
                                                     PromisedQueryPtr query) mutable {
-          send_request(make_object<td_api::sendChatAction>(chat_id, 0, business_connection_id, std::move(action)),
+          send_request(make_object<td_api::sendChatAction>(chat_id, 0, business_connection->id_, std::move(action)),
                        td::make_unique<TdOnOkQueryCallback>(std::move(query)));
         });
     return td::Status::OK();
@@ -10335,10 +10335,8 @@ td::Status Client::process_revoke_chat_invite_link_query(PromisedQueryPtr &query
 td::Status Client::process_get_business_connection_query(PromisedQueryPtr &query) {
   auto business_connection_id = query->arg("business_connection_id");
   check_business_connection(business_connection_id.str(), std::move(query),
-                            [this](const td::string &business_connection_id, PromisedQueryPtr query) mutable {
-                              const auto *connection = get_business_connection(business_connection_id);
-                              CHECK(connection != nullptr);
-                              answer_query(JsonBusinessConnection(connection, this), std::move(query));
+                            [this](const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
+                              answer_query(JsonBusinessConnection(business_connection, this), std::move(query));
                             });
   return td::Status::OK();
 }
@@ -11665,13 +11663,13 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
               business_connection_id, std::move(query),
               [this, chat_id, reply_parameters = std::move(reply_parameters), disable_notification, protect_content,
                reply_markup = std::move(reply_markup), input_message_content = std::move(input_message_content)](
-                  const td::string &business_connection_id, PromisedQueryPtr query) mutable {
+                  const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
                 send_request(
-                    make_object<td_api::sendBusinessMessage>(business_connection_id, chat_id,
+                    make_object<td_api::sendBusinessMessage>(business_connection->id_, chat_id,
                                                              get_input_message_reply_to(std::move(reply_parameters)),
                                                              disable_notification, protect_content,
                                                              std::move(reply_markup), std::move(input_message_content)),
-                    td::make_unique<TdOnSendBusinessMessageCallback>(this, business_connection_id, std::move(query)));
+                    td::make_unique<TdOnSendBusinessMessageCallback>(this, business_connection->id_, std::move(query)));
               });
         }
 
