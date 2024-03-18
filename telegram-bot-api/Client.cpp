@@ -2471,6 +2471,9 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
   auto object = scope->enter_object();
   if (!message_->business_connection_id.empty()) {
     object("business_connection_id", message_->business_connection_id);
+    if (message_->sender_business_bot_user_id != 0) {
+      object("sender_business_bot", JsonUser(message_->sender_business_bot_user_id, client_));
+    }
   }
   object("message_id", as_client_message_id(message_->id));
   if (message_->sender_user_id != 0) {
@@ -13361,10 +13364,13 @@ td::unique_ptr<Client::MessageInfo> Client::create_business_message(td::string b
                                                                     object_ptr<td_api::businessMessage> &&message) {
   auto message_info = td::make_unique<MessageInfo>();
   CHECK(message != nullptr);
+  message_info->sender_business_bot_user_id = message->message_->sender_business_bot_user_id_;
   init_message(message_info.get(), std::move(message->message_), true);
   message_info->business_connection_id = std::move(business_connection_id);
   if (message->reply_to_message_ != nullptr) {
     message_info->business_reply_to_message = td::make_unique<MessageInfo>();
+    message_info->business_reply_to_message->sender_business_bot_user_id =
+        message->reply_to_message_->sender_business_bot_user_id_;
     init_message(message_info->business_reply_to_message.get(), std::move(message->reply_to_message_), true);
     message_info->business_reply_to_message->business_connection_id = message_info->business_connection_id;
   }
