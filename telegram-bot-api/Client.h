@@ -245,6 +245,7 @@ class Client final : public WebhookActor::Callback {
   void on_get_callback_query_message(object_ptr<td_api::message> message, int64 user_id, int state);
 
   void on_get_sticker_set(int64 set_id, int64 new_callback_query_user_id, int64 new_message_chat_id,
+                          const td::string &new_message_business_connection_id,
                           object_ptr<td_api::stickerSet> sticker_set);
 
   void on_get_sticker_set_name(int64 set_id, const td::string &name);
@@ -968,6 +969,12 @@ class Client final : public WebhookActor::Callback {
 
   void process_new_message_queue(int64 chat_id, int state);
 
+  void add_new_business_message(object_ptr<td_api::updateNewBusinessMessage> &&update);
+
+  void add_business_message_edited(object_ptr<td_api::updateBusinessMessageEdited> &&update);
+
+  void process_new_business_message_queue(const td::string &connection_id);
+
   struct FullMessageId {
     int64 chat_id;
     int64 message_id;
@@ -1073,6 +1080,8 @@ class Client final : public WebhookActor::Callback {
     MessageReaction,
     MessageReactionCount,
     BusinessConnection,
+    BusinessMessage,
+    EditedBusinessMessage,
     Size
   };
 
@@ -1179,6 +1188,20 @@ class Client final : public WebhookActor::Callback {
     bool has_active_request_ = false;
   };
   td::FlatHashMap<int64, NewMessageQueue> new_message_queues_;  // chat_id -> queue
+
+  struct NewBusinessMessage {
+    object_ptr<td_api::businessMessage> message_;
+    bool is_edited_ = false;
+
+    NewBusinessMessage(object_ptr<td_api::businessMessage> &&message, bool is_edited)
+        : message_(std::move(message)), is_edited_(is_edited) {
+    }
+  };
+  struct NewBusinessMessageQueue {
+    std::queue<NewBusinessMessage> queue_;
+    bool has_active_request_ = false;
+  };
+  td::FlatHashMap<td::string, NewBusinessMessageQueue> new_business_message_queues_;  // connection_id -> queue
 
   struct NewCallbackQueryQueue {
     std::queue<object_ptr<td_api::updateNewCallbackQuery>> queue_;

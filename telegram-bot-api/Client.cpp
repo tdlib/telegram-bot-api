@@ -4513,11 +4513,13 @@ class Client::TdOnGetCallbackQueryMessageCallback final : public TdQueryCallback
 
 class Client::TdOnGetStickerSetCallback final : public TdQueryCallback {
  public:
-  TdOnGetStickerSetCallback(Client *client, int64 set_id, int64 new_callback_query_user_id, int64 new_message_chat_id)
+  TdOnGetStickerSetCallback(Client *client, int64 set_id, int64 new_callback_query_user_id, int64 new_message_chat_id,
+                            const td::string &new_message_business_connection_id)
       : client_(client)
       , set_id_(set_id)
       , new_callback_query_user_id_(new_callback_query_user_id)
-      , new_message_chat_id_(new_message_chat_id) {
+      , new_message_chat_id_(new_message_chat_id)
+      , new_message_business_connection_id_(new_message_business_connection_id) {
   }
 
   void on_result(object_ptr<td_api::Object> result) final {
@@ -4528,12 +4530,13 @@ class Client::TdOnGetStickerSetCallback final : public TdQueryCallback {
                    << new_callback_query_user_id_ << "/new message in chat " << new_message_chat_id_ << ": "
                    << td::oneline(to_string(error));
       }
-      return client_->on_get_sticker_set(set_id_, new_callback_query_user_id_, new_message_chat_id_, nullptr);
+      return client_->on_get_sticker_set(set_id_, new_callback_query_user_id_, new_message_chat_id_,
+                                         new_message_business_connection_id_, nullptr);
     }
 
     CHECK(result->get_id() == td_api::stickerSet::ID);
     client_->on_get_sticker_set(set_id_, new_callback_query_user_id_, new_message_chat_id_,
-                                move_object_as<td_api::stickerSet>(result));
+                                new_message_business_connection_id_, move_object_as<td_api::stickerSet>(result));
   }
 
  private:
@@ -4541,6 +4544,7 @@ class Client::TdOnGetStickerSetCallback final : public TdQueryCallback {
   int64 set_id_;
   int64 new_callback_query_user_id_;
   int64 new_message_chat_id_;
+  td::string new_message_business_connection_id_;
 };
 
 class Client::TdOnGetChatCustomEmojiStickerSetCallback final : public TdQueryCallback {
@@ -5422,6 +5426,7 @@ void Client::on_get_callback_query_message(object_ptr<td_api::message> message, 
 }
 
 void Client::on_get_sticker_set(int64 set_id, int64 new_callback_query_user_id, int64 new_message_chat_id,
+                                const td::string &new_message_business_connection_id,
                                 object_ptr<td_api::stickerSet> sticker_set) {
   if (new_callback_query_user_id != 0) {
     auto &queue = new_callback_query_queues_[new_callback_query_user_id];
@@ -5432,6 +5437,13 @@ void Client::on_get_sticker_set(int64 set_id, int64 new_callback_query_user_id, 
   }
   if (new_message_chat_id != 0) {
     auto &queue = new_message_queues_[new_message_chat_id];
+    CHECK(queue.has_active_request_);
+    queue.has_active_request_ = false;
+
+    CHECK(!queue.queue_.empty());
+  }
+  if (!new_message_business_connection_id.empty()) {
+    auto &queue = new_business_message_queues_[new_message_business_connection_id];
     CHECK(queue.has_active_request_);
     queue.has_active_request_ = false;
 
@@ -5451,6 +5463,9 @@ void Client::on_get_sticker_set(int64 set_id, int64 new_callback_query_user_id, 
   }
   if (new_message_chat_id != 0) {
     process_new_message_queue(new_message_chat_id, 2);
+  }
+  if (!new_message_business_connection_id.empty()) {
+    process_new_business_message_queue(new_message_business_connection_id);
   }
 }
 
@@ -6458,6 +6473,12 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       break;
     case td_api::updateBusinessConnection::ID:
       add_update_business_connection(move_object_as<td_api::updateBusinessConnection>(result));
+      break;
+    case td_api::updateNewBusinessMessage::ID:
+      add_new_business_message(move_object_as<td_api::updateNewBusinessMessage>(result));
+      break;
+    case td_api::updateBusinessMessageEdited::ID:
+      add_business_message_edited(move_object_as<td_api::updateBusinessMessageEdited>(result));
       break;
     case td_api::updateConnectionState::ID: {
       auto update = move_object_as<td_api::updateConnectionState>(result);
@@ -12185,6 +12206,10 @@ td::Slice Client::get_update_type_name(UpdateType update_type) {
       return td::Slice("message_reaction_count");
     case UpdateType::BusinessConnection:
       return td::Slice("business_connection");
+    case UpdateType::BusinessMessage:
+      return td::Slice("business_message");
+    case UpdateType::EditedBusinessMessage:
+      return td::Slice("edited_business_message");
     default:
       UNREACHABLE();
       return td::Slice();
@@ -12400,8 +12425,9 @@ void Client::process_new_callback_query_queue(int64 user_id, int state) {
       auto message_sticker_set_id = message_info == nullptr ? 0 : get_sticker_set_id(message_info->content);
       if (!have_sticker_set_name(message_sticker_set_id)) {
         queue.has_active_request_ = true;
-        return send_request(make_object<td_api::getStickerSet>(message_sticker_set_id),
-                            td::make_unique<TdOnGetStickerSetCallback>(this, message_sticker_set_id, user_id, 0));
+        return send_request(
+            make_object<td_api::getStickerSet>(message_sticker_set_id),
+            td::make_unique<TdOnGetStickerSetCallback>(this, message_sticker_set_id, user_id, 0, td::string()));
       }
       auto reply_to_message_id = get_same_chat_reply_to_message_id(message_info);
       if (reply_to_message_id > 0) {
@@ -12410,8 +12436,9 @@ void Client::process_new_callback_query_queue(int64 user_id, int state) {
             reply_to_message_info == nullptr ? 0 : get_sticker_set_id(reply_to_message_info->content);
         if (!have_sticker_set_name(reply_sticker_set_id)) {
           queue.has_active_request_ = true;
-          return send_request(make_object<td_api::getStickerSet>(reply_sticker_set_id),
-                              td::make_unique<TdOnGetStickerSetCallback>(this, reply_sticker_set_id, user_id, 0));
+          return send_request(
+              make_object<td_api::getStickerSet>(reply_sticker_set_id),
+              td::make_unique<TdOnGetStickerSetCallback>(this, reply_sticker_set_id, user_id, 0, td::string()));
         }
       }
     }
@@ -12546,6 +12573,20 @@ void Client::add_update_business_connection(object_ptr<td_api::updateBusinessCon
     LOG(DEBUG) << "Skip updateBusinessConnection with date " << connection->date_ << ", because current date is "
                << get_unix_time();
   }
+}
+
+void Client::add_new_business_message(object_ptr<td_api::updateNewBusinessMessage> &&update) {
+  CHECK(update != nullptr);
+  CHECK(!update->connection_id_.empty());
+  new_business_message_queues_[update->connection_id_].queue_.emplace(std::move(update->message_), false);
+  process_new_business_message_queue(update->connection_id_);
+}
+
+void Client::add_business_message_edited(object_ptr<td_api::updateBusinessMessageEdited> &&update) {
+  CHECK(update != nullptr);
+  CHECK(!update->connection_id_.empty());
+  new_business_message_queues_[update->connection_id_].queue_.emplace(std::move(update->message_), true);
+  process_new_business_message_queue(update->connection_id_);
 }
 
 td::int64 Client::choose_added_member_id(const td_api::messageChatAddMembers *message_add_members) const {
@@ -12780,6 +12821,7 @@ td::int64 Client::get_same_chat_reply_to_message_id(const MessageInfo *message_i
 }
 
 void Client::drop_internal_reply_to_message_in_another_chat(object_ptr<td_api::message> &message) {
+  CHECK(message != nullptr);
   if (message->reply_to_ != nullptr && message->reply_to_->get_id() == td_api::messageReplyToMessage::ID) {
     auto *reply_to = static_cast<td_api::messageReplyToMessage *>(message->reply_to_.get());
     auto reply_in_chat_id = reply_to->chat_id_;
@@ -12969,8 +13011,9 @@ void Client::process_new_message_queue(int64 chat_id, int state) {
     auto message_sticker_set_id = get_sticker_set_id(message_ref->content_);
     if (!have_sticker_set_name(message_sticker_set_id)) {
       queue.has_active_request_ = true;
-      return send_request(make_object<td_api::getStickerSet>(message_sticker_set_id),
-                          td::make_unique<TdOnGetStickerSetCallback>(this, message_sticker_set_id, 0, chat_id));
+      return send_request(
+          make_object<td_api::getStickerSet>(message_sticker_set_id),
+          td::make_unique<TdOnGetStickerSetCallback>(this, message_sticker_set_id, 0, chat_id, td::string()));
     }
     if (reply_to_message_id > 0) {
       auto reply_to_message_info = get_message(chat_id, reply_to_message_id, true);
@@ -12978,8 +13021,9 @@ void Client::process_new_message_queue(int64 chat_id, int state) {
         auto reply_sticker_set_id = get_sticker_set_id(reply_to_message_info->content);
         if (!have_sticker_set_name(reply_sticker_set_id)) {
           queue.has_active_request_ = true;
-          return send_request(make_object<td_api::getStickerSet>(reply_sticker_set_id),
-                              td::make_unique<TdOnGetStickerSetCallback>(this, reply_sticker_set_id, 0, chat_id));
+          return send_request(
+              make_object<td_api::getStickerSet>(reply_sticker_set_id),
+              td::make_unique<TdOnGetStickerSetCallback>(this, reply_sticker_set_id, 0, chat_id, td::string()));
         }
       }
     }
@@ -13048,6 +13092,57 @@ void Client::process_new_message_queue(int64 chat_id, int state) {
                chat_id);
   }
   new_message_queues_.erase(chat_id);
+}
+
+void Client::process_new_business_message_queue(const td::string &connection_id) {
+  auto &queue = new_business_message_queues_[connection_id];
+  if (queue.has_active_request_) {
+    return;
+  }
+  if (logging_out_ || closing_) {
+    new_business_message_queues_.erase(connection_id);
+    return;
+  }
+  while (!queue.queue_.empty()) {
+    auto &message_ref = queue.queue_.front().message_;
+
+    drop_internal_reply_to_message_in_another_chat(message_ref->message_);
+
+    auto message_sticker_set_id = get_sticker_set_id(message_ref->message_->content_);
+    if (!have_sticker_set_name(message_sticker_set_id)) {
+      queue.has_active_request_ = true;
+      return send_request(
+          make_object<td_api::getStickerSet>(message_sticker_set_id),
+          td::make_unique<TdOnGetStickerSetCallback>(this, message_sticker_set_id, 0, 0, connection_id));
+    }
+    if (message_ref->reply_to_message_ != nullptr) {
+      drop_internal_reply_to_message_in_another_chat(message_ref->reply_to_message_);
+      auto reply_sticker_set_id = get_sticker_set_id(message_ref->reply_to_message_->content_);
+      if (!have_sticker_set_name(reply_sticker_set_id)) {
+        queue.has_active_request_ = true;
+        return send_request(
+            make_object<td_api::getStickerSet>(reply_sticker_set_id),
+            td::make_unique<TdOnGetStickerSetCallback>(this, reply_sticker_set_id, 0, 0, connection_id));
+      }
+    }
+
+    auto message = std::move(message_ref);
+    auto is_edited = queue.queue_.front().is_edited_;
+    queue.queue_.pop();
+    if (need_skip_update_message(0, message->message_, is_edited)) {
+      continue;
+    }
+
+    auto message_date = message->message_->edit_date_ == 0 ? message->message_->date_ : message->message_->edit_date_;
+    auto now = get_unix_time();
+    auto left_time = message_date + 86400 - now;
+    auto webhook_queue_id = message->message_->chat_id_ + (static_cast<int64>(11) << 33);
+    auto update_type = is_edited ? UpdateType::EditedBusinessMessage : UpdateType::BusinessMessage;
+    auto message_info = create_business_message(connection_id, std::move(message));
+    add_update(update_type, JsonMessage(message_info.get(), true, get_update_type_name(update_type).str(), this),
+               left_time, webhook_queue_id);
+  }
+  new_business_message_queues_.erase(connection_id);
 }
 
 td::unique_ptr<Client::MessageInfo> Client::delete_message(int64 chat_id, int64 message_id, bool only_from_cache) {
@@ -13179,7 +13274,7 @@ void Client::init_message(MessageInfo *message_info, object_ptr<td_api::message>
     auto sticker_set_id = get_sticker_set_id(message_info->content);
     if (!have_sticker_set_name(sticker_set_id)) {
       send_request(make_object<td_api::getStickerSet>(sticker_set_id),
-                   td::make_unique<TdOnGetStickerSetCallback>(this, sticker_set_id, 0, 0));
+                   td::make_unique<TdOnGetStickerSetCallback>(this, sticker_set_id, 0, 0, td::string()));
     }
   } else if (message->content_->get_id() == td_api::messagePoll::ID) {
     message_info->content = std::move(message->content_);
