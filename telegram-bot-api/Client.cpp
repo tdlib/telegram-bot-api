@@ -627,6 +627,22 @@ class Client::JsonReactionCount final : public td::Jsonable {
   const td_api::messageReaction *message_reaction_;
 };
 
+class Client::JsonBusinessLocation final : public td::Jsonable {
+ public:
+  JsonBusinessLocation(const td_api::businessLocation *business_location) : business_location_(business_location) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    if (business_location_->location_ != nullptr) {
+      object("location", JsonLocation(business_location_->location_.get()));
+    }
+    object("address", business_location_->address_);
+  }
+
+ private:
+  const td_api::businessLocation *business_location_;
+};
+
 class Client::JsonChatPermissions final : public td::Jsonable {
  public:
   explicit JsonChatPermissions(const td_api::chatPermissions *chat_permissions) : chat_permissions_(chat_permissions) {
@@ -768,6 +784,9 @@ class Client::JsonChat final : public td::Jsonable {
           }
           if (user_info->has_restricted_voice_and_video_messages) {
             object("has_restricted_voice_and_video_messages", td::JsonTrue());
+          }
+          if (user_info->business_location != nullptr) {
+            object("business_location", JsonBusinessLocation(user_info->business_location.get()));
           }
         }
         photo = user_info->photo.get();
@@ -6340,6 +6359,10 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       user_info->photo =
           full_info->photo_ == nullptr ? std::move(full_info->public_photo_) : std::move(full_info->photo_);
       user_info->bio = full_info->bio_ != nullptr ? std::move(full_info->bio_->text_) : td::string();
+      user_info->business_location =
+          full_info->business_info_ != nullptr && full_info->business_info_->location_ != nullptr
+              ? std::move(full_info->business_info_->location_)
+              : nullptr;
       user_info->has_private_forwards = full_info->has_private_forwards_;
       user_info->has_restricted_voice_and_video_messages = full_info->has_restricted_voice_and_video_note_messages_;
       break;

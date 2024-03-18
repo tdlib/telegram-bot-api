@@ -93,6 +93,7 @@ class Client final : public WebhookActor::Callback {
   class JsonUsers;
   class JsonReactionType;
   class JsonReactionCount;
+  class JsonBusinessLocation;
   class JsonChatPermissions;
   class JsonChatPhotoInfo;
   class JsonChatLocation;
@@ -793,6 +794,7 @@ class Client final : public WebhookActor::Callback {
 
     object_ptr<td_api::chatPhoto> photo;
     td::string bio;
+    object_ptr<td_api::businessLocation> business_location;
 
     bool have_access = false;
     bool can_join_groups = false;
