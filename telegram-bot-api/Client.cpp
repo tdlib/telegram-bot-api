@@ -12562,9 +12562,17 @@ td::int64 Client::choose_added_member_id(const td_api::messageChatAddMembers *me
 }
 
 bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::message> &message, bool is_edited) const {
-  auto chat = get_chat(chat_id);
-  CHECK(chat != nullptr);
-  if (message->is_outgoing_) {
+  const ChatInfo *chat;
+  ChatInfo::Type chat_type;
+  if (chat_id != 0) {
+    chat = get_chat(chat_id);
+    CHECK(chat != nullptr);
+    chat_type = chat->type;
+  } else {
+    chat = nullptr;
+    chat_type = ChatInfo::Type::Private;
+  }
+  if (message->is_outgoing_ && chat_id != 0) {
     switch (message->content_->get_id()) {
       case td_api::messageChatChangeTitle::ID:
       case td_api::messageChatChangePhoto::ID:
@@ -12600,7 +12608,8 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     return true;
   }
 
-  if (chat->type == ChatInfo::Type::Supergroup) {
+  if (chat_type == ChatInfo::Type::Supergroup) {
+    CHECK(chat != nullptr);
     auto supergroup_info = get_supergroup_info(chat->supergroup_id);
     if (supergroup_info->status->get_id() == td_api::chatMemberStatusLeft::ID ||
         supergroup_info->status->get_id() == td_api::chatMemberStatusBanned::ID) {
@@ -12641,7 +12650,7 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       break;
     }
     case td_api::messageSupergroupChatCreate::ID: {
-      if (chat->type != ChatInfo::Type::Supergroup) {
+      if (chat_type != ChatInfo::Type::Supergroup) {
         LOG(ERROR) << "Receive messageSupergroupChatCreate in the non-supergroup chat " << chat_id;
         return true;
       }
@@ -12698,7 +12707,7 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       break;
   }
 
-  if (is_edited) {
+  if (is_edited && chat_id != 0) {
     const MessageInfo *old_message = get_message(chat_id, message->id_, true);
     if (old_message != nullptr && !old_message->is_content_changed) {
       return true;
