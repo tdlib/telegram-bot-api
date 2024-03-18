@@ -887,6 +887,7 @@ class Client final : public WebhookActor::Callback {
     int32 sender_boost_count = 0;
     object_ptr<td_api::MessageOrigin> forward_origin;
     td::string author_signature;
+    td::unique_ptr<MessageInfo> business_reply_to_message;
     object_ptr<td_api::messageReplyToMessage> reply_to_message;
     object_ptr<td_api::messageReplyToStory> reply_to_story;
     int64 media_album_id = 0;

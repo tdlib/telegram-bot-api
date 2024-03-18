@@ -2486,7 +2486,9 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     auto reply_to_message_id = get_same_chat_reply_to_message_id(message_);
     if (reply_to_message_id > 0) {
       // internal reply
-      const MessageInfo *reply_to_message = client_->get_message(message_->chat_id, reply_to_message_id, true);
+      const MessageInfo *reply_to_message = !message_->business_connection_id.empty()
+                                                ? message_->business_reply_to_message.get()
+                                                : client_->get_message(message_->chat_id, reply_to_message_id, true);
       if (reply_to_message != nullptr) {
         object("reply_to_message", JsonMessage(reply_to_message, false, "reply in " + source_, client_));
       } else {
@@ -2719,7 +2721,9 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       auto content = static_cast<const td_api::messagePinMessage *>(message_->content.get());
       auto message_id = content->message_id_;
       if (message_id > 0) {
-        const MessageInfo *pinned_message = client_->get_message(message_->chat_id, message_id, true);
+        const MessageInfo *pinned_message = !message_->business_connection_id.empty()
+                                                ? message_->business_reply_to_message.get()
+                                                : client_->get_message(message_->chat_id, message_id, true);
         if (pinned_message != nullptr) {
           object("pinned_message", JsonMessage(pinned_message, false, "pin in " + source_, client_));
         } else if (need_reply_) {
@@ -3814,7 +3818,7 @@ class Client::TdOnSendBusinessMessageCallback final : public TdQueryCallback {
     CHECK(result->get_id() == td_api::businessMessage::ID);
     auto message = client_->create_business_message(std::move(business_connection_id_),
                                                     move_object_as<td_api::businessMessage>(result));
-    answer_query(JsonMessage(message.get(), false, "sent business message", client_), std::move(query_));
+    answer_query(JsonMessage(message.get(), true, "sent business message", client_), std::move(query_));
   }
 
  private:
@@ -3870,7 +3874,7 @@ class Client::TdOnSendBusinessMessageAlbumCallback final : public TdQueryCallbac
     for (auto &message : messages->messages_) {
       auto message_info = client_->create_business_message(business_connection_id_, std::move(message));
       message_strings.push_back(
-          td::json_encode<td::string>(JsonMessage(message_info.get(), false, "sent business message", client_)));
+          td::json_encode<td::string>(JsonMessage(message_info.get(), true, "sent business message", client_)));
     }
     answer_query(JsonMessages(message_strings), std::move(query_));
   }
@@ -13182,6 +13186,11 @@ td::unique_ptr<Client::MessageInfo> Client::create_business_message(td::string b
   CHECK(message != nullptr);
   init_message(message_info.get(), std::move(message->message_), true);
   message_info->business_connection_id = std::move(business_connection_id);
+  if (message->reply_to_message_ != nullptr) {
+    message_info->business_reply_to_message = td::make_unique<MessageInfo>();
+    init_message(message_info->business_reply_to_message.get(), std::move(message->reply_to_message_), true);
+    message_info->business_reply_to_message->business_connection_id = message_info->business_connection_id;
+  }
   return message_info;
 }
 
