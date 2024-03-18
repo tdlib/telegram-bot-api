@@ -643,6 +643,37 @@ class Client::JsonBusinessLocation final : public td::Jsonable {
   const td_api::businessLocation *business_location_;
 };
 
+class Client::JsonBusinessOpeningHoursInterval final : public td::Jsonable {
+ public:
+  JsonBusinessOpeningHoursInterval(const td_api::businessOpeningHoursInterval *opening_hours_interval)
+      : opening_hours_interval_(opening_hours_interval) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("opening_minute", opening_hours_interval_->start_minute_);
+    object("closing_minute", opening_hours_interval_->end_minute_);
+  }
+
+ private:
+  const td_api::businessOpeningHoursInterval *opening_hours_interval_;
+};
+
+class Client::JsonBusinessOpeningHours final : public td::Jsonable {
+ public:
+  JsonBusinessOpeningHours(const td_api::businessOpeningHours *opening_hours) : opening_hours_(opening_hours) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("opening_hours", td::json_array(opening_hours_->opening_hours_, [](const auto &opening_hours_interval) {
+             return JsonBusinessOpeningHoursInterval(opening_hours_interval.get());
+           }));
+    object("time_zone_name", opening_hours_->time_zone_id_);
+  }
+
+ private:
+  const td_api::businessOpeningHours *opening_hours_;
+};
+
 class Client::JsonChatPermissions final : public td::Jsonable {
  public:
   explicit JsonChatPermissions(const td_api::chatPermissions *chat_permissions) : chat_permissions_(chat_permissions) {
@@ -787,6 +818,9 @@ class Client::JsonChat final : public td::Jsonable {
           }
           if (user_info->business_location != nullptr) {
             object("business_location", JsonBusinessLocation(user_info->business_location.get()));
+          }
+          if (user_info->business_opening_hours != nullptr) {
+            object("business_opening_hours", JsonBusinessOpeningHours(user_info->business_opening_hours.get()));
           }
         }
         photo = user_info->photo.get();
@@ -6362,6 +6396,10 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       user_info->business_location =
           full_info->business_info_ != nullptr && full_info->business_info_->location_ != nullptr
               ? std::move(full_info->business_info_->location_)
+              : nullptr;
+      user_info->business_opening_hours =
+          full_info->business_info_ != nullptr && full_info->business_info_->opening_hours_ != nullptr
+              ? std::move(full_info->business_info_->opening_hours_)
               : nullptr;
       user_info->has_private_forwards = full_info->has_private_forwards_;
       user_info->has_restricted_voice_and_video_messages = full_info->has_restricted_voice_and_video_note_messages_;

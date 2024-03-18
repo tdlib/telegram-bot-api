@@ -94,6 +94,8 @@ class Client final : public WebhookActor::Callback {
   class JsonReactionType;
   class JsonReactionCount;
   class JsonBusinessLocation;
+  class JsonBusinessOpeningHoursInterval;
+  class JsonBusinessOpeningHours;
   class JsonChatPermissions;
   class JsonChatPhotoInfo;
   class JsonChatLocation;
@@ -795,6 +797,7 @@ class Client final : public WebhookActor::Callback {
     object_ptr<td_api::chatPhoto> photo;
     td::string bio;
     object_ptr<td_api::businessLocation> business_location;
+    object_ptr<td_api::businessOpeningHours> business_opening_hours;
 
     bool have_access = false;
     bool can_join_groups = false;
