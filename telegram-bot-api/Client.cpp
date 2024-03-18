@@ -8138,8 +8138,11 @@ td::Result<td_api::object_ptr<td_api::inputSticker>> Client::get_input_sticker(c
     return r_sticker.move_as_ok();
   }
 
-  auto emojis = query->arg("emojis");
+  return get_legacy_input_sticker(query);
+}
 
+td::Result<td_api::object_ptr<td_api::inputSticker>> Client::get_legacy_input_sticker(const Query *query) const {
+  auto emojis = query->arg("emojis");
   auto sticker = get_input_file(query, "png_sticker");
   object_ptr<td_api::StickerFormat> sticker_format;
   object_ptr<td_api::maskPosition> mask_position;
@@ -8202,37 +8205,10 @@ td::Result<td::vector<td_api::object_ptr<td_api::inputSticker>>> Client::get_inp
     return std::move(input_stickers);
   }
 
-  auto emojis = query->arg("emojis");
-
-  auto sticker = get_input_file(query, "png_sticker");
-  object_ptr<td_api::StickerFormat> sticker_format;
-  object_ptr<td_api::maskPosition> mask_position;
-  if (sticker != nullptr) {
-    sticker_format = make_object<td_api::stickerFormatWebp>();
-    TRY_RESULT_ASSIGN(mask_position, get_mask_position(query, "mask_position"));
-  } else {
-    sticker = get_input_file(query, "tgs_sticker", true);
-    if (sticker != nullptr) {
-      sticker_format = make_object<td_api::stickerFormatTgs>();
-    } else {
-      sticker = get_input_file(query, "webm_sticker", true);
-      if (sticker != nullptr) {
-        sticker_format = make_object<td_api::stickerFormatWebm>();
-      } else {
-        if (!query->arg("tgs_sticker").empty()) {
-          return td::Status::Error(400, "Bad Request: animated sticker must be uploaded as an InputFile");
-        }
-        if (!query->arg("webm_sticker").empty()) {
-          return td::Status::Error(400, "Bad Request: video sticker must be uploaded as an InputFile");
-        }
-        return td::Status::Error(400, "Bad Request: there is no sticker file in the request");
-      }
-    }
-  }
+  TRY_RESULT(input_sticker, get_legacy_input_sticker(query));
 
   td::vector<object_ptr<td_api::inputSticker>> stickers;
-  stickers.push_back(make_object<td_api::inputSticker>(std::move(sticker), std::move(sticker_format), emojis.str(),
-                                                       std::move(mask_position), td::vector<td::string>()));
+  stickers.push_back(std::move(input_sticker));
   return std::move(stickers);
 }
 
