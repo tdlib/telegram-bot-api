@@ -552,6 +552,101 @@ class Client::JsonVectorEntities final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonMaskPosition final : public td::Jsonable {
+ public:
+  explicit JsonMaskPosition(const td_api::maskPosition *mask_position) : mask_position_(mask_position) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("point", Client::MASK_POINTS[Client::mask_point_to_index(mask_position_->point_)]);
+    object("x_shift", mask_position_->x_shift_);
+    object("y_shift", mask_position_->y_shift_);
+    object("scale", mask_position_->scale_);
+  }
+
+ private:
+  const td_api::maskPosition *mask_position_;
+};
+
+class Client::JsonSticker final : public td::Jsonable {
+ public:
+  JsonSticker(const td_api::sticker *sticker, const Client *client) : sticker_(sticker), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("width", sticker_->width_);
+    object("height", sticker_->height_);
+    if (!sticker_->emoji_.empty()) {
+      object("emoji", sticker_->emoji_);
+    }
+    auto set_name = client_->get_sticker_set_name(sticker_->set_id_);
+    if (!set_name.empty()) {
+      object("set_name", set_name);
+    }
+
+    auto format = sticker_->format_->get_id();
+    object("is_animated", td::JsonBool(format == td_api::stickerFormatTgs::ID));
+    object("is_video", td::JsonBool(format == td_api::stickerFormatWebm::ID));
+
+    switch (sticker_->full_type_->get_id()) {
+      case td_api::stickerFullTypeRegular::ID: {
+        auto full_type = static_cast<const td_api::stickerFullTypeRegular *>(sticker_->full_type_.get());
+        object("type", Client::get_sticker_type(make_object<td_api::stickerTypeRegular>()));
+        if (full_type->premium_animation_ != nullptr) {
+          object("premium_animation", JsonFile(full_type->premium_animation_.get(), client_, false));
+        }
+        break;
+      }
+      case td_api::stickerFullTypeMask::ID: {
+        auto full_type = static_cast<const td_api::stickerFullTypeMask *>(sticker_->full_type_.get());
+        object("type", Client::get_sticker_type(make_object<td_api::stickerTypeMask>()));
+        if (full_type->mask_position_ != nullptr) {
+          object("mask_position", JsonMaskPosition(full_type->mask_position_.get()));
+        }
+        break;
+      }
+      case td_api::stickerFullTypeCustomEmoji::ID: {
+        auto full_type = static_cast<const td_api::stickerFullTypeCustomEmoji *>(sticker_->full_type_.get());
+        object("type", Client::get_sticker_type(make_object<td_api::stickerTypeCustomEmoji>()));
+        if (full_type->custom_emoji_id_ != 0) {
+          object("custom_emoji_id", td::to_string(full_type->custom_emoji_id_));
+        }
+        if (full_type->needs_repainting_) {
+          object("needs_repainting", td::JsonBool(full_type->needs_repainting_));
+        }
+        break;
+      }
+      default:
+        UNREACHABLE();
+        break;
+    }
+
+    client_->json_store_thumbnail(object, sticker_->thumbnail_.get());
+    client_->json_store_file(object, sticker_->sticker_.get());
+  }
+
+ private:
+  const td_api::sticker *sticker_;
+  const Client *client_;
+};
+
+class Client::JsonStickers final : public td::Jsonable {
+ public:
+  JsonStickers(const td::vector<object_ptr<td_api::sticker>> &stickers, const Client *client)
+      : stickers_(stickers), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto array = scope->enter_array();
+    for (auto &sticker : stickers_) {
+      array << JsonSticker(sticker.get(), client_);
+    }
+  }
+
+ private:
+  const td::vector<object_ptr<td_api::sticker>> &stickers_;
+  const Client *client_;
+};
+
 class Client::JsonLocation final : public td::Jsonable {
  public:
   explicit JsonLocation(const td_api::location *location, double expires_in = 0.0, int32 live_period = 0,
@@ -628,9 +723,32 @@ class Client::JsonReactionCount final : public td::Jsonable {
   const td_api::messageReaction *message_reaction_;
 };
 
+class Client::JsonBusinessIntro final : public td::Jsonable {
+ public:
+  JsonBusinessIntro(const td_api::businessIntro *intro, const Client *client) : intro_(intro), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    if (!intro_->title_.empty()) {
+      object("title", intro_->title_);
+    }
+    if (!intro_->message_.empty()) {
+      object("message", intro_->message_);
+    }
+    if (intro_->sticker_ != nullptr) {
+      object("sticker", JsonSticker(intro_->sticker_.get(), client_));
+    }
+  }
+
+ private:
+  const td_api::businessIntro *intro_;
+  const Client *client_;
+};
+
 class Client::JsonBusinessLocation final : public td::Jsonable {
  public:
-  JsonBusinessLocation(const td_api::businessLocation *business_location) : business_location_(business_location) {
+  explicit JsonBusinessLocation(const td_api::businessLocation *business_location)
+      : business_location_(business_location) {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
@@ -646,7 +764,7 @@ class Client::JsonBusinessLocation final : public td::Jsonable {
 
 class Client::JsonBusinessOpeningHoursInterval final : public td::Jsonable {
  public:
-  JsonBusinessOpeningHoursInterval(const td_api::businessOpeningHoursInterval *opening_hours_interval)
+  explicit JsonBusinessOpeningHoursInterval(const td_api::businessOpeningHoursInterval *opening_hours_interval)
       : opening_hours_interval_(opening_hours_interval) {
   }
   void store(td::JsonValueScope *scope) const {
@@ -661,7 +779,7 @@ class Client::JsonBusinessOpeningHoursInterval final : public td::Jsonable {
 
 class Client::JsonBusinessOpeningHours final : public td::Jsonable {
  public:
-  JsonBusinessOpeningHours(const td_api::businessOpeningHours *opening_hours) : opening_hours_(opening_hours) {
+  explicit JsonBusinessOpeningHours(const td_api::businessOpeningHours *opening_hours) : opening_hours_(opening_hours) {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
@@ -816,6 +934,9 @@ class Client::JsonChat final : public td::Jsonable {
           }
           if (user_info->has_restricted_voice_and_video_messages) {
             object("has_restricted_voice_and_video_messages", td::JsonTrue());
+          }
+          if (user_info->business_intro != nullptr) {
+            object("business_intro", JsonBusinessIntro(user_info->business_intro.get(), client_));
           }
           if (user_info->business_location != nullptr) {
             object("business_location", JsonBusinessLocation(user_info->business_location.get()));
@@ -1300,101 +1421,6 @@ class Client::JsonChatPhoto final : public td::Jsonable {
 
  private:
   const td_api::chatPhoto *photo_;
-  const Client *client_;
-};
-
-class Client::JsonMaskPosition final : public td::Jsonable {
- public:
-  explicit JsonMaskPosition(const td_api::maskPosition *mask_position) : mask_position_(mask_position) {
-  }
-  void store(td::JsonValueScope *scope) const {
-    auto object = scope->enter_object();
-    object("point", Client::MASK_POINTS[Client::mask_point_to_index(mask_position_->point_)]);
-    object("x_shift", mask_position_->x_shift_);
-    object("y_shift", mask_position_->y_shift_);
-    object("scale", mask_position_->scale_);
-  }
-
- private:
-  const td_api::maskPosition *mask_position_;
-};
-
-class Client::JsonSticker final : public td::Jsonable {
- public:
-  JsonSticker(const td_api::sticker *sticker, const Client *client) : sticker_(sticker), client_(client) {
-  }
-  void store(td::JsonValueScope *scope) const {
-    auto object = scope->enter_object();
-    object("width", sticker_->width_);
-    object("height", sticker_->height_);
-    if (!sticker_->emoji_.empty()) {
-      object("emoji", sticker_->emoji_);
-    }
-    auto set_name = client_->get_sticker_set_name(sticker_->set_id_);
-    if (!set_name.empty()) {
-      object("set_name", set_name);
-    }
-
-    auto format = sticker_->format_->get_id();
-    object("is_animated", td::JsonBool(format == td_api::stickerFormatTgs::ID));
-    object("is_video", td::JsonBool(format == td_api::stickerFormatWebm::ID));
-
-    switch (sticker_->full_type_->get_id()) {
-      case td_api::stickerFullTypeRegular::ID: {
-        auto full_type = static_cast<const td_api::stickerFullTypeRegular *>(sticker_->full_type_.get());
-        object("type", Client::get_sticker_type(make_object<td_api::stickerTypeRegular>()));
-        if (full_type->premium_animation_ != nullptr) {
-          object("premium_animation", JsonFile(full_type->premium_animation_.get(), client_, false));
-        }
-        break;
-      }
-      case td_api::stickerFullTypeMask::ID: {
-        auto full_type = static_cast<const td_api::stickerFullTypeMask *>(sticker_->full_type_.get());
-        object("type", Client::get_sticker_type(make_object<td_api::stickerTypeMask>()));
-        if (full_type->mask_position_ != nullptr) {
-          object("mask_position", JsonMaskPosition(full_type->mask_position_.get()));
-        }
-        break;
-      }
-      case td_api::stickerFullTypeCustomEmoji::ID: {
-        auto full_type = static_cast<const td_api::stickerFullTypeCustomEmoji *>(sticker_->full_type_.get());
-        object("type", Client::get_sticker_type(make_object<td_api::stickerTypeCustomEmoji>()));
-        if (full_type->custom_emoji_id_ != 0) {
-          object("custom_emoji_id", td::to_string(full_type->custom_emoji_id_));
-        }
-        if (full_type->needs_repainting_) {
-          object("needs_repainting", td::JsonBool(full_type->needs_repainting_));
-        }
-        break;
-      }
-      default:
-        UNREACHABLE();
-        break;
-    }
-
-    client_->json_store_thumbnail(object, sticker_->thumbnail_.get());
-    client_->json_store_file(object, sticker_->sticker_.get());
-  }
-
- private:
-  const td_api::sticker *sticker_;
-  const Client *client_;
-};
-
-class Client::JsonStickers final : public td::Jsonable {
- public:
-  JsonStickers(const td::vector<object_ptr<td_api::sticker>> &stickers, const Client *client)
-      : stickers_(stickers), client_(client) {
-  }
-  void store(td::JsonValueScope *scope) const {
-    auto array = scope->enter_array();
-    for (auto &sticker : stickers_) {
-      array << JsonSticker(sticker.get(), client_);
-    }
-  }
-
- private:
-  const td::vector<object_ptr<td_api::sticker>> &stickers_;
   const Client *client_;
 };
 
@@ -6397,6 +6423,9 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       user_info->photo =
           full_info->photo_ == nullptr ? std::move(full_info->public_photo_) : std::move(full_info->photo_);
       user_info->bio = full_info->bio_ != nullptr ? std::move(full_info->bio_->text_) : td::string();
+      user_info->business_intro = full_info->business_info_ != nullptr && full_info->business_info_->intro_ != nullptr
+                                      ? std::move(full_info->business_info_->intro_)
+                                      : nullptr;
       user_info->business_location =
           full_info->business_info_ != nullptr && full_info->business_info_->location_ != nullptr
               ? std::move(full_info->business_info_->location_)
