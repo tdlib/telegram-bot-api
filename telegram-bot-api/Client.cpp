@@ -935,14 +935,17 @@ class Client::JsonChat final : public td::Jsonable {
           if (user_info->has_restricted_voice_and_video_messages) {
             object("has_restricted_voice_and_video_messages", td::JsonTrue());
           }
-          if (user_info->business_intro != nullptr) {
-            object("business_intro", JsonBusinessIntro(user_info->business_intro.get(), client_));
-          }
-          if (user_info->business_location != nullptr) {
-            object("business_location", JsonBusinessLocation(user_info->business_location.get()));
-          }
-          if (user_info->business_opening_hours != nullptr) {
-            object("business_opening_hours", JsonBusinessOpeningHours(user_info->business_opening_hours.get()));
+          if (user_info->business_info != nullptr) {
+            auto business_info = user_info->business_info.get();
+            if (business_info->intro_ != nullptr) {
+              object("business_intro", JsonBusinessIntro(business_info->intro_.get(), client_));
+            }
+            if (business_info->location_ != nullptr) {
+              object("business_location", JsonBusinessLocation(business_info->location_.get()));
+            }
+            if (business_info->opening_hours_ != nullptr) {
+              object("business_opening_hours", JsonBusinessOpeningHours(business_info->opening_hours_.get()));
+            }
           }
         }
         photo = user_info->photo.get();
@@ -6423,17 +6426,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       user_info->photo =
           full_info->photo_ == nullptr ? std::move(full_info->public_photo_) : std::move(full_info->photo_);
       user_info->bio = full_info->bio_ != nullptr ? std::move(full_info->bio_->text_) : td::string();
-      user_info->business_intro = full_info->business_info_ != nullptr && full_info->business_info_->intro_ != nullptr
-                                      ? std::move(full_info->business_info_->intro_)
-                                      : nullptr;
-      user_info->business_location =
-          full_info->business_info_ != nullptr && full_info->business_info_->location_ != nullptr
-              ? std::move(full_info->business_info_->location_)
-              : nullptr;
-      user_info->business_opening_hours =
-          full_info->business_info_ != nullptr && full_info->business_info_->opening_hours_ != nullptr
-              ? std::move(full_info->business_info_->opening_hours_)
-              : nullptr;
+      user_info->business_info = std::move(full_info->business_info_);
       user_info->has_private_forwards = full_info->has_private_forwards_;
       user_info->has_restricted_voice_and_video_messages = full_info->has_restricted_voice_and_video_note_messages_;
       break;

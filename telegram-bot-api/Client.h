@@ -798,9 +798,7 @@ class Client final : public WebhookActor::Callback {
 
     object_ptr<td_api::chatPhoto> photo;
     td::string bio;
-    object_ptr<td_api::businessIntro> business_intro;
-    object_ptr<td_api::businessLocation> business_location;
-    object_ptr<td_api::businessOpeningHours> business_opening_hours;
+    object_ptr<td_api::businessInfo> business_info;
 
     bool have_access = false;
     bool can_join_groups = false;
