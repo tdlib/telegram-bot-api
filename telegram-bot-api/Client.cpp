@@ -4681,6 +4681,39 @@ class Client::TdOnGetChatCustomEmojiStickerSetCallback final : public TdQueryCal
   PromisedQueryPtr query_;
 };
 
+class Client::TdOnGetChatBusinessIntroStickerSetCallback final : public TdQueryCallback {
+ public:
+  TdOnGetChatBusinessIntroStickerSetCallback(Client *client, int64 chat_id, int64 pinned_message_id,
+                                             PromisedQueryPtr query)
+      : client_(client), chat_id_(chat_id), pinned_message_id_(pinned_message_id), query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    auto chat_info = client_->get_chat(chat_id_);
+    CHECK(chat_info != nullptr);
+    CHECK(chat_info->type == ChatInfo::Type::Private);
+    auto user_info = client_->add_user_info(chat_info->user_id);
+    if (result->get_id() == td_api::error::ID) {
+      if (user_info->business_info != nullptr && user_info->business_info->intro_ != nullptr &&
+          user_info->business_info->intro_->sticker_ != nullptr) {
+        user_info->business_info->intro_->sticker_->set_id_ = 0;
+      }
+    } else {
+      CHECK(result->get_id() == td_api::stickerSet::ID);
+      auto sticker_set = move_object_as<td_api::stickerSet>(result);
+      client_->on_get_sticker_set_name(sticker_set->id_, sticker_set->name_);
+    }
+
+    answer_query(JsonChat(chat_id_, client_, true, pinned_message_id_), std::move(query_));
+  }
+
+ private:
+  Client *client_;
+  int64 chat_id_;
+  int64 pinned_message_id_;
+  PromisedQueryPtr query_;
+};
+
 class Client::TdOnGetChatStickerSetCallback final : public TdQueryCallback {
  public:
   TdOnGetChatStickerSetCallback(Client *client, int64 chat_id, int64 pinned_message_id, PromisedQueryPtr query)
@@ -4758,6 +4791,21 @@ class Client::TdOnGetChatPinnedMessageCallback final : public TdQueryCallback {
         return client_->send_request(make_object<td_api::getStickerSet>(sticker_set_id),
                                      td::make_unique<TdOnGetChatCustomEmojiStickerSetCallback>(
                                          client_, chat_id_, pinned_message_id, std::move(query_)));
+      }
+    } else if (chat_info->type == ChatInfo::Type::Private) {
+      auto user_info = client_->get_user_info(chat_info->user_id);
+      CHECK(user_info != nullptr);
+
+      if (user_info->business_info != nullptr && user_info->business_info->intro_ != nullptr) {
+        auto *sticker = user_info->business_info->intro_->sticker_.get();
+        if (sticker != nullptr) {
+          auto sticker_set_id = sticker->set_id_;
+          if (sticker_set_id != 0 && client_->get_sticker_set_name(sticker_set_id).empty()) {
+            return client_->send_request(make_object<td_api::getStickerSet>(sticker_set_id),
+                                         td::make_unique<TdOnGetChatBusinessIntroStickerSetCallback>(
+                                             client_, chat_id_, pinned_message_id, std::move(query_)));
+          }
+        }
       }
     }
 

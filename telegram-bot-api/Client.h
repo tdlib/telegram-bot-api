@@ -224,6 +224,7 @@ class Client final : public WebhookActor::Callback {
   class TdOnGetChatFullInfoCallback;
   class TdOnGetChatStickerSetCallback;
   class TdOnGetChatCustomEmojiStickerSetCallback;
+  class TdOnGetChatBusinessIntroStickerSetCallback;
   class TdOnGetChatPinnedMessageCallback;
   class TdOnGetChatPinnedMessageToUnpinCallback;
   class TdOnGetGroupMembersCallback;
