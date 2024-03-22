@@ -2121,16 +2121,28 @@ class Client::JsonUsersShared final : public td::Jsonable {
 
 class Client::JsonChatShared final : public td::Jsonable {
  public:
-  explicit JsonChatShared(const td_api::messageChatShared *chat_shared) : chat_shared_(chat_shared) {
+  JsonChatShared(const td_api::messageChatShared *chat_shared, const Client *client)
+      : chat_shared_(chat_shared), client_(client) {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
-    object("chat_id", chat_shared_->chat_->chat_id_);
+    auto *shared_chat = chat_shared_->chat_.get();
+    object("chat_id", shared_chat->chat_id_);
+    if (!shared_chat->title_.empty()) {
+      object("title", shared_chat->title_);
+    }
+    if (!shared_chat->username_.empty()) {
+      object("username", shared_chat->username_);
+    }
+    if (shared_chat->photo_ != nullptr) {
+      object("photo", JsonPhoto(shared_chat->photo_.get(), client_));
+    }
     object("request_id", chat_shared_->button_id_);
   }
 
  private:
   const td_api::messageChatShared *chat_shared_;
+  const Client *client_;
 };
 
 class Client::JsonGiveaway final : public td::Jsonable {
@@ -2959,7 +2971,7 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     }
     case td_api::messageChatShared::ID: {
       auto content = static_cast<const td_api::messageChatShared *>(message_->content.get());
-      object("chat_shared", JsonChatShared(content));
+      object("chat_shared", JsonChatShared(content, client_));
       break;
     }
     case td_api::messageStory::ID: {
