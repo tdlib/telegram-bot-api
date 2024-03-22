@@ -303,6 +303,7 @@ bool Client::init_methods() {
   methods_.emplace("uploadstickerfile", &Client::process_upload_sticker_file_query);
   methods_.emplace("createnewstickerset", &Client::process_create_new_sticker_set_query);
   methods_.emplace("addstickertoset", &Client::process_add_sticker_to_set_query);
+  methods_.emplace("replacestickerinset", &Client::process_replace_sticker_in_set_query);
   methods_.emplace("setstickersettitle", &Client::process_set_sticker_set_title_query);
   methods_.emplace("setstickersetthumb", &Client::process_set_sticker_set_thumbnail_query);
   methods_.emplace("setstickersetthumbnail", &Client::process_set_sticker_set_thumbnail_query);
@@ -8421,8 +8422,9 @@ td::Result<td::vector<td_api::object_ptr<td_api::inputSticker>>> Client::get_inp
   return std::move(stickers);
 }
 
-td::Result<td_api::object_ptr<td_api::InputFile>> Client::get_sticker_input_file(const Query *query) {
-  auto file_id = trim(query->arg("sticker"));
+td::Result<td_api::object_ptr<td_api::InputFile>> Client::get_sticker_input_file(const Query *query,
+                                                                                 td::Slice field_name) {
+  auto file_id = trim(query->arg(field_name));
   if (file_id.empty()) {
     return td::Status::Error(400, "Sticker is not specified");
   }
@@ -11212,6 +11214,22 @@ td::Status Client::process_add_sticker_to_set_query(PromisedQueryPtr &query) {
   check_user(user_id, std::move(query),
              [this, user_id, name, sticker = std::move(sticker)](PromisedQueryPtr query) mutable {
                send_request(make_object<td_api::addStickerToSet>(user_id, name.str(), std::move(sticker)),
+                            td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+             });
+  return td::Status::OK();
+}
+
+td::Status Client::process_replace_sticker_in_set_query(PromisedQueryPtr &query) {
+  TRY_RESULT(user_id, get_user_id(query.get()));
+  auto name = query->arg("name");
+  TRY_RESULT(input_file, get_sticker_input_file(query.get(), "old_sticker"));
+  TRY_RESULT(sticker, get_input_sticker(query.get()));
+
+  check_user(user_id, std::move(query),
+             [this, user_id, name, input_file = std::move(input_file),
+              sticker = std::move(sticker)](PromisedQueryPtr query) mutable {
+               send_request(make_object<td_api::replaceStickerInSet>(user_id, name.str(), std::move(input_file),
+                                                                     std::move(sticker)),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
   return td::Status::OK();

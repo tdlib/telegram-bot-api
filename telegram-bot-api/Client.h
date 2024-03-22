@@ -502,7 +502,8 @@ class Client final : public WebhookActor::Callback {
 
   td::Result<td::vector<object_ptr<td_api::inputSticker>>> get_input_stickers(const Query *query) const;
 
-  static td::Result<object_ptr<td_api::InputFile>> get_sticker_input_file(const Query *query);
+  static td::Result<object_ptr<td_api::InputFile>> get_sticker_input_file(const Query *query,
+                                                                          td::Slice field_name = "sticker");
 
   static td::Result<td::string> get_passport_element_hash(td::Slice encoded_hash);
 
@@ -697,6 +698,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_upload_sticker_file_query(PromisedQueryPtr &query);
   td::Status process_create_new_sticker_set_query(PromisedQueryPtr &query);
   td::Status process_add_sticker_to_set_query(PromisedQueryPtr &query);
+  td::Status process_replace_sticker_in_set_query(PromisedQueryPtr &query);
   td::Status process_set_sticker_set_title_query(PromisedQueryPtr &query);
   td::Status process_set_sticker_set_thumbnail_query(PromisedQueryPtr &query);
   td::Status process_set_custom_emoji_sticker_set_thumbnail_query(PromisedQueryPtr &query);
