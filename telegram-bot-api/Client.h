@@ -93,6 +93,7 @@ class Client final : public WebhookActor::Callback {
   class JsonUsers;
   class JsonReactionType;
   class JsonReactionCount;
+  class JsonBirthdate;
   class JsonBusinessIntro;
   class JsonBusinessLocation;
   class JsonBusinessOpeningHoursInterval;
@@ -802,6 +803,7 @@ class Client final : public WebhookActor::Callback {
 
     object_ptr<td_api::chatPhoto> photo;
     td::string bio;
+    object_ptr<td_api::birthdate> birthdate;
     object_ptr<td_api::businessInfo> business_info;
 
     bool have_access = false;

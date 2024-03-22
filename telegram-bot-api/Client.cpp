@@ -724,6 +724,23 @@ class Client::JsonReactionCount final : public td::Jsonable {
   const td_api::messageReaction *message_reaction_;
 };
 
+class Client::JsonBirthdate final : public td::Jsonable {
+ public:
+  explicit JsonBirthdate(const td_api::birthdate *birthdate) : birthdate_(birthdate) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("day", birthdate_->day_);
+    object("month", birthdate_->month_);
+    if (birthdate_->year_ != 0) {
+      object("year", birthdate_->year_);
+    }
+  }
+
+ private:
+  const td_api::birthdate *birthdate_;
+};
+
 class Client::JsonBusinessIntro final : public td::Jsonable {
  public:
   JsonBusinessIntro(const td_api::businessIntro *intro, const Client *client) : intro_(intro), client_(client) {
@@ -947,6 +964,9 @@ class Client::JsonChat final : public td::Jsonable {
             if (business_info->opening_hours_ != nullptr) {
               object("business_opening_hours", JsonBusinessOpeningHours(business_info->opening_hours_.get()));
             }
+          }
+          if (user_info->birthdate != nullptr) {
+            object("birthdate", JsonBirthdate(user_info->birthdate.get()));
           }
         }
         photo = user_info->photo.get();
@@ -6521,6 +6541,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       user_info->photo =
           full_info->photo_ == nullptr ? std::move(full_info->public_photo_) : std::move(full_info->photo_);
       user_info->bio = full_info->bio_ != nullptr ? std::move(full_info->bio_->text_) : td::string();
+      user_info->birthdate = std::move(full_info->birthdate_);
       user_info->business_info = std::move(full_info->business_info_);
       user_info->has_private_forwards = full_info->has_private_forwards_;
       user_info->has_restricted_voice_and_video_messages = full_info->has_restricted_voice_and_video_note_messages_;
