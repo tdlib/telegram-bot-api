@@ -6947,10 +6947,13 @@ td::Result<td_api::object_ptr<td_api::keyboardButton>> Client::get_keyboard_butt
       auto restrict_user_is_premium = request_user_object.has_field("user_is_premium");
       TRY_RESULT(user_is_premium, request_user_object.get_optional_bool_field("user_is_premium"));
       TRY_RESULT(max_quantity, request_user_object.get_optional_int_field("max_quantity", 1));
+      TRY_RESULT(request_name, request_user_object.get_optional_bool_field("request_name"));
+      TRY_RESULT(request_username, request_user_object.get_optional_bool_field("request_username"));
+      TRY_RESULT(request_photo, request_user_object.get_optional_bool_field("request_photo"));
       return make_object<td_api::keyboardButton>(
-          text, make_object<td_api::keyboardButtonTypeRequestUsers>(id, restrict_user_is_bot, user_is_bot,
-                                                                    restrict_user_is_premium, user_is_premium,
-                                                                    max_quantity, false, false, false));
+          text, make_object<td_api::keyboardButtonTypeRequestUsers>(
+                    id, restrict_user_is_bot, user_is_bot, restrict_user_is_premium, user_is_premium, max_quantity,
+                    request_name, request_username, request_photo));
     }
 
     if (object.has_field("request_chat")) {
@@ -6975,11 +6978,15 @@ td::Result<td_api::object_ptr<td_api::keyboardButton>> Client::get_keyboard_butt
                           get_chat_administrator_rights(request_chat_object.extract_field("bot_administrator_rights")));
       }
       TRY_RESULT(bot_is_member, request_chat_object.get_optional_bool_field("bot_is_member"));
+      TRY_RESULT(request_title, request_chat_object.get_optional_bool_field("request_title"));
+      TRY_RESULT(request_username, request_chat_object.get_optional_bool_field("request_username"));
+      TRY_RESULT(request_photo, request_chat_object.get_optional_bool_field("request_photo"));
       return make_object<td_api::keyboardButton>(
-          text, make_object<td_api::keyboardButtonTypeRequestChat>(
-                    id, chat_is_channel, restrict_chat_is_forum, chat_is_forum, restrict_chat_has_username,
-                    chat_has_username, chat_is_created, std::move(user_administrator_rights),
-                    std::move(bot_administrator_rights), bot_is_member, false, false, false));
+          text,
+          make_object<td_api::keyboardButtonTypeRequestChat>(
+              id, chat_is_channel, restrict_chat_is_forum, chat_is_forum, restrict_chat_has_username, chat_has_username,
+              chat_is_created, std::move(user_administrator_rights), std::move(bot_administrator_rights), bot_is_member,
+              request_title, request_username, request_photo));
     }
 
     return make_object<td_api::keyboardButton>(text, nullptr);
