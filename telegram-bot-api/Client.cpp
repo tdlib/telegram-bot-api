@@ -2978,6 +2978,9 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
   if (message_->is_topic_message) {
     object("is_topic_message", td::JsonTrue());
   }
+  if (message_->is_from_offline) {
+    object("is_from_offline", td::JsonTrue());
+  }
 }
 
 class Client::JsonMessageId final : public td::Jsonable {
@@ -13406,6 +13409,7 @@ void Client::init_message(MessageInfo *message_info, object_ptr<td_api::message>
   }
 
   message_info->can_be_saved = message->can_be_saved_;
+  message_info->is_from_offline = message->is_from_offline_;
   message_info->is_topic_message = message->is_topic_message_;
   message_info->author_signature = std::move(message->author_signature_);
   message_info->sender_boost_count = message->sender_boost_count_;

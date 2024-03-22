@@ -911,6 +911,7 @@ class Client final : public WebhookActor::Callback {
     bool can_be_saved = false;
     bool is_automatic_forward = false;
     bool is_topic_message = false;
+    bool is_from_offline = false;
     mutable bool is_content_changed = false;
   };
 
