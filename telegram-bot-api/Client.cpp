@@ -969,6 +969,9 @@ class Client::JsonChat final : public td::Jsonable {
           if (user_info->birthdate != nullptr) {
             object("birthdate", JsonBirthdate(user_info->birthdate.get()));
           }
+          if (user_info->personal_chat_id != 0) {
+            object("personal_chat", JsonChat(user_info->personal_chat_id, client_));
+          }
         }
         photo = user_info->photo.get();
         break;
@@ -6544,6 +6547,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       user_info->bio = full_info->bio_ != nullptr ? std::move(full_info->bio_->text_) : td::string();
       user_info->birthdate = std::move(full_info->birthdate_);
       user_info->business_info = std::move(full_info->business_info_);
+      user_info->personal_chat_id = full_info->personal_chat_id_;
       user_info->has_private_forwards = full_info->has_private_forwards_;
       user_info->has_restricted_voice_and_video_messages = full_info->has_restricted_voice_and_video_note_messages_;
       break;

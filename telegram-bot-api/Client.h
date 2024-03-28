@@ -805,6 +805,7 @@ class Client final : public WebhookActor::Callback {
     td::string bio;
     object_ptr<td_api::birthdate> birthdate;
     object_ptr<td_api::businessInfo> business_info;
+    int64 personal_chat_id = 0;
 
     bool have_access = false;
     bool can_join_groups = false;
