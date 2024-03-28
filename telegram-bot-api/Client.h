@@ -809,6 +809,7 @@ class Client final : public WebhookActor::Callback {
     bool have_access = false;
     bool can_join_groups = false;
     bool can_read_all_group_messages = false;
+    bool can_connect_to_business = false;
     bool is_inline_bot = false;
     bool has_private_forwards = false;
     bool has_restricted_voice_and_video_messages = false;
