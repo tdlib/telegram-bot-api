@@ -742,25 +742,26 @@ class Client::JsonBirthdate final : public td::Jsonable {
   const td_api::birthdate *birthdate_;
 };
 
-class Client::JsonBusinessIntro final : public td::Jsonable {
+class Client::JsonBusinessStartPage final : public td::Jsonable {
  public:
-  JsonBusinessIntro(const td_api::businessIntro *intro, const Client *client) : intro_(intro), client_(client) {
+  JsonBusinessStartPage(const td_api::businessStartPage *start_page, const Client *client)
+      : start_page_(start_page), client_(client) {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
-    if (!intro_->title_.empty()) {
-      object("title", intro_->title_);
+    if (!start_page_->title_.empty()) {
+      object("title", start_page_->title_);
     }
-    if (!intro_->message_.empty()) {
-      object("message", intro_->message_);
+    if (!start_page_->message_.empty()) {
+      object("message", start_page_->message_);
     }
-    if (intro_->sticker_ != nullptr) {
-      object("sticker", JsonSticker(intro_->sticker_.get(), client_));
+    if (start_page_->sticker_ != nullptr) {
+      object("sticker", JsonSticker(start_page_->sticker_.get(), client_));
     }
   }
 
  private:
-  const td_api::businessIntro *intro_;
+  const td_api::businessStartPage *start_page_;
   const Client *client_;
 };
 
@@ -956,8 +957,8 @@ class Client::JsonChat final : public td::Jsonable {
           }
           if (user_info->business_info != nullptr) {
             auto business_info = user_info->business_info.get();
-            if (business_info->intro_ != nullptr) {
-              object("business_intro", JsonBusinessIntro(business_info->intro_.get(), client_));
+            if (business_info->start_page_ != nullptr) {
+              object("business_intro", JsonBusinessStartPage(business_info->start_page_.get(), client_));
             }
             if (business_info->location_ != nullptr) {
               object("business_location", JsonBusinessLocation(business_info->location_.get()));
@@ -4752,10 +4753,10 @@ class Client::TdOnGetChatCustomEmojiStickerSetCallback final : public TdQueryCal
   PromisedQueryPtr query_;
 };
 
-class Client::TdOnGetChatBusinessIntroStickerSetCallback final : public TdQueryCallback {
+class Client::TdOnGetChatBusinessStartPageStickerSetCallback final : public TdQueryCallback {
  public:
-  TdOnGetChatBusinessIntroStickerSetCallback(Client *client, int64 chat_id, int64 pinned_message_id,
-                                             PromisedQueryPtr query)
+  TdOnGetChatBusinessStartPageStickerSetCallback(Client *client, int64 chat_id, int64 pinned_message_id,
+                                                 PromisedQueryPtr query)
       : client_(client), chat_id_(chat_id), pinned_message_id_(pinned_message_id), query_(std::move(query)) {
   }
 
@@ -4765,9 +4766,9 @@ class Client::TdOnGetChatBusinessIntroStickerSetCallback final : public TdQueryC
     CHECK(chat_info->type == ChatInfo::Type::Private);
     auto user_info = client_->add_user_info(chat_info->user_id);
     if (result->get_id() == td_api::error::ID) {
-      if (user_info->business_info != nullptr && user_info->business_info->intro_ != nullptr &&
-          user_info->business_info->intro_->sticker_ != nullptr) {
-        user_info->business_info->intro_->sticker_->set_id_ = 0;
+      if (user_info->business_info != nullptr && user_info->business_info->start_page_ != nullptr &&
+          user_info->business_info->start_page_->sticker_ != nullptr) {
+        user_info->business_info->start_page_->sticker_->set_id_ = 0;
       }
     } else {
       CHECK(result->get_id() == td_api::stickerSet::ID);
@@ -4867,13 +4868,13 @@ class Client::TdOnGetChatPinnedMessageCallback final : public TdQueryCallback {
       auto user_info = client_->get_user_info(chat_info->user_id);
       CHECK(user_info != nullptr);
 
-      if (user_info->business_info != nullptr && user_info->business_info->intro_ != nullptr) {
-        auto *sticker = user_info->business_info->intro_->sticker_.get();
+      if (user_info->business_info != nullptr && user_info->business_info->start_page_ != nullptr) {
+        auto *sticker = user_info->business_info->start_page_->sticker_.get();
         if (sticker != nullptr) {
           auto sticker_set_id = sticker->set_id_;
           if (sticker_set_id != 0 && client_->get_sticker_set_name(sticker_set_id).empty()) {
             return client_->send_request(make_object<td_api::getStickerSet>(sticker_set_id),
-                                         td::make_unique<TdOnGetChatBusinessIntroStickerSetCallback>(
+                                         td::make_unique<TdOnGetChatBusinessStartPageStickerSetCallback>(
                                              client_, chat_id_, pinned_message_id, std::move(query_)));
           }
         }

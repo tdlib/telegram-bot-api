@@ -94,7 +94,7 @@ class Client final : public WebhookActor::Callback {
   class JsonReactionType;
   class JsonReactionCount;
   class JsonBirthdate;
-  class JsonBusinessIntro;
+  class JsonBusinessStartPage;
   class JsonBusinessLocation;
   class JsonBusinessOpeningHoursInterval;
   class JsonBusinessOpeningHours;
@@ -226,7 +226,7 @@ class Client final : public WebhookActor::Callback {
   class TdOnGetChatFullInfoCallback;
   class TdOnGetChatStickerSetCallback;
   class TdOnGetChatCustomEmojiStickerSetCallback;
-  class TdOnGetChatBusinessIntroStickerSetCallback;
+  class TdOnGetChatBusinessStartPageStickerSetCallback;
   class TdOnGetChatPinnedMessageCallback;
   class TdOnGetChatPinnedMessageToUnpinCallback;
   class TdOnGetGroupMembersCallback;
