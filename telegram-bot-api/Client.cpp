@@ -1738,6 +1738,128 @@ class Client::JsonStory final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonBackgroundFill final : public td::Jsonable {
+ public:
+  explicit JsonBackgroundFill(const td_api::BackgroundFill *background_fill) : background_fill_(background_fill) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    CHECK(background_fill_ != nullptr);
+    auto object = scope->enter_object();
+    switch (background_fill_->get_id()) {
+      case td_api::backgroundFillSolid::ID: {
+        auto fill = static_cast<const td_api::backgroundFillSolid *>(background_fill_);
+        object("type", "solid");
+        object("color", fill->color_);
+        break;
+      }
+      case td_api::backgroundFillGradient::ID: {
+        auto fill = static_cast<const td_api::backgroundFillGradient *>(background_fill_);
+        object("type", "gradient");
+        object("top_color", fill->top_color_);
+        object("bottom_color", fill->bottom_color_);
+        object("rotation_angle", fill->rotation_angle_);
+        break;
+      }
+      case td_api::backgroundFillFreeformGradient::ID: {
+        auto fill = static_cast<const td_api::backgroundFillFreeformGradient *>(background_fill_);
+        object("type", "freeform_gradient");
+        object("colors", td::json_array(fill->colors_, [](int32 color) { return color; }));
+        break;
+      }
+      default:
+        UNREACHABLE();
+    }
+  }
+
+ private:
+  const td_api::BackgroundFill *background_fill_;
+};
+
+class Client::JsonBackgroundType final : public td::Jsonable {
+ public:
+  JsonBackgroundType(const td_api::BackgroundType *background_type, const td_api::document *document,
+                     int32 dark_theme_dimming, const Client *client)
+      : background_type_(background_type)
+      , document_(document)
+      , dark_theme_dimming_(dark_theme_dimming)
+      , client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    CHECK(background_type_ != nullptr);
+    auto object = scope->enter_object();
+    switch (background_type_->get_id()) {
+      case td_api::backgroundTypeWallpaper::ID: {
+        auto type = static_cast<const td_api::backgroundTypeWallpaper *>(background_type_);
+        object("type", "wallpaper");
+        CHECK(document_ != nullptr);
+        object("document", JsonDocument(document_, client_));
+        object("dark_theme_dimming", dark_theme_dimming_);
+        if (type->is_blurred_) {
+          object("is_blurred", td::JsonTrue());
+        }
+        if (type->is_moving_) {
+          object("is_moving", td::JsonTrue());
+        }
+        break;
+      }
+      case td_api::backgroundTypePattern::ID: {
+        auto type = static_cast<const td_api::backgroundTypePattern *>(background_type_);
+        object("type", "pattern");
+        CHECK(document_ != nullptr);
+        object("document", JsonDocument(document_, client_));
+        object("fill", JsonBackgroundFill(type->fill_.get()));
+        object("intensity", type->intensity_);
+        if (type->is_inverted_) {
+          object("is_inverted", td::JsonTrue());
+        }
+        if (type->is_moving_) {
+          object("is_moving", td::JsonTrue());
+        }
+        break;
+      }
+      case td_api::backgroundTypeFill::ID: {
+        auto type = static_cast<const td_api::backgroundTypeFill *>(background_type_);
+        object("type", "fill");
+        object("fill", JsonBackgroundFill(type->fill_.get()));
+        object("dark_theme_dimming", dark_theme_dimming_);
+        break;
+      }
+      case td_api::backgroundTypeChatTheme::ID: {
+        auto type = static_cast<const td_api::backgroundTypeChatTheme *>(background_type_);
+        object("type", "chat_theme");
+        object("theme_name", type->theme_name_);
+        break;
+      }
+      default:
+        UNREACHABLE();
+    }
+  }
+
+ private:
+  const td_api::BackgroundType *background_type_;
+  const td_api::document *document_;
+  int32 dark_theme_dimming_;
+  const Client *client_;
+};
+
+class Client::JsonChatBackground final : public td::Jsonable {
+ public:
+  JsonChatBackground(const td_api::chatBackground *chat_background, const Client *client)
+      : chat_background_(chat_background), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    CHECK(chat_background_ != nullptr);
+    auto object = scope->enter_object();
+    auto background = chat_background_->background_.get();
+    object("type", JsonBackgroundType(background->type_.get(), background->document_.get(),
+                                      chat_background_->dark_theme_dimming_, client_));
+  }
+
+ private:
+  const td_api::chatBackground *chat_background_;
+  const Client *client_;
+};
+
 class Client::JsonForumTopicCreated final : public td::Jsonable {
  public:
   explicit JsonForumTopicCreated(const td_api::messageForumTopicCreated *forum_topic_created)
@@ -3005,8 +3127,11 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("story", JsonStory(content->story_sender_chat_id_, content->story_id_, client_));
       break;
     }
-    case td_api::messageChatSetBackground::ID:
+    case td_api::messageChatSetBackground::ID: {
+      auto content = static_cast<const td_api::messageChatSetBackground *>(message_->content.get());
+      object("chat_background_set", JsonChatBackground(content->background_.get(), client_));
       break;
+    }
     case td_api::messagePremiumGiftCode::ID:
       break;
     case td_api::messagePremiumGiveawayCreated::ID:
@@ -12994,8 +13119,6 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageGiftedPremium::ID:
       return true;
     case td_api::messageSuggestProfilePhoto::ID:
-      return true;
-    case td_api::messageChatSetBackground::ID:
       return true;
     case td_api::messagePremiumGiftCode::ID:
       return true;
