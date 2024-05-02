@@ -5837,7 +5837,7 @@ void Client::check_user_read_access(const UserInfo *user_info, PromisedQueryPtr 
 template <class OnSuccess>
 void Client::check_user(int64 user_id, PromisedQueryPtr query, OnSuccess on_success) {
   const UserInfo *user_info = get_user_info(user_id);
-  if (user_info != nullptr) {
+  if (user_info != nullptr && user_info->have_access) {
     return check_user_read_access(user_info, std::move(query), std::move(on_success));
   }
   send_request(make_object<td_api::getUser>(user_id),
@@ -5847,7 +5847,7 @@ void Client::check_user(int64 user_id, PromisedQueryPtr query, OnSuccess on_succ
 template <class OnSuccess>
 void Client::check_user_no_fail(int64 user_id, PromisedQueryPtr query, OnSuccess on_success) {
   const UserInfo *user_info = get_user_info(user_id);
-  if (user_info != nullptr) {
+  if (user_info != nullptr && user_info->have_access) {
     on_success(std::move(query));
     return;
   }
@@ -5943,6 +5943,12 @@ void Client::check_chat(td::Slice chat_id_str, AccessRights access_rights, Promi
 
   auto chat_id = td::to_integer<int64>(chat_id_str);
   auto chat_info = get_chat(chat_id);
+  if (chat_info != nullptr && chat_info->type == ChatInfo::Type::Private) {
+    const UserInfo *user_info = get_user_info(chat_info->user_id);
+    if (user_info == nullptr || !user_info->have_access) {
+      chat_info = nullptr;
+    }
+  }
   if (chat_info != nullptr) {
     return check_chat_access(chat_id, access_rights, chat_info, std::move(query), std::move(on_success));
   }
@@ -5964,6 +5970,12 @@ void Client::check_chat_no_fail(td::Slice chat_id_str, PromisedQueryPtr query, O
   auto chat_id = r_chat_id.move_as_ok();
 
   auto chat_info = get_chat(chat_id);
+  if (chat_info != nullptr && chat_info->type == ChatInfo::Type::Private) {
+    const UserInfo *user_info = get_user_info(chat_info->user_id);
+    if (user_info == nullptr || !user_info->have_access) {
+      chat_info = nullptr;
+    }
+  }
   if (chat_info != nullptr) {
     return on_success(chat_id, std::move(query));
   }
