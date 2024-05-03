@@ -9271,6 +9271,16 @@ td::Result<td::vector<td_api::object_ptr<td_api::formattedText>>> Client::get_po
   td::vector<object_ptr<td_api::formattedText>> options;
   for (auto &input_option : value.get_array()) {
     if (input_option.type() != td::JsonValue::Type::String) {
+      if (input_option.type() == td::JsonValue::Type::Object) {
+        auto &object = input_option.get_object();
+        TRY_RESULT(text, object.get_required_string_field("text"));
+        TRY_RESULT(parse_mode, object.get_optional_string_field("text_parse_mode"));
+        TRY_RESULT(option_text,
+                   get_formatted_text(std::move(text), std::move(parse_mode), object.extract_field("text_entities")));
+        options.push_back(std::move(option_text));
+        continue;
+      }
+
       return td::Status::Error(400, "Expected an option to be of type String");
     }
     options.push_back(make_object<td_api::formattedText>(input_option.get_string().str(), td::Auto()));
@@ -9934,7 +9944,8 @@ td::Status Client::process_send_contact_query(PromisedQueryPtr &query) {
 }
 
 td::Status Client::process_send_poll_query(PromisedQueryPtr &query) {
-  auto question = query->arg("question");
+  TRY_RESULT(question, get_formatted_text(query->arg("question").str(), query->arg("question_parse_mode").str(),
+                                          get_input_entities(query.get(), "question_entities")));
   TRY_RESULT(options, get_poll_options(query.get()));
   bool is_anonymous = true;
   if (query->has_arg("is_anonymous")) {
@@ -9958,9 +9969,8 @@ td::Status Client::process_send_poll_query(PromisedQueryPtr &query) {
   int32 open_period = get_integer_arg(query.get(), "open_period", 0, 0, 10 * 60);
   int32 close_date = get_integer_arg(query.get(), "close_date", 0);
   auto is_closed = to_bool(query->arg("is_closed"));
-  do_send_message(make_object<td_api::inputMessagePoll>(make_object<td_api::formattedText>(question.str(), td::Auto()),
-                                                        std::move(options), is_anonymous, std::move(poll_type),
-                                                        open_period, close_date, is_closed),
+  do_send_message(make_object<td_api::inputMessagePoll>(std::move(question), std::move(options), is_anonymous,
+                                                        std::move(poll_type), open_period, close_date, is_closed),
                   std::move(query));
   return td::Status::OK();
 }
