@@ -1142,6 +1142,7 @@ class Client::JsonChat final : public td::Jsonable {
                td::json_array(chat_info->available_reactions->reactions_,
                               [](const auto &reaction) { return JsonReactionType(reaction.get()); }));
       }
+      object("max_reaction_count", chat_info->max_reaction_count);
       CHECK(chat_info->accent_color_id != -1);
       object("accent_color_id", chat_info->accent_color_id);
       if (chat_info->background_custom_emoji_id != 0) {
@@ -6591,9 +6592,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
           chat->emoji_status_ != nullptr ? chat->emoji_status_->custom_emoji_id_ : 0;
       chat_info->emoji_status_expiration_date =
           chat->emoji_status_ != nullptr ? chat->emoji_status_->expiration_date_ : 0;
-      if (chat->available_reactions_->get_id() == td_api::chatAvailableReactionsSome::ID) {
-        chat_info->available_reactions = move_object_as<td_api::chatAvailableReactionsSome>(chat->available_reactions_);
-      }
+      set_chat_available_reactions(chat_info, std::move(chat->available_reactions_));
       chat_info->accent_color_id = chat->accent_color_id_;
       chat_info->background_custom_emoji_id = chat->background_custom_emoji_id_;
       chat_info->profile_accent_color_id = chat->profile_accent_color_id_;
@@ -6643,12 +6642,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       auto update = move_object_as<td_api::updateChatAvailableReactions>(result);
       auto chat_info = add_chat(update->chat_id_);
       CHECK(chat_info->type != ChatInfo::Type::Unknown);
-      if (update->available_reactions_->get_id() == td_api::chatAvailableReactionsSome::ID) {
-        chat_info->available_reactions =
-            move_object_as<td_api::chatAvailableReactionsSome>(update->available_reactions_);
-      } else {
-        chat_info->available_reactions = nullptr;
-      }
+      set_chat_available_reactions(chat_info, std::move(update->available_reactions_));
       break;
     }
     case td_api::updateChatAccentColors::ID: {
@@ -12347,6 +12341,25 @@ Client::ChatInfo *Client::add_chat(int64 chat_id) {
 
 const Client::ChatInfo *Client::get_chat(int64 chat_id) const {
   return chats_.get_pointer(chat_id);
+}
+
+void Client::set_chat_available_reactions(ChatInfo *chat_info,
+                                          object_ptr<td_api::ChatAvailableReactions> &&available_reactions) {
+  CHECK(chat_info != nullptr);
+  CHECK(available_reactions != nullptr);
+  switch (available_reactions->get_id()) {
+    case td_api::chatAvailableReactionsSome::ID:
+      chat_info->available_reactions = move_object_as<td_api::chatAvailableReactionsSome>(available_reactions);
+      chat_info->max_reaction_count = chat_info->available_reactions->max_reaction_count_;
+      break;
+    case td_api::chatAvailableReactionsAll::ID:
+      chat_info->available_reactions = nullptr;
+      chat_info->max_reaction_count =
+          static_cast<const td_api::chatAvailableReactionsAll *>(available_reactions.get())->max_reaction_count_;
+      break;
+    default:
+      UNREACHABLE();
+  }
 }
 
 Client::ChatType Client::get_chat_type(int64 chat_id) const {

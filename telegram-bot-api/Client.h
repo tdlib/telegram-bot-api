@@ -878,6 +878,7 @@ class Client final : public WebhookActor::Callback {
     int64 background_custom_emoji_id = 0;
     int64 profile_background_custom_emoji_id = 0;
     bool has_protected_content = false;
+    int32 max_reaction_count = 0;
     object_ptr<td_api::chatAvailableReactionsSome> available_reactions;
     object_ptr<td_api::chatPhotoInfo> photo_info;
     object_ptr<td_api::chatPermissions> permissions;
@@ -889,6 +890,9 @@ class Client final : public WebhookActor::Callback {
   };
   ChatInfo *add_chat(int64 chat_id);
   const ChatInfo *get_chat(int64 chat_id) const;
+
+  void set_chat_available_reactions(ChatInfo *chat_info,
+                                    object_ptr<td_api::ChatAvailableReactions> &&available_reactions);
 
   enum class ChatType { Private, Group, Supergroup, Channel, Unknown };
 
