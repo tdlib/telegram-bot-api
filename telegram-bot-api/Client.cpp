@@ -1634,7 +1634,7 @@ class Client::JsonPollOption final : public td::Jsonable {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
-    object("text", option_->text_);
+    object("text", option_->text_->text_);
     object("voter_count", option_->voter_count_);
     // ignore is_chosen
   }
@@ -1650,7 +1650,7 @@ class Client::JsonPoll final : public td::Jsonable {
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("id", td::to_string(poll_->id_));
-    object("question", poll_->question_);
+    object("question", poll_->question_->text_);
     object("options", td::json_array(poll_->options_, [](auto &option) { return JsonPollOption(option.get()); }));
     object("total_voter_count", poll_->total_voter_count_);
     if (poll_->open_period_ != 0 && poll_->close_date_ != 0) {
@@ -2395,7 +2395,7 @@ class Client::JsonGiveawayCompleted final : public td::Jsonable {
 
 class Client::JsonChatBoostAdded final : public td::Jsonable {
  public:
-  JsonChatBoostAdded(const td_api::messageChatBoost *chat_boost) : chat_boost_(chat_boost) {
+  explicit JsonChatBoostAdded(const td_api::messageChatBoost *chat_boost) : chat_boost_(chat_boost) {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
@@ -3895,8 +3895,7 @@ class Client::JsonBusinessMessagesDeleted final : public td::Jsonable {
     auto object = scope->enter_object();
     object("business_connection_id", update_->connection_id_);
     object("chat", JsonChat(update_->chat_id_, client_));
-    object("message_ids",
-           td::json_array(update_->message_ids_, [](int64 message_id) { return as_client_message_id(message_id); }));
+    object("message_ids", td::json_array(update_->message_ids_, as_client_message_id));
   }
 
  private:
@@ -6142,7 +6141,7 @@ void Client::check_reply_parameters(td::Slice chat_id_str, InputReplyParameters 
           }
 
           if (message_thread_id <= 0) {
-            // if message thread isn't specified, then the message to reply can be only from a different chat
+            // if message thread isn't specified, then the message to be replied can be only from a different chat
             if (reply_parameters.reply_in_chat_id == chat_id) {
               reply_parameters.reply_in_chat_id = 0;
             }
@@ -6172,13 +6171,13 @@ void Client::check_reply_parameters(td::Slice chat_id_str, InputReplyParameters 
                                        on_success = std::move(on_reply_message_resolved)](
                                           int64 reply_in_chat_id, PromisedQueryPtr query) mutable {
           if (!have_message_access(reply_in_chat_id)) {
-            return fail_query_with_error(std::move(query), 400, "MESSAGE_NOT_FOUND", "message to reply not found");
+            return fail_query_with_error(std::move(query), 400, "MESSAGE_NOT_FOUND", "message to be replied not found");
           }
 
           send_request(make_object<td_api::getMessage>(reply_in_chat_id, reply_to_message_id),
                        td::make_unique<TdOnCheckMessageCallback<decltype(on_success)>>(
-                           this, reply_in_chat_id, reply_to_message_id, allow_sending_without_reply, "message to reply",
-                           std::move(query), std::move(on_success)));
+                           this, reply_in_chat_id, reply_to_message_id, allow_sending_without_reply,
+                           "message to be replied", std::move(query), std::move(on_success)));
         };
         if (reply_parameters.reply_in_chat_id.empty()) {
           return on_reply_chat_resolved(chat_id, std::move(query));
@@ -9249,7 +9248,7 @@ td::Result<td_api::object_ptr<td_api::inputMessageInvoice>> Client::get_input_me
       provider_token.str(), provider_data.str(), start_parameter.str(), std::move(extended_media));
 }
 
-td::Result<td::vector<td::string>> Client::get_poll_options(const Query *query) {
+td::Result<td::vector<td_api::object_ptr<td_api::formattedText>>> Client::get_poll_options(const Query *query) {
   auto input_options = query->arg("options");
   LOG(INFO) << "Parsing JSON object: " << input_options;
   auto r_value = json_decode(input_options);
@@ -9263,12 +9262,12 @@ td::Result<td::vector<td::string>> Client::get_poll_options(const Query *query) 
     return td::Status::Error(400, "Expected an Array of String as options");
   }
 
-  td::vector<td::string> options;
+  td::vector<object_ptr<td_api::formattedText>> options;
   for (auto &input_option : value.get_array()) {
     if (input_option.type() != td::JsonValue::Type::String) {
       return td::Status::Error(400, "Expected an option to be of type String");
     }
-    options.push_back(input_option.get_string().str());
+    options.push_back(make_object<td_api::formattedText>(input_option.get_string().str(), td::Auto()));
   }
   return std::move(options);
 }
@@ -9953,8 +9952,9 @@ td::Status Client::process_send_poll_query(PromisedQueryPtr &query) {
   int32 open_period = get_integer_arg(query.get(), "open_period", 0, 0, 10 * 60);
   int32 close_date = get_integer_arg(query.get(), "close_date", 0);
   auto is_closed = to_bool(query->arg("is_closed"));
-  do_send_message(make_object<td_api::inputMessagePoll>(question.str(), std::move(options), is_anonymous,
-                                                        std::move(poll_type), open_period, close_date, is_closed),
+  do_send_message(make_object<td_api::inputMessagePoll>(make_object<td_api::formattedText>(question.str(), td::Auto()),
+                                                        std::move(options), is_anonymous, std::move(poll_type),
+                                                        open_period, close_date, is_closed),
                   std::move(query));
   return td::Status::OK();
 }
@@ -10254,8 +10254,8 @@ td::Status Client::process_edit_message_live_location_query(PromisedQueryPtr &qu
         [this, inline_message_id = inline_message_id.str(), location = std::move(location), heading,
          proximity_alert_radius](object_ptr<td_api::ReplyMarkup> reply_markup, PromisedQueryPtr query) mutable {
           send_request(
-              make_object<td_api::editInlineMessageLiveLocation>(inline_message_id, std::move(reply_markup),
-                                                                 std::move(location), heading, proximity_alert_radius),
+              make_object<td_api::editInlineMessageLiveLocation>(
+                  inline_message_id, std::move(reply_markup), std::move(location), 0, heading, proximity_alert_radius),
               td::make_unique<TdOnEditInlineMessageCallback>(std::move(query)));
         });
   } else {
@@ -10268,8 +10268,8 @@ td::Status Client::process_edit_message_live_location_query(PromisedQueryPtr &qu
                          reply_markup = std::move(reply_markup)](int64 chat_id, int64 message_id,
                                                                  PromisedQueryPtr query) mutable {
                           send_request(make_object<td_api::editMessageLiveLocation>(
-                                           chat_id, message_id, std::move(reply_markup), std::move(location), heading,
-                                           proximity_alert_radius),
+                                           chat_id, message_id, std::move(reply_markup), std::move(location), 0,
+                                           heading, proximity_alert_radius),
                                        td::make_unique<TdOnEditMessageCallback>(this, std::move(query)));
                         });
         });
@@ -10956,7 +10956,7 @@ td::Status Client::process_get_chat_member_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
   TRY_RESULT(user_id, get_user_id(query.get()));
 
-  check_chat(chat_id, AccessRights::ReadMembers, std::move(query),
+  check_chat(chat_id, user_id == my_id_ ? AccessRights::Read : AccessRights::ReadMembers, std::move(query),
              [this, user_id](int64 chat_id, PromisedQueryPtr query) {
                get_chat_member(chat_id, user_id, std::move(query),
                                [this, chat_type = get_chat_type(chat_id)](object_ptr<td_api::chatMember> &&chat_member,
@@ -12950,14 +12950,8 @@ void Client::add_update_message_reaction_count(object_ptr<td_api::updateMessageR
 void Client::add_update_business_connection(object_ptr<td_api::updateBusinessConnection> &&update) {
   CHECK(update != nullptr);
   const auto *connection = add_business_connection(std::move(update->connection_), true);
-  auto left_time = connection->date_ + 86400 - get_unix_time();
-  if (left_time > 0) {
-    auto webhook_queue_id = connection->user_id_ + (static_cast<int64>(10) << 33);
-    add_update(UpdateType::BusinessConnection, JsonBusinessConnection(connection, this), left_time, webhook_queue_id);
-  } else {
-    LOG(DEBUG) << "Skip updateBusinessConnection with date " << connection->date_ << ", because current date is "
-               << get_unix_time();
-  }
+  auto webhook_queue_id = connection->user_id_ + (static_cast<int64>(10) << 33);
+  add_update(UpdateType::BusinessConnection, JsonBusinessConnection(connection, this), 86400, webhook_queue_id);
 }
 
 void Client::add_update_business_messages_deleted(object_ptr<td_api::updateBusinessMessagesDeleted> &&update) {

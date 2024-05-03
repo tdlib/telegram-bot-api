@@ -590,8 +590,7 @@ void WebhookActor::send_updates() {
 
 void WebhookActor::handle(td::unique_ptr<td::HttpQuery> response) {
   SCOPE_EXIT {
-    bool dummy = false;
-    td::Scheduler::instance()->destroy_on_scheduler(SharedData::get_file_gc_scheduler_id(), response, dummy);
+    td::Scheduler::instance()->destroy_on_scheduler_unique_ptr(SharedData::get_file_gc_scheduler_id(), response);
   };
 
   auto connection_id = get_link_token();
