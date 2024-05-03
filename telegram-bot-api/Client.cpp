@@ -1631,17 +1631,21 @@ class Client::JsonInvoice final : public td::Jsonable {
 
 class Client::JsonPollOption final : public td::Jsonable {
  public:
-  explicit JsonPollOption(const td_api::pollOption *option) : option_(option) {
+  JsonPollOption(const td_api::pollOption *option, const Client *client) : option_(option), client_(client) {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("text", option_->text_->text_);
+    if (!option_->text_->entities_.empty()) {
+      object("text_entities", JsonVectorEntities(option_->text_->entities_, client_));
+    }
     object("voter_count", option_->voter_count_);
     // ignore is_chosen
   }
 
  private:
   const td_api::pollOption *option_;
+  const Client *client_;
 };
 
 class Client::JsonPoll final : public td::Jsonable {
@@ -1652,7 +1656,12 @@ class Client::JsonPoll final : public td::Jsonable {
     auto object = scope->enter_object();
     object("id", td::to_string(poll_->id_));
     object("question", poll_->question_->text_);
-    object("options", td::json_array(poll_->options_, [](auto &option) { return JsonPollOption(option.get()); }));
+    if (!poll_->question_->entities_.empty()) {
+      object("question_entities", JsonVectorEntities(poll_->question_->entities_, client_));
+    }
+    object("options", td::json_array(poll_->options_, [client = client_](auto &option) {
+             return JsonPollOption(option.get(), client);
+           }));
     object("total_voter_count", poll_->total_voter_count_);
     if (poll_->open_period_ != 0 && poll_->close_date_ != 0) {
       object("open_period", poll_->open_period_);
