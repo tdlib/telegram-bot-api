@@ -7685,7 +7685,7 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
     if (!td::check_utf8(payload)) {
       return td::Status::Error(400, "InputInvoiceMessageContent payload must be encoded in UTF-8");
     }
-    TRY_RESULT(provider_token, object.get_required_string_field("provider_token"));
+    TRY_RESULT(provider_token, object.get_optional_string_field("provider_token"));
     TRY_RESULT(currency, object.get_required_string_field("currency"));
     TRY_RESULT(prices_object, object.extract_required_field("prices", td::JsonValue::Type::Array));
     TRY_RESULT(prices, get_labeled_price_parts(prices_object));
@@ -9204,7 +9204,7 @@ td::Result<td_api::object_ptr<td_api::inputMessageInvoice>> Client::get_input_me
   if (!td::check_utf8(payload.str())) {
     return td::Status::Error(400, "The payload must be encoded in UTF-8");
   }
-  TRY_RESULT(provider_token, get_required_string_arg(query, "provider_token"));
+  auto provider_token = query->arg("provider_token");
   auto provider_data = query->arg("provider_data");
   auto start_parameter = query->arg("start_parameter");
   TRY_RESULT(currency, get_required_string_arg(query, "currency"));
