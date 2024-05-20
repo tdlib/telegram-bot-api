@@ -901,13 +901,18 @@ class Client::JsonMessage final : public td::Jsonable {
   const td::string &source_;
   const Client *client_;
 
-  void add_caption(td::JsonObjectScope &object, const object_ptr<td_api::formattedText> &caption) const {
+  void add_caption(td::JsonObjectScope &object, const object_ptr<td_api::formattedText> &caption,
+                   bool show_caption_above_media) const {
     CHECK(caption != nullptr);
     if (!caption->text_.empty()) {
       object("caption", caption->text_);
 
       if (!caption->entities_.empty()) {
         object("caption_entities", JsonVectorEntities(caption->entities_, client_));
+      }
+
+      if (show_caption_above_media) {
+        object("show_caption_above_media", td::JsonTrue());
       }
     }
   }
@@ -2814,27 +2819,27 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       auto content = static_cast<const td_api::messageAnimation *>(message_->content.get());
       object("animation", JsonAnimation(content->animation_.get(), false, client_));
       object("document", JsonAnimation(content->animation_.get(), true, client_));
-      add_caption(object, content->caption_);
+      add_caption(object, content->caption_, content->show_caption_above_media_);
       add_media_spoiler(object, content->has_spoiler_);
       break;
     }
     case td_api::messageAudio::ID: {
       auto content = static_cast<const td_api::messageAudio *>(message_->content.get());
       object("audio", JsonAudio(content->audio_.get(), client_));
-      add_caption(object, content->caption_);
+      add_caption(object, content->caption_, false);
       break;
     }
     case td_api::messageDocument::ID: {
       auto content = static_cast<const td_api::messageDocument *>(message_->content.get());
       object("document", JsonDocument(content->document_.get(), client_));
-      add_caption(object, content->caption_);
+      add_caption(object, content->caption_, false);
       break;
     }
     case td_api::messagePhoto::ID: {
       auto content = static_cast<const td_api::messagePhoto *>(message_->content.get());
       CHECK(content->photo_ != nullptr);
       object("photo", JsonPhoto(content->photo_.get(), client_));
-      add_caption(object, content->caption_);
+      add_caption(object, content->caption_, content->show_caption_above_media_);
       add_media_spoiler(object, content->has_spoiler_);
       break;
     }
@@ -2846,7 +2851,7 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     case td_api::messageVideo::ID: {
       auto content = static_cast<const td_api::messageVideo *>(message_->content.get());
       object("video", JsonVideo(content->video_.get(), client_));
-      add_caption(object, content->caption_);
+      add_caption(object, content->caption_, content->show_caption_above_media_);
       add_media_spoiler(object, content->has_spoiler_);
       break;
     }
@@ -2858,7 +2863,7 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     case td_api::messageVoiceNote::ID: {
       auto content = static_cast<const td_api::messageVoiceNote *>(message_->content.get());
       object("voice", JsonVoiceNote(content->voice_note_.get(), client_));
-      add_caption(object, content->caption_);
+      add_caption(object, content->caption_, false);
       break;
     }
     case td_api::messageContact::ID: {
