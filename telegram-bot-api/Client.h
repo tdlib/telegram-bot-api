@@ -921,6 +921,7 @@ class Client final : public WebhookActor::Callback {
     object_ptr<td_api::ReplyMarkup> reply_markup;
     td::string business_connection_id;
     int64 sender_business_bot_user_id = 0;
+    int64 effect_id = 0;
 
     bool can_be_saved = false;
     bool is_automatic_forward = false;
