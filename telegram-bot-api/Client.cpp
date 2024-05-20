@@ -10352,28 +10352,30 @@ td::Status Client::process_edit_message_caption_query(PromisedQueryPtr &query) {
   auto message_id = get_message_id(query.get());
   TRY_RESULT(reply_markup, get_reply_markup(query.get(), bot_user_ids_));
   TRY_RESULT(caption, get_caption(query.get()));
+  auto show_caption_above_media = to_bool(query->arg("show_caption_above_media"));
 
   if (chat_id.empty() && message_id == 0) {
     TRY_RESULT(inline_message_id, get_inline_message_id(query.get()));
     resolve_reply_markup_bot_usernames(
         std::move(reply_markup), std::move(query),
-        [this, inline_message_id = inline_message_id.str(), caption = std::move(caption)](
+        [this, inline_message_id = inline_message_id.str(), caption = std::move(caption), show_caption_above_media](
             object_ptr<td_api::ReplyMarkup> reply_markup, PromisedQueryPtr query) mutable {
           send_request(make_object<td_api::editInlineMessageCaption>(inline_message_id, std::move(reply_markup),
-                                                                     std::move(caption), false),
+                                                                     std::move(caption), show_caption_above_media),
                        td::make_unique<TdOnEditInlineMessageCallback>(std::move(query)));
         });
   } else {
     resolve_reply_markup_bot_usernames(
         std::move(reply_markup), std::move(query),
-        [this, chat_id = chat_id.str(), message_id, caption = std::move(caption)](
+        [this, chat_id = chat_id.str(), message_id, caption = std::move(caption), show_caption_above_media](
             object_ptr<td_api::ReplyMarkup> reply_markup, PromisedQueryPtr query) mutable {
           check_message(chat_id, message_id, false, AccessRights::Edit, "message to edit", std::move(query),
-                        [this, reply_markup = std::move(reply_markup), caption = std::move(caption)](
-                            int64 chat_id, int64 message_id, PromisedQueryPtr query) mutable {
-                          send_request(make_object<td_api::editMessageCaption>(
-                                           chat_id, message_id, std::move(reply_markup), std::move(caption), false),
-                                       td::make_unique<TdOnEditMessageCallback>(this, std::move(query)));
+                        [this, reply_markup = std::move(reply_markup), caption = std::move(caption),
+                         show_caption_above_media](int64 chat_id, int64 message_id, PromisedQueryPtr query) mutable {
+                          send_request(
+                              make_object<td_api::editMessageCaption>(chat_id, message_id, std::move(reply_markup),
+                                                                      std::move(caption), show_caption_above_media),
+                              td::make_unique<TdOnEditMessageCallback>(this, std::move(query)));
                         });
         });
   }
