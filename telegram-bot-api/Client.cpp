@@ -7725,9 +7725,9 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
 }
 
 td_api::object_ptr<td_api::messageSendOptions> Client::get_message_send_options(bool disable_notification,
-                                                                                bool protect_content) {
-  return make_object<td_api::messageSendOptions>(disable_notification, false, protect_content, false, nullptr, 0, 0,
-                                                 false);
+                                                                                bool protect_content, int64 effect_id) {
+  return make_object<td_api::messageSendOptions>(disable_notification, false, protect_content, false, nullptr,
+                                                 effect_id, 0, false);
 }
 
 td::Result<td_api::object_ptr<td_api::inlineQueryResultsButton>> Client::get_inline_query_results_button(
@@ -10059,7 +10059,7 @@ td::Status Client::process_copy_messages_query(PromisedQueryPtr &query) {
 
           send_request(make_object<td_api::forwardMessages>(
                            chat_id, message_thread_id, from_chat_id, std::move(message_ids),
-                           get_message_send_options(disable_notification, protect_content), true, remove_caption),
+                           get_message_send_options(disable_notification, protect_content, 0), true, remove_caption),
                        td::make_unique<TdOnForwardMessagesCallback>(this, chat_id, message_count, std::move(query)));
         });
   };
@@ -10113,7 +10113,7 @@ td::Status Client::process_forward_messages_query(PromisedQueryPtr &query) {
 
           send_request(make_object<td_api::forwardMessages>(
                            chat_id, message_thread_id, from_chat_id, std::move(message_ids),
-                           get_message_send_options(disable_notification, protect_content), false, false),
+                           get_message_send_options(disable_notification, protect_content, 0), false, false),
                        td::make_unique<TdOnForwardMessagesCallback>(this, chat_id, message_count, std::move(query)));
         });
   };
@@ -10129,6 +10129,7 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
   auto business_connection_id = query->arg("business_connection_id");
   auto disable_notification = to_bool(query->arg("disable_notification"));
   auto protect_content = to_bool(query->arg("protect_content"));
+  auto effect_id = td::to_integer<int64>(query->arg("message_effect_id"));
   // TRY_RESULT(reply_markup, get_reply_markup(query.get(), bot_user_ids_));
   auto reply_markup = nullptr;
   TRY_RESULT(input_message_contents, get_input_message_contents(query.get(), "media"));
@@ -10136,7 +10137,7 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
   resolve_reply_markup_bot_usernames(
       std::move(reply_markup), std::move(query),
       [this, chat_id_str = chat_id.str(), message_thread_id, business_connection_id = business_connection_id.str(),
-       reply_parameters = std::move(reply_parameters), disable_notification, protect_content,
+       reply_parameters = std::move(reply_parameters), disable_notification, protect_content, effect_id,
        input_message_contents = std::move(input_message_contents)](object_ptr<td_api::ReplyMarkup> reply_markup,
                                                                    PromisedQueryPtr query) mutable {
         if (!business_connection_id.empty()) {
@@ -10148,18 +10149,19 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
           return check_business_connection(
               business_connection_id, std::move(query),
               [this, chat_id, reply_parameters = std::move(reply_parameters), disable_notification, protect_content,
-               input_message_contents = std::move(input_message_contents), reply_markup = std::move(reply_markup)](
-                  const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
+               effect_id, input_message_contents = std::move(input_message_contents),
+               reply_markup = std::move(reply_markup)](const BusinessConnection *business_connection,
+                                                       PromisedQueryPtr query) mutable {
                 send_request(
                     make_object<td_api::sendBusinessMessageAlbum>(
                         business_connection->id_, chat_id, get_input_message_reply_to(std::move(reply_parameters)),
-                        disable_notification, protect_content, 0, std::move(input_message_contents)),
+                        disable_notification, protect_content, effect_id, std::move(input_message_contents)),
                     td::make_unique<TdOnSendBusinessMessageAlbumCallback>(this, business_connection->id_,
                                                                           std::move(query)));
               });
         }
 
-        auto on_success = [this, disable_notification, protect_content,
+        auto on_success = [this, disable_notification, protect_content, effect_id,
                            input_message_contents = std::move(input_message_contents),
                            reply_markup = std::move(reply_markup)](int64 chat_id, int64 message_thread_id,
                                                                    CheckedReplyParameters reply_parameters,
@@ -10171,11 +10173,11 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
           auto message_count = input_message_contents.size();
           count += static_cast<int32>(message_count);
 
-          send_request(
-              make_object<td_api::sendMessageAlbum>(
-                  chat_id, message_thread_id, get_input_message_reply_to(std::move(reply_parameters)),
-                  get_message_send_options(disable_notification, protect_content), std::move(input_message_contents)),
-              td::make_unique<TdOnSendMessageAlbumCallback>(this, chat_id, message_count, std::move(query)));
+          send_request(make_object<td_api::sendMessageAlbum>(
+                           chat_id, message_thread_id, get_input_message_reply_to(std::move(reply_parameters)),
+                           get_message_send_options(disable_notification, protect_content, effect_id),
+                           std::move(input_message_contents)),
+                       td::make_unique<TdOnSendMessageAlbumCallback>(this, chat_id, message_count, std::move(query)));
         };
         check_reply_parameters(chat_id_str, std::move(reply_parameters), message_thread_id, std::move(query),
                                std::move(on_success));
@@ -11973,6 +11975,7 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
   auto reply_parameters = r_reply_parameters.move_as_ok();
   auto disable_notification = to_bool(query->arg("disable_notification"));
   auto protect_content = to_bool(query->arg("protect_content"));
+  auto effect_id = td::to_integer<int64>(query->arg("message_effect_id"));
   auto r_reply_markup = get_reply_markup(query.get(), bot_user_ids_);
   if (r_reply_markup.is_error()) {
     return fail_query_with_error(std::move(query), 400, r_reply_markup.error().message());
@@ -11982,7 +11985,7 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
   resolve_reply_markup_bot_usernames(
       std::move(reply_markup), std::move(query),
       [this, chat_id_str = chat_id.str(), message_thread_id, business_connection_id = business_connection_id.str(),
-       reply_parameters = std::move(reply_parameters), disable_notification, protect_content,
+       reply_parameters = std::move(reply_parameters), disable_notification, protect_content, effect_id,
        input_message_content = std::move(input_message_content)](object_ptr<td_api::ReplyMarkup> reply_markup,
                                                                  PromisedQueryPtr query) mutable {
         if (!business_connection_id.empty()) {
@@ -11994,18 +11997,19 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
           return check_business_connection(
               business_connection_id, std::move(query),
               [this, chat_id, reply_parameters = std::move(reply_parameters), disable_notification, protect_content,
-               reply_markup = std::move(reply_markup), input_message_content = std::move(input_message_content)](
-                  const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
+               effect_id, reply_markup = std::move(reply_markup),
+               input_message_content = std::move(input_message_content)](const BusinessConnection *business_connection,
+                                                                         PromisedQueryPtr query) mutable {
                 send_request(
                     make_object<td_api::sendBusinessMessage>(business_connection->id_, chat_id,
                                                              get_input_message_reply_to(std::move(reply_parameters)),
-                                                             disable_notification, protect_content, 0,
+                                                             disable_notification, protect_content, effect_id,
                                                              std::move(reply_markup), std::move(input_message_content)),
                     td::make_unique<TdOnSendBusinessMessageCallback>(this, business_connection->id_, std::move(query)));
               });
         }
 
-        auto on_success = [this, disable_notification, protect_content,
+        auto on_success = [this, disable_notification, protect_content, effect_id,
                            input_message_content = std::move(input_message_content),
                            reply_markup = std::move(reply_markup)](int64 chat_id, int64 message_thread_id,
                                                                    CheckedReplyParameters reply_parameters,
@@ -12016,10 +12020,10 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
           }
           count++;
 
-          send_request(make_object<td_api::sendMessage>(chat_id, message_thread_id,
-                                                        get_input_message_reply_to(std::move(reply_parameters)),
-                                                        get_message_send_options(disable_notification, protect_content),
-                                                        std::move(reply_markup), std::move(input_message_content)),
+          send_request(make_object<td_api::sendMessage>(
+                           chat_id, message_thread_id, get_input_message_reply_to(std::move(reply_parameters)),
+                           get_message_send_options(disable_notification, protect_content, effect_id),
+                           std::move(reply_markup), std::move(input_message_content)),
                        td::make_unique<TdOnSendMessageCallback>(this, chat_id, std::move(query)));
         };
         check_reply_parameters(chat_id_str, std::move(reply_parameters), message_thread_id, std::move(query),
