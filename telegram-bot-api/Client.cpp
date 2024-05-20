@@ -542,7 +542,8 @@ class Client::JsonVectorEntities final : public td::Jsonable {
     auto array = scope->enter_array();
     for (auto &entity : entities_) {
       auto entity_type = entity->type_->get_id();
-      if (entity_type != td_api::textEntityTypeBankCardNumber::ID &&
+      if (entity_type != td_api::textEntityTypeExpandableBlockQuote::ID &&
+          entity_type != td_api::textEntityTypeBankCardNumber::ID &&
           entity_type != td_api::textEntityTypeMediaTimestamp::ID) {
         array << JsonEntity(entity.get(), client_);
       }
@@ -1614,12 +1615,12 @@ class Client::JsonInvoice final : public td::Jsonable {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
-    object("title", invoice_->title_);
-    object("description", invoice_->description_->text_);
+    object("title", invoice_->product_info_->title_);
+    object("description", invoice_->product_info_->description_->text_);
     object("start_parameter", invoice_->start_parameter_);
     object("currency", invoice_->currency_);
     object("total_amount", invoice_->total_amount_);
-    // skip photo
+    // skip product_info_->photo
     // skip is_test
     // skip need_shipping_address
     // skip receipt_message_id
@@ -7717,7 +7718,7 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
 
 td_api::object_ptr<td_api::messageSendOptions> Client::get_message_send_options(bool disable_notification,
                                                                                 bool protect_content) {
-  return make_object<td_api::messageSendOptions>(disable_notification, false, protect_content, false, nullptr, 0,
+  return make_object<td_api::messageSendOptions>(disable_notification, false, protect_content, false, nullptr, 0, 0,
                                                  false);
 }
 
@@ -7971,7 +7972,7 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
 
     if (input_message_content == nullptr) {
       input_message_content = make_object<td_api::inputMessageAnimation>(
-          nullptr, nullptr, td::vector<int32>(), gif_duration, gif_width, gif_height, std::move(caption), false);
+          nullptr, nullptr, td::vector<int32>(), gif_duration, gif_width, gif_height, std::move(caption), false, false);
     }
     return make_object<td_api::inputInlineQueryResultAnimation>(
         id, title, thumbnail_url, thumbnail_mime_type, gif_url, "image/gif", gif_duration, gif_width, gif_height,
@@ -8011,8 +8012,9 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
     }
 
     if (input_message_content == nullptr) {
-      input_message_content = make_object<td_api::inputMessageAnimation>(
-          nullptr, nullptr, td::vector<int32>(), mpeg4_duration, mpeg4_width, mpeg4_height, std::move(caption), false);
+      input_message_content =
+          make_object<td_api::inputMessageAnimation>(nullptr, nullptr, td::vector<int32>(), mpeg4_duration, mpeg4_width,
+                                                     mpeg4_height, std::move(caption), false, false);
     }
     return make_object<td_api::inputInlineQueryResultAnimation>(
         id, title, thumbnail_url, thumbnail_mime_type, mpeg4_url, "video/mp4", mpeg4_duration, mpeg4_width,
@@ -8030,7 +8032,7 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
 
     if (input_message_content == nullptr) {
       input_message_content = make_object<td_api::inputMessagePhoto>(nullptr, nullptr, td::vector<int32>(), 0, 0,
-                                                                     std::move(caption), nullptr, false);
+                                                                     std::move(caption), false, nullptr, false);
     }
     return make_object<td_api::inputInlineQueryResultPhoto>(id, title, description, thumbnail_url, photo_url,
                                                             photo_width, photo_height, std::move(reply_markup),
@@ -8097,7 +8099,7 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
     if (input_message_content == nullptr) {
       input_message_content =
           make_object<td_api::inputMessageVideo>(nullptr, nullptr, td::vector<int32>(), video_duration, video_width,
-                                                 video_height, false, std::move(caption), nullptr, false);
+                                                 video_height, false, std::move(caption), false, nullptr, false);
     }
     return make_object<td_api::inputInlineQueryResultVideo>(id, title, description, thumbnail_url, video_url, mime_type,
                                                             video_width, video_height, video_duration,
@@ -9087,7 +9089,7 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
   TRY_RESULT(type, object.get_required_string_field("type"));
   if (type == "photo") {
     return make_object<td_api::inputMessagePhoto>(std::move(input_file), nullptr, td::vector<int32>(), 0, 0,
-                                                  std::move(caption), nullptr, has_spoiler);
+                                                  std::move(caption), false, nullptr, has_spoiler);
   }
   if (type == "video") {
     TRY_RESULT(width, object.get_optional_int_field("width"));
@@ -9100,7 +9102,7 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
 
     return make_object<td_api::inputMessageVideo>(std::move(input_file), std::move(input_thumbnail),
                                                   td::vector<int32>(), duration, width, height, supports_streaming,
-                                                  std::move(caption), nullptr, has_spoiler);
+                                                  std::move(caption), false, nullptr, has_spoiler);
   }
   if (for_album && type == "animation") {
     return td::Status::Error(PSLICE() << "type \"" << type << "\" can't be used in sendMediaGroup");
@@ -9114,7 +9116,7 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
     duration = td::clamp(duration, 0, MAX_DURATION);
     return make_object<td_api::inputMessageAnimation>(std::move(input_file), std::move(input_thumbnail),
                                                       td::vector<int32>(), duration, width, height, std::move(caption),
-                                                      has_spoiler);
+                                                      false, has_spoiler);
   }
   if (type == "audio") {
     TRY_RESULT(duration, object.get_optional_int_field("duration"));
@@ -9767,7 +9769,7 @@ td::Status Client::process_send_animation_query(PromisedQueryPtr &query) {
   auto has_spoiler = to_bool(query->arg("has_spoiler"));
   do_send_message(
       make_object<td_api::inputMessageAnimation>(std::move(animation), std::move(thumbnail), td::vector<int32>(),
-                                                 duration, width, height, std::move(caption), has_spoiler),
+                                                 duration, width, height, std::move(caption), false, has_spoiler),
       std::move(query));
   return td::Status::OK();
 }
@@ -9816,7 +9818,7 @@ td::Status Client::process_send_photo_query(PromisedQueryPtr &query) {
   TRY_RESULT(caption, get_caption(query.get()));
   auto has_spoiler = to_bool(query->arg("has_spoiler"));
   do_send_message(make_object<td_api::inputMessagePhoto>(std::move(photo), nullptr, td::vector<int32>(), 0, 0,
-                                                         std::move(caption), nullptr, has_spoiler),
+                                                         std::move(caption), false, nullptr, has_spoiler),
                   std::move(query));
   return td::Status::OK();
 }
@@ -9846,7 +9848,7 @@ td::Status Client::process_send_video_query(PromisedQueryPtr &query) {
   auto has_spoiler = to_bool(query->arg("has_spoiler"));
   do_send_message(make_object<td_api::inputMessageVideo>(std::move(video), std::move(thumbnail), td::vector<int32>(),
                                                          duration, width, height, supports_streaming,
-                                                         std::move(caption), nullptr, has_spoiler),
+                                                         std::move(caption), false, nullptr, has_spoiler),
                   std::move(query));
   return td::Status::OK();
 }
@@ -10003,7 +10005,7 @@ td::Status Client::process_copy_message_query(PromisedQueryPtr &query) {
   if (replace_caption) {
     TRY_RESULT_ASSIGN(caption, get_caption(query.get()));
   }
-  auto options = make_object<td_api::messageCopyOptions>(true, replace_caption, std::move(caption));
+  auto options = make_object<td_api::messageCopyOptions>(true, replace_caption, std::move(caption), false);
 
   check_message(
       from_chat_id, message_id, false, AccessRights::Read, "message to copy", std::move(query),
@@ -10143,7 +10145,7 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
                 send_request(
                     make_object<td_api::sendBusinessMessageAlbum>(
                         business_connection->id_, chat_id, get_input_message_reply_to(std::move(reply_parameters)),
-                        disable_notification, protect_content, std::move(input_message_contents)),
+                        disable_notification, protect_content, 0, std::move(input_message_contents)),
                     td::make_unique<TdOnSendBusinessMessageAlbumCallback>(this, business_connection->id_,
                                                                           std::move(query)));
               });
@@ -10341,7 +10343,7 @@ td::Status Client::process_edit_message_caption_query(PromisedQueryPtr &query) {
         [this, inline_message_id = inline_message_id.str(), caption = std::move(caption)](
             object_ptr<td_api::ReplyMarkup> reply_markup, PromisedQueryPtr query) mutable {
           send_request(make_object<td_api::editInlineMessageCaption>(inline_message_id, std::move(reply_markup),
-                                                                     std::move(caption)),
+                                                                     std::move(caption), false),
                        td::make_unique<TdOnEditInlineMessageCallback>(std::move(query)));
         });
   } else {
@@ -10353,7 +10355,7 @@ td::Status Client::process_edit_message_caption_query(PromisedQueryPtr &query) {
                         [this, reply_markup = std::move(reply_markup), caption = std::move(caption)](
                             int64 chat_id, int64 message_id, PromisedQueryPtr query) mutable {
                           send_request(make_object<td_api::editMessageCaption>(
-                                           chat_id, message_id, std::move(reply_markup), std::move(caption)),
+                                           chat_id, message_id, std::move(reply_markup), std::move(caption), false),
                                        td::make_unique<TdOnEditMessageCallback>(this, std::move(query)));
                         });
         });
@@ -11989,7 +11991,7 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
                 send_request(
                     make_object<td_api::sendBusinessMessage>(business_connection->id_, chat_id,
                                                              get_input_message_reply_to(std::move(reply_parameters)),
-                                                             disable_notification, protect_content,
+                                                             disable_notification, protect_content, 0,
                                                              std::move(reply_markup), std::move(input_message_content)),
                     td::make_unique<TdOnSendBusinessMessageCallback>(this, business_connection->id_, std::move(query)));
               });
