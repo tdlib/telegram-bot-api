@@ -10020,7 +10020,9 @@ td::Status Client::process_copy_message_query(PromisedQueryPtr &query) {
   if (replace_caption) {
     TRY_RESULT_ASSIGN(caption, get_caption(query.get()));
   }
-  auto options = make_object<td_api::messageCopyOptions>(true, replace_caption, std::move(caption), false);
+  auto show_caption_above_media = to_bool(query->arg("show_caption_above_media"));
+  auto options =
+      make_object<td_api::messageCopyOptions>(true, replace_caption, std::move(caption), show_caption_above_media);
 
   check_message(
       from_chat_id, message_id, false, AccessRights::Read, "message to copy", std::move(query),
