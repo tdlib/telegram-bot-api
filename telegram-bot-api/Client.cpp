@@ -523,6 +523,9 @@ class Client::JsonEntity final : public td::Jsonable {
       case td_api::textEntityTypeBlockQuote::ID:
         object("type", "blockquote");
         break;
+      case td_api::textEntityTypeExpandableBlockQuote::ID:
+        object("type", "expandable_blockquote");
+        break;
       default:
         UNREACHABLE();
     }
@@ -542,8 +545,7 @@ class Client::JsonVectorEntities final : public td::Jsonable {
     auto array = scope->enter_array();
     for (auto &entity : entities_) {
       auto entity_type = entity->type_->get_id();
-      if (entity_type != td_api::textEntityTypeExpandableBlockQuote::ID &&
-          entity_type != td_api::textEntityTypeBankCardNumber::ID &&
+      if (entity_type != td_api::textEntityTypeBankCardNumber::ID &&
           entity_type != td_api::textEntityTypeMediaTimestamp::ID) {
         array << JsonEntity(entity.get(), client_);
       }
@@ -8791,6 +8793,9 @@ td::Result<td_api::object_ptr<td_api::TextEntityType>> Client::get_text_entity_t
   }
   if (type == "blockquote") {
     return make_object<td_api::textEntityTypeBlockQuote>();
+  }
+  if (type == "expandable_blockquote") {
+    return make_object<td_api::textEntityTypeExpandableBlockQuote>();
   }
   if (type == "mention" || type == "hashtag" || type == "cashtag" || type == "bot_command" || type == "url" ||
       type == "email" || type == "phone_number" || type == "bank_card_number") {
