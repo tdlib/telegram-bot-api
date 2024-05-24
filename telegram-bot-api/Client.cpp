@@ -246,6 +246,7 @@ bool Client::init_methods() {
   methods_.emplace("deletemessage", &Client::process_delete_message_query);
   methods_.emplace("deletemessages", &Client::process_delete_messages_query);
   methods_.emplace("createinvoicelink", &Client::process_create_invoice_link_query);
+  methods_.emplace("refundstarpayment", &Client::process_refund_star_payment_query);
   methods_.emplace("setgamescore", &Client::process_set_game_score_query);
   methods_.emplace("getgamehighscores", &Client::process_get_game_high_scores_query);
   methods_.emplace("answerwebappquery", &Client::process_answer_web_app_query_query);
@@ -10458,6 +10459,18 @@ td::Status Client::process_create_invoice_link_query(PromisedQueryPtr &query) {
   TRY_RESULT(input_message_invoice, get_input_message_invoice(query.get()));
   send_request(make_object<td_api::createInvoiceLink>(std::move(input_message_invoice)),
                td::make_unique<TdOnCreateInvoiceLinkCallback>(std::move(query)));
+  return td::Status::OK();
+}
+
+td::Status Client::process_refund_star_payment_query(PromisedQueryPtr &query) {
+  TRY_RESULT(user_id, get_user_id(query.get()));
+  TRY_RESULT(telegram_payment_charge_id, get_required_string_arg(query.get(), "telegram_payment_charge_id"));
+  check_user_no_fail(
+      user_id, std::move(query),
+      [this, telegram_payment_charge_id = telegram_payment_charge_id.str(), user_id](PromisedQueryPtr query) {
+        send_request(make_object<td_api::refundStarPayment>(user_id, telegram_payment_charge_id),
+                     td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+      });
   return td::Status::OK();
 }
 
