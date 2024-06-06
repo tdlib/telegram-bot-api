@@ -12963,7 +12963,7 @@ void Client::add_update_chat_member(object_ptr<td_api::updateChatMember> &&updat
     }
     auto user_id = static_cast<const td_api::messageSenderUser *>(update->old_chat_member_->member_id_.get())->user_id_;
     bool is_my = (user_id == my_id_);
-    auto webhook_queue_id = update->chat_id_ + (static_cast<int64>(is_my ? 5 : 6) << 33);
+    auto webhook_queue_id = (is_my ? update->chat_id_ : user_id) + (static_cast<int64>(is_my ? 5 : 6) << 33);
     auto update_type = is_my ? UpdateType::MyChatMember : UpdateType::ChatMember;
     add_update(update_type, JsonChatMemberUpdated(update.get(), this), left_time, webhook_queue_id);
   } else {
@@ -12977,7 +12977,7 @@ void Client::add_update_chat_join_request(object_ptr<td_api::updateNewChatJoinRe
   CHECK(update->request_ != nullptr);
   auto left_time = update->request_->date_ + 86400 - get_unix_time();
   if (left_time > 0) {
-    auto webhook_queue_id = update->chat_id_ + (static_cast<int64>(6) << 33);
+    auto webhook_queue_id = update->request_->user_id_ + (static_cast<int64>(6) << 33);
     add_update(UpdateType::ChatJoinRequest, JsonChatJoinRequest(update.get(), this), left_time, webhook_queue_id);
   } else {
     LOG(DEBUG) << "Skip updateNewChatJoinRequest with date " << update->request_->date_ << ", because current date is "
