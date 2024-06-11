@@ -4129,9 +4129,9 @@ class Client::TdOnSendMessageCallback final : public TdQueryCallback {
   PromisedQueryPtr query_;
 };
 
-class Client::TdOnSendBusinessMessageCallback final : public TdQueryCallback {
+class Client::TdOnReturnBusinessMessageCallback final : public TdQueryCallback {
  public:
-  TdOnSendBusinessMessageCallback(Client *client, td::string business_connection_id, PromisedQueryPtr query)
+  TdOnReturnBusinessMessageCallback(Client *client, td::string business_connection_id, PromisedQueryPtr query)
       : client_(client), business_connection_id_(std::move(business_connection_id)), query_(std::move(query)) {
   }
 
@@ -4143,7 +4143,7 @@ class Client::TdOnSendBusinessMessageCallback final : public TdQueryCallback {
     CHECK(result->get_id() == td_api::businessMessage::ID);
     auto message = client_->create_business_message(std::move(business_connection_id_),
                                                     move_object_as<td_api::businessMessage>(result));
-    answer_query(JsonMessage(message.get(), true, "sent business message", client_), std::move(query_));
+    answer_query(JsonMessage(message.get(), true, "business message", client_), std::move(query_));
   }
 
  private:
@@ -10269,6 +10269,7 @@ td::Status Client::process_set_message_reaction_query(PromisedQueryPtr &query) {
 
 td::Status Client::process_edit_message_text_query(PromisedQueryPtr &query) {
   TRY_RESULT(input_message_text, get_input_message_text(query.get()));
+  auto business_connection_id = query->arg("business_connection_id");
   auto chat_id = query->arg("chat_id");
   auto message_id = get_message_id(query.get());
   TRY_RESULT(reply_markup, get_reply_markup(query.get(), bot_user_ids_));
@@ -10286,10 +10287,30 @@ td::Status Client::process_edit_message_text_query(PromisedQueryPtr &query) {
   } else {
     resolve_reply_markup_bot_usernames(
         std::move(reply_markup), std::move(query),
-        [this, chat_id = chat_id.str(), message_id, input_message_text = std::move(input_message_text)](
-            object_ptr<td_api::ReplyMarkup> reply_markup, PromisedQueryPtr query) mutable {
+        [this, business_connection_id = business_connection_id.str(), chat_id_str = chat_id.str(), message_id,
+         input_message_text = std::move(input_message_text)](object_ptr<td_api::ReplyMarkup> reply_markup,
+                                                             PromisedQueryPtr query) mutable {
+          if (!business_connection_id.empty()) {
+            auto r_chat_id = get_business_connection_chat_id(chat_id_str);
+            if (r_chat_id.is_error()) {
+              return fail_query_with_error(std::move(query), 400, r_chat_id.error().message());
+            }
+            auto chat_id = r_chat_id.move_as_ok();
+            return check_business_connection(
+                business_connection_id, std::move(query),
+                [this, business_connection_id, chat_id, message_id, input_message_text = std::move(input_message_text),
+                 reply_markup = std::move(reply_markup)](const BusinessConnection *business_connection,
+                                                         PromisedQueryPtr query) mutable {
+                  send_request(make_object<td_api::editBusinessMessageText>(business_connection_id, chat_id, message_id,
+                                                                            std::move(reply_markup),
+                                                                            std::move(input_message_text)),
+                               td::make_unique<TdOnReturnBusinessMessageCallback>(this, business_connection_id,
+                                                                                  std::move(query)));
+                });
+          }
+
           check_message(
-              chat_id, message_id, false, AccessRights::Edit, "message to edit", std::move(query),
+              chat_id_str, message_id, false, AccessRights::Edit, "message to edit", std::move(query),
               [this, input_message_text = std::move(input_message_text), reply_markup = std::move(reply_markup)](
                   int64 chat_id, int64 message_id, PromisedQueryPtr query) mutable {
                 send_request(make_object<td_api::editMessageText>(chat_id, message_id, std::move(reply_markup),
@@ -12051,12 +12072,12 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
                effect_id, reply_markup = std::move(reply_markup),
                input_message_content = std::move(input_message_content)](const BusinessConnection *business_connection,
                                                                          PromisedQueryPtr query) mutable {
-                send_request(
-                    make_object<td_api::sendBusinessMessage>(business_connection->id_, chat_id,
-                                                             get_input_message_reply_to(std::move(reply_parameters)),
-                                                             disable_notification, protect_content, effect_id,
-                                                             std::move(reply_markup), std::move(input_message_content)),
-                    td::make_unique<TdOnSendBusinessMessageCallback>(this, business_connection->id_, std::move(query)));
+                send_request(make_object<td_api::sendBusinessMessage>(
+                                 business_connection->id_, chat_id,
+                                 get_input_message_reply_to(std::move(reply_parameters)), disable_notification,
+                                 protect_content, effect_id, std::move(reply_markup), std::move(input_message_content)),
+                             td::make_unique<TdOnReturnBusinessMessageCallback>(this, business_connection->id_,
+                                                                                std::move(query)));
               });
         }
 
