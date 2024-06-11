@@ -257,7 +257,7 @@ class Client final : public WebhookActor::Callback {
 
   void on_get_sticker_set(int64 set_id, int64 new_callback_query_user_id, int64 new_message_chat_id,
                           const td::string &new_message_business_connection_id,
-                          object_ptr<td_api::stickerSet> sticker_set);
+                          int64 new_business_callback_query_user_id, object_ptr<td_api::stickerSet> sticker_set);
 
   void on_get_sticker_set_name(int64 set_id, const td::string &name);
 
@@ -1063,6 +1063,10 @@ class Client final : public WebhookActor::Callback {
 
   void process_new_callback_query_queue(int64 user_id, int state);
 
+  void add_new_business_callback_query(object_ptr<td_api::updateNewBusinessCallbackQuery> &&query);
+
+  void process_new_business_callback_query_queue(int64 user_id);
+
   void add_new_inline_callback_query(object_ptr<td_api::updateNewInlineCallbackQuery> &&query);
 
   void add_new_shipping_query(object_ptr<td_api::updateNewShippingQuery> &&query);
@@ -1239,6 +1243,12 @@ class Client final : public WebhookActor::Callback {
     bool has_active_request_ = false;
   };
   td::FlatHashMap<int64, NewCallbackQueryQueue> new_callback_query_queues_;  // sender_user_id -> queue
+
+  struct NewBusinessCallbackQueryQueue {
+    std::queue<object_ptr<td_api::updateNewBusinessCallbackQuery>> queue_;
+    bool has_active_request_ = false;
+  };
+  td::FlatHashMap<int64, NewBusinessCallbackQueryQueue> new_business_callback_query_queues_;  // sender_user_id -> queue
 
   td::WaitFreeHashMap<int64, td::string> sticker_set_names_;
 
