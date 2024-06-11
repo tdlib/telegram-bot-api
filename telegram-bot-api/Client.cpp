@@ -7011,8 +7011,12 @@ bool Client::to_bool(td::MutableSlice value) {
 td_api::object_ptr<td_api::InputMessageReplyTo> Client::get_input_message_reply_to(
     CheckedReplyParameters &&reply_parameters) {
   if (reply_parameters.reply_to_message_id > 0) {
-    return make_object<td_api::inputMessageReplyToMessage>(
-        reply_parameters.reply_in_chat_id, reply_parameters.reply_to_message_id, std::move(reply_parameters.quote));
+    if (reply_parameters.reply_in_chat_id != 0) {
+      return make_object<td_api::inputMessageReplyToExternalMessage>(
+          reply_parameters.reply_in_chat_id, reply_parameters.reply_to_message_id, std::move(reply_parameters.quote));
+    }
+    return make_object<td_api::inputMessageReplyToMessage>(reply_parameters.reply_to_message_id,
+                                                           std::move(reply_parameters.quote));
   }
   return nullptr;
 }
@@ -7020,7 +7024,7 @@ td_api::object_ptr<td_api::InputMessageReplyTo> Client::get_input_message_reply_
 td_api::object_ptr<td_api::InputMessageReplyTo> Client::get_input_message_reply_to(
     InputReplyParameters &&reply_parameters) {
   if (reply_parameters.reply_in_chat_id.empty() && reply_parameters.reply_to_message_id > 0) {
-    return make_object<td_api::inputMessageReplyToMessage>(0, reply_parameters.reply_to_message_id,
+    return make_object<td_api::inputMessageReplyToMessage>(reply_parameters.reply_to_message_id,
                                                            std::move(reply_parameters.quote));
   }
   return nullptr;
