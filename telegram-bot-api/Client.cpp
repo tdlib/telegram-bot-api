@@ -4359,6 +4359,34 @@ class Client::TdOnStopPollCallback final : public TdQueryCallback {
   PromisedQueryPtr query_;
 };
 
+class Client::TdOnStopBusinessPollCallback final : public TdQueryCallback {
+ public:
+  TdOnStopBusinessPollCallback(Client *client, const td::string &business_connection_id, PromisedQueryPtr query)
+      : client_(client), business_connection_id_(business_connection_id), query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::businessMessage::ID);
+    auto message = client_->create_business_message(std::move(business_connection_id_),
+                                                    move_object_as<td_api::businessMessage>(result));
+    if (message->content->get_id() != td_api::messagePoll::ID) {
+      LOG(ERROR) << "Poll not found in a business message from connection " << business_connection_id_;
+      return fail_query_with_error(std::move(query_), 400, "message poll not found");
+    }
+    auto message_poll = static_cast<const td_api::messagePoll *>(message->content.get());
+    answer_query(JsonPoll(message_poll->poll_.get(), client_), std::move(query_));
+  }
+
+ private:
+  Client *client_;
+  td::string business_connection_id_;
+  PromisedQueryPtr query_;
+};
+
 class Client::TdOnOkQueryCallback final : public TdQueryCallback {
  public:
   explicit TdOnOkQueryCallback(PromisedQueryPtr query) : query_(std::move(query)) {
@@ -10021,15 +10049,33 @@ td::Status Client::process_send_poll_query(PromisedQueryPtr &query) {
 }
 
 td::Status Client::process_stop_poll_query(PromisedQueryPtr &query) {
+  auto business_connection_id = query->arg("business_connection_id");
   auto chat_id = query->arg("chat_id");
   auto message_id = get_message_id(query.get());
   TRY_RESULT(reply_markup, get_reply_markup(query.get(), bot_user_ids_));
 
   resolve_reply_markup_bot_usernames(
       std::move(reply_markup), std::move(query),
-      [this, chat_id = chat_id.str(), message_id](object_ptr<td_api::ReplyMarkup> reply_markup,
-                                                  PromisedQueryPtr query) {
-        check_message(chat_id, message_id, false, AccessRights::Edit, "message with poll to stop", std::move(query),
+      [this, business_connection_id = business_connection_id.str(), chat_id_str = chat_id.str(), message_id](
+          object_ptr<td_api::ReplyMarkup> reply_markup, PromisedQueryPtr query) {
+        if (!business_connection_id.empty()) {
+          auto r_chat_id = get_business_connection_chat_id(chat_id_str);
+          if (r_chat_id.is_error()) {
+            return fail_query_with_error(std::move(query), 400, r_chat_id.error().message());
+          }
+          auto chat_id = r_chat_id.move_as_ok();
+          return check_business_connection(
+              business_connection_id, std::move(query),
+              [this, business_connection_id, chat_id, message_id, reply_markup = std::move(reply_markup)](
+                  const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
+                send_request(
+                    make_object<td_api::stopBusinessPoll>(business_connection_id, chat_id, message_id,
+                                                          std::move(reply_markup)),
+                    td::make_unique<TdOnStopBusinessPollCallback>(this, business_connection_id, std::move(query)));
+              });
+        }
+
+        check_message(chat_id_str, message_id, false, AccessRights::Edit, "message with poll to stop", std::move(query),
                       [this, reply_markup = std::move(reply_markup)](int64 chat_id, int64 message_id,
                                                                      PromisedQueryPtr query) mutable {
                         send_request(

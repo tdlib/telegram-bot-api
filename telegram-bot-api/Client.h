@@ -214,6 +214,7 @@ class Client final : public WebhookActor::Callback {
   class TdOnEditMessageCallback;
   class TdOnEditInlineMessageCallback;
   class TdOnStopPollCallback;
+  class TdOnStopBusinessPollCallback;
   class TdOnOkQueryCallback;
   class TdOnGetReplyMessageCallback;
   class TdOnGetEditedMessageCallback;
