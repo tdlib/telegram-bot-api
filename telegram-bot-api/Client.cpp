@@ -6075,6 +6075,21 @@ void Client::check_business_connection(const td::string &business_connection_id,
 }
 
 template <class OnSuccess>
+void Client::check_business_connection_chat_id(const td::string &business_connection_id, const td::string &chat_id_str,
+                                               PromisedQueryPtr query, OnSuccess on_success) {
+  auto r_chat_id = get_business_connection_chat_id(chat_id_str);
+  if (r_chat_id.is_error()) {
+    return fail_query_with_error(std::move(query), 400, r_chat_id.error().message());
+  }
+  auto chat_id = r_chat_id.move_as_ok();
+  check_business_connection(business_connection_id, std::move(query),
+                            [this, chat_id, on_success = std::move(on_success)](
+                                const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
+                              on_success(business_connection, chat_id, std::move(query));
+                            });
+}
+
+template <class OnSuccess>
 void Client::check_bot_command_scope(BotCommandScope &&scope, PromisedQueryPtr query, OnSuccess on_success) {
   CHECK(scope.scope_ != nullptr);
   if (scope.chat_id_.empty()) {
@@ -10059,15 +10074,10 @@ td::Status Client::process_stop_poll_query(PromisedQueryPtr &query) {
       [this, business_connection_id = business_connection_id.str(), chat_id_str = chat_id.str(), message_id](
           object_ptr<td_api::ReplyMarkup> reply_markup, PromisedQueryPtr query) {
         if (!business_connection_id.empty()) {
-          auto r_chat_id = get_business_connection_chat_id(chat_id_str);
-          if (r_chat_id.is_error()) {
-            return fail_query_with_error(std::move(query), 400, r_chat_id.error().message());
-          }
-          auto chat_id = r_chat_id.move_as_ok();
-          return check_business_connection(
-              business_connection_id, std::move(query),
-              [this, business_connection_id, chat_id, message_id, reply_markup = std::move(reply_markup)](
-                  const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
+          return check_business_connection_chat_id(
+              business_connection_id, chat_id_str, std::move(query),
+              [this, business_connection_id, message_id, reply_markup = std::move(reply_markup)](
+                  const BusinessConnection *business_connection, int64 chat_id, PromisedQueryPtr query) mutable {
                 send_request(
                     make_object<td_api::stopBusinessPoll>(business_connection_id, chat_id, message_id,
                                                           std::move(reply_markup)),
@@ -10224,17 +10234,11 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
        input_message_contents = std::move(input_message_contents)](object_ptr<td_api::ReplyMarkup> reply_markup,
                                                                    PromisedQueryPtr query) mutable {
         if (!business_connection_id.empty()) {
-          auto r_chat_id = get_business_connection_chat_id(chat_id_str);
-          if (r_chat_id.is_error()) {
-            return fail_query_with_error(std::move(query), 400, r_chat_id.error().message());
-          }
-          auto chat_id = r_chat_id.move_as_ok();
-          return check_business_connection(
-              business_connection_id, std::move(query),
-              [this, chat_id, reply_parameters = std::move(reply_parameters), disable_notification, protect_content,
-               effect_id, input_message_contents = std::move(input_message_contents),
-               reply_markup = std::move(reply_markup)](const BusinessConnection *business_connection,
-                                                       PromisedQueryPtr query) mutable {
+          return check_business_connection_chat_id(
+              business_connection_id, chat_id_str, std::move(query),
+              [this, reply_parameters = std::move(reply_parameters), disable_notification, protect_content, effect_id,
+               input_message_contents = std::move(input_message_contents), reply_markup = std::move(reply_markup)](
+                  const BusinessConnection *business_connection, int64 chat_id, PromisedQueryPtr query) mutable {
                 send_request(
                     make_object<td_api::sendBusinessMessageAlbum>(
                         business_connection->id_, chat_id, get_input_message_reply_to(std::move(reply_parameters)),
@@ -10277,11 +10281,10 @@ td::Status Client::process_send_chat_action_query(PromisedQueryPtr &query) {
     return td::Status::Error(400, "Wrong parameter action in request");
   }
   if (!business_connection_id.empty()) {
-    TRY_RESULT(chat_id, get_business_connection_chat_id(chat_id_str));
-    check_business_connection(
-        business_connection_id, std::move(query),
-        [this, chat_id, action = std::move(action)](const BusinessConnection *business_connection,
-                                                    PromisedQueryPtr query) mutable {
+    check_business_connection_chat_id(
+        business_connection_id, chat_id_str.str(), std::move(query),
+        [this, action = std::move(action)](const BusinessConnection *business_connection, int64 chat_id,
+                                           PromisedQueryPtr query) mutable {
           send_request(make_object<td_api::sendChatAction>(chat_id, 0, business_connection->id_, std::move(action)),
                        td::make_unique<TdOnOkQueryCallback>(std::move(query)));
         });
@@ -10337,15 +10340,10 @@ td::Status Client::process_edit_message_text_query(PromisedQueryPtr &query) {
          input_message_text = std::move(input_message_text)](object_ptr<td_api::ReplyMarkup> reply_markup,
                                                              PromisedQueryPtr query) mutable {
           if (!business_connection_id.empty()) {
-            auto r_chat_id = get_business_connection_chat_id(chat_id_str);
-            if (r_chat_id.is_error()) {
-              return fail_query_with_error(std::move(query), 400, r_chat_id.error().message());
-            }
-            auto chat_id = r_chat_id.move_as_ok();
-            return check_business_connection(
-                business_connection_id, std::move(query),
-                [this, business_connection_id, chat_id, message_id, input_message_text = std::move(input_message_text),
-                 reply_markup = std::move(reply_markup)](const BusinessConnection *business_connection,
+            return check_business_connection_chat_id(
+                business_connection_id, chat_id_str, std::move(query),
+                [this, business_connection_id, message_id, input_message_text = std::move(input_message_text),
+                 reply_markup = std::move(reply_markup)](const BusinessConnection *business_connection, int64 chat_id,
                                                          PromisedQueryPtr query) mutable {
                   send_request(make_object<td_api::editBusinessMessageText>(business_connection_id, chat_id, message_id,
                                                                             std::move(reply_markup),
@@ -10399,16 +10397,11 @@ td::Status Client::process_edit_message_live_location_query(PromisedQueryPtr &qu
          location = std::move(location), live_period, heading,
          proximity_alert_radius](object_ptr<td_api::ReplyMarkup> reply_markup, PromisedQueryPtr query) mutable {
           if (!business_connection_id.empty()) {
-            auto r_chat_id = get_business_connection_chat_id(chat_id_str);
-            if (r_chat_id.is_error()) {
-              return fail_query_with_error(std::move(query), 400, r_chat_id.error().message());
-            }
-            auto chat_id = r_chat_id.move_as_ok();
-            return check_business_connection(
-                business_connection_id, std::move(query),
-                [this, business_connection_id, chat_id, message_id, location = std::move(location), live_period,
-                 heading, proximity_alert_radius, reply_markup = std::move(reply_markup)](
-                    const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
+            return check_business_connection_chat_id(
+                business_connection_id, chat_id_str, std::move(query),
+                [this, business_connection_id, message_id, location = std::move(location), live_period, heading,
+                 proximity_alert_radius, reply_markup = std::move(reply_markup)](
+                    const BusinessConnection *business_connection, int64 chat_id, PromisedQueryPtr query) mutable {
                   send_request(make_object<td_api::editBusinessMessageLiveLocation>(
                                    business_connection_id, chat_id, message_id, std::move(reply_markup),
                                    std::move(location), live_period, heading, proximity_alert_radius),
@@ -10455,16 +10448,11 @@ td::Status Client::process_edit_message_media_query(PromisedQueryPtr &query) {
          input_message_content = std::move(input_media)](object_ptr<td_api::ReplyMarkup> reply_markup,
                                                          PromisedQueryPtr query) mutable {
           if (!business_connection_id.empty()) {
-            auto r_chat_id = get_business_connection_chat_id(chat_id_str);
-            if (r_chat_id.is_error()) {
-              return fail_query_with_error(std::move(query), 400, r_chat_id.error().message());
-            }
-            auto chat_id = r_chat_id.move_as_ok();
-            return check_business_connection(
-                business_connection_id, std::move(query),
-                [this, business_connection_id, chat_id, message_id,
-                 input_message_content = std::move(input_message_content), reply_markup = std::move(reply_markup)](
-                    const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
+            return check_business_connection_chat_id(
+                business_connection_id, chat_id_str, std::move(query),
+                [this, business_connection_id, message_id, input_message_content = std::move(input_message_content),
+                 reply_markup = std::move(reply_markup)](const BusinessConnection *business_connection, int64 chat_id,
+                                                         PromisedQueryPtr query) mutable {
                   send_request(make_object<td_api::editBusinessMessageMedia>(business_connection_id, chat_id,
                                                                              message_id, std::move(reply_markup),
                                                                              std::move(input_message_content)),
@@ -10511,16 +10499,11 @@ td::Status Client::process_edit_message_caption_query(PromisedQueryPtr &query) {
          caption = std::move(caption),
          show_caption_above_media](object_ptr<td_api::ReplyMarkup> reply_markup, PromisedQueryPtr query) mutable {
           if (!business_connection_id.empty()) {
-            auto r_chat_id = get_business_connection_chat_id(chat_id_str);
-            if (r_chat_id.is_error()) {
-              return fail_query_with_error(std::move(query), 400, r_chat_id.error().message());
-            }
-            auto chat_id = r_chat_id.move_as_ok();
-            return check_business_connection(
-                business_connection_id, std::move(query),
-                [this, business_connection_id, chat_id, message_id, reply_markup = std::move(reply_markup),
-                 caption = std::move(caption), show_caption_above_media](const BusinessConnection *business_connection,
-                                                                         PromisedQueryPtr query) mutable {
+            return check_business_connection_chat_id(
+                business_connection_id, chat_id_str, std::move(query),
+                [this, business_connection_id, message_id, reply_markup = std::move(reply_markup),
+                 caption = std::move(caption), show_caption_above_media](
+                    const BusinessConnection *business_connection, int64 chat_id, PromisedQueryPtr query) mutable {
                   send_request(make_object<td_api::editBusinessMessageCaption>(
                                    business_connection_id, chat_id, message_id, std::move(reply_markup),
                                    std::move(caption), show_caption_above_media),
@@ -10563,15 +10546,10 @@ td::Status Client::process_edit_message_reply_markup_query(PromisedQueryPtr &que
         [this, business_connection_id = business_connection_id.str(), chat_id_str = chat_id.str(), message_id](
             object_ptr<td_api::ReplyMarkup> reply_markup, PromisedQueryPtr query) {
           if (!business_connection_id.empty()) {
-            auto r_chat_id = get_business_connection_chat_id(chat_id_str);
-            if (r_chat_id.is_error()) {
-              return fail_query_with_error(std::move(query), 400, r_chat_id.error().message());
-            }
-            auto chat_id = r_chat_id.move_as_ok();
-            return check_business_connection(
-                business_connection_id, std::move(query),
-                [this, business_connection_id, chat_id, message_id, reply_markup = std::move(reply_markup)](
-                    const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
+            return check_business_connection_chat_id(
+                business_connection_id, chat_id_str, std::move(query),
+                [this, business_connection_id, message_id, reply_markup = std::move(reply_markup)](
+                    const BusinessConnection *business_connection, int64 chat_id, PromisedQueryPtr query) mutable {
                   send_request(make_object<td_api::editBusinessMessageReplyMarkup>(business_connection_id, chat_id,
                                                                                    message_id, std::move(reply_markup)),
                                td::make_unique<TdOnReturnBusinessMessageCallback>(this, business_connection_id,
@@ -12188,17 +12166,11 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
        input_message_content = std::move(input_message_content)](object_ptr<td_api::ReplyMarkup> reply_markup,
                                                                  PromisedQueryPtr query) mutable {
         if (!business_connection_id.empty()) {
-          auto r_chat_id = get_business_connection_chat_id(chat_id_str);
-          if (r_chat_id.is_error()) {
-            return fail_query_with_error(std::move(query), 400, r_chat_id.error().message());
-          }
-          auto chat_id = r_chat_id.move_as_ok();
-          return check_business_connection(
-              business_connection_id, std::move(query),
-              [this, chat_id, reply_parameters = std::move(reply_parameters), disable_notification, protect_content,
-               effect_id, reply_markup = std::move(reply_markup),
-               input_message_content = std::move(input_message_content)](const BusinessConnection *business_connection,
-                                                                         PromisedQueryPtr query) mutable {
+          return check_business_connection_chat_id(
+              business_connection_id, chat_id_str, std::move(query),
+              [this, reply_parameters = std::move(reply_parameters), disable_notification, protect_content, effect_id,
+               reply_markup = std::move(reply_markup), input_message_content = std::move(input_message_content)](
+                  const BusinessConnection *business_connection, int64 chat_id, PromisedQueryPtr query) mutable {
                 send_request(make_object<td_api::sendBusinessMessage>(
                                  business_connection->id_, chat_id,
                                  get_input_message_reply_to(std::move(reply_parameters)), disable_notification,

@@ -345,6 +345,10 @@ class Client final : public WebhookActor::Callback {
                                  OnSuccess on_success);
 
   template <class OnSuccess>
+  void check_business_connection_chat_id(const td::string &business_connection_id, const td::string &chat_id_str,
+                                         PromisedQueryPtr query, OnSuccess on_success);
+
+  template <class OnSuccess>
   void check_bot_command_scope(BotCommandScope &&scope, PromisedQueryPtr query, OnSuccess on_success);
 
   template <class OnSuccess>
