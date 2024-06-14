@@ -195,6 +195,10 @@ class Client final : public WebhookActor::Callback {
   class JsonGiveawayWinners;
   class JsonGiveawayCompleted;
   class JsonChatBoostAdded;
+  class JsonRevenueWithdrawalState;
+  class JsonStarTransactionPartner;
+  class JsonStarTransaction;
+  class JsonStarTransactions;
   class JsonUpdateTypes;
   class JsonWebhookInfo;
   class JsonStickerSet;
@@ -238,6 +242,7 @@ class Client final : public WebhookActor::Callback {
   class TdOnGetSupergroupMemberCountCallback;
   class TdOnGetUserChatBoostsCallback;
   class TdOnCreateInvoiceLinkCallback;
+  class TdOnGetStarTransactionsQueryCallback;
   class TdOnReplacePrimaryChatInviteLinkCallback;
   class TdOnGetChatInviteLinkCallback;
   class TdOnGetGameHighScoresCallback;
@@ -652,6 +657,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_delete_message_query(PromisedQueryPtr &query);
   td::Status process_delete_messages_query(PromisedQueryPtr &query);
   td::Status process_create_invoice_link_query(PromisedQueryPtr &query);
+  td::Status process_get_star_transactions_query(PromisedQueryPtr &query);
   td::Status process_refund_star_payment_query(PromisedQueryPtr &query);
   td::Status process_set_game_score_query(PromisedQueryPtr &query);
   td::Status process_get_game_high_scores_query(PromisedQueryPtr &query);

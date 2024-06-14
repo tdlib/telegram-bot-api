@@ -246,6 +246,7 @@ bool Client::init_methods() {
   methods_.emplace("deletemessage", &Client::process_delete_message_query);
   methods_.emplace("deletemessages", &Client::process_delete_messages_query);
   methods_.emplace("createinvoicelink", &Client::process_create_invoice_link_query);
+  methods_.emplace("getstartransactions", &Client::process_get_star_transactions_query);
   methods_.emplace("refundstarpayment", &Client::process_refund_star_payment_query);
   methods_.emplace("setgamescore", &Client::process_set_game_score_query);
   methods_.emplace("getgamehighscores", &Client::process_get_game_high_scores_query);
@@ -3928,6 +3929,117 @@ class Client::JsonBusinessMessagesDeleted final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonRevenueWithdrawalState final : public td::Jsonable {
+ public:
+  explicit JsonRevenueWithdrawalState(const td_api::RevenueWithdrawalState *state) : state_(state) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    switch (state_->get_id()) {
+      case td_api::revenueWithdrawalStatePending::ID:
+        object("type", "pending");
+        break;
+      case td_api::revenueWithdrawalStateSucceeded::ID: {
+        auto state = static_cast<const td_api::revenueWithdrawalStateSucceeded *>(state_);
+        object("type", "succeeded");
+        object("date", state->date_);
+        object("url", state->url_);
+        break;
+      }
+      case td_api::revenueWithdrawalStateFailed::ID:
+        object("type", "failed");
+        break;
+      default:
+        UNREACHABLE();
+    }
+  }
+
+ private:
+  const td_api::RevenueWithdrawalState *state_;
+};
+
+class Client::JsonStarTransactionPartner final : public td::Jsonable {
+ public:
+  JsonStarTransactionPartner(const td_api::StarTransactionPartner *source, const Client *client)
+      : source_(source), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    switch (source_->get_id()) {
+      case td_api::starTransactionPartnerFragment::ID: {
+        auto source_fragment = static_cast<const td_api::starTransactionPartnerFragment *>(source_);
+        object("type", "fragment");
+        if (source_fragment->withdrawal_state_ != nullptr) {
+          object("withdrawal_state", JsonRevenueWithdrawalState(source_fragment->withdrawal_state_.get()));
+        }
+        break;
+      }
+      case td_api::starTransactionPartnerUser::ID: {
+        auto source_user = static_cast<const td_api::starTransactionPartnerUser *>(source_);
+        object("type", "user");
+        object("user", JsonUser(source_user->user_id_, client_));
+        break;
+      }
+      case td_api::starTransactionPartnerTelegram::ID:
+      case td_api::starTransactionPartnerAppStore::ID:
+      case td_api::starTransactionPartnerGooglePlay::ID:
+      case td_api::starTransactionPartnerChannel::ID:
+        LOG(ERROR) << "Receive " << to_string(*source_);
+        object("type", "other");
+        break;
+      case td_api::starTransactionPartnerUnsupported::ID:
+        object("type", "other");
+        break;
+      default:
+        UNREACHABLE();
+    }
+  }
+
+ private:
+  const td_api::StarTransactionPartner *source_;
+  const Client *client_;
+};
+
+class Client::JsonStarTransaction final : public td::Jsonable {
+ public:
+  JsonStarTransaction(const td_api::starTransaction *transaction, const Client *client)
+      : transaction_(transaction), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("id", transaction_->id_);
+    object("date", transaction_->date_);
+    if (transaction_->star_count_ > 0) {
+      object("amount", transaction_->star_count_);
+      object("source", JsonStarTransactionPartner(transaction_->partner_.get(), client_));
+    } else {
+      object("amount", -transaction_->star_count_);
+      object("receiver", JsonStarTransactionPartner(transaction_->partner_.get(), client_));
+    }
+  }
+
+ private:
+  const td_api::starTransaction *transaction_;
+  const Client *client_;
+};
+
+class Client::JsonStarTransactions final : public td::Jsonable {
+ public:
+  JsonStarTransactions(const td_api::starTransactions *transactions, const Client *client)
+      : transactions_(transactions), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("transactions", td::json_array(transactions_->transactions_, [client = client_](const auto &transaction) {
+             return JsonStarTransaction(transaction.get(), client);
+           }));
+  }
+
+ private:
+  const td_api::starTransactions *transactions_;
+  const Client *client_;
+};
+
 class Client::JsonUpdateTypes final : public td::Jsonable {
  public:
   explicit JsonUpdateTypes(td::uint32 update_types) : update_types_(update_types) {
@@ -5388,13 +5500,34 @@ class Client::TdOnGetChatInviteLinkCallback final : public TdQueryCallback {
 
     if (result->get_id() == td_api::chatInviteLink::ID) {
       auto invite_link = move_object_as<td_api::chatInviteLink>(result);
-      return answer_query(JsonChatInviteLink(invite_link.get(), client_), std::move(query_));
+      answer_query(JsonChatInviteLink(invite_link.get(), client_), std::move(query_));
     } else {
       CHECK(result->get_id() == td_api::chatInviteLinks::ID);
       auto invite_links = move_object_as<td_api::chatInviteLinks>(result);
       CHECK(!invite_links->invite_links_.empty());
-      return answer_query(JsonChatInviteLink(invite_links->invite_links_[0].get(), client_), std::move(query_));
+      answer_query(JsonChatInviteLink(invite_links->invite_links_[0].get(), client_), std::move(query_));
     }
+  }
+
+ private:
+  const Client *client_;
+  PromisedQueryPtr query_;
+};
+
+class Client::TdOnGetStarTransactionsQueryCallback final : public TdQueryCallback {
+ public:
+  TdOnGetStarTransactionsQueryCallback(const Client *client, PromisedQueryPtr query)
+      : client_(client), query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::starTransactions::ID);
+    auto transactions = move_object_as<td_api::starTransactions>(result);
+    answer_query(JsonStarTransactions(transactions.get(), client_), std::move(query_));
   }
 
  private:
@@ -10607,6 +10740,15 @@ td::Status Client::process_create_invoice_link_query(PromisedQueryPtr &query) {
   TRY_RESULT(input_message_invoice, get_input_message_invoice(query.get()));
   send_request(make_object<td_api::createInvoiceLink>(std::move(input_message_invoice)),
                td::make_unique<TdOnCreateInvoiceLinkCallback>(std::move(query)));
+  return td::Status::OK();
+}
+
+td::Status Client::process_get_star_transactions_query(PromisedQueryPtr &query) {
+  auto offset = get_integer_arg(query.get(), "offset", 0, 0);
+  auto limit = get_integer_arg(query.get(), "limit", 100, 1, 100);
+  send_request(make_object<td_api::getStarTransactions>(make_object<td_api::messageSenderUser>(my_id_), nullptr,
+                                                        td::to_string(offset), limit),
+               td::make_unique<TdOnGetStarTransactionsQueryCallback>(this, std::move(query)));
   return td::Status::OK();
 }
 
