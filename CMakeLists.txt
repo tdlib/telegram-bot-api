@@ -6,7 +6,7 @@ if (POLICY CMP0065)
   cmake_policy(SET CMP0065 NEW)
 endif()
 
-project(TelegramBotApi VERSION 7.4 LANGUAGES CXX)
+project(TelegramBotApi VERSION 7.5 LANGUAGES CXX)
 
 if (POLICY CMP0069)
   option(TELEGRAM_BOT_API_ENABLE_LTO "Use \"ON\" to enable Link Time Optimization.")
