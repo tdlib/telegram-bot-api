@@ -4865,7 +4865,7 @@ class Client::TdOnGetChatMemberCallback final : public TdQueryCallback {
 
   void on_result(object_ptr<td_api::Object> result) final {
     if (result->get_id() == td_api::error::ID) {
-      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result), "user not found");
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
     }
 
     CHECK(result->get_id() == td_api::chatMember::ID);
@@ -5197,7 +5197,7 @@ class Client::TdOnGetChatPinnedMessageToUnpinCallback final : public TdQueryCall
       if (error->code_ == 429) {
         return fail_query_with_error(std::move(query_), std::move(error));
       } else {
-        return fail_query_with_error(std::move(query_), make_object<td_api::error>(400, "Message to unpin not found"));
+        return fail_query_with_error(std::move(query_), 400, "Message to unpin not found");
       }
     }
 
@@ -5252,8 +5252,7 @@ class Client::TdOnGetMyDefaultAdministratorRightsCallback final : public TdQuery
     auto full_info = move_object_as<td_api::userFullInfo>(result);
     if (full_info->bot_info_ == nullptr) {
       LOG(ERROR) << "Have no bot info for self";
-      return fail_query_with_error(std::move(query_),
-                                   make_object<td_api::error>(500, "Requested data is inaccessible"));
+      return fail_query_with_error(std::move(query_), 500, "Requested data is inaccessible");
     }
     auto bot_info = std::move(full_info->bot_info_);
     const auto *rights = for_channels_ ? bot_info->default_channel_administrator_rights_.get()
