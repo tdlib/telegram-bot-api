@@ -3980,6 +3980,14 @@ class Client::JsonStarTransactionPartner final : public td::Jsonable {
         auto source_user = static_cast<const td_api::starTransactionPartnerBot *>(source_);
         object("type", "user");
         object("user", JsonUser(source_user->bot_user_id_, client_));
+        if (!source_user->invoice_payload_.empty()) {
+          if (!td::check_utf8(source_user->invoice_payload_)) {
+            LOG(WARNING) << "Receive non-UTF-8 invoice payload";
+            object("invoice_payload", td::JsonRawString(source_user->invoice_payload_));
+          } else {
+            object("invoice_payload", source_user->invoice_payload_);
+          }
+        }
         break;
       }
       case td_api::starTransactionPartnerTelegramAds::ID:
