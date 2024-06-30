@@ -1091,6 +1091,9 @@ class Client::JsonChat final : public td::Jsonable {
           if (supergroup_info->location != nullptr) {
             object("location", JsonChatLocation(supergroup_info->location.get()));
           }
+          if (supergroup_info->has_paid_media_allowed && !supergroup_info->is_supergroup) {
+            object("can_send_paid_media", td::JsonTrue());
+          }
         }
         photo = supergroup_info->photo.get();
         break;
@@ -6952,6 +6955,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       supergroup_info->location = std::move(full_info->location_);
       supergroup_info->has_hidden_members = full_info->has_hidden_members_;
       supergroup_info->has_aggressive_anti_spam_enabled = full_info->has_aggressive_anti_spam_enabled_;
+      supergroup_info->has_paid_media_allowed = full_info->has_paid_media_allowed_;
       break;
     }
     case td_api::updateOption::ID: {

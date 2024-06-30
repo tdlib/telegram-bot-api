@@ -878,6 +878,7 @@ class Client final : public WebhookActor::Callback {
     bool join_by_request = false;
     bool has_hidden_members = false;
     bool has_aggressive_anti_spam_enabled = false;
+    bool has_paid_media_allowed = false;
   };
   static void add_supergroup(SupergroupInfo *supergroup_info, object_ptr<td_api::supergroup> &&supergroup);
   SupergroupInfo *add_supergroup_info(int64 supergroup_id);
