@@ -1526,6 +1526,70 @@ class Client::JsonVoiceNote final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonPaidMedia final : public td::Jsonable {
+ public:
+  JsonPaidMedia(const td_api::PaidMedia *paid_media, const Client *client) : paid_media_(paid_media), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    switch (paid_media_->get_id()) {
+      case td_api::paidMediaPreview::ID: {
+        auto media = static_cast<const td_api::paidMediaPreview *>(paid_media_);
+        object("type", "preview");
+        if (media->width_) {
+          object("width", media->width_);
+        }
+        if (media->height_) {
+          object("height", media->height_);
+        }
+        if (media->duration_) {
+          object("duration", media->duration_);
+        }
+        break;
+      }
+      case td_api::paidMediaPhoto::ID: {
+        auto media = static_cast<const td_api::paidMediaPhoto *>(paid_media_);
+        object("type", "photo");
+        object("photo", JsonPhoto(media->photo_.get(), client_));
+        break;
+      }
+      case td_api::paidMediaVideo::ID: {
+        auto media = static_cast<const td_api::paidMediaVideo *>(paid_media_);
+        object("type", "video");
+        object("video", JsonVideo(media->video_.get(), client_));
+        break;
+      }
+      case td_api::paidMediaUnsupported::ID:
+        object("type", "other");
+        break;
+      default:
+        UNREACHABLE();
+    }
+  }
+
+ private:
+  const td_api::PaidMedia *paid_media_;
+  const Client *client_;
+};
+
+class Client::JsonPaidMediaInfo final : public td::Jsonable {
+ public:
+  JsonPaidMediaInfo(const td_api::messagePaidMedia *paid_media, const Client *client)
+      : paid_media_(paid_media), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("star_count", paid_media_->star_count_);
+    object("paid_media", td::json_array(paid_media_->media_, [client = client_](auto &media) {
+             return JsonPaidMedia(media.get(), client);
+           }));
+  }
+
+ private:
+  const td_api::messagePaidMedia *paid_media_;
+  const Client *client_;
+};
+
 class Client::JsonVenue final : public td::Jsonable {
  public:
   explicit JsonVenue(const td_api::venue *venue) : venue_(venue) {
@@ -2593,6 +2657,11 @@ class Client::JsonExternalReplyInfo final : public td::Jsonable {
           object("document", JsonDocument(content->document_.get(), client_));
           break;
         }
+        case td_api::messagePaidMedia::ID: {
+          auto content = static_cast<const td_api::messagePaidMedia *>(reply_->content_.get());
+          object("paid_media", JsonPaidMediaInfo(content, client_));
+          break;
+        }
         case td_api::messagePhoto::ID: {
           auto content = static_cast<const td_api::messagePhoto *>(reply_->content_.get());
           CHECK(content->photo_ != nullptr);
@@ -2840,6 +2909,12 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       auto content = static_cast<const td_api::messageDocument *>(message_->content.get());
       object("document", JsonDocument(content->document_.get(), client_));
       add_caption(object, content->caption_, false);
+      break;
+    }
+    case td_api::messagePaidMedia::ID: {
+      auto content = static_cast<const td_api::messagePaidMedia *>(message_->content.get());
+      object("paid_media", JsonPaidMediaInfo(content, client_));
+      add_caption(object, content->caption_, content->show_caption_above_media_);
       break;
     }
     case td_api::messagePhoto::ID: {
@@ -3180,8 +3255,6 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("boost_added", JsonChatBoostAdded(content));
       break;
     }
-    case td_api::messagePaidMedia::ID:
-      break;
     default:
       UNREACHABLE();
   }
@@ -13631,8 +13704,6 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageSuggestProfilePhoto::ID:
       return true;
     case td_api::messagePremiumGiftCode::ID:
-      return true;
-    case td_api::messagePaidMedia::ID:
       return true;
     default:
       break;
