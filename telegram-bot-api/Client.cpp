@@ -3177,6 +3177,8 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("boost_added", JsonChatBoostAdded(content));
       break;
     }
+    case td_api::messagePaidMedia::ID:
+      break;
     default:
       UNREACHABLE();
   }
@@ -3974,10 +3976,10 @@ class Client::JsonStarTransactionPartner final : public td::Jsonable {
         }
         break;
       }
-      case td_api::starTransactionPartnerUser::ID: {
-        auto source_user = static_cast<const td_api::starTransactionPartnerUser *>(source_);
+      case td_api::starTransactionPartnerBot::ID: {
+        auto source_user = static_cast<const td_api::starTransactionPartnerBot *>(source_);
         object("type", "user");
-        object("user", JsonUser(source_user->user_id_, client_));
+        object("user", JsonUser(source_user->bot_user_id_, client_));
         break;
       }
       case td_api::starTransactionPartnerTelegram::ID:
@@ -3987,6 +3989,7 @@ class Client::JsonStarTransactionPartner final : public td::Jsonable {
         LOG(ERROR) << "Receive " << to_string(*source_);
         object("type", "other");
         break;
+      case td_api::starTransactionPartnerTelegramAds::ID:
       case td_api::starTransactionPartnerUnsupported::ID:
         object("type", "other");
         break;
@@ -7915,7 +7918,7 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
                                      need_email_address, need_shipping_address, send_phone_number_to_provider,
                                      send_email_address_to_provider, is_flexible),
         title, description, photo_url, photo_size, photo_width, photo_height, payload, provider_token, provider_data,
-        td::string(), nullptr);
+        td::string(), nullptr, nullptr);
   }
 
   if (is_input_message_content_required) {
@@ -9318,10 +9321,10 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
                                                   td::vector<int32>(), duration, width, height, supports_streaming,
                                                   std::move(caption), show_caption_above_media, nullptr, has_spoiler);
   }
-  if (for_album && type == "animation") {
-    return td::Status::Error(PSLICE() << "type \"" << type << "\" can't be used in sendMediaGroup");
-  }
   if (type == "animation") {
+    if (for_album) {
+      return td::Status::Error(PSLICE() << "type \"" << type << "\" can't be used in sendMediaGroup");
+    }
     TRY_RESULT(width, object.get_optional_int_field("width"));
     TRY_RESULT(height, object.get_optional_int_field("height"));
     TRY_RESULT(duration, object.get_optional_int_field("duration"));
@@ -9399,6 +9402,67 @@ td::Result<td::vector<td_api::object_ptr<td_api::InputMessageContent>>> Client::
   return std::move(contents);
 }
 
+td::Result<td_api::object_ptr<td_api::inputPaidMedia>> Client::get_input_paid_media(const Query *query,
+                                                                                    td::JsonValue &&input_media) const {
+  if (input_media.type() != td::JsonValue::Type::Object) {
+    return td::Status::Error("expected an Object");
+  }
+
+  auto &object = input_media.get_object();
+  TRY_RESULT(media, object.get_optional_string_field("media"));
+
+  auto input_file = get_input_file(query, td::Slice(), media, false);
+  if (input_file == nullptr) {
+    return td::Status::Error("media not found");
+  }
+
+  object_ptr<td_api::inputThumbnail> input_thumbnail;
+  TRY_RESULT(thumbnail, object.get_optional_string_field("thumbnail"));
+  auto thumbnail_input_file = get_input_file(query, "thumbnail", thumbnail, true);
+  if (thumbnail_input_file != nullptr) {
+    input_thumbnail = make_object<td_api::inputThumbnail>(std::move(thumbnail_input_file), 0, 0);
+  }
+
+  TRY_RESULT(width, object.get_optional_int_field("width"));
+  TRY_RESULT(height, object.get_optional_int_field("height"));
+  width = td::clamp(width, 0, MAX_LENGTH);
+  height = td::clamp(height, 0, MAX_LENGTH);
+
+  object_ptr<td_api::InputPaidMediaType> media_type;
+  TRY_RESULT(type, object.get_required_string_field("type"));
+  if (type == "photo") {
+    media_type = make_object<td_api::inputPaidMediaTypePhoto>();
+  } else if (type == "video") {
+    TRY_RESULT(duration, object.get_optional_int_field("duration"));
+    TRY_RESULT(supports_streaming, object.get_optional_bool_field("supports_streaming"));
+    duration = td::clamp(duration, 0, MAX_DURATION);
+    media_type = make_object<td_api::inputPaidMediaTypeVideo>(duration, supports_streaming);
+  } else {
+    return td::Status::Error(PSLICE() << "type \"" << type << "\" is unsupported");
+  }
+
+  return make_object<td_api::inputPaidMedia>(std::move(media_type), std::move(input_file), std::move(input_thumbnail),
+                                             td::vector<int32>(), width, height);
+}
+
+td::Result<td_api::object_ptr<td_api::inputPaidMedia>> Client::get_input_paid_media(const Query *query,
+                                                                                    td::Slice field_name) const {
+  TRY_RESULT(media, get_required_string_arg(query, field_name));
+
+  LOG(INFO) << "Parsing JSON object: " << media;
+  auto r_value = json_decode(media);
+  if (r_value.is_error()) {
+    LOG(INFO) << "Can't parse JSON object: " << r_value.error();
+    return td::Status::Error(400, "Can't parse input paid media JSON object");
+  }
+
+  auto r_input_paid_media = get_input_paid_media(query, r_value.move_as_ok());
+  if (r_input_paid_media.is_error()) {
+    return td::Status::Error(400, PSLICE() << "Can't parse InputPaidMedia: " << r_input_paid_media.error().message());
+  }
+  return r_input_paid_media.move_as_ok();
+}
+
 td::Result<td_api::object_ptr<td_api::inputMessageInvoice>> Client::get_input_message_invoice(
     const Query *query) const {
   TRY_RESULT(title, get_required_string_arg(query, "title"));
@@ -9456,10 +9520,15 @@ td::Result<td_api::object_ptr<td_api::inputMessageInvoice>> Client::get_input_me
   auto send_email_address_to_provider = to_bool(query->arg("send_email_to_provider"));
   auto is_flexible = to_bool(query->arg("is_flexible"));
 
-  object_ptr<td_api::InputMessageContent> extended_media;
-  if (!query->arg("extended_media").empty()) {
-    TRY_RESULT_ASSIGN(extended_media, get_input_media(query, "extended_media"));
+  object_ptr<td_api::inputPaidMedia> paid_media;
+  if (!query->arg("paid_media").empty()) {
+    TRY_RESULT_ASSIGN(paid_media, get_input_paid_media(query, "paid_media"));
+  } else if (!query->arg("extended_media").empty()) {
+    TRY_RESULT_ASSIGN(paid_media, get_input_paid_media(query, "extended_media"));
   }
+  TRY_RESULT(paid_media_caption, get_formatted_text(query->arg("paid_media_caption").str(),
+                                                    query->arg("paid_media_caption_parse_mode").str(),
+                                                    get_input_entities(query, "paid_media_caption_entities")));
 
   return make_object<td_api::inputMessageInvoice>(
       make_object<td_api::invoice>(currency.str(), std::move(prices), max_tip_amount, std::move(suggested_tip_amounts),
@@ -9467,7 +9536,8 @@ td::Result<td_api::object_ptr<td_api::inputMessageInvoice>> Client::get_input_me
                                    need_shipping_address, send_phone_number_to_provider, send_email_address_to_provider,
                                    is_flexible),
       title.str(), description.str(), photo_url.str(), photo_size, photo_width, photo_height, payload.str(),
-      provider_token.str(), provider_data.str(), start_parameter.str(), std::move(extended_media));
+      provider_token.str(), provider_data.str(), start_parameter.str(), std::move(paid_media),
+      std::move(paid_media_caption));
 }
 
 td::Result<td::vector<td_api::object_ptr<td_api::formattedText>>> Client::get_poll_options(const Query *query) {
@@ -13547,6 +13617,8 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageSuggestProfilePhoto::ID:
       return true;
     case td_api::messagePremiumGiftCode::ID:
+      return true;
+    case td_api::messagePaidMedia::ID:
       return true;
     default:
       break;
