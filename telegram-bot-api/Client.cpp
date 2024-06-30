@@ -223,6 +223,7 @@ bool Client::init_methods() {
   methods_.emplace("sendvideo", &Client::process_send_video_query);
   methods_.emplace("sendvideonote", &Client::process_send_video_note_query);
   methods_.emplace("sendvoice", &Client::process_send_voice_query);
+  methods_.emplace("sendpaidmedia", &Client::process_send_paid_media_query);
   methods_.emplace("sendgame", &Client::process_send_game_query);
   methods_.emplace("sendinvoice", &Client::process_send_invoice_query);
   methods_.emplace("sendlocation", &Client::process_send_location_query);
@@ -9550,6 +9551,37 @@ td::Result<td_api::object_ptr<td_api::inputPaidMedia>> Client::get_input_paid_me
   return r_input_paid_media.move_as_ok();
 }
 
+td::Result<td::vector<td_api::object_ptr<td_api::inputPaidMedia>>> Client::get_paid_media(const Query *query,
+                                                                                          td::Slice field_name) const {
+  TRY_RESULT(media, get_required_string_arg(query, field_name));
+
+  LOG(INFO) << "Parsing JSON object: " << media;
+  auto r_value = json_decode(media);
+  if (r_value.is_error()) {
+    LOG(INFO) << "Can't parse JSON object: " << r_value.error();
+    return td::Status::Error(400, "Can't parse paid media JSON object");
+  }
+
+  return get_paid_media(query, r_value.move_as_ok());
+}
+
+td::Result<td::vector<td_api::object_ptr<td_api::inputPaidMedia>>> Client::get_paid_media(const Query *query,
+                                                                                          td::JsonValue &&value) const {
+  if (value.type() != td::JsonValue::Type::Array) {
+    return td::Status::Error(400, "Expected an Array of InputPaidMedia");
+  }
+
+  td::vector<object_ptr<td_api::inputPaidMedia>> paid_media;
+  for (auto &input_media : value.get_array()) {
+    auto r_paid_media = get_input_paid_media(query, std::move(input_media));
+    if (r_paid_media.is_error()) {
+      return td::Status::Error(400, PSLICE() << "Can't parse InputPaidMedia: " << r_paid_media.error().message());
+    }
+    paid_media.push_back(r_paid_media.move_as_ok());
+  }
+  return std::move(paid_media);
+}
+
 td::Result<td_api::object_ptr<td_api::inputMessageInvoice>> Client::get_input_message_invoice(
     const Query *query) const {
   TRY_RESULT(title, get_required_string_arg(query, "title"));
@@ -10252,6 +10284,17 @@ td::Status Client::process_send_voice_query(PromisedQueryPtr &query) {
   do_send_message(
       make_object<td_api::inputMessageVoiceNote>(std::move(voice_note), duration, "", std::move(caption), nullptr),
       std::move(query));
+  return td::Status::OK();
+}
+
+td::Status Client::process_send_paid_media_query(PromisedQueryPtr &query) {
+  int32 star_count = get_integer_arg(query.get(), "star_count", 0, 0, 1000000000);
+  TRY_RESULT(paid_media, get_paid_media(query.get(), "media"));
+  TRY_RESULT(caption, get_caption(query.get()));
+  auto show_caption_above_media = to_bool(query->arg("show_caption_above_media"));
+  do_send_message(make_object<td_api::inputMessagePaidMedia>(star_count, std::move(paid_media), std::move(caption),
+                                                             show_caption_above_media),
+                  std::move(query));
   return td::Status::OK();
 }
 
