@@ -3982,6 +3982,9 @@ class Client::JsonStarTransactionPartner final : public td::Jsonable {
         object("user", JsonUser(source_user->bot_user_id_, client_));
         break;
       }
+      case td_api::starTransactionPartnerTelegramAds::ID:
+        object("type", "telegram_ads");
+        break;
       case td_api::starTransactionPartnerTelegram::ID:
       case td_api::starTransactionPartnerAppStore::ID:
       case td_api::starTransactionPartnerGooglePlay::ID:
@@ -3989,7 +3992,6 @@ class Client::JsonStarTransactionPartner final : public td::Jsonable {
         LOG(ERROR) << "Receive " << to_string(*source_);
         object("type", "other");
         break;
-      case td_api::starTransactionPartnerTelegramAds::ID:
       case td_api::starTransactionPartnerUnsupported::ID:
         object("type", "other");
         break;
