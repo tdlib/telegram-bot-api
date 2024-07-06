@@ -1009,7 +1009,7 @@ class Client::JsonChat final : public td::Jsonable {
             permissions->can_send_basic_messages_ && permissions->can_send_audios_ &&
             permissions->can_send_documents_ && permissions->can_send_photos_ && permissions->can_send_videos_ &&
             permissions->can_send_video_notes_ && permissions->can_send_voice_notes_ && permissions->can_send_polls_ &&
-            permissions->can_send_other_messages_ && permissions->can_add_web_page_previews_ &&
+            permissions->can_send_other_messages_ && permissions->can_add_link_previews_ &&
             permissions->can_change_info_ && permissions->can_invite_users_ && permissions->can_pin_messages_;
         object("all_members_are_administrators", td::JsonBool(everyone_is_administrator));
         photo = group_info->photo.get();
@@ -3256,6 +3256,8 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("boost_added", JsonChatBoostAdded(content));
       break;
     }
+    case td_api::messagePaymentRefunded::ID:
+      break;
     default:
       UNREACHABLE();
   }
@@ -13101,7 +13103,7 @@ void Client::json_store_permissions(td::JsonObjectScope &object, const td_api::c
   object("can_send_voice_notes", td::JsonBool(permissions->can_send_voice_notes_));
   object("can_send_polls", td::JsonBool(permissions->can_send_polls_));
   object("can_send_other_messages", td::JsonBool(permissions->can_send_other_messages_));
-  object("can_add_web_page_previews", td::JsonBool(permissions->can_add_web_page_previews_));
+  object("can_add_web_page_previews", td::JsonBool(permissions->can_add_link_previews_));
   object("can_change_info", td::JsonBool(permissions->can_change_info_));
   object("can_invite_users", td::JsonBool(permissions->can_invite_users_));
   object("can_pin_messages", td::JsonBool(permissions->can_pin_messages_));
@@ -13747,6 +13749,8 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageSuggestProfilePhoto::ID:
       return true;
     case td_api::messagePremiumGiftCode::ID:
+      return true;
+    case td_api::messagePaymentRefunded::ID:
       return true;
     default:
       break;
