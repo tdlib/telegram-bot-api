@@ -179,6 +179,7 @@ class Client final : public WebhookActor::Callback {
   class JsonBackgroundType;
   class JsonChatBackground;
   class JsonSuccessfulPaymentBot;
+  class JsonRefundedPayment;
   class JsonEncryptedPassportElement;
   class JsonEncryptedCredentials;
   class JsonPassportData;

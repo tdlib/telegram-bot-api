@@ -2068,13 +2068,37 @@ class Client::JsonSuccessfulPaymentBot final : public td::Jsonable {
     if (successful_payment_->order_info_ != nullptr) {
       object("order_info", JsonOrderInfo(successful_payment_->order_info_.get()));
     }
-
     object("telegram_payment_charge_id", successful_payment_->telegram_payment_charge_id_);
     object("provider_payment_charge_id", successful_payment_->provider_payment_charge_id_);
   }
 
  private:
   const td_api::messagePaymentSuccessfulBot *successful_payment_;
+};
+
+class Client::JsonRefundedPayment final : public td::Jsonable {
+ public:
+  explicit JsonRefundedPayment(const td_api::messagePaymentRefunded *refunded_payment)
+      : refunded_payment_(refunded_payment) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("currency", refunded_payment_->currency_);
+    object("total_amount", refunded_payment_->total_amount_);
+    if (!td::check_utf8(refunded_payment_->invoice_payload_)) {
+      LOG(WARNING) << "Receive non-UTF-8 invoice payload";
+      object("invoice_payload", td::JsonRawString(refunded_payment_->invoice_payload_));
+    } else {
+      object("invoice_payload", refunded_payment_->invoice_payload_);
+    }
+    object("telegram_payment_charge_id", refunded_payment_->telegram_payment_charge_id_);
+    if (!refunded_payment_->provider_payment_charge_id_.empty()) {
+      object("provider_payment_charge_id", refunded_payment_->provider_payment_charge_id_);
+    }
+  }
+
+ private:
+  const td_api::messagePaymentRefunded *refunded_payment_;
 };
 
 class Client::JsonEncryptedPassportElement final : public td::Jsonable {
@@ -3256,8 +3280,11 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("boost_added", JsonChatBoostAdded(content));
       break;
     }
-    case td_api::messagePaymentRefunded::ID:
+    case td_api::messagePaymentRefunded::ID: {
+      auto content = static_cast<const td_api::messagePaymentRefunded *>(message_->content.get());
+      object("refunded_payment", JsonRefundedPayment(content));
       break;
+    }
     default:
       UNREACHABLE();
   }
@@ -13642,6 +13669,7 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       case td_api::messagePremiumGiveaway::ID:
       case td_api::messagePremiumGiveawayWinners::ID:
       case td_api::messagePremiumGiveawayCompleted::ID:
+      case td_api::messagePaymentRefunded::ID:
         // don't skip
         break;
       default:
@@ -13749,8 +13777,6 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageSuggestProfilePhoto::ID:
       return true;
     case td_api::messagePremiumGiftCode::ID:
-      return true;
-    case td_api::messagePaymentRefunded::ID:
       return true;
     default:
       break;
