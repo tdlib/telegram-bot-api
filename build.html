@@ -201,10 +201,10 @@
       <option>Alpine</option>
       <option>CentOS 7</option>
       <option>CentOS 8</option>
-      <option>CentOS 9</option>
+      <option>CentOS Stream 9</option>
       <option>Debian 8/9</option>
       <option>Debian 10+</option>
-      <option>Fedora 37</option>
+      <option>Fedora 21+</option>
       <option>Ubuntu 14</option>
       <option>Ubuntu 16</option>
       <option>Ubuntu 18</option>
@@ -542,7 +542,7 @@ function onOptionsChanged() {
         commands.push(sudo + 'yum install -y ' + packages);
         break;
       case 'CentOS 8':
-      case 'CentOS 9':
+      case 'CentOS Stream 9':
         commands.push(sudo + 'dnf update -y');
         var packages = 'gcc-c++ make git zlib-devel openssl-devel';
         if (linux_distro === 'CentOS 8') {
@@ -553,14 +553,14 @@ function onOptionsChanged() {
         packages += ' ' + cmake;
         commands.push(sudo + 'dnf install -y ' + packages);
         break;
-      case 'Debian 8/9':
-      case 'Debian 10+':
-      case 'Fedora 37':
+      case 'Fedora 21+':
         commands.push(sudo + 'dnf update -y');
         var packages = 'gperf gcc-c++ make git zlib-devel openssl-devel';
         packages += ' ' + cmake;
         commands.push(sudo + 'dnf install -y ' + packages);
         break;
+      case 'Debian 8/9':
+      case 'Debian 10+':
       case 'Ubuntu 14':
       case 'Ubuntu 16':
       case 'Ubuntu 18':
