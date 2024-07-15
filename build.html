@@ -201,8 +201,10 @@
       <option>Alpine</option>
       <option>CentOS 7</option>
       <option>CentOS 8</option>
+      <option>CentOS Stream 9</option>
       <option>Debian 8/9</option>
       <option>Debian 10+</option>
+      <option>Fedora 21+</option>
       <option>Ubuntu 14</option>
       <option>Ubuntu 16</option>
       <option>Ubuntu 18</option>
@@ -354,7 +356,7 @@ function onOptionsChanged() {
   document.getElementById('buildCommandsDiv').style.display = 'block';
 
   var use_clang = os_freebsd || os_openbsd;
-  if (os_linux && linux_distro !== 'Alpine' && !linux_distro.includes('CentOS')) {
+  if (os_linux && linux_distro !== 'Alpine' && !linux_distro.includes('CentOS') && !linux_distro.includes('Fedora')) {
     document.getElementById('buildCompilerDiv').style.display = 'block';
     use_clang = document.getElementById('buildCompilerRadioClang').checked;
   } else {
@@ -531,19 +533,31 @@ function onOptionsChanged() {
         commands.push(sudo + 'apk add ' + packages);
         break;
       case 'CentOS 7':
-      case 'CentOS 8':
         commands.push(sudo + 'yum update -y');
         var packages = 'gcc-c++ make git zlib-devel openssl-devel';
-        if (linux_distro === 'CentOS 7') {
-          commands.push(sudo + 'yum install -y centos-release-scl-rh epel-release');
-          commands.push(sudo + 'yum install -y devtoolset-9-gcc devtoolset-9-gcc-c++');
-          cmake = 'cmake3';
-          packages += ' gperf';
-        } else {
+        commands.push(sudo + 'yum install -y centos-release-scl-rh epel-release');
+        commands.push(sudo + 'yum install -y devtoolset-9-gcc devtoolset-9-gcc-c++');
+        cmake = 'cmake3';
+        packages += ' gperf ' + cmake;
+        commands.push(sudo + 'yum install -y ' + packages);
+        break;
+      case 'CentOS 8':
+      case 'CentOS Stream 9':
+        commands.push(sudo + 'dnf update -y');
+        var packages = 'gcc-c++ make git zlib-devel openssl-devel';
+        if (linux_distro === 'CentOS 8') {
           commands.push(sudo + 'dnf --enablerepo=powertools install gperf');
+        } else {
+          commands.push(sudo + 'dnf --enablerepo=crb install gperf');
         }
         packages += ' ' + cmake;
-        commands.push(sudo + 'yum install -y ' + packages);
+        commands.push(sudo + 'dnf install -y ' + packages);
+        break;
+      case 'Fedora 21+':
+        commands.push(sudo + 'dnf update -y');
+        var packages = 'gperf gcc-c++ make git zlib-devel openssl-devel';
+        packages += ' ' + cmake;
+        commands.push(sudo + 'dnf install -y ' + packages);
         break;
       case 'Debian 8/9':
       case 'Debian 10+':
