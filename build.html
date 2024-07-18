@@ -534,29 +534,26 @@ function onOptionsChanged() {
         break;
       case 'CentOS 7':
         commands.push(sudo + 'yum update -y');
-        var packages = 'gcc-c++ make git zlib-devel openssl-devel';
         commands.push(sudo + 'yum install -y centos-release-scl-rh epel-release');
         commands.push(sudo + 'yum install -y devtoolset-9-gcc devtoolset-9-gcc-c++');
         cmake = 'cmake3';
-        packages += ' gperf ' + cmake;
+        var packages = 'gcc-c++ make git zlib-devel openssl-devel gperf ' + cmake;
         commands.push(sudo + 'yum install -y ' + packages);
         break;
       case 'CentOS 8':
       case 'CentOS Stream 9':
         commands.push(sudo + 'dnf update -y');
-        var packages = 'gcc-c++ make git zlib-devel openssl-devel';
         if (linux_distro === 'CentOS 8') {
           commands.push(sudo + 'dnf --enablerepo=powertools install gperf');
         } else {
           commands.push(sudo + 'dnf --enablerepo=crb install gperf');
         }
-        packages += ' ' + cmake;
+        var packages = 'gcc-c++ make git zlib-devel openssl-devel cmake';
         commands.push(sudo + 'dnf install -y ' + packages);
         break;
       case 'Fedora 21+':
         commands.push(sudo + 'dnf update -y');
-        var packages = 'gperf gcc-c++ make git zlib-devel openssl-devel';
-        packages += ' ' + cmake;
+        var packages = 'gperf gcc-c++ make git zlib-devel openssl-devel cmake';
         commands.push(sudo + 'dnf install -y ' + packages);
         break;
       case 'Debian 8/9':
