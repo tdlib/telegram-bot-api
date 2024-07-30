@@ -11326,8 +11326,20 @@ td::Status Client::process_pin_chat_message_query(PromisedQueryPtr &query) {
 }
 
 td::Status Client::process_unpin_chat_message_query(PromisedQueryPtr &query) {
+  auto business_connection_id = query->arg("business_connection_id");
   auto chat_id = query->arg("chat_id");
   auto message_id = get_message_id(query.get());
+
+  if (!business_connection_id.empty()) {
+    check_business_connection_chat_id(
+        business_connection_id.str(), chat_id.str(), std::move(query),
+        [this, message_id](const BusinessConnection *business_connection, int64 chat_id, PromisedQueryPtr query) {
+          send_request(
+              make_object<td_api::setBusinessMessageIsPinned>(business_connection->id_, chat_id, message_id, false),
+              td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+        });
+    return td::Status::OK();
+  }
 
   if (message_id == 0) {
     check_chat(chat_id, AccessRights::Write, std::move(query), [this](int64 chat_id, PromisedQueryPtr query) {
