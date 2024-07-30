@@ -3285,6 +3285,8 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("refunded_payment", JsonRefundedPayment(content));
       break;
     }
+    case td_api::messageGiftedStars::ID:
+      break;
     default:
       UNREACHABLE();
   }
@@ -4085,7 +4087,7 @@ class Client::JsonStarTransactionPartner final : public td::Jsonable {
       case td_api::starTransactionPartnerBot::ID: {
         auto source_user = static_cast<const td_api::starTransactionPartnerBot *>(source_);
         object("type", "user");
-        object("user", JsonUser(source_user->bot_user_id_, client_));
+        object("user", JsonUser(source_user->user_id_, client_));
         if (!source_user->invoice_payload_.empty()) {
           if (!td::check_utf8(source_user->invoice_payload_)) {
             LOG(WARNING) << "Receive non-UTF-8 invoice payload";
@@ -4102,6 +4104,7 @@ class Client::JsonStarTransactionPartner final : public td::Jsonable {
       case td_api::starTransactionPartnerTelegram::ID:
       case td_api::starTransactionPartnerAppStore::ID:
       case td_api::starTransactionPartnerGooglePlay::ID:
+      case td_api::starTransactionPartnerUser::ID:
       case td_api::starTransactionPartnerChannel::ID:
         LOG(ERROR) << "Receive " << to_string(*source_);
         object("type", "other");
@@ -13777,6 +13780,8 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageSuggestProfilePhoto::ID:
       return true;
     case td_api::messagePremiumGiftCode::ID:
+      return true;
+    case td_api::messageGiftedStars::ID:
       return true;
     default:
       break;
