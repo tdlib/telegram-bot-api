@@ -420,6 +420,7 @@ class Client::JsonUser final : public td::Jsonable {
       object("can_read_all_group_messages", td::JsonBool(user_info->can_read_all_group_messages));
       object("supports_inline_queries", td::JsonBool(user_info->is_inline_bot));
       object("can_connect_to_business", td::JsonBool(user_info->can_connect_to_business));
+      object("has_main_web_app", td::JsonBool(user_info->has_main_web_app));
     }
   }
 
@@ -12858,6 +12859,7 @@ void Client::add_user(UserInfo *user_info, object_ptr<td_api::user> &&user) {
       user_info->can_read_all_group_messages = bot->can_read_all_group_messages_;
       user_info->is_inline_bot = bot->is_inline_;
       user_info->can_connect_to_business = bot->can_connect_to_business_;
+      user_info->has_main_web_app = bot->has_main_web_app_;
       break;
     }
     case td_api::userTypeDeleted::ID:

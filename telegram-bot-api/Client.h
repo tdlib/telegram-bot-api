@@ -841,9 +841,10 @@ class Client final : public WebhookActor::Callback {
     bool can_join_groups = false;
     bool can_read_all_group_messages = false;
     bool can_connect_to_business = false;
-    bool is_inline_bot = false;
+    bool has_main_web_app = false;
     bool has_private_forwards = false;
     bool has_restricted_voice_and_video_messages = false;
+    bool is_inline_bot = false;
     bool is_premium = false;
     bool added_to_attachment_menu = false;
   };
