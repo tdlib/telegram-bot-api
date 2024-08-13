@@ -258,6 +258,7 @@ bool Client::init_methods() {
   methods_.emplace("answerprecheckoutquery", &Client::process_answer_pre_checkout_query_query);
   methods_.emplace("exportchatinvitelink", &Client::process_export_chat_invite_link_query);
   methods_.emplace("createchatinvitelink", &Client::process_create_chat_invite_link_query);
+  methods_.emplace("createchatsubscriptioninvitelink", &Client::process_create_chat_subscription_invite_link_query);
   methods_.emplace("editchatinvitelink", &Client::process_edit_chat_invite_link_query);
   methods_.emplace("revokechatinvitelink", &Client::process_revoke_chat_invite_link_query);
   methods_.emplace("getbusinessconnection", &Client::process_get_business_connection_query);
@@ -11196,6 +11197,22 @@ td::Status Client::process_create_chat_invite_link_query(PromisedQueryPtr &query
                                                                                         PromisedQueryPtr query) {
                send_request(make_object<td_api::createChatInviteLink>(chat_id, name, expire_date, member_limit,
                                                                       creates_join_request),
+                            td::make_unique<TdOnGetChatInviteLinkCallback>(this, std::move(query)));
+             });
+  return td::Status::OK();
+}
+
+td::Status Client::process_create_chat_subscription_invite_link_query(PromisedQueryPtr &query) {
+  auto chat_id = query->arg("chat_id");
+  auto name = query->arg("name");
+  auto subscription_period = get_integer_arg(query.get(), "subscription_period", 0, 0, 1000000000);
+  auto subscription_price = get_integer_arg(query.get(), "subscription_price", 0, 0, 1000000);
+
+  check_chat(chat_id, AccessRights::Write, std::move(query),
+             [this, name = name.str(), subscription_period, subscription_price](int64 chat_id, PromisedQueryPtr query) {
+               send_request(make_object<td_api::createChatSubscriptionInviteLink>(
+                                chat_id, name,
+                                make_object<td_api::starSubscriptionPricing>(subscription_period, subscription_price)),
                             td::make_unique<TdOnGetChatInviteLinkCallback>(this, std::move(query)));
              });
   return td::Status::OK();
