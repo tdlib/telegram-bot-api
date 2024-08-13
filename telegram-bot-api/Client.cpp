@@ -709,6 +709,8 @@ class Client::JsonReactionType final : public td::Jsonable {
         object("custom_emoji_id",
                td::to_string(static_cast<const td_api::reactionTypeCustomEmoji *>(reaction_type_)->custom_emoji_id_));
         break;
+      case td_api::reactionTypePaid::ID:
+        break;
       default:
         UNREACHABLE();
     }
@@ -4089,13 +4091,25 @@ class Client::JsonStarTransactionPartner final : public td::Jsonable {
         auto source_user = static_cast<const td_api::starTransactionPartnerBot *>(source_);
         object("type", "user");
         object("user", JsonUser(source_user->user_id_, client_));
-        if (!source_user->invoice_payload_.empty()) {
-          if (!td::check_utf8(source_user->invoice_payload_)) {
-            LOG(WARNING) << "Receive non-UTF-8 invoice payload";
-            object("invoice_payload", td::JsonRawString(source_user->invoice_payload_));
-          } else {
-            object("invoice_payload", source_user->invoice_payload_);
+        CHECK(source_user->purpose_ != nullptr);
+        switch (source_user->purpose_->get_id()) {
+          case td_api::botTransactionPurposeInvoicePayment::ID: {
+            auto purpose =
+                static_cast<const td_api::botTransactionPurposeInvoicePayment *>(source_user->purpose_.get());
+            if (!purpose->invoice_payload_.empty()) {
+              if (!td::check_utf8(purpose->invoice_payload_)) {
+                LOG(WARNING) << "Receive non-UTF-8 invoice payload";
+                object("invoice_payload", td::JsonRawString(purpose->invoice_payload_));
+              } else {
+                object("invoice_payload", purpose->invoice_payload_);
+              }
+            }
+            break;
           }
+          case td_api::botTransactionPurposePaidMedia::ID:
+            break;
+          default:
+            UNREACHABLE();
         }
         break;
       }
@@ -4106,6 +4120,7 @@ class Client::JsonStarTransactionPartner final : public td::Jsonable {
       case td_api::starTransactionPartnerAppStore::ID:
       case td_api::starTransactionPartnerGooglePlay::ID:
       case td_api::starTransactionPartnerUser::ID:
+      case td_api::starTransactionPartnerBusiness::ID:
       case td_api::starTransactionPartnerChannel::ID:
         LOG(ERROR) << "Receive " << to_string(*source_);
         object("type", "other");
@@ -10978,8 +10993,8 @@ td::Status Client::process_create_invoice_link_query(PromisedQueryPtr &query) {
 td::Status Client::process_get_star_transactions_query(PromisedQueryPtr &query) {
   auto offset = get_integer_arg(query.get(), "offset", 0, 0);
   auto limit = get_integer_arg(query.get(), "limit", 100, 1, 100);
-  send_request(make_object<td_api::getStarTransactions>(make_object<td_api::messageSenderUser>(my_id_), nullptr,
-                                                        td::to_string(offset), limit),
+  send_request(make_object<td_api::getStarTransactions>(make_object<td_api::messageSenderUser>(my_id_), td::string(),
+                                                        nullptr, td::to_string(offset), limit),
                td::make_unique<TdOnGetStarTransactionsQueryCallback>(this, std::move(query)));
   return td::Status::OK();
 }
