@@ -887,6 +887,10 @@ class Client::JsonChatInviteLink final : public td::Jsonable {
     if (chat_invite_link_->pending_join_request_count_ != 0) {
       object("pending_join_request_count", chat_invite_link_->pending_join_request_count_);
     }
+    if (chat_invite_link_->subscription_pricing_ != nullptr) {
+      object("subscription_period", chat_invite_link_->subscription_pricing_->period_);
+      object("subscription_price", chat_invite_link_->subscription_pricing_->star_count_);
+    }
     object("creates_join_request", td::JsonBool(chat_invite_link_->creates_join_request_));
     object("is_primary", td::JsonBool(chat_invite_link_->is_primary_));
     object("is_revoked", td::JsonBool(chat_invite_link_->is_revoked_));
