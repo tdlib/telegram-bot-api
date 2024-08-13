@@ -685,6 +685,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_create_chat_invite_link_query(PromisedQueryPtr &query);
   td::Status process_create_chat_subscription_invite_link_query(PromisedQueryPtr &query);
   td::Status process_edit_chat_invite_link_query(PromisedQueryPtr &query);
+  td::Status process_edit_chat_subscription_invite_link_query(PromisedQueryPtr &query);
   td::Status process_revoke_chat_invite_link_query(PromisedQueryPtr &query);
   td::Status process_get_business_connection_query(PromisedQueryPtr &query);
   td::Status process_get_chat_query(PromisedQueryPtr &query);
