@@ -4116,8 +4116,13 @@ class Client::JsonStarTransactionPartner final : public td::Jsonable {
             }
             break;
           }
-          case td_api::botTransactionPurposePaidMedia::ID:
+          case td_api::botTransactionPurposePaidMedia::ID: {
+            auto purpose = static_cast<const td_api::botTransactionPurposePaidMedia *>(source_user->purpose_.get());
+            object("paid_media", td::json_array(purpose->media_, [client = client_](auto &media) {
+                     return JsonPaidMedia(media.get(), client);
+                   }));
             break;
+          }
           default:
             UNREACHABLE();
         }
