@@ -710,6 +710,7 @@ class Client::JsonReactionType final : public td::Jsonable {
                td::to_string(static_cast<const td_api::reactionTypeCustomEmoji *>(reaction_type_)->custom_emoji_id_));
         break;
       case td_api::reactionTypePaid::ID:
+        object("type", "paid");
         break;
       default:
         UNREACHABLE();
