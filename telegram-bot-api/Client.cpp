@@ -3710,8 +3710,13 @@ class Client::JsonChatMember final : public td::Jsonable {
         }
         break;
       }
-      case td_api::chatMemberStatusMember::ID:
+      case td_api::chatMemberStatusMember::ID: {
+        auto member = static_cast<const td_api::chatMemberStatusMember *>(member_->status_.get());
+        if (member->member_until_date_ > 0) {
+          object("until_date", member->member_until_date_);
+        }
         break;
+      }
       case td_api::chatMemberStatusRestricted::ID:
         if (chat_type_ == Client::ChatType::Supergroup) {
           auto restricted = static_cast<const td_api::chatMemberStatusRestricted *>(member_->status_.get());
