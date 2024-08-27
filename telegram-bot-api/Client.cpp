@@ -2421,8 +2421,7 @@ class Client::JsonChatShared final : public td::Jsonable {
 
 class Client::JsonGiveaway final : public td::Jsonable {
  public:
-  JsonGiveaway(const td_api::messagePremiumGiveaway *giveaway, const Client *client)
-      : giveaway_(giveaway), client_(client) {
+  JsonGiveaway(const td_api::messageGiveaway *giveaway, const Client *client) : giveaway_(giveaway), client_(client) {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
@@ -2447,19 +2446,29 @@ class Client::JsonGiveaway final : public td::Jsonable {
     if (!giveaway_->parameters_->prize_description_.empty()) {
       object("prize_description", giveaway_->parameters_->prize_description_);
     }
-    if (giveaway_->month_count_ > 0) {
-      object("premium_subscription_month_count", giveaway_->month_count_);
+    switch (giveaway_->prize_->get_id()) {
+      case td_api::giveawayPrizePremium::ID: {
+        auto month_count = static_cast<const td_api::giveawayPrizePremium *>(giveaway_->prize_.get())->month_count_;
+        if (month_count > 0) {
+          object("premium_subscription_month_count", month_count);
+        }
+        break;
+      }
+      case td_api::giveawayPrizeStars::ID:
+        break;
+      default:
+        UNREACHABLE();
     }
   }
 
  private:
-  const td_api::messagePremiumGiveaway *giveaway_;
+  const td_api::messageGiveaway *giveaway_;
   const Client *client_;
 };
 
 class Client::JsonGiveawayWinners final : public td::Jsonable {
  public:
-  JsonGiveawayWinners(const td_api::messagePremiumGiveawayWinners *giveaway_winners, const Client *client)
+  JsonGiveawayWinners(const td_api::messageGiveawayWinners *giveaway_winners, const Client *client)
       : giveaway_winners_(giveaway_winners), client_(client) {
   }
   void store(td::JsonValueScope *scope) const {
@@ -2476,8 +2485,19 @@ class Client::JsonGiveawayWinners final : public td::Jsonable {
     if (giveaway_winners_->was_refunded_) {
       object("was_refunded", td::JsonTrue());
     }
-    if (giveaway_winners_->month_count_ > 0) {
-      object("premium_subscription_month_count", giveaway_winners_->month_count_);
+    switch (giveaway_winners_->prize_->get_id()) {
+      case td_api::giveawayPrizePremium::ID: {
+        auto month_count =
+            static_cast<const td_api::giveawayPrizePremium *>(giveaway_winners_->prize_.get())->month_count_;
+        if (month_count > 0) {
+          object("premium_subscription_month_count", month_count);
+        }
+        break;
+      }
+      case td_api::giveawayPrizeStars::ID:
+        break;
+      default:
+        UNREACHABLE();
     }
     if (!giveaway_winners_->prize_description_.empty()) {
       object("prize_description", giveaway_winners_->prize_description_);
@@ -2490,14 +2510,13 @@ class Client::JsonGiveawayWinners final : public td::Jsonable {
   }
 
  private:
-  const td_api::messagePremiumGiveawayWinners *giveaway_winners_;
+  const td_api::messageGiveawayWinners *giveaway_winners_;
   const Client *client_;
 };
 
 class Client::JsonGiveawayCompleted final : public td::Jsonable {
  public:
-  JsonGiveawayCompleted(const td_api::messagePremiumGiveawayCompleted *giveaway_completed, int64 chat_id,
-                        const Client *client)
+  JsonGiveawayCompleted(const td_api::messageGiveawayCompleted *giveaway_completed, int64 chat_id, const Client *client)
       : giveaway_completed_(giveaway_completed), chat_id_(chat_id), client_(client) {
   }
   void store(td::JsonValueScope *scope) const {
@@ -2514,7 +2533,7 @@ class Client::JsonGiveawayCompleted final : public td::Jsonable {
   }
 
  private:
-  const td_api::messagePremiumGiveawayCompleted *giveaway_completed_;
+  const td_api::messageGiveawayCompleted *giveaway_completed_;
   int64 chat_id_;
   const Client *client_;
 };
@@ -2767,13 +2786,13 @@ class Client::JsonExternalReplyInfo final : public td::Jsonable {
         }
         case td_api::messageUnsupported::ID:
           break;
-        case td_api::messagePremiumGiveaway::ID: {
-          auto content = static_cast<const td_api::messagePremiumGiveaway *>(reply_->content_.get());
+        case td_api::messageGiveaway::ID: {
+          auto content = static_cast<const td_api::messageGiveaway *>(reply_->content_.get());
           object("giveaway", JsonGiveaway(content, client_));
           break;
         }
-        case td_api::messagePremiumGiveawayWinners::ID: {
-          auto content = static_cast<const td_api::messagePremiumGiveawayWinners *>(reply_->content_.get());
+        case td_api::messageGiveawayWinners::ID: {
+          auto content = static_cast<const td_api::messageGiveawayWinners *>(reply_->content_.get());
           object("giveaway_winners", JsonGiveawayWinners(content, client_));
           break;
         }
@@ -3271,21 +3290,21 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     }
     case td_api::messagePremiumGiftCode::ID:
       break;
-    case td_api::messagePremiumGiveawayCreated::ID:
+    case td_api::messageGiveawayCreated::ID:
       object("giveaway_created", JsonEmptyObject());
       break;
-    case td_api::messagePremiumGiveaway::ID: {
-      auto content = static_cast<const td_api::messagePremiumGiveaway *>(message_->content.get());
+    case td_api::messageGiveaway::ID: {
+      auto content = static_cast<const td_api::messageGiveaway *>(message_->content.get());
       object("giveaway", JsonGiveaway(content, client_));
       break;
     }
-    case td_api::messagePremiumGiveawayWinners::ID: {
-      auto content = static_cast<const td_api::messagePremiumGiveawayWinners *>(message_->content.get());
+    case td_api::messageGiveawayWinners::ID: {
+      auto content = static_cast<const td_api::messageGiveawayWinners *>(message_->content.get());
       object("giveaway_winners", JsonGiveawayWinners(content, client_));
       break;
     }
-    case td_api::messagePremiumGiveawayCompleted::ID: {
-      auto content = static_cast<const td_api::messagePremiumGiveawayCompleted *>(message_->content.get());
+    case td_api::messageGiveawayCompleted::ID: {
+      auto content = static_cast<const td_api::messageGiveawayCompleted *>(message_->content.get());
       object("giveaway_completed", JsonGiveawayCompleted(content, message_->chat_id, client_));
       break;
     }
@@ -3300,6 +3319,8 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       break;
     }
     case td_api::messageGiftedStars::ID:
+      break;
+    case td_api::messageGiveawayPrizeStars::ID:
       break;
     default:
       UNREACHABLE();
@@ -4142,7 +4163,7 @@ class Client::JsonStarTransactionPartner final : public td::Jsonable {
       case td_api::starTransactionPartnerGooglePlay::ID:
       case td_api::starTransactionPartnerUser::ID:
       case td_api::starTransactionPartnerBusiness::ID:
-      case td_api::starTransactionPartnerChannel::ID:
+      case td_api::starTransactionPartnerChat::ID:
         LOG(ERROR) << "Receive " << to_string(*source_);
         object("type", "other");
         break;
@@ -10362,7 +10383,7 @@ td::Status Client::process_send_paid_media_query(PromisedQueryPtr &query) {
   TRY_RESULT(caption, get_caption(query.get()));
   auto show_caption_above_media = to_bool(query->arg("show_caption_above_media"));
   do_send_message(make_object<td_api::inputMessagePaidMedia>(star_count, std::move(paid_media), std::move(caption),
-                                                             show_caption_above_media),
+                                                             show_caption_above_media, td::string()),
                   std::move(query));
   return td::Status::OK();
 }
@@ -13758,10 +13779,10 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       case td_api::messageForumTopicEdited::ID:
       case td_api::messageForumTopicIsClosedToggled::ID:
       case td_api::messageForumTopicIsHiddenToggled::ID:
-      case td_api::messagePremiumGiveawayCreated::ID:
-      case td_api::messagePremiumGiveaway::ID:
-      case td_api::messagePremiumGiveawayWinners::ID:
-      case td_api::messagePremiumGiveawayCompleted::ID:
+      case td_api::messageGiveawayCreated::ID:
+      case td_api::messageGiveaway::ID:
+      case td_api::messageGiveawayWinners::ID:
+      case td_api::messageGiveawayCompleted::ID:
       case td_api::messagePaymentRefunded::ID:
         // don't skip
         break;
@@ -13873,6 +13894,8 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       return true;
     case td_api::messageGiftedStars::ID:
       return true;
+    case td_api::messageGiveawayPrizeStars::ID:
+      return true;
     default:
       break;
   }
@@ -13923,9 +13946,8 @@ td::int64 Client::get_same_chat_reply_to_message_id(const object_ptr<td_api::mes
       case td_api::messageChatSetBackground::ID:
         return static_cast<const td_api::messageChatSetBackground *>(message->content_.get())
             ->old_background_message_id_;
-      case td_api::messagePremiumGiveawayCompleted::ID:
-        return static_cast<const td_api::messagePremiumGiveawayCompleted *>(message->content_.get())
-            ->giveaway_message_id_;
+      case td_api::messageGiveawayCompleted::ID:
+        return static_cast<const td_api::messageGiveawayCompleted *>(message->content_.get())->giveaway_message_id_;
       case td_api::messagePaymentSuccessful::ID:
         UNREACHABLE();
         return static_cast<int64>(0);
