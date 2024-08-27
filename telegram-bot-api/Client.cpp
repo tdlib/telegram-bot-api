@@ -39,6 +39,24 @@ namespace telegram_bot_api {
 using td_api::make_object;
 using td_api::move_object_as;
 
+Client::Client(td::ActorShared<> parent, const td::string &bot_token, bool is_test_dc, int64 tqueue_id,
+               std::shared_ptr<const ClientParameters> parameters, td::ActorId<BotStatActor> stat_actor)
+    : parent_(std::move(parent))
+    , bot_token_(bot_token)
+    , bot_token_id_("<unknown>")
+    , is_test_dc_(is_test_dc)
+    , tqueue_id_(tqueue_id)
+    , parameters_(std::move(parameters))
+    , stat_actor_(std::move(stat_actor)) {
+  static auto is_inited = init_methods();
+  CHECK(is_inited);
+}
+
+Client::~Client() {
+  td::Scheduler::instance()->destroy_on_scheduler(SharedData::get_file_gc_scheduler_id(), messages_, users_, groups_,
+                                                  supergroups_, chats_, sticker_set_names_);
+}
+
 int Client::get_retry_after_time(td::Slice error_message) {
   td::Slice prefix = "Too Many Requests: retry after ";
   if (td::begins_with(error_message, prefix)) {
@@ -179,22 +197,8 @@ void Client::fail_query_with_error(PromisedQueryPtr &&query, object_ptr<td_api::
   fail_query_with_error(std::move(query), error->code_, error->message_, default_message);
 }
 
-Client::Client(td::ActorShared<> parent, const td::string &bot_token, bool is_test_dc, int64 tqueue_id,
-               std::shared_ptr<const ClientParameters> parameters, td::ActorId<BotStatActor> stat_actor)
-    : parent_(std::move(parent))
-    , bot_token_(bot_token)
-    , bot_token_id_("<unknown>")
-    , is_test_dc_(is_test_dc)
-    , tqueue_id_(tqueue_id)
-    , parameters_(std::move(parameters))
-    , stat_actor_(std::move(stat_actor)) {
-  static auto is_inited = init_methods();
-  CHECK(is_inited);
-}
-
-Client::~Client() {
-  td::Scheduler::instance()->destroy_on_scheduler(SharedData::get_file_gc_scheduler_id(), messages_, users_, groups_,
-                                                  supergroups_, chats_, sticker_set_names_);
+bool Client::is_special_error_code(int32 error_code) {
+  return error_code == 401 || error_code == 429 || error_code >= 500;
 }
 
 bool Client::init_methods() {
@@ -5281,7 +5285,7 @@ class Client::TdOnGetChatPinnedMessageCallback final : public TdQueryCallback {
     int64 pinned_message_id = 0;
     if (result->get_id() == td_api::error::ID) {
       auto error = move_object_as<td_api::error>(result);
-      if (error->code_ == 429) {
+      if (is_special_error_code(error->code_)) {
         return fail_query_with_error(std::move(query_), std::move(error));
       } else if (error->code_ != 404 && error->message_ != "CHANNEL_PRIVATE") {
         LOG(ERROR) << "Failed to get chat pinned message: " << to_string(error);
@@ -5349,7 +5353,7 @@ class Client::TdOnGetChatPinnedMessageToUnpinCallback final : public TdQueryCall
     int64 pinned_message_id = 0;
     if (result->get_id() == td_api::error::ID) {
       auto error = move_object_as<td_api::error>(result);
-      if (error->code_ == 429) {
+      if (is_special_error_code(error->code_)) {
         return fail_query_with_error(std::move(query_), std::move(error));
       } else {
         return fail_query_with_error(std::move(query_), 400, "Message to unpin not found");
@@ -9959,7 +9963,7 @@ void Client::on_message_send_failed(int64 chat_id, int64 old_message_id, int64 n
   auto &query = *pending_send_message_queries_[query_id];
   if (query.is_multisend) {
     if (query.error == nullptr || query.error->message_ == "Group send failed") {
-      if (error->code_ == 401 || error->code_ == 429 || error->code_ >= 500 || error->message_ == "Group send failed") {
+      if (is_special_error_code(error->code_) || error->message_ == "Group send failed") {
         query.error = std::move(error);
       } else {
         auto pos = (query.total_message_count - query.awaited_message_count + 1);

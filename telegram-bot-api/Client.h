@@ -810,6 +810,8 @@ class Client final : public WebhookActor::Callback {
   static void fail_query_with_error(PromisedQueryPtr &&query, object_ptr<td_api::error> error,
                                     td::Slice default_message = td::Slice());
 
+  static bool is_special_error_code(int32 error_code);
+
   class JsonUpdates;
   void do_get_updates(int32 offset, int32 limit, int32 timeout, PromisedQueryPtr query);
 
