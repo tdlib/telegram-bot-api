@@ -5216,9 +5216,7 @@ class Client::TdOnGetChatCustomEmojiStickerSetCallback final : public TdQueryCal
     if (result->get_id() == td_api::error::ID) {
       supergroup_info->custom_emoji_sticker_set_id = 0;
     } else {
-      CHECK(result->get_id() == td_api::text::ID);
-      auto sticker_set_name = move_object_as<td_api::text>(result);
-      client_->on_get_sticker_set_name(sticker_set_id_, sticker_set_name->text_);
+      client_->on_get_sticker_set_name(sticker_set_id_, std::move(result));
     }
 
     answer_query(JsonChat(chat_id_, client_, true, pinned_message_id_), std::move(query_));
@@ -5254,9 +5252,7 @@ class Client::TdOnGetChatBusinessStartPageStickerSetCallback final : public TdQu
         user_info->business_info->start_page_->sticker_->set_id_ = 0;
       }
     } else {
-      CHECK(result->get_id() == td_api::text::ID);
-      auto sticker_set_name = move_object_as<td_api::text>(result);
-      client_->on_get_sticker_set_name(sticker_set_id_, sticker_set_name->text_);
+      client_->on_get_sticker_set_name(sticker_set_id_, std::move(result));
     }
 
     answer_query(JsonChat(chat_id_, client_, true, pinned_message_id_), std::move(query_));
@@ -5289,9 +5285,7 @@ class Client::TdOnGetChatStickerSetCallback final : public TdQueryCallback {
     if (result->get_id() == td_api::error::ID) {
       supergroup_info->sticker_set_id = 0;
     } else {
-      CHECK(result->get_id() == td_api::text::ID);
-      auto sticker_set_name = move_object_as<td_api::text>(result);
-      client_->on_get_sticker_set_name(sticker_set_id_, sticker_set_name->text_);
+      client_->on_get_sticker_set_name(sticker_set_id_, std::move(result));
     }
 
     auto sticker_set_id = supergroup_info->custom_emoji_sticker_set_id;
@@ -5851,9 +5845,7 @@ class Client::TdOnGetStickerSetPromiseCallback final : public TdQueryCallback {
       return promise_.set_error(td::Status::Error(error->code_, error->message_));
     }
 
-    CHECK(result->get_id() == td_api::text::ID);
-    auto sticker_set_name = move_object_as<td_api::text>(result);
-    client_->on_get_sticker_set_name(sticker_set_id_, sticker_set_name->text_);
+    client_->on_get_sticker_set_name(sticker_set_id_, std::move(result));
     promise_.set_value(td::Unit());
   }
 
@@ -6220,6 +6212,12 @@ void Client::on_get_sticker_set_name(int64 set_id, const td::string &name) {
   if (set_id != GREAT_MINDS_SET_ID) {
     sticker_set_names_[set_id] = name;
   }
+}
+
+void Client::on_get_sticker_set_name(int64 set_id, object_ptr<td_api::Object> sticker_set_name) {
+  CHECK(sticker_set_name->get_id() == td_api::text::ID);
+  auto text = move_object_as<td_api::text>(sticker_set_name);
+  on_get_sticker_set_name(set_id, text->text_);
 }
 
 template <class OnSuccess>

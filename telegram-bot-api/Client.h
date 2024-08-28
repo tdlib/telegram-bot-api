@@ -270,6 +270,8 @@ class Client final : public WebhookActor::Callback {
 
   void on_get_sticker_set_name(int64 set_id, const td::string &name);
 
+  void on_get_sticker_set_name(int64 set_id, object_ptr<td_api::Object> sticker_set_name);
+
   class TdQueryCallback {
    public:
     virtual void on_result(object_ptr<td_api::Object> result) = 0;
