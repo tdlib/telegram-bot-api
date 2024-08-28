@@ -2419,6 +2419,22 @@ class Client::JsonChatShared final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonGiveawayCreated final : public td::Jsonable {
+ public:
+  explicit JsonGiveawayCreated(const td_api::messageGiveawayCreated *giveaway_created)
+      : giveaway_created_(giveaway_created) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    if (giveaway_created_->star_count_ > 0) {
+      object("prize_star_count", giveaway_created_->star_count_);
+    }
+  }
+
+ private:
+  const td_api::messageGiveawayCreated *giveaway_created_;
+};
+
 class Client::JsonGiveaway final : public td::Jsonable {
  public:
   JsonGiveaway(const td_api::messageGiveaway *giveaway, const Client *client) : giveaway_(giveaway), client_(client) {
@@ -3290,9 +3306,11 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     }
     case td_api::messagePremiumGiftCode::ID:
       break;
-    case td_api::messageGiveawayCreated::ID:
-      object("giveaway_created", JsonEmptyObject());
+    case td_api::messageGiveawayCreated::ID: {
+      auto content = static_cast<const td_api::messageGiveawayCreated *>(message_->content.get());
+      object("giveaway_created", JsonGiveawayCreated(content));
       break;
+    }
     case td_api::messageGiveaway::ID: {
       auto content = static_cast<const td_api::messageGiveaway *>(message_->content.get());
       object("giveaway", JsonGiveaway(content, client_));
