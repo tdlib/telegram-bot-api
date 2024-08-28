@@ -2470,8 +2470,13 @@ class Client::JsonGiveaway final : public td::Jsonable {
         }
         break;
       }
-      case td_api::giveawayPrizeStars::ID:
+      case td_api::giveawayPrizeStars::ID: {
+        auto star_count = static_cast<const td_api::giveawayPrizeStars *>(giveaway_->prize_.get())->star_count_;
+        if (star_count > 0) {
+          object("prize_star_count", star_count);
+        }
         break;
+      }
       default:
         UNREACHABLE();
     }
