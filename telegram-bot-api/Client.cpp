@@ -4148,6 +4148,9 @@ class Client::JsonStarTransactionPartner final : public td::Jsonable {
             object("paid_media", td::json_array(purpose->media_, [client = client_](auto &media) {
                      return JsonPaidMedia(media.get(), client);
                    }));
+            if (!purpose->payload_.empty()) {
+              object("paid_media_payload", purpose->payload_);
+            }
             break;
           }
           default:
