@@ -148,6 +148,7 @@ class Client final : public WebhookActor::Callback {
   class JsonInlineCallbackQuery;
   class JsonShippingQuery;
   class JsonPreCheckoutQuery;
+  class JsonPaidMediaPurchased;
   class JsonBotCommand;
   class JsonBotMenuButton;
   class JsonBotName;
@@ -1108,6 +1109,8 @@ class Client final : public WebhookActor::Callback {
 
   void add_new_pre_checkout_query(object_ptr<td_api::updateNewPreCheckoutQuery> &&query);
 
+  void add_update_purchased_paid_media(object_ptr<td_api::updatePaidMediaPurchased> &&query);
+
   void add_new_custom_event(object_ptr<td_api::updateNewCustomEvent> &&event);
 
   void add_new_custom_query(object_ptr<td_api::updateNewCustomQuery> &&query);
@@ -1152,6 +1155,7 @@ class Client final : public WebhookActor::Callback {
     BusinessMessage,
     EditedBusinessMessage,
     BusinessMessagesDeleted,
+    PurchasedPaidMedia,
     Size
   };
 

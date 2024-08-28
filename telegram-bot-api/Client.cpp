@@ -3610,6 +3610,23 @@ class Client::JsonPreCheckoutQuery final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonPaidMediaPurchased final : public td::Jsonable {
+ public:
+  JsonPaidMediaPurchased(const td_api::updatePaidMediaPurchased *update, const Client *client)
+      : update_(update), client_(client) {
+  }
+
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("from", JsonUser(update_->user_id_, client_));
+    object("payload", update_->payload_);
+  }
+
+ private:
+  const td_api::updatePaidMediaPurchased *update_;
+  const Client *client_;
+};
+
 class Client::JsonCustomJson final : public td::Jsonable {
  public:
   explicit JsonCustomJson(const td::string &json) : json_(json) {
@@ -7251,6 +7268,9 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       break;
     case td_api::updateNewPreCheckoutQuery::ID:
       add_new_pre_checkout_query(move_object_as<td_api::updateNewPreCheckoutQuery>(result));
+      break;
+    case td_api::updatePaidMediaPurchased::ID:
+      add_update_purchased_paid_media(move_object_as<td_api::updatePaidMediaPurchased>(result));
       break;
     case td_api::updateNewCustomEvent::ID:
       add_new_custom_event(move_object_as<td_api::updateNewCustomEvent>(result));
@@ -13349,6 +13369,8 @@ td::Slice Client::get_update_type_name(UpdateType update_type) {
       return td::Slice("edited_business_message");
     case UpdateType::BusinessMessagesDeleted:
       return td::Slice("deleted_business_messages");
+    case UpdateType::PurchasedPaidMedia:
+      return td::Slice("purchased_paid_media");
     default:
       UNREACHABLE();
       return td::Slice();
@@ -13670,6 +13692,12 @@ void Client::add_new_pre_checkout_query(object_ptr<td_api::updateNewPreCheckoutQ
   CHECK(query != nullptr);
   add_update(UpdateType::PreCheckoutQuery, JsonPreCheckoutQuery(query.get(), this), 150,
              query->sender_user_id_ + (static_cast<int64>(4) << 33));
+}
+
+void Client::add_update_purchased_paid_media(object_ptr<td_api::updatePaidMediaPurchased> &&query) {
+  CHECK(query != nullptr);
+  add_update(UpdateType::PurchasedPaidMedia, JsonPaidMediaPurchased(query.get(), this), 86400,
+             query->user_id_ + (static_cast<int64>(12) << 33));
 }
 
 void Client::add_new_custom_event(object_ptr<td_api::updateNewCustomEvent> &&event) {
