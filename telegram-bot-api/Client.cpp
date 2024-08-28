@@ -10400,9 +10400,10 @@ td::Status Client::process_send_paid_media_query(PromisedQueryPtr &query) {
   int32 star_count = get_integer_arg(query.get(), "star_count", 0, 0, 1000000000);
   TRY_RESULT(paid_media, get_paid_media(query.get(), "media"));
   TRY_RESULT(caption, get_caption(query.get()));
+  auto payload = query->arg("payload").str();
   auto show_caption_above_media = to_bool(query->arg("show_caption_above_media"));
   do_send_message(make_object<td_api::inputMessagePaidMedia>(star_count, std::move(paid_media), std::move(caption),
-                                                             show_caption_above_media, td::string()),
+                                                             show_caption_above_media, payload),
                   std::move(query));
   return td::Status::OK();
 }
