@@ -2551,6 +2551,9 @@ class Client::JsonGiveawayCompleted final : public td::Jsonable {
     if (giveaway_completed_->unclaimed_prize_count_ > 0) {
       object("unclaimed_prize_count", giveaway_completed_->unclaimed_prize_count_);
     }
+    if (giveaway_completed_->is_star_giveaway_) {
+      object("is_star_giveaway", td::JsonTrue());
+    }
     const MessageInfo *giveaway_message =
         client_->get_message(chat_id_, giveaway_completed_->giveaway_message_id_, true);
     if (giveaway_message != nullptr) {
