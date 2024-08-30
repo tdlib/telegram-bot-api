@@ -3934,6 +3934,9 @@ class Client::JsonChatBoostSource final : public td::Jsonable {
         const auto *source = static_cast<const td_api::chatBoostSourceGiveaway *>(boost_source_);
         object("source", "giveaway");
         object("giveaway_message_id", as_client_message_id_unchecked(source->giveaway_message_id_));
+        if (source->star_count_ > 0) {
+          object("prize_star_count", source->star_count_);
+        }
         if (source->user_id_ != 0) {
           object("user", JsonUser(source->user_id_, client_));
         } else if (source->is_unclaimed_) {
