@@ -2825,9 +2825,11 @@ class Client::JsonExternalReplyInfo final : public td::Jsonable {
           object("giveaway_winners", JsonGiveawayWinners(content, client_));
           break;
         }
-        case td_api::messageStory::ID:
-          object("story", JsonEmptyObject());
+        case td_api::messageStory::ID: {
+          auto content = static_cast<const td_api::messageStory *>(reply_->content_.get());
+          object("story", JsonStory(content->story_sender_chat_id_, content->story_id_, client_));
           break;
+        }
         default:
           LOG(ERROR) << "Receive external reply with " << to_string(reply_->content_);
       }
