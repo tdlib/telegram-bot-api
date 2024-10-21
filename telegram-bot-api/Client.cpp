@@ -2664,6 +2664,8 @@ class Client::JsonInlineKeyboardButton final : public td::Jsonable {
         object("web_app", JsonWebAppInfo(type->url_));
         break;
       }
+      case td_api::inlineKeyboardButtonTypeCopyText::ID:
+        break;
       default:
         UNREACHABLE();
         break;
@@ -3354,6 +3356,8 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     case td_api::messageGiftedStars::ID:
       break;
     case td_api::messageGiveawayPrizeStars::ID:
+      break;
+    case td_api::messageGift::ID:
       break;
     default:
       UNREACHABLE();
@@ -6660,7 +6664,7 @@ void Client::resolve_sticker_set(const td::string &sticker_set_name, PromisedQue
     return fail_query(400, "Bad Request: sticker_set_name is empty", std::move(query));
   }
 
-  send_request(make_object<td_api::searchStickerSet>(sticker_set_name),
+  send_request(make_object<td_api::searchStickerSet>(sticker_set_name, false),
                td::make_unique<TdOnSearchStickerSetCallback<OnSuccess>>(std::move(query), std::move(on_success)));
 }
 
@@ -12054,7 +12058,7 @@ td::Status Client::process_get_sticker_set_query(PromisedQueryPtr &query) {
     send_request(make_object<td_api::getStickerSet>(GREAT_MINDS_SET_ID),
                  td::make_unique<TdOnReturnStickerSetCallback>(this, true, std::move(query)));
   } else {
-    send_request(make_object<td_api::searchStickerSet>(name.str()),
+    send_request(make_object<td_api::searchStickerSet>(name.str(), false),
                  td::make_unique<TdOnReturnStickerSetCallback>(this, true, std::move(query)));
   }
   return td::Status::OK();
@@ -13980,6 +13984,8 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       return true;
     case td_api::messageGiveawayPrizeStars::ID:
       return true;
+    case td_api::messageGift::ID:
+      return true;
     default:
       break;
   }
@@ -14154,6 +14160,11 @@ bool Client::are_equal_inline_keyboard_buttons(const td_api::inlineKeyboardButto
       auto lhs_type = static_cast<const td_api::inlineKeyboardButtonTypeWebApp *>(lhs->type_.get());
       auto rhs_type = static_cast<const td_api::inlineKeyboardButtonTypeWebApp *>(rhs->type_.get());
       return lhs_type->url_ == rhs_type->url_;
+    }
+    case td_api::inlineKeyboardButtonTypeCopyText::ID: {
+      auto lhs_type = static_cast<const td_api::inlineKeyboardButtonTypeCopyText *>(lhs->type_.get());
+      auto rhs_type = static_cast<const td_api::inlineKeyboardButtonTypeCopyText *>(rhs->type_.get());
+      return lhs_type->text_ == rhs_type->text_;
     }
     default:
       UNREACHABLE();
