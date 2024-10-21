@@ -2593,6 +2593,19 @@ class Client::JsonWebAppInfo final : public td::Jsonable {
   const td::string &url_;
 };
 
+class Client::JsonCopyTextButton final : public td::Jsonable {
+ public:
+  explicit JsonCopyTextButton(const td::string &text) : text_(text) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("text", text_);
+  }
+
+ private:
+  const td::string &text_;
+};
+
 class Client::JsonInlineKeyboardButton final : public td::Jsonable {
  public:
   explicit JsonInlineKeyboardButton(const td_api::inlineKeyboardButton *button) : button_(button) {
@@ -2664,8 +2677,11 @@ class Client::JsonInlineKeyboardButton final : public td::Jsonable {
         object("web_app", JsonWebAppInfo(type->url_));
         break;
       }
-      case td_api::inlineKeyboardButtonTypeCopyText::ID:
+      case td_api::inlineKeyboardButtonTypeCopyText::ID: {
+        auto type = static_cast<const td_api::inlineKeyboardButtonTypeCopyText *>(button_->type_.get());
+        object("copy_text", JsonCopyTextButton(type->text_));
         break;
+      }
       default:
         UNREACHABLE();
         break;
@@ -7745,6 +7761,14 @@ td::Result<td_api::object_ptr<td_api::inlineKeyboardButton>> Client::get_inline_
     auto &web_app_object = web_app.get_object();
     TRY_RESULT(url, web_app_object.get_required_string_field("url"));
     return make_object<td_api::inlineKeyboardButton>(text, make_object<td_api::inlineKeyboardButtonTypeWebApp>(url));
+  }
+
+  if (object.has_field("copy_text")) {
+    TRY_RESULT(copy_text, object.extract_required_field("copy_text", td::JsonValue::Type::Object));
+    auto &copy_text_object = copy_text.get_object();
+    TRY_RESULT(copied_text, copy_text_object.get_required_string_field("text"));
+    return make_object<td_api::inlineKeyboardButton>(
+        text, make_object<td_api::inlineKeyboardButtonTypeCopyText>(copied_text));
   }
 
   return td::Status::Error(400, "Text buttons are unallowed in the inline keyboard");
