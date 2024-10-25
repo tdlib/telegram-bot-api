@@ -346,7 +346,8 @@ class Client final : public WebhookActor::Callback {
                          OnSuccess on_success) const;
 
   template <class OnSuccess>
-  void check_chat(td::Slice chat_id_str, AccessRights access_rights, PromisedQueryPtr query, OnSuccess on_success);
+  void check_chat(td::Slice chat_id_str, AccessRights access_rights, PromisedQueryPtr query, OnSuccess on_success,
+                  bool allow_unknown_user = false);
 
   template <class OnSuccess>
   void check_chat_no_fail(td::Slice chat_id_str, PromisedQueryPtr query, OnSuccess on_success);
@@ -377,7 +378,7 @@ class Client final : public WebhookActor::Callback {
 
   template <class OnSuccess>
   void check_reply_parameters(td::Slice chat_id_str, InputReplyParameters &&reply_parameters, int64 message_thread_id,
-                              PromisedQueryPtr query, OnSuccess on_success);
+                              PromisedQueryPtr query, OnSuccess on_success, bool allow_unknown_user = false);
 
   template <class OnSuccess>
   void resolve_sticker_set(const td::string &sticker_set_name, PromisedQueryPtr query, OnSuccess on_success);

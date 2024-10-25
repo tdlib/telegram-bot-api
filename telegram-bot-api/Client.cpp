@@ -6400,8 +6400,8 @@ void Client::check_chat_access(int64 chat_id, AccessRights access_rights, const 
 }
 
 template <class OnSuccess>
-void Client::check_chat(td::Slice chat_id_str, AccessRights access_rights, PromisedQueryPtr query,
-                        OnSuccess on_success) {
+void Client::check_chat(td::Slice chat_id_str, AccessRights access_rights, PromisedQueryPtr query, OnSuccess on_success,
+                        bool allow_unknown_user) {
   if (chat_id_str.empty()) {
     return fail_query(400, "Bad Request: chat_id is empty", std::move(query));
   }
@@ -6413,6 +6413,9 @@ void Client::check_chat(td::Slice chat_id_str, AccessRights access_rights, Promi
   }
 
   auto chat_id = td::to_integer<int64>(chat_id_str);
+  if (allow_unknown_user && 0 < chat_id && chat_id < (static_cast<int64>(1) << 40)) {
+    return on_success(chat_id, std::move(query));
+  }
   auto chat_info = get_chat(chat_id);
   if (chat_info != nullptr && chat_info->type == ChatInfo::Type::Private) {
     const UserInfo *user_info = get_user_info(chat_info->user_id);
@@ -6608,7 +6611,8 @@ void Client::check_messages(td::Slice chat_id_str, td::vector<int64> message_ids
 
 template <class OnSuccess>
 void Client::check_reply_parameters(td::Slice chat_id_str, InputReplyParameters &&reply_parameters,
-                                    int64 message_thread_id, PromisedQueryPtr query, OnSuccess on_success) {
+                                    int64 message_thread_id, PromisedQueryPtr query, OnSuccess on_success,
+                                    bool allow_unknown_user) {
   if (chat_id_str == reply_parameters.reply_in_chat_id) {
     reply_parameters.reply_in_chat_id.clear();
   }
@@ -6671,7 +6675,8 @@ void Client::check_reply_parameters(td::Slice chat_id_str, InputReplyParameters 
         }
         check_chat(reply_parameters.reply_in_chat_id, AccessRights::Read, std::move(query),
                    std::move(on_reply_chat_resolved));
-      });
+      },
+      allow_unknown_user);
 }
 
 template <class OnSuccess>
@@ -10798,7 +10803,7 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
               td::make_unique<TdOnSendMessageAlbumCallback>(this, chat_id, message_count, std::move(query)));
         };
         check_reply_parameters(chat_id_str, std::move(reply_parameters), message_thread_id, std::move(query),
-                               std::move(on_success));
+                               std::move(on_success), allow_paid_broadcast);
       });
   return td::Status::OK();
 }
@@ -12792,7 +12797,7 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
               td::make_unique<TdOnSendMessageCallback>(this, chat_id, std::move(query)));
         };
         check_reply_parameters(chat_id_str, std::move(reply_parameters), message_thread_id, std::move(query),
-                               std::move(on_success));
+                               std::move(on_success), allow_paid_broadcast);
       });
 }
 
