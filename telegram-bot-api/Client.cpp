@@ -3644,7 +3644,7 @@ class Client::JsonPaidMediaPurchased final : public td::Jsonable {
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("from", JsonUser(update_->user_id_, client_));
-    object("payload", update_->payload_);
+    object("paid_media_payload", update_->payload_);
   }
 
  private:
