@@ -4234,9 +4234,12 @@ class Client::JsonStarTransactionPartner final : public td::Jsonable {
       case td_api::starTransactionPartnerTelegramAds::ID:
         object("type", "telegram_ads");
         break;
-      case td_api::starTransactionPartnerTelegramApi::ID:
-        object("type", "other");
+      case td_api::starTransactionPartnerTelegramApi::ID: {
+        auto source = static_cast<const td_api::starTransactionPartnerTelegramApi *>(source_);
+        object("type", "telegram_api");
+        object("request_count", source->request_count_);
         break;
+      }
       case td_api::starTransactionPartnerTelegram::ID:
       case td_api::starTransactionPartnerAppStore::ID:
       case td_api::starTransactionPartnerGooglePlay::ID:
