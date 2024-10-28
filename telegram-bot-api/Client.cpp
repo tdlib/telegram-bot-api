@@ -2895,7 +2895,7 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("sender_business_bot", JsonUser(message_->sender_business_bot_user_id, client_));
     }
   }
-  object("message_id", as_client_message_id(message_->id));
+  object("message_id", message_->is_scheduled ? 0 : as_client_message_id(message_->id));
   if (message_->sender_user_id != 0) {
     object("from", JsonUser(message_->sender_user_id, client_));
   }
@@ -3404,7 +3404,7 @@ class Client::JsonMessageId final : public td::Jsonable {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
-    object("message_id", as_client_message_id(message_id_));
+    object("message_id", as_client_message_id_unchecked(message_id_));
   }
 
  private:
@@ -14532,6 +14532,7 @@ void Client::init_message(MessageInfo *message_info, object_ptr<td_api::message>
   }
 
   message_info->can_be_saved = message->can_be_saved_;
+  message_info->is_scheduled = message->scheduling_state_ != nullptr;
   message_info->is_from_offline = message->is_from_offline_;
   message_info->is_topic_message = message->is_topic_message_;
   message_info->author_signature = std::move(message->author_signature_);
