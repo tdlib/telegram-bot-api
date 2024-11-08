@@ -2644,17 +2644,17 @@ class Client::JsonInlineKeyboardButton final : public td::Jsonable {
             object("switch_inline_query_current_chat", type->query_);
             break;
           case td_api::targetChatChosen::ID: {
-            auto target_chat = static_cast<const td_api::targetChatChosen *>(type->target_chat_.get());
-            if (target_chat->allow_user_chats_ && target_chat->allow_bot_chats_ && target_chat->allow_group_chats_ &&
-                target_chat->allow_channel_chats_) {
+            auto types = static_cast<const td_api::targetChatChosen *>(type->target_chat_.get())->types_.get();
+            if (types->allow_user_chats_ && types->allow_bot_chats_ && types->allow_group_chats_ &&
+                types->allow_channel_chats_) {
               object("switch_inline_query", type->query_);
             } else {
               object("switch_inline_query_chosen_chat", td::json_object([&](auto &o) {
                        o("query", type->query_);
-                       o("allow_user_chats", td::JsonBool(target_chat->allow_user_chats_));
-                       o("allow_bot_chats", td::JsonBool(target_chat->allow_bot_chats_));
-                       o("allow_group_chats", td::JsonBool(target_chat->allow_group_chats_));
-                       o("allow_channel_chats", td::JsonBool(target_chat->allow_channel_chats_));
+                       o("allow_user_chats", td::JsonBool(types->allow_user_chats_));
+                       o("allow_bot_chats", td::JsonBool(types->allow_bot_chats_));
+                       o("allow_group_chats", td::JsonBool(types->allow_group_chats_));
+                       o("allow_channel_chats", td::JsonBool(types->allow_channel_chats_));
                      }));
             }
             break;
@@ -4223,6 +4223,18 @@ class Client::JsonStarTransactionPartner final : public td::Jsonable {
                    }));
             if (!purpose->payload_.empty()) {
               object("paid_media_payload", purpose->payload_);
+            }
+            break;
+          }
+          case td_api::botTransactionPurposeSubscription::ID: {
+            auto purpose = static_cast<const td_api::botTransactionPurposeSubscription *>(source_user->purpose_.get());
+            if (!purpose->invoice_payload_.empty()) {
+              if (!td::check_utf8(purpose->invoice_payload_)) {
+                LOG(WARNING) << "Receive non-UTF-8 invoice payload";
+                object("invoice_payload", td::JsonRawString(purpose->invoice_payload_));
+              } else {
+                object("invoice_payload", purpose->invoice_payload_);
+              }
             }
             break;
           }
@@ -7554,7 +7566,7 @@ td::Result<Client::InputReplyParameters> Client::get_reply_parameters(td::JsonVa
   result.reply_in_chat_id = std::move(chat_id);
   result.reply_to_message_id = as_tdlib_message_id(td::max(message_id, 0));
   result.allow_sending_without_reply = allow_sending_without_reply;
-  result.quote = td_api::make_object<td_api::inputTextQuote>(std::move(quote), quote_position);
+  result.quote = make_object<td_api::inputTextQuote>(std::move(quote), quote_position);
   return std::move(result);
 }
 
@@ -7700,7 +7712,8 @@ td::Result<td_api::object_ptr<td_api::inlineKeyboardButton>> Client::get_inline_
     TRY_RESULT(switch_inline_query, object.get_required_string_field("switch_inline_query"));
     return make_object<td_api::inlineKeyboardButton>(
         text, make_object<td_api::inlineKeyboardButtonTypeSwitchInline>(
-                  switch_inline_query, td_api::make_object<td_api::targetChatChosen>(true, true, true, true)));
+                  switch_inline_query,
+                  make_object<td_api::targetChatChosen>(make_object<td_api::targetChatTypes>(true, true, true, true))));
   }
 
   if (object.has_field("switch_inline_query_chosen_chat")) {
@@ -7715,15 +7728,15 @@ td::Result<td_api::object_ptr<td_api::inlineKeyboardButton>> Client::get_inline_
     TRY_RESULT(allow_channel_chats, switch_inline_query_object.get_optional_bool_field("allow_channel_chats"));
     return make_object<td_api::inlineKeyboardButton>(
         text, make_object<td_api::inlineKeyboardButtonTypeSwitchInline>(
-                  query, td_api::make_object<td_api::targetChatChosen>(allow_user_chats, allow_bot_chats,
-                                                                       allow_group_chats, allow_channel_chats)));
+                  query, make_object<td_api::targetChatChosen>(make_object<td_api::targetChatTypes>(
+                             allow_user_chats, allow_bot_chats, allow_group_chats, allow_channel_chats))));
   }
 
   if (object.has_field("switch_inline_query_current_chat")) {
     TRY_RESULT(switch_inline_query, object.get_required_string_field("switch_inline_query_current_chat"));
     return make_object<td_api::inlineKeyboardButton>(
-        text, make_object<td_api::inlineKeyboardButtonTypeSwitchInline>(
-                  switch_inline_query, td_api::make_object<td_api::targetChatCurrent>()));
+        text, make_object<td_api::inlineKeyboardButtonTypeSwitchInline>(switch_inline_query,
+                                                                        make_object<td_api::targetChatCurrent>()));
   }
 
   if (object.has_field("login_url")) {
@@ -8205,7 +8218,7 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
     TRY_RESULT(is_flexible, object.get_optional_bool_field("is_flexible"));
 
     return make_object<td_api::inputMessageInvoice>(
-        make_object<td_api::invoice>(currency, std::move(prices), max_tip_amount, std::move(suggested_tip_amounts),
+        make_object<td_api::invoice>(currency, std::move(prices), 0, max_tip_amount, std::move(suggested_tip_amounts),
                                      td::string(), td::string(), false, need_name, need_phone_number,
                                      need_email_address, need_shipping_address, send_phone_number_to_provider,
                                      send_email_address_to_provider, is_flexible),
@@ -9856,10 +9869,10 @@ td::Result<td_api::object_ptr<td_api::inputMessageInvoice>> Client::get_input_me
                                                     get_input_entities(query, "paid_media_caption_entities")));
 
   return make_object<td_api::inputMessageInvoice>(
-      make_object<td_api::invoice>(currency.str(), std::move(prices), max_tip_amount, std::move(suggested_tip_amounts),
-                                   td::string(), td::string(), false, need_name, need_phone_number, need_email_address,
-                                   need_shipping_address, send_phone_number_to_provider, send_email_address_to_provider,
-                                   is_flexible),
+      make_object<td_api::invoice>(currency.str(), std::move(prices), 0, max_tip_amount,
+                                   std::move(suggested_tip_amounts), td::string(), td::string(), false, need_name,
+                                   need_phone_number, need_email_address, need_shipping_address,
+                                   send_phone_number_to_provider, send_email_address_to_provider, is_flexible),
       title.str(), description.str(), photo_url.str(), photo_size, photo_width, photo_height, payload.str(),
       provider_token.str(), provider_data.str(), start_parameter.str(), std::move(paid_media),
       std::move(paid_media_caption));
@@ -11147,7 +11160,7 @@ td::Status Client::process_delete_messages_query(PromisedQueryPtr &query) {
 
 td::Status Client::process_create_invoice_link_query(PromisedQueryPtr &query) {
   TRY_RESULT(input_message_invoice, get_input_message_invoice(query.get()));
-  send_request(make_object<td_api::createInvoiceLink>(std::move(input_message_invoice)),
+  send_request(make_object<td_api::createInvoiceLink>(td::string(), std::move(input_message_invoice)),
                td::make_unique<TdOnCreateInvoiceLinkCallback>(std::move(query)));
   return td::Status::OK();
 }
@@ -14080,9 +14093,10 @@ td::int64 Client::get_same_chat_reply_to_message_id(const object_ptr<td_api::mes
             ->old_background_message_id_;
       case td_api::messageGiveawayCompleted::ID:
         return static_cast<const td_api::messageGiveawayCompleted *>(message->content_.get())->giveaway_message_id_;
-      case td_api::messagePaymentSuccessful::ID:
-        UNREACHABLE();
-        return static_cast<int64>(0);
+      case td_api::messagePaymentSuccessful::ID: {
+        const auto *content = static_cast<const td_api::messagePaymentSuccessful *>(message->content_.get());
+        return content->invoice_chat_id_ == message->chat_id_ ? content->invoice_message_id_ : static_cast<int64>(0);
+      }
       default:
         return static_cast<int64>(0);
     }
