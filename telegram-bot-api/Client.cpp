@@ -257,6 +257,7 @@ bool Client::init_methods() {
   methods_.emplace("getgamehighscores", &Client::process_get_game_high_scores_query);
   methods_.emplace("answerwebappquery", &Client::process_answer_web_app_query_query);
   methods_.emplace("answerinlinequery", &Client::process_answer_inline_query_query);
+  methods_.emplace("savepreparedinlinemessage", &Client::process_save_prepared_inline_message_query);
   methods_.emplace("answercallbackquery", &Client::process_answer_callback_query_query);
   methods_.emplace("answershippingquery", &Client::process_answer_shipping_query_query);
   methods_.emplace("answerprecheckoutquery", &Client::process_answer_pre_checkout_query_query);
@@ -4419,6 +4420,20 @@ class Client::JsonSentWebAppMessage final : public td::Jsonable {
   const td_api::sentWebAppMessage *message_;
 };
 
+class Client::JsonPreparedInlineMessageId final : public td::Jsonable {
+ public:
+  explicit JsonPreparedInlineMessageId(const td_api::preparedInlineMessageId *message) : message_(message) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("id", message_->id_);
+    object("expiration_date", message_->expiration_date_);
+  }
+
+ private:
+  const td_api::preparedInlineMessageId *message_;
+};
+
 class Client::TdOnOkCallback final : public TdQueryCallback {
  public:
   void on_result(object_ptr<td_api::Object> result) final {
@@ -5854,6 +5869,25 @@ class Client::TdOnAnswerWebAppQueryCallback final : public TdQueryCallback {
     CHECK(result->get_id() == td_api::sentWebAppMessage::ID);
     auto message = move_object_as<td_api::sentWebAppMessage>(result);
     answer_query(JsonSentWebAppMessage(message.get()), std::move(query_));
+  }
+
+ private:
+  PromisedQueryPtr query_;
+};
+
+class Client::TdOnSavePreparedInlineMessageCallback final : public TdQueryCallback {
+ public:
+  explicit TdOnSavePreparedInlineMessageCallback(PromisedQueryPtr query) : query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::preparedInlineMessageId::ID);
+    auto message = move_object_as<td_api::preparedInlineMessageId>(result);
+    answer_query(JsonPreparedInlineMessageId(message.get()), std::move(query_));
   }
 
  private:
@@ -11289,6 +11323,30 @@ td::Status Client::process_answer_inline_query_query(PromisedQueryPtr &query) {
         send_request(make_object<td_api::answerInlineQuery>(inline_query_id, is_personal, std::move(button),
                                                             std::move(results), cache_time, next_offset),
                      td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+      });
+  return td::Status::OK();
+}
+
+td::Status Client::process_save_prepared_inline_message_query(PromisedQueryPtr &query) {
+  TRY_RESULT(user_id, get_user_id(query.get()));
+  TRY_RESULT(result, get_inline_query_result(query.get(), bot_user_ids_));
+  auto allow_user_chats = to_bool(query->arg("allow_user_chats"));
+  auto allow_bot_chats = to_bool(query->arg("allow_bot_chats"));
+  auto allow_group_chats = to_bool(query->arg("allow_group_chats"));
+  auto allow_channel_chats = to_bool(query->arg("allow_channel_chats"));
+  auto types =
+      make_object<td_api::targetChatTypes>(allow_user_chats, allow_bot_chats, allow_group_chats, allow_channel_chats);
+
+  td::vector<object_ptr<td_api::InputInlineQueryResult>> results;
+  results.push_back(std::move(result));
+
+  resolve_inline_query_results_bot_usernames(
+      std::move(results), std::move(query),
+      [this, user_id, types = std::move(types)](td::vector<object_ptr<td_api::InputInlineQueryResult>> results,
+                                                PromisedQueryPtr query) mutable {
+        CHECK(results.size() == 1);
+        send_request(make_object<td_api::savePreparedInlineMessage>(user_id, std::move(results[0]), std::move(types)),
+                     td::make_unique<TdOnSavePreparedInlineMessageCallback>(std::move(query)));
       });
   return td::Status::OK();
 }
