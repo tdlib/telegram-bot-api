@@ -268,6 +268,7 @@ bool Client::init_methods() {
   methods_.emplace("editchatsubscriptioninvitelink", &Client::process_edit_chat_subscription_invite_link_query);
   methods_.emplace("revokechatinvitelink", &Client::process_revoke_chat_invite_link_query);
   methods_.emplace("getbusinessconnection", &Client::process_get_business_connection_query);
+  methods_.emplace("setuseremojistatus", &Client::process_set_user_emoji_status_query);
   methods_.emplace("getchat", &Client::process_get_chat_query);
   methods_.emplace("setchatphoto", &Client::process_set_chat_photo_query);
   methods_.emplace("deletechatphoto", &Client::process_delete_chat_photo_query);
@@ -11484,6 +11485,23 @@ td::Status Client::process_get_business_connection_query(PromisedQueryPtr &query
                             [this](const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
                               answer_query(JsonBusinessConnection(business_connection, this), std::move(query));
                             });
+  return td::Status::OK();
+}
+
+td::Status Client::process_set_user_emoji_status_query(PromisedQueryPtr &query) {
+  TRY_RESULT(user_id, get_user_id(query.get()));
+  auto emoji_status_custom_emoji_id = td::to_integer<int64>(query->arg("emoji_status_custom_emoji_id"));
+  auto emoji_status_expiration_date = td::to_integer<int32>(query->arg("emoji_status_expiration_date"));
+  check_user(
+      user_id, std::move(query),
+      [this, user_id, emoji_status_custom_emoji_id, emoji_status_expiration_date](PromisedQueryPtr query) mutable {
+        send_request(make_object<td_api::setUserEmojiStatus>(
+                         user_id, emoji_status_custom_emoji_id == 0
+                                      ? nullptr
+                                      : make_object<td_api::emojiStatus>(emoji_status_custom_emoji_id,
+                                                                         emoji_status_expiration_date)),
+                     td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+      });
   return td::Status::OK();
 }
 
