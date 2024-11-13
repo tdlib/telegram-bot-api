@@ -2088,6 +2088,12 @@ class Client::JsonSuccessfulPaymentBot final : public td::Jsonable {
     }
     object("telegram_payment_charge_id", successful_payment_->telegram_payment_charge_id_);
     object("provider_payment_charge_id", successful_payment_->provider_payment_charge_id_);
+    if (successful_payment_->is_recurring_) {
+      object("is_recurring", td::JsonTrue());
+    }
+    if (successful_payment_->is_first_recurring_) {
+      object("is_first_recurring", td::JsonTrue());
+    }
   }
 
  private:
