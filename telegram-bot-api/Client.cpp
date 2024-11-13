@@ -11255,6 +11255,17 @@ td::Status Client::process_delete_messages_query(PromisedQueryPtr &query) {
 
 td::Status Client::process_create_invoice_link_query(PromisedQueryPtr &query) {
   TRY_RESULT(input_message_invoice, get_input_message_invoice(query.get()));
+  auto business_connection_id = query->arg("business_connection_id").str();
+  if (!business_connection_id.empty()) {
+    check_business_connection(business_connection_id, std::move(query),
+                              [this, input_message_invoice = std::move(input_message_invoice)](
+                                  const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
+                                send_request(make_object<td_api::createInvoiceLink>(business_connection->id_,
+                                                                                    std::move(input_message_invoice)),
+                                             td::make_unique<TdOnCreateInvoiceLinkCallback>(std::move(query)));
+                              });
+    return td::Status::OK();
+  }
   send_request(make_object<td_api::createInvoiceLink>(td::string(), std::move(input_message_invoice)),
                td::make_unique<TdOnCreateInvoiceLinkCallback>(std::move(query)));
   return td::Status::OK();
