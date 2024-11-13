@@ -9961,9 +9961,10 @@ td::Result<td_api::object_ptr<td_api::inputMessageInvoice>> Client::get_input_me
   TRY_RESULT(paid_media_caption, get_formatted_text(query->arg("paid_media_caption").str(),
                                                     query->arg("paid_media_caption_parse_mode").str(),
                                                     get_input_entities(query, "paid_media_caption_entities")));
+  int32 subscription_period = get_integer_arg(query, "subscription_period", 0, 0);
 
   return make_object<td_api::inputMessageInvoice>(
-      make_object<td_api::invoice>(currency.str(), std::move(prices), 0, max_tip_amount,
+      make_object<td_api::invoice>(currency.str(), std::move(prices), subscription_period, max_tip_amount,
                                    std::move(suggested_tip_amounts), td::string(), td::string(), false, need_name,
                                    need_phone_number, need_email_address, need_shipping_address,
                                    send_phone_number_to_provider, send_email_address_to_provider, is_flexible),
