@@ -4297,10 +4297,24 @@ class Client::JsonStarTransactionPartner final : public td::Jsonable {
         object("request_count", source->request_count_);
         break;
       }
+      case td_api::starTransactionPartnerUser::ID: {
+        auto source = static_cast<const td_api::starTransactionPartnerUser *>(source_);
+        if (source->purpose_->get_id() == td_api::userTransactionPurposeGiftSend::ID) {
+          object("type", "user");
+          object("user", JsonUser(source->user_id_, client_));
+          object(
+              "gift",
+              JsonGift(static_cast<const td_api::userTransactionPurposeGiftSend *>(source->purpose_.get())->gift_.get(),
+                       client_));
+        } else {
+          LOG(ERROR) << "Receive " << to_string(*source_);
+          object("type", "other");
+        }
+        break;
+      }
       case td_api::starTransactionPartnerTelegram::ID:
       case td_api::starTransactionPartnerAppStore::ID:
       case td_api::starTransactionPartnerGooglePlay::ID:
-      case td_api::starTransactionPartnerUser::ID:
       case td_api::starTransactionPartnerBusiness::ID:
       case td_api::starTransactionPartnerChat::ID:
         LOG(ERROR) << "Receive " << to_string(*source_);
