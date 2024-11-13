@@ -253,6 +253,7 @@ bool Client::init_methods() {
   methods_.emplace("createinvoicelink", &Client::process_create_invoice_link_query);
   methods_.emplace("getstartransactions", &Client::process_get_star_transactions_query);
   methods_.emplace("refundstarpayment", &Client::process_refund_star_payment_query);
+  methods_.emplace("sendgift", &Client::process_send_gift_query);
   methods_.emplace("setgamescore", &Client::process_set_game_score_query);
   methods_.emplace("getgamehighscores", &Client::process_get_game_high_scores_query);
   methods_.emplace("answerwebappquery", &Client::process_answer_web_app_query_query);
@@ -11218,6 +11219,19 @@ td::Status Client::process_refund_star_payment_query(PromisedQueryPtr &query) {
         send_request(make_object<td_api::refundStarPayment>(user_id, telegram_payment_charge_id),
                      td::make_unique<TdOnOkQueryCallback>(std::move(query)));
       });
+  return td::Status::OK();
+}
+
+td::Status Client::process_send_gift_query(PromisedQueryPtr &query) {
+  auto gift_id = td::to_integer<int64>(query->arg("gift_id"));
+  TRY_RESULT(user_id, get_user_id(query.get()));
+  TRY_RESULT(text, get_formatted_text(query->arg("text").str(), query->arg("text_parse_mode").str(),
+                                      get_input_entities(query.get(), "text_entities")));
+  check_user(user_id, std::move(query),
+             [this, gift_id, user_id, text = std::move(text)](PromisedQueryPtr query) mutable {
+               send_request(make_object<td_api::sendGift>(gift_id, user_id, std::move(text), false),
+                            td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+             });
   return td::Status::OK();
 }
 
