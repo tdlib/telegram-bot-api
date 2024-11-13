@@ -253,6 +253,7 @@ bool Client::init_methods() {
   methods_.emplace("createinvoicelink", &Client::process_create_invoice_link_query);
   methods_.emplace("getstartransactions", &Client::process_get_star_transactions_query);
   methods_.emplace("refundstarpayment", &Client::process_refund_star_payment_query);
+  methods_.emplace("getavailablegifts", &Client::process_get_available_gifts_query);
   methods_.emplace("sendgift", &Client::process_send_gift_query);
   methods_.emplace("setgamescore", &Client::process_set_game_score_query);
   methods_.emplace("getgamehighscores", &Client::process_get_game_high_scores_query);
@@ -4064,6 +4065,41 @@ class Client::JsonGameHighScore final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonGift final : public td::Jsonable {
+ public:
+  JsonGift(const td_api::gift *gift, const Client *client) : gift_(gift), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("id", td::to_string(gift_->id_));
+    object("sticker", JsonSticker(gift_->sticker_.get(), client_));
+    object("star_count", gift_->star_count_);
+    if (gift_->total_count_ > 0) {
+      object("remaining_count", gift_->remaining_count_);
+      object("total_count", gift_->total_count_);
+    }
+  }
+
+ private:
+  const td_api::gift *gift_;
+  const Client *client_;
+};
+
+class Client::JsonGifts final : public td::Jsonable {
+ public:
+  JsonGifts(const td_api::gifts *gifts, const Client *client) : gifts_(gifts), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("gifts",
+           td::json_array(gifts_->gifts_, [client = client_](auto &gift) { return JsonGift(gift.get(), client); }));
+  }
+
+ private:
+  const td_api::gifts *gifts_;
+  const Client *client_;
+};
+
 class Client::JsonMessageReactionUpdated final : public td::Jsonable {
  public:
   JsonMessageReactionUpdated(const td_api::updateMessageReaction *update, const Client *client)
@@ -5913,6 +5949,28 @@ class Client::TdOnGetUserChatBoostsCallback final : public TdQueryCallback {
 
  private:
   Client *client_;
+  PromisedQueryPtr query_;
+};
+
+class Client::TdOnGetGiftsCallback final : public TdQueryCallback {
+ public:
+  TdOnGetGiftsCallback(const Client *client, PromisedQueryPtr query) : client_(client), query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::gifts::ID);
+    auto gifts = move_object_as<td_api::gifts>(result);
+    td::remove_if(gifts->gifts_,
+                  [](const auto &gift) { return gift->total_count_ > 0 && gift->remaining_count_ == 0; });
+    answer_query(JsonGifts(gifts.get(), client_), std::move(query_));
+  }
+
+ private:
+  const Client *client_;
   PromisedQueryPtr query_;
 };
 
@@ -11219,6 +11277,11 @@ td::Status Client::process_refund_star_payment_query(PromisedQueryPtr &query) {
         send_request(make_object<td_api::refundStarPayment>(user_id, telegram_payment_charge_id),
                      td::make_unique<TdOnOkQueryCallback>(std::move(query)));
       });
+  return td::Status::OK();
+}
+
+td::Status Client::process_get_available_gifts_query(PromisedQueryPtr &query) {
+  send_request(make_object<td_api::getAvailableGifts>(), td::make_unique<TdOnGetGiftsCallback>(this, std::move(query)));
   return td::Status::OK();
 }
 

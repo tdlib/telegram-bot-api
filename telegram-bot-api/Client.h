@@ -170,6 +170,8 @@ class Client final : public WebhookActor::Callback {
   class JsonForumTopicEdited;
   class JsonForumTopicInfo;
   class JsonGameHighScore;
+  class JsonGift;
+  class JsonGifts;
   class JsonMessageReactionUpdated;
   class JsonMessageReactionCountUpdated;
   class JsonBusinessConnection;
@@ -248,6 +250,7 @@ class Client final : public WebhookActor::Callback {
   class TdOnGetSupergroupMembersCallback;
   class TdOnGetSupergroupMemberCountCallback;
   class TdOnGetUserChatBoostsCallback;
+  class TdOnGetGiftsCallback;
   class TdOnCreateInvoiceLinkCallback;
   class TdOnGetStarTransactionsQueryCallback;
   class TdOnReplacePrimaryChatInviteLinkCallback;
@@ -683,6 +686,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_create_invoice_link_query(PromisedQueryPtr &query);
   td::Status process_get_star_transactions_query(PromisedQueryPtr &query);
   td::Status process_refund_star_payment_query(PromisedQueryPtr &query);
+  td::Status process_get_available_gifts_query(PromisedQueryPtr &query);
   td::Status process_send_gift_query(PromisedQueryPtr &query);
   td::Status process_set_game_score_query(PromisedQueryPtr &query);
   td::Status process_get_game_high_scores_query(PromisedQueryPtr &query);
