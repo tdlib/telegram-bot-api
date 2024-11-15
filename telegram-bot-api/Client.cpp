@@ -253,6 +253,7 @@ bool Client::init_methods() {
   methods_.emplace("createinvoicelink", &Client::process_create_invoice_link_query);
   methods_.emplace("getstartransactions", &Client::process_get_star_transactions_query);
   methods_.emplace("refundstarpayment", &Client::process_refund_star_payment_query);
+  methods_.emplace("edituserstarsubscription", &Client::process_edit_user_star_subscription_query);
   methods_.emplace("getavailablegifts", &Client::process_get_available_gifts_query);
   methods_.emplace("sendgift", &Client::process_send_gift_query);
   methods_.emplace("setgamescore", &Client::process_set_game_score_query);
@@ -11307,6 +11308,20 @@ td::Status Client::process_refund_star_payment_query(PromisedQueryPtr &query) {
       user_id, std::move(query),
       [this, telegram_payment_charge_id = telegram_payment_charge_id.str(), user_id](PromisedQueryPtr query) {
         send_request(make_object<td_api::refundStarPayment>(user_id, telegram_payment_charge_id),
+                     td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+      });
+  return td::Status::OK();
+}
+
+td::Status Client::process_edit_user_star_subscription_query(PromisedQueryPtr &query) {
+  TRY_RESULT(user_id, get_user_id(query.get()));
+  auto telegram_payment_charge_id = query->arg("telegram_payment_charge_id");
+  auto is_canceled = to_bool(query->arg("is_canceled"));
+  check_user_no_fail(
+      user_id, std::move(query),
+      [this, user_id, telegram_payment_charge_id = telegram_payment_charge_id.str(),
+       is_canceled](PromisedQueryPtr query) {
+        send_request(make_object<td_api::editUserStarSubscription>(user_id, telegram_payment_charge_id, is_canceled),
                      td::make_unique<TdOnOkQueryCallback>(std::move(query)));
       });
   return td::Status::OK();
