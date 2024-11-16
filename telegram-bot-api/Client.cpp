@@ -4282,6 +4282,9 @@ class Client::JsonStarTransactionPartner final : public td::Jsonable {
                 object("invoice_payload", purpose->invoice_payload_);
               }
             }
+            if (purpose->period_ > 0) {
+              object("subscription_period", purpose->period_);
+            }
             break;
           }
           default:
