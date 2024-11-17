@@ -2095,6 +2095,9 @@ class Client::JsonSuccessfulPaymentBot final : public td::Jsonable {
     if (successful_payment_->is_first_recurring_) {
       object("is_first_recurring", td::JsonTrue());
     }
+    if (successful_payment_->subscription_until_date_ > 0) {
+      object("subscription_expiration_date", successful_payment_->subscription_until_date_);
+    }
   }
 
  private:
