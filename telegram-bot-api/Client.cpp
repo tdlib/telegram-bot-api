@@ -4230,104 +4230,87 @@ class Client::JsonRevenueWithdrawalState final : public td::Jsonable {
   const td_api::RevenueWithdrawalState *state_;
 };
 
-class Client::JsonStarTransactionPartner final : public td::Jsonable {
+class Client::JsonStarTransactionType final : public td::Jsonable {
  public:
-  JsonStarTransactionPartner(const td_api::StarTransactionPartner *source, const Client *client)
-      : source_(source), client_(client) {
+  JsonStarTransactionType(const td_api::StarTransactionType *type, const Client *client)
+      : type_(type), client_(client) {
   }
+
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
-    switch (source_->get_id()) {
-      case td_api::starTransactionPartnerFragment::ID: {
-        auto source_fragment = static_cast<const td_api::starTransactionPartnerFragment *>(source_);
+    switch (type_->get_id()) {
+      case td_api::starTransactionTypeFragmentDeposit::ID:
         object("type", "fragment");
-        if (source_fragment->withdrawal_state_ != nullptr) {
-          object("withdrawal_state", JsonRevenueWithdrawalState(source_fragment->withdrawal_state_.get()));
+        break;
+      case td_api::starTransactionTypeFragmentWithdrawal::ID: {
+        auto type = static_cast<const td_api::starTransactionTypeFragmentWithdrawal *>(type_);
+        object("type", "fragment");
+        if (type->withdrawal_state_ != nullptr) {
+          object("withdrawal_state", JsonRevenueWithdrawalState(type->withdrawal_state_.get()));
         }
         break;
       }
-      case td_api::starTransactionPartnerBot::ID: {
-        auto source_user = static_cast<const td_api::starTransactionPartnerBot *>(source_);
+      case td_api::starTransactionTypeBotPaidMediaSale::ID: {
+        auto type = static_cast<const td_api::starTransactionTypeBotPaidMediaSale *>(type_);
         object("type", "user");
-        object("user", JsonUser(source_user->user_id_, client_));
-        CHECK(source_user->purpose_ != nullptr);
-        switch (source_user->purpose_->get_id()) {
-          case td_api::botTransactionPurposeInvoicePayment::ID: {
-            auto purpose =
-                static_cast<const td_api::botTransactionPurposeInvoicePayment *>(source_user->purpose_.get());
-            if (!purpose->invoice_payload_.empty()) {
-              if (!td::check_utf8(purpose->invoice_payload_)) {
-                LOG(WARNING) << "Receive non-UTF-8 invoice payload";
-                object("invoice_payload", td::JsonRawString(purpose->invoice_payload_));
-              } else {
-                object("invoice_payload", purpose->invoice_payload_);
-              }
-            }
-            break;
-          }
-          case td_api::botTransactionPurposePaidMedia::ID: {
-            auto purpose = static_cast<const td_api::botTransactionPurposePaidMedia *>(source_user->purpose_.get());
-            object("paid_media", td::json_array(purpose->media_, [client = client_](auto &media) {
-                     return JsonPaidMedia(media.get(), client);
-                   }));
-            if (!purpose->payload_.empty()) {
-              object("paid_media_payload", purpose->payload_);
-            }
-            break;
-          }
-          case td_api::botTransactionPurposeSubscription::ID: {
-            auto purpose = static_cast<const td_api::botTransactionPurposeSubscription *>(source_user->purpose_.get());
-            if (!purpose->invoice_payload_.empty()) {
-              if (!td::check_utf8(purpose->invoice_payload_)) {
-                LOG(WARNING) << "Receive non-UTF-8 invoice payload";
-                object("invoice_payload", td::JsonRawString(purpose->invoice_payload_));
-              } else {
-                object("invoice_payload", purpose->invoice_payload_);
-              }
-            }
-            if (purpose->period_ > 0) {
-              object("subscription_period", purpose->period_);
-            }
-            break;
-          }
-          default:
-            UNREACHABLE();
+        object("user", JsonUser(type->user_id_, client_));
+        object("paid_media", td::json_array(type->media_, [client = client_](auto &media) {
+                 return JsonPaidMedia(media.get(), client);
+               }));
+        if (!type->payload_.empty()) {
+          object("paid_media_payload", type->payload_);
         }
         break;
       }
-      case td_api::starTransactionPartnerTelegramAds::ID:
+      case td_api::starTransactionTypeBotInvoiceSale::ID: {
+        auto type = static_cast<const td_api::starTransactionTypeBotInvoiceSale *>(type_);
+        object("type", "user");
+        object("user", JsonUser(type->user_id_, client_));
+        if (!type->invoice_payload_.empty()) {
+          if (!td::check_utf8(type->invoice_payload_)) {
+            LOG(WARNING) << "Receive non-UTF-8 invoice payload";
+            object("invoice_payload", td::JsonRawString(type->invoice_payload_));
+          } else {
+            object("invoice_payload", type->invoice_payload_);
+          }
+        }
+        break;
+      }
+      case td_api::starTransactionTypeBotSubscriptionSale::ID: {
+        auto type = static_cast<const td_api::starTransactionTypeBotSubscriptionSale *>(type_);
+        object("type", "user");
+        object("user", JsonUser(type->user_id_, client_));
+        if (!type->invoice_payload_.empty()) {
+          if (!td::check_utf8(type->invoice_payload_)) {
+            LOG(WARNING) << "Receive non-UTF-8 invoice payload";
+            object("invoice_payload", td::JsonRawString(type->invoice_payload_));
+          } else {
+            object("invoice_payload", type->invoice_payload_);
+          }
+        }
+        if (type->subscription_period_ > 0) {
+          object("subscription_period", type->subscription_period_);
+        }
+        break;
+      }
+      case td_api::starTransactionTypeTelegramAdsWithdrawal::ID:
         object("type", "telegram_ads");
         break;
-      case td_api::starTransactionPartnerTelegramApi::ID: {
-        auto source = static_cast<const td_api::starTransactionPartnerTelegramApi *>(source_);
+      case td_api::starTransactionTypeTelegramApiUsage::ID: {
+        auto type = static_cast<const td_api::starTransactionTypeTelegramApiUsage *>(type_);
         object("type", "telegram_api");
-        object("request_count", source->request_count_);
+        object("request_count", type->request_count_);
         break;
       }
-      case td_api::starTransactionPartnerUser::ID: {
-        auto source = static_cast<const td_api::starTransactionPartnerUser *>(source_);
-        if (source->purpose_->get_id() == td_api::userTransactionPurposeGiftSend::ID) {
-          object("type", "user");
-          object("user", JsonUser(source->user_id_, client_));
-          object(
-              "gift",
-              JsonGift(static_cast<const td_api::userTransactionPurposeGiftSend *>(source->purpose_.get())->gift_.get(),
-                       client_));
-        } else {
-          LOG(ERROR) << "Receive " << to_string(*source_);
-          object("type", "other");
-        }
+      case td_api::starTransactionTypeGiftPurchase::ID: {
+        auto type = static_cast<const td_api::starTransactionTypeGiftPurchase *>(type_);
+        object("type", "user");
+        object("user", JsonUser(type->user_id_, client_));
+        object("gift", JsonGift(type->gift_.get(), client_));
         break;
       }
-      case td_api::starTransactionPartnerTelegram::ID:
-      case td_api::starTransactionPartnerAppStore::ID:
-      case td_api::starTransactionPartnerGooglePlay::ID:
-      case td_api::starTransactionPartnerBusiness::ID:
-      case td_api::starTransactionPartnerChat::ID:
-        LOG(ERROR) << "Receive " << to_string(*source_);
-        object("type", "other");
-        break;
-      case td_api::starTransactionPartnerUnsupported::ID:
+      case td_api::starTransactionTypeAffiliateProgramCommission::ID:
+      case td_api::starTransactionTypeUnsupported::ID:
         object("type", "other");
         break;
       default:
@@ -4336,7 +4319,7 @@ class Client::JsonStarTransactionPartner final : public td::Jsonable {
   }
 
  private:
-  const td_api::StarTransactionPartner *source_;
+  const td_api::StarTransactionType *type_;
   const Client *client_;
 };
 
@@ -4349,12 +4332,14 @@ class Client::JsonStarTransaction final : public td::Jsonable {
     auto object = scope->enter_object();
     object("id", transaction_->id_);
     object("date", transaction_->date_);
-    if (transaction_->star_count_ > 0) {
-      object("amount", transaction_->star_count_);
-      object("source", JsonStarTransactionPartner(transaction_->partner_.get(), client_));
+    auto star_count = transaction_->star_amount_->star_count_;
+    auto nanostar_count = transaction_->star_amount_->nanostar_count_;
+    if (star_count > 0 || nanostar_count > 0) {
+      object("amount", star_count);
+      object("source", JsonStarTransactionType(transaction_->type_.get(), client_));
     } else {
-      object("amount", -transaction_->star_count_);
-      object("receiver", JsonStarTransactionPartner(transaction_->partner_.get(), client_));
+      object("amount", -star_count);
+      object("receiver", JsonStarTransactionType(transaction_->type_.get(), client_));
     }
   }
 
