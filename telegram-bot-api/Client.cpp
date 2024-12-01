@@ -4344,7 +4344,20 @@ class Client::JsonStarTransactionType final : public td::Jsonable {
         object("gift", JsonGift(type->gift_.get(), client_));
         break;
       }
-      case td_api::starTransactionTypeAffiliateProgramCommission::ID:
+      case td_api::starTransactionTypeAffiliateProgramCommission::ID: {
+        auto type = static_cast<const td_api::starTransactionTypeAffiliateProgramCommission *>(type_);
+        object("type", "affiliate_program");
+        auto chat_info = client_->get_chat(type->chat_id_);
+        CHECK(chat_info != nullptr);
+        if (chat_info->type == ChatInfo::Type::Private) {
+          object("sponsor_user", JsonUser(chat_info->user_id, client_));
+        } else {
+          LOG(ERROR) << "Receive chat " << type->chat_id_ << " as an affiliate program sponsor";
+          object("sponsor_chat", JsonChat(type->chat_id_, client_));
+        }
+        object("commission_per_mille", type->commission_per_mille_);
+        break;
+      }
       case td_api::starTransactionTypeUnsupported::ID:
         object("type", "other");
         break;
