@@ -4383,11 +4383,15 @@ class Client::JsonStarTransaction final : public td::Jsonable {
     auto star_count = transaction_->star_amount_->star_count_;
     auto nanostar_count = transaction_->star_amount_->nanostar_count_;
     if (star_count > 0 || nanostar_count > 0) {
-      object("amount", star_count);
       object("source", JsonStarTransactionType(transaction_->type_.get(), client_));
     } else {
-      object("amount", -star_count);
+      star_count = -star_count;
+      nanostar_count = -nanostar_count;
       object("receiver", JsonStarTransactionType(transaction_->type_.get(), client_));
+    }
+    object("amount", star_count);
+    if (nanostar_count != 0) {
+      object("nanostar_amount", nanostar_count);
     }
   }
 
