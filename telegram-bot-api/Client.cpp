@@ -4230,6 +4230,32 @@ class Client::JsonRevenueWithdrawalState final : public td::Jsonable {
   const td_api::RevenueWithdrawalState *state_;
 };
 
+class Client::JsonAffiliateInfo final : public td::Jsonable {
+ public:
+  JsonAffiliateInfo(const td_api::affiliateInfo *affiliate_info, const Client *client)
+      : affiliate_info_(affiliate_info), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    auto chat_info = client_->get_chat(affiliate_info_->affiliate_chat_id_);
+    CHECK(chat_info != nullptr);
+    if (chat_info->type == ChatInfo::Type::Private) {
+      object("affiliate_user", JsonUser(chat_info->user_id, client_));
+    } else {
+      object("affiliate_chat", JsonChat(affiliate_info_->affiliate_chat_id_, client_));
+    }
+    object("commission_per_mille", affiliate_info_->commission_per_mille_);
+    object("amount", affiliate_info_->star_amount_->star_count_);
+    if (affiliate_info_->star_amount_->nanostar_count_ != 0) {
+      object("nanostar_amount", affiliate_info_->star_amount_->nanostar_count_);
+    }
+  }
+
+ private:
+  const td_api::affiliateInfo *affiliate_info_;
+  const Client *client_;
+};
+
 class Client::JsonStarTransactionType final : public td::Jsonable {
  public:
   JsonStarTransactionType(const td_api::StarTransactionType *type, const Client *client)
@@ -4260,6 +4286,9 @@ class Client::JsonStarTransactionType final : public td::Jsonable {
         if (!type->payload_.empty()) {
           object("paid_media_payload", type->payload_);
         }
+        if (type->affiliate_ != nullptr) {
+          object("affiliate", JsonAffiliateInfo(type->affiliate_.get(), client_));
+        }
         break;
       }
       case td_api::starTransactionTypeBotInvoiceSale::ID: {
@@ -4273,6 +4302,9 @@ class Client::JsonStarTransactionType final : public td::Jsonable {
           } else {
             object("invoice_payload", type->invoice_payload_);
           }
+        }
+        if (type->affiliate_ != nullptr) {
+          object("affiliate", JsonAffiliateInfo(type->affiliate_.get(), client_));
         }
         break;
       }
@@ -4290,6 +4322,9 @@ class Client::JsonStarTransactionType final : public td::Jsonable {
         }
         if (type->subscription_period_ > 0) {
           object("subscription_period", type->subscription_period_);
+        }
+        if (type->affiliate_ != nullptr) {
+          object("affiliate", JsonAffiliateInfo(type->affiliate_.get(), client_));
         }
         break;
       }
