@@ -23,6 +23,9 @@ ServerCpuStat::ServerCpuStat() {
 void ServerCpuStat::update(double now) {
   auto r_cpu_stat = td::cpu_stat();
   if (r_cpu_stat.is_error()) {
+    if (r_cpu_stat.error().message() != "Not supported") {
+      LOG(ERROR) << "Failed to get CPU statistics: " << r_cpu_stat.error();
+    }
     return;
   }
 
