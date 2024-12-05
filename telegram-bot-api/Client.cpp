@@ -6666,7 +6666,7 @@ void Client::check_business_connection_chat_id(const td::string &business_connec
   }
   auto chat_id = r_chat_id.move_as_ok();
   check_business_connection(business_connection_id, std::move(query),
-                            [this, chat_id, on_success = std::move(on_success)](
+                            [chat_id, on_success = std::move(on_success)](
                                 const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
                               on_success(business_connection, chat_id, std::move(query));
                             });
