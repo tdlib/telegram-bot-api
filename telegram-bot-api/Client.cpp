@@ -4088,6 +4088,9 @@ class Client::JsonGift final : public td::Jsonable {
     object("id", td::to_string(gift_->id_));
     object("sticker", JsonSticker(gift_->sticker_.get(), client_));
     object("star_count", gift_->star_count_);
+    if (gift_->upgrade_star_count_ > 0) {
+      object("upgrade_star_count", gift_->upgrade_star_count_);
+    }
     if (gift_->total_count_ > 0) {
       object("remaining_count", gift_->remaining_count_);
       object("total_count", gift_->total_count_);
