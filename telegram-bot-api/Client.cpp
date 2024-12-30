@@ -256,6 +256,7 @@ bool Client::init_methods() {
   methods_.emplace("edituserstarsubscription", &Client::process_edit_user_star_subscription_query);
   methods_.emplace("getavailablegifts", &Client::process_get_available_gifts_query);
   methods_.emplace("sendgift", &Client::process_send_gift_query);
+  methods_.emplace("verifyuser", &Client::process_verify_user_query);
   methods_.emplace("setgamescore", &Client::process_set_game_score_query);
   methods_.emplace("getgamehighscores", &Client::process_get_game_high_scores_query);
   methods_.emplace("answerwebappquery", &Client::process_answer_web_app_query_query);
@@ -11391,6 +11392,18 @@ td::Status Client::process_send_gift_query(PromisedQueryPtr &query) {
   check_user(user_id, std::move(query),
              [this, gift_id, pay_for_upgrade, user_id, text = std::move(text)](PromisedQueryPtr query) mutable {
                send_request(make_object<td_api::sendGift>(gift_id, user_id, std::move(text), false, pay_for_upgrade),
+                            td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+             });
+  return td::Status::OK();
+}
+
+td::Status Client::process_verify_user_query(PromisedQueryPtr &query) {
+  TRY_RESULT(user_id, get_user_id(query.get()));
+  auto custom_description = query->arg("custom_description");
+  check_user(user_id, std::move(query),
+             [this, user_id, custom_description = custom_description.str()](PromisedQueryPtr query) {
+               send_request(make_object<td_api::setMessageSenderBotVerification>(
+                                0, make_object<td_api::messageSenderUser>(user_id), custom_description),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
   return td::Status::OK();
