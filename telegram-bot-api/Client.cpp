@@ -11384,12 +11384,13 @@ td::Status Client::process_get_available_gifts_query(PromisedQueryPtr &query) {
 
 td::Status Client::process_send_gift_query(PromisedQueryPtr &query) {
   auto gift_id = td::to_integer<int64>(query->arg("gift_id"));
+  auto pay_for_upgrade = to_bool(query->arg("pay_for_upgrade"));
   TRY_RESULT(user_id, get_user_id(query.get()));
   TRY_RESULT(text, get_formatted_text(query->arg("text").str(), query->arg("text_parse_mode").str(),
                                       get_input_entities(query.get(), "text_entities")));
   check_user(user_id, std::move(query),
-             [this, gift_id, user_id, text = std::move(text)](PromisedQueryPtr query) mutable {
-               send_request(make_object<td_api::sendGift>(gift_id, user_id, std::move(text), false, false),
+             [this, gift_id, pay_for_upgrade, user_id, text = std::move(text)](PromisedQueryPtr query) mutable {
+               send_request(make_object<td_api::sendGift>(gift_id, user_id, std::move(text), false, pay_for_upgrade),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
   return td::Status::OK();
