@@ -3389,6 +3389,10 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       break;
     case td_api::messageGift::ID:
       break;
+    case td_api::messageUpgradedGift::ID:
+      break;
+    case td_api::messageRefundedUpgradedGift::ID:
+      break;
     default:
       UNREACHABLE();
   }
@@ -6666,8 +6670,8 @@ void Client::check_business_connection_chat_id(const td::string &business_connec
   }
   auto chat_id = r_chat_id.move_as_ok();
   check_business_connection(business_connection_id, std::move(query),
-                            [chat_id, on_success = std::move(on_success)](
-                                const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
+                            [chat_id, on_success = std::move(on_success)](const BusinessConnection *business_connection,
+                                                                          PromisedQueryPtr query) mutable {
                               on_success(business_connection, chat_id, std::move(query));
                             });
 }
@@ -8577,7 +8581,7 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
 
     CHECK(input_message_content != nullptr);
     return make_object<td_api::inputInlineQueryResultArticle>(
-        id, url, hide_url, title, description, thumbnail_url, thumbnail_width, thumbnail_height,
+        id, hide_url ? td::string() : url, title, description, thumbnail_url, thumbnail_width, thumbnail_height,
         std::move(reply_markup), std::move(input_message_content));
   }
   if (type == "audio") {
@@ -11382,7 +11386,7 @@ td::Status Client::process_send_gift_query(PromisedQueryPtr &query) {
                                       get_input_entities(query.get(), "text_entities")));
   check_user(user_id, std::move(query),
              [this, gift_id, user_id, text = std::move(text)](PromisedQueryPtr query) mutable {
-               send_request(make_object<td_api::sendGift>(gift_id, user_id, std::move(text), false),
+               send_request(make_object<td_api::sendGift>(gift_id, user_id, std::move(text), false, false),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
   return td::Status::OK();
@@ -14283,6 +14287,10 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageGiveawayPrizeStars::ID:
       return true;
     case td_api::messageGift::ID:
+      return true;
+    case td_api::messageUpgradedGift::ID:
+      return true;
+    case td_api::messageRefundedUpgradedGift::ID:
       return true;
     default:
       break;
