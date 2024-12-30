@@ -259,6 +259,7 @@ bool Client::init_methods() {
   methods_.emplace("verifyuser", &Client::process_verify_user_query);
   methods_.emplace("verifychat", &Client::process_verify_chat_query);
   methods_.emplace("removeuserverification", &Client::process_remove_user_verification_query);
+  methods_.emplace("removechatverification", &Client::process_remove_chat_verification_query);
   methods_.emplace("setgamescore", &Client::process_set_game_score_query);
   methods_.emplace("getgamehighscores", &Client::process_get_game_high_scores_query);
   methods_.emplace("answerwebappquery", &Client::process_answer_web_app_query_query);
@@ -11428,6 +11429,16 @@ td::Status Client::process_remove_user_verification_query(PromisedQueryPtr &quer
   check_user(user_id, std::move(query), [this, user_id](PromisedQueryPtr query) {
     send_request(
         make_object<td_api::removeMessageSenderBotVerification>(0, make_object<td_api::messageSenderUser>(user_id)),
+        td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+  });
+  return td::Status::OK();
+}
+
+td::Status Client::process_remove_chat_verification_query(PromisedQueryPtr &query) {
+  auto chat_id = query->arg("chat_id");
+  check_chat(chat_id, AccessRights::Read, std::move(query), [this](int64 chat_id, PromisedQueryPtr query) {
+    send_request(
+        make_object<td_api::removeMessageSenderBotVerification>(0, make_object<td_api::messageSenderChat>(chat_id)),
         td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   });
   return td::Status::OK();

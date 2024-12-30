@@ -693,6 +693,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_verify_user_query(PromisedQueryPtr &query);
   td::Status process_verify_chat_query(PromisedQueryPtr &query);
   td::Status process_remove_user_verification_query(PromisedQueryPtr &query);
+  td::Status process_remove_chat_verification_query(PromisedQueryPtr &query);
   td::Status process_set_game_score_query(PromisedQueryPtr &query);
   td::Status process_get_game_high_scores_query(PromisedQueryPtr &query);
   td::Status process_answer_web_app_query_query(PromisedQueryPtr &query);
