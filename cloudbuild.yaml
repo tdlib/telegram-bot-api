@@ -1,0 +1,53 @@
+steps:
+  - id: Pulling Latest Image
+    name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    args:
+      - -c
+      - pull
+        europe-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/$REF_NAME:latest
+        || exit 0
+    waitFor:
+      - "-"
+  - id: Build New Image
+    name: gcr.io/cloud-builders/docker
+    args:
+      - -c
+      - build
+      - -t
+      - europe-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/$REF_NAME:latest
+      - --cache-from
+      - europe-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/$REF_NAME:latest
+      - .
+    waitFor:
+      - Pulling Latest Image
+  - id: Push New Image
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - europe-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/$REF_NAME
+    waitFor:
+      - Build New Image
+  - id: Deploy Backend
+    name: gcr.io/cloud-builders/gcloud
+    entrypoint: bash
+    args:
+      - -c
+      - |-
+        BACKEND_SECRETS=( \
+          "TELEGRAM_API_ID=telegram-local-bot-api-id-${_ENVIRONMENT}:latest" \
+          "TELEGRAM_API_HASH=telegram-local-bot-api-hash-${_ENVIRONMENT}:latest" \
+        )
+        gcloud run services update $REPO_NAME-$(echo '$REF_NAME' | tr '[:upper:]' '[:lower:]' | sed 's/ /-/g' | sed 's/\//-/g' | sed 's/[^a-zA-Z0-9-]//g')-${_ENVIRONMENT} \
+        --platform=managed \
+        --region=${_REGION} \
+        --execution-environment=gen2 \
+        --quiet \
+        --container=backend \
+        --image=europe-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/$REF_NAME:latest \
+        --update-secrets=$(IFS=,; echo "$${BACKEND_SECRETS[*]}")
+    waitFor:
+      - Push New Image
+
+images:
+  - europe-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/$REF_NAME:latest
