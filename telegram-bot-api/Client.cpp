@@ -976,6 +976,9 @@ class Client::JsonChat final : public td::Jsonable {
         }
         object("type", "private");
         if (is_full_) {
+          if (user_info->type == UserInfo::Type::Regular) {
+            object("can_send_gift", td::JsonTrue());
+          }
           if (!user_info->active_usernames.empty()) {
             object("active_usernames", td::json_array(user_info->active_usernames,
                                                       [](td::Slice username) { return td::JsonString(username); }));
@@ -1081,6 +1084,9 @@ class Client::JsonChat final : public td::Jsonable {
             } else {
               LOG(ERROR) << "Not found chat custom emoji sticker set " << supergroup_info->custom_emoji_sticker_set_id;
             }
+          }
+          if (supergroup_info->can_send_gift) {
+            object("can_send_gift", td::JsonTrue());
           }
           if (supergroup_info->can_set_sticker_set) {
             object("can_set_sticker_set", td::JsonTrue());
@@ -7418,6 +7424,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       supergroup_info->sticker_set_id = full_info->sticker_set_id_;
       supergroup_info->custom_emoji_sticker_set_id = full_info->custom_emoji_sticker_set_id_;
       supergroup_info->can_set_sticker_set = full_info->can_set_sticker_set_;
+      supergroup_info->can_send_gift = full_info->can_send_gift_;
       supergroup_info->is_all_history_available = full_info->is_all_history_available_;
       supergroup_info->slow_mode_delay = full_info->slow_mode_delay_;
       supergroup_info->unrestrict_boost_count = full_info->unrestrict_boost_count_;
