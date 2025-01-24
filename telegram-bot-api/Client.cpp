@@ -4948,7 +4948,7 @@ class Client::TdOnCheckUserCallback final : public TdQueryCallback {
     CHECK(result->get_id() == td_api::user::ID);
     auto user = move_object_as<td_api::user>(result);
     auto user_info = client_->get_user_info(user->id_);
-    CHECK(user_info != nullptr);  // it must have already been got through updates
+    CHECK(user_info != nullptr);  // it must have already been received through updates
 
     client_->check_user_read_access(user_info, std::move(query_), std::move(on_success_));
   }
@@ -4995,7 +4995,7 @@ class Client::TdOnCheckChatCallback final : public TdQueryCallback {
     CHECK(result->get_id() == td_api::chat::ID);
     auto chat = move_object_as<td_api::chat>(result);
     auto chat_info = client_->get_chat(chat->id_);
-    CHECK(chat_info != nullptr);  // it must have already been got through updates
+    CHECK(chat_info != nullptr);  // it must have already been received through updates
     CHECK(chat_info->title == chat->title_);
     if (only_supergroup_ && chat_info->type != ChatInfo::Type::Supergroup) {
       return fail_query(400, "Bad Request: chat not found", std::move(query_));
@@ -5089,7 +5089,7 @@ class Client::TdOnResolveBotUsernameCallback final : public TdQueryCallback {
     CHECK(result->get_id() == td_api::chat::ID);
     auto chat = move_object_as<td_api::chat>(result);
     auto chat_info = client_->get_chat(chat->id_);
-    CHECK(chat_info != nullptr);  // it must have already been got through updates
+    CHECK(chat_info != nullptr);  // it must have already been received through updates
     if (chat_info->type != ChatInfo::Type::Private) {
       return client_->on_resolve_bot_username(username_, 0);
     }
@@ -14303,7 +14303,7 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageChatAddMembers::ID: {
       auto content = static_cast<const td_api::messageChatAddMembers *>(message->content_.get());
       if (content->member_user_ids_.empty()) {
-        LOG(ERROR) << "Got empty messageChatAddMembers";
+        LOG(ERROR) << "Receive empty messageChatAddMembers";
         return true;
       }
       break;

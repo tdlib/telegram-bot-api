@@ -26,7 +26,7 @@ struct SharedData;
 
 class HttpConnection final : public td::HttpInboundConnection::Callback {
  public:
-  explicit HttpConnection(td::ActorId<ClientManager> client_manager, std::shared_ptr<SharedData> shared_data)
+  HttpConnection(td::ActorId<ClientManager> client_manager, std::shared_ptr<SharedData> shared_data)
       : client_manager_(client_manager), shared_data_(std::move(shared_data)) {
   }
 

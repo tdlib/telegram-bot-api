@@ -595,9 +595,9 @@ void WebhookActor::handle(td::unique_ptr<td::HttpQuery> response) {
 
   auto connection_id = get_link_token();
   if (response) {
-    VLOG(webhook) << "Got response from connection " << connection_id;
+    VLOG(webhook) << "Receive response from connection " << connection_id;
   } else {
-    VLOG(webhook) << "Got hangup from connection " << connection_id;
+    VLOG(webhook) << "Receive hangup from connection " << connection_id;
   }
   auto *connection_ptr = connections_.get(connection_id);
   if (connection_ptr == nullptr) {
