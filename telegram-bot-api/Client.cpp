@@ -4350,8 +4350,21 @@ class Client::JsonStarTransactionType final : public td::Jsonable {
       }
       case td_api::starTransactionTypeGiftPurchase::ID: {
         auto type = static_cast<const td_api::starTransactionTypeGiftPurchase *>(type_);
-        object("type", "user");
-        object("user", JsonUser(type->user_id_, client_));
+        switch (type->owner_id_->get_id()) {
+          case td_api::messageSenderUser::ID: {
+            auto owner_id = static_cast<const td_api::messageSenderUser *>(type->owner_id_.get());
+            object("type", "user");
+            object("user", JsonUser(owner_id->user_id_, client_));
+            break;
+          }
+          case td_api::messageSenderChat::ID: {
+            // auto owner_id = static_cast<const td_api::messageSenderChat *>(type->owner_id_.get());
+            object("type", "other");
+            break;
+          }
+          default:
+            UNREACHABLE();
+        }
         object("gift", JsonGift(type->gift_.get(), client_));
         break;
       }
@@ -7267,7 +7280,11 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       chat_info->permissions = std::move(chat->permissions_);
       chat_info->message_auto_delete_time = chat->message_auto_delete_time_;
       chat_info->emoji_status_custom_emoji_id =
-          chat->emoji_status_ != nullptr ? chat->emoji_status_->custom_emoji_id_ : 0;
+          chat->emoji_status_ != nullptr &&
+                  chat->emoji_status_->type_->get_id() == td_api::emojiStatusTypeCustomEmoji::ID
+              ? static_cast<const td_api::emojiStatusTypeCustomEmoji *>(chat->emoji_status_->type_.get())
+                    ->custom_emoji_id_
+              : 0;
       chat_info->emoji_status_expiration_date =
           chat->emoji_status_ != nullptr ? chat->emoji_status_->expiration_date_ : 0;
       set_chat_available_reactions(chat_info, std::move(chat->available_reactions_));
@@ -7311,7 +7328,11 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       auto chat_info = add_chat(update->chat_id_);
       CHECK(chat_info->type != ChatInfo::Type::Unknown);
       chat_info->emoji_status_custom_emoji_id =
-          update->emoji_status_ != nullptr ? update->emoji_status_->custom_emoji_id_ : 0;
+          update->emoji_status_ != nullptr &&
+                  update->emoji_status_->type_->get_id() == td_api::emojiStatusTypeCustomEmoji::ID
+              ? static_cast<const td_api::emojiStatusTypeCustomEmoji *>(update->emoji_status_->type_.get())
+                    ->custom_emoji_id_
+              : 0;
       chat_info->emoji_status_expiration_date =
           update->emoji_status_ != nullptr ? update->emoji_status_->expiration_date_ : 0;
       break;
@@ -8787,8 +8808,8 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
 
     if (input_message_content == nullptr) {
       input_message_content = make_object<td_api::inputMessageVideo>(
-          nullptr, nullptr, td::vector<int32>(), video_duration, video_width, video_height, false, std::move(caption),
-          show_caption_above_media, nullptr, false);
+          nullptr, nullptr, nullptr, 0, td::vector<int32>(), video_duration, video_width, video_height, false,
+          std::move(caption), show_caption_above_media, nullptr, false);
     }
     return make_object<td_api::inputInlineQueryResultVideo>(id, title, description, thumbnail_url, video_url, mime_type,
                                                             video_width, video_height, video_duration,
@@ -9793,7 +9814,7 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
     height = td::clamp(height, 0, MAX_LENGTH);
     duration = td::clamp(duration, 0, MAX_DURATION);
 
-    return make_object<td_api::inputMessageVideo>(std::move(input_file), std::move(input_thumbnail),
+    return make_object<td_api::inputMessageVideo>(std::move(input_file), std::move(input_thumbnail), nullptr, 0,
                                                   td::vector<int32>(), duration, width, height, supports_streaming,
                                                   std::move(caption), show_caption_above_media, nullptr, has_spoiler);
   }
@@ -9912,7 +9933,7 @@ td::Result<td_api::object_ptr<td_api::inputPaidMedia>> Client::get_input_paid_me
     TRY_RESULT(duration, object.get_optional_int_field("duration"));
     TRY_RESULT(supports_streaming, object.get_optional_bool_field("supports_streaming"));
     duration = td::clamp(duration, 0, MAX_DURATION);
-    media_type = make_object<td_api::inputPaidMediaTypeVideo>(duration, supports_streaming);
+    media_type = make_object<td_api::inputPaidMediaTypeVideo>(nullptr, 0, duration, supports_streaming);
   } else {
     return td::Status::Error(PSLICE() << "type \"" << type << "\" is unsupported");
   }
@@ -10643,7 +10664,7 @@ td::Status Client::process_send_video_query(PromisedQueryPtr &query) {
   auto show_caption_above_media = to_bool(query->arg("show_caption_above_media"));
   auto has_spoiler = to_bool(query->arg("has_spoiler"));
   do_send_message(make_object<td_api::inputMessageVideo>(
-                      std::move(video), std::move(thumbnail), td::vector<int32>(), duration, width, height,
+                      std::move(video), std::move(thumbnail), nullptr, 0, td::vector<int32>(), duration, width, height,
                       supports_streaming, std::move(caption), show_caption_above_media, nullptr, has_spoiler),
                   std::move(query));
   return td::Status::OK();
@@ -10833,8 +10854,9 @@ td::Status Client::process_copy_message_query(PromisedQueryPtr &query) {
   check_message(
       from_chat_id, message_id, false, AccessRights::Read, "message to copy", std::move(query),
       [this, options = std::move(options)](int64 from_chat_id, int64 message_id, PromisedQueryPtr query) mutable {
-        do_send_message(make_object<td_api::inputMessageForwarded>(from_chat_id, message_id, false, std::move(options)),
-                        std::move(query));
+        do_send_message(
+            make_object<td_api::inputMessageForwarded>(from_chat_id, message_id, false, false, 0, std::move(options)),
+            std::move(query));
       });
   return td::Status::OK();
 }
@@ -10890,8 +10912,9 @@ td::Status Client::process_forward_message_query(PromisedQueryPtr &query) {
 
   check_message(from_chat_id, message_id, false, AccessRights::Read, "message to forward", std::move(query),
                 [this](int64 from_chat_id, int64 message_id, PromisedQueryPtr query) {
-                  do_send_message(make_object<td_api::inputMessageForwarded>(from_chat_id, message_id, false, nullptr),
-                                  std::move(query));
+                  do_send_message(
+                      make_object<td_api::inputMessageForwarded>(from_chat_id, message_id, false, false, 0, nullptr),
+                      std::move(query));
                 });
   return td::Status::OK();
 }
@@ -11394,7 +11417,8 @@ td::Status Client::process_send_gift_query(PromisedQueryPtr &query) {
                                       get_input_entities(query.get(), "text_entities")));
   check_user(user_id, std::move(query),
              [this, gift_id, pay_for_upgrade, user_id, text = std::move(text)](PromisedQueryPtr query) mutable {
-               send_request(make_object<td_api::sendGift>(gift_id, user_id, std::move(text), false, pay_for_upgrade),
+               send_request(make_object<td_api::sendGift>(gift_id, make_object<td_api::messageSenderUser>(user_id),
+                                                          std::move(text), false, pay_for_upgrade),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
   return td::Status::OK();
@@ -11718,12 +11742,14 @@ td::Status Client::process_set_user_emoji_status_query(PromisedQueryPtr &query) 
   check_user(
       user_id, std::move(query),
       [this, user_id, emoji_status_custom_emoji_id, emoji_status_expiration_date](PromisedQueryPtr query) mutable {
-        send_request(make_object<td_api::setUserEmojiStatus>(
-                         user_id, emoji_status_custom_emoji_id == 0
-                                      ? nullptr
-                                      : make_object<td_api::emojiStatus>(emoji_status_custom_emoji_id,
-                                                                         emoji_status_expiration_date)),
-                     td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+        send_request(
+            make_object<td_api::setUserEmojiStatus>(
+                user_id, emoji_status_custom_emoji_id == 0
+                             ? nullptr
+                             : make_object<td_api::emojiStatus>(
+                                   make_object<td_api::emojiStatusTypeCustomEmoji>(emoji_status_custom_emoji_id),
+                                   emoji_status_expiration_date)),
+            td::make_unique<TdOnOkQueryCallback>(std::move(query)));
       });
   return td::Status::OK();
 }
