@@ -4358,8 +4358,9 @@ class Client::JsonStarTransactionType final : public td::Jsonable {
             break;
           }
           case td_api::messageSenderChat::ID: {
-            // auto owner_id = static_cast<const td_api::messageSenderChat *>(type->owner_id_.get());
-            object("type", "other");
+            auto owner_id = static_cast<const td_api::messageSenderChat *>(type->owner_id_.get());
+            object("type", "chat");
+            object("chat", JsonChat(owner_id->chat_id_, client_));
             break;
           }
           default:
