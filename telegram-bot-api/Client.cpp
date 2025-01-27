@@ -9808,16 +9808,19 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
     TRY_RESULT(width, object.get_optional_int_field("width"));
     TRY_RESULT(height, object.get_optional_int_field("height"));
     TRY_RESULT(duration, object.get_optional_int_field("duration"));
+    TRY_RESULT(cover, object.get_optional_string_field("cover"));
     TRY_RESULT(start_timestamp, object.get_optional_int_field("start_timestamp"));
     TRY_RESULT(supports_streaming, object.get_optional_bool_field("supports_streaming"));
+    auto input_cover = get_input_file(query, td::Slice(), cover, false);
     width = td::clamp(width, 0, MAX_LENGTH);
     height = td::clamp(height, 0, MAX_LENGTH);
     duration = td::clamp(duration, 0, MAX_DURATION);
     start_timestamp = td::clamp(start_timestamp, 0, MAX_DURATION);
 
-    return make_object<td_api::inputMessageVideo>(
-        std::move(input_file), std::move(input_thumbnail), nullptr, start_timestamp, td::vector<int32>(), duration,
-        width, height, supports_streaming, std::move(caption), show_caption_above_media, nullptr, has_spoiler);
+    return make_object<td_api::inputMessageVideo>(std::move(input_file), std::move(input_thumbnail),
+                                                  std::move(input_cover), start_timestamp, td::vector<int32>(),
+                                                  duration, width, height, supports_streaming, std::move(caption),
+                                                  show_caption_above_media, nullptr, has_spoiler);
   }
   if (type == "animation") {
     if (for_album) {
@@ -10660,13 +10663,14 @@ td::Status Client::process_send_video_query(PromisedQueryPtr &query) {
   int32 duration = get_integer_arg(query.get(), "duration", 0, 0, MAX_DURATION);
   int32 width = get_integer_arg(query.get(), "width", 0, 0, MAX_LENGTH);
   int32 height = get_integer_arg(query.get(), "height", 0, 0, MAX_LENGTH);
+  auto cover = get_input_file(query.get(), "cover");
   int32 start_timestamp = get_integer_arg(query.get(), "start_timestamp", 0, 0, MAX_DURATION);
   bool supports_streaming = to_bool(query->arg("supports_streaming"));
   TRY_RESULT(caption, get_caption(query.get()));
   auto show_caption_above_media = to_bool(query->arg("show_caption_above_media"));
   auto has_spoiler = to_bool(query->arg("has_spoiler"));
   do_send_message(
-      make_object<td_api::inputMessageVideo>(std::move(video), std::move(thumbnail), nullptr, start_timestamp,
+      make_object<td_api::inputMessageVideo>(std::move(video), std::move(thumbnail), std::move(cover), start_timestamp,
                                              td::vector<int32>(), duration, width, height, supports_streaming,
                                              std::move(caption), show_caption_above_media, nullptr, has_spoiler),
       std::move(query));
