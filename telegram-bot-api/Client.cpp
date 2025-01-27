@@ -9936,8 +9936,9 @@ td::Result<td_api::object_ptr<td_api::inputPaidMedia>> Client::get_input_paid_me
   } else if (type == "video") {
     TRY_RESULT(duration, object.get_optional_int_field("duration"));
     TRY_RESULT(supports_streaming, object.get_optional_bool_field("supports_streaming"));
+    TRY_RESULT(start_timestamp, object.get_optional_int_field("start_timestamp"));
     duration = td::clamp(duration, 0, MAX_DURATION);
-    media_type = make_object<td_api::inputPaidMediaTypeVideo>(nullptr, 0, duration, supports_streaming);
+    media_type = make_object<td_api::inputPaidMediaTypeVideo>(nullptr, start_timestamp, duration, supports_streaming);
   } else {
     return td::Status::Error(PSLICE() << "type \"" << type << "\" is unsupported");
   }
