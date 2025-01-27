@@ -10910,12 +10910,16 @@ td::Status Client::process_copy_messages_query(PromisedQueryPtr &query) {
 td::Status Client::process_forward_message_query(PromisedQueryPtr &query) {
   TRY_RESULT(from_chat_id, get_required_string_arg(query.get(), "from_chat_id"));
   auto message_id = get_message_id(query.get());
+  bool replace_video_start_timestamp = query->has_arg("video_start_timestamp");
+  int32 new_video_start_timestamp = get_integer_arg(query.get(), "video_start_timestamp", 0);
 
   check_message(from_chat_id, message_id, false, AccessRights::Read, "message to forward", std::move(query),
-                [this](int64 from_chat_id, int64 message_id, PromisedQueryPtr query) {
-                  do_send_message(
-                      make_object<td_api::inputMessageForwarded>(from_chat_id, message_id, false, false, 0, nullptr),
-                      std::move(query));
+                [this, replace_video_start_timestamp, new_video_start_timestamp](int64 from_chat_id, int64 message_id,
+                                                                                 PromisedQueryPtr query) {
+                  do_send_message(make_object<td_api::inputMessageForwarded>(from_chat_id, message_id, false,
+                                                                             replace_video_start_timestamp,
+                                                                             new_video_start_timestamp, nullptr),
+                                  std::move(query));
                 });
   return td::Status::OK();
 }
