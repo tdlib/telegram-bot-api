@@ -10845,17 +10845,20 @@ td::Status Client::process_copy_message_query(PromisedQueryPtr &query) {
   if (replace_caption) {
     TRY_RESULT_ASSIGN(caption, get_caption(query.get()));
   }
+  bool replace_video_start_timestamp = query->has_arg("video_start_timestamp");
+  int32 new_video_start_timestamp = get_integer_arg(query.get(), "video_start_timestamp", 0);
   auto show_caption_above_media = to_bool(query->arg("show_caption_above_media"));
   auto options =
       make_object<td_api::messageCopyOptions>(true, replace_caption, std::move(caption), show_caption_above_media);
 
-  check_message(
-      from_chat_id, message_id, false, AccessRights::Read, "message to copy", std::move(query),
-      [this, options = std::move(options)](int64 from_chat_id, int64 message_id, PromisedQueryPtr query) mutable {
-        do_send_message(
-            make_object<td_api::inputMessageForwarded>(from_chat_id, message_id, false, false, 0, std::move(options)),
-            std::move(query));
-      });
+  check_message(from_chat_id, message_id, false, AccessRights::Read, "message to copy", std::move(query),
+                [this, replace_video_start_timestamp, new_video_start_timestamp, options = std::move(options)](
+                    int64 from_chat_id, int64 message_id, PromisedQueryPtr query) mutable {
+                  do_send_message(make_object<td_api::inputMessageForwarded>(
+                                      from_chat_id, message_id, false, replace_video_start_timestamp,
+                                      new_video_start_timestamp, std::move(options)),
+                                  std::move(query));
+                });
   return td::Status::OK();
 }
 
