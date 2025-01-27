@@ -1104,6 +1104,8 @@ class Client final : public WebhookActor::Callback {
 
   static int64 get_basic_group_chat_id(int64 basic_group_id);
 
+  static int64 get_status_custom_emoji_id(const object_ptr<td_api::emojiStatus> &emoji_status);
+
   void add_update_poll(object_ptr<td_api::updatePoll> &&update);
 
   void add_update_poll_answer(object_ptr<td_api::updatePollAnswer> &&update);

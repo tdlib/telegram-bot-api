@@ -7286,12 +7286,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       chat_info->photo_info = std::move(chat->photo_);
       chat_info->permissions = std::move(chat->permissions_);
       chat_info->message_auto_delete_time = chat->message_auto_delete_time_;
-      chat_info->emoji_status_custom_emoji_id =
-          chat->emoji_status_ != nullptr &&
-                  chat->emoji_status_->type_->get_id() == td_api::emojiStatusTypeCustomEmoji::ID
-              ? static_cast<const td_api::emojiStatusTypeCustomEmoji *>(chat->emoji_status_->type_.get())
-                    ->custom_emoji_id_
-              : 0;
+      chat_info->emoji_status_custom_emoji_id = get_status_custom_emoji_id(chat->emoji_status_);
       chat_info->emoji_status_expiration_date =
           chat->emoji_status_ != nullptr ? chat->emoji_status_->expiration_date_ : 0;
       set_chat_available_reactions(chat_info, std::move(chat->available_reactions_));
@@ -7334,12 +7329,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       auto update = move_object_as<td_api::updateChatEmojiStatus>(result);
       auto chat_info = add_chat(update->chat_id_);
       CHECK(chat_info->type != ChatInfo::Type::Unknown);
-      chat_info->emoji_status_custom_emoji_id =
-          update->emoji_status_ != nullptr &&
-                  update->emoji_status_->type_->get_id() == td_api::emojiStatusTypeCustomEmoji::ID
-              ? static_cast<const td_api::emojiStatusTypeCustomEmoji *>(update->emoji_status_->type_.get())
-                    ->custom_emoji_id_
-              : 0;
+      chat_info->emoji_status_custom_emoji_id = get_status_custom_emoji_id(update->emoji_status_);
       chat_info->emoji_status_expiration_date =
           update->emoji_status_ != nullptr ? update->emoji_status_->expiration_date_ : 0;
       break;
@@ -15127,6 +15117,22 @@ td::int64 Client::get_supergroup_chat_id(int64 supergroup_id) {
 
 td::int64 Client::get_basic_group_chat_id(int64 basic_group_id) {
   return -basic_group_id;
+}
+
+td::int64 Client::get_status_custom_emoji_id(const object_ptr<td_api::emojiStatus> &emoji_status) {
+  if (emoji_status == nullptr) {
+    return 0;
+  }
+  switch (emoji_status->type_->get_id()) {
+    case td_api::emojiStatusTypeCustomEmoji::ID:
+      return static_cast<const td_api::emojiStatusTypeCustomEmoji *>(emoji_status->type_.get())->custom_emoji_id_;
+    case td_api::emojiStatusTypeUpgradedGift::ID:
+      return static_cast<const td_api::emojiStatusTypeUpgradedGift *>(emoji_status->type_.get())
+          ->model_custom_emoji_id_;
+    default:
+      UNREACHABLE();
+      return 0;
+  }
 }
 
 constexpr Client::int64 Client::GENERAL_MESSAGE_THREAD_ID;
