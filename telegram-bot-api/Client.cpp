@@ -8800,14 +8800,15 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
     TRY_RESULT(video_width, object.get_optional_int_field("video_width"));
     TRY_RESULT(video_height, object.get_optional_int_field("video_height"));
     TRY_RESULT(video_duration, object.get_optional_int_field("video_duration"));
+    TRY_RESULT(video_start_timestamp, object.get_optional_int_field("video_start_timestamp"));
     if (video_url.empty()) {
       TRY_RESULT_ASSIGN(video_url, object.get_required_string_field("video_file_id"));
     }
 
     if (input_message_content == nullptr) {
       input_message_content = make_object<td_api::inputMessageVideo>(
-          nullptr, nullptr, nullptr, 0, td::vector<int32>(), video_duration, video_width, video_height, false,
-          std::move(caption), show_caption_above_media, nullptr, false);
+          nullptr, nullptr, nullptr, video_start_timestamp, td::vector<int32>(), video_duration, video_width,
+          video_height, false, std::move(caption), show_caption_above_media, nullptr, false);
     }
     return make_object<td_api::inputInlineQueryResultVideo>(id, title, description, thumbnail_url, video_url, mime_type,
                                                             video_width, video_height, video_duration,
@@ -9807,14 +9808,16 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
     TRY_RESULT(width, object.get_optional_int_field("width"));
     TRY_RESULT(height, object.get_optional_int_field("height"));
     TRY_RESULT(duration, object.get_optional_int_field("duration"));
+    TRY_RESULT(start_timestamp, object.get_optional_int_field("start_timestamp"));
     TRY_RESULT(supports_streaming, object.get_optional_bool_field("supports_streaming"));
     width = td::clamp(width, 0, MAX_LENGTH);
     height = td::clamp(height, 0, MAX_LENGTH);
     duration = td::clamp(duration, 0, MAX_DURATION);
+    start_timestamp = td::clamp(start_timestamp, 0, MAX_DURATION);
 
-    return make_object<td_api::inputMessageVideo>(std::move(input_file), std::move(input_thumbnail), nullptr, 0,
-                                                  td::vector<int32>(), duration, width, height, supports_streaming,
-                                                  std::move(caption), show_caption_above_media, nullptr, has_spoiler);
+    return make_object<td_api::inputMessageVideo>(
+        std::move(input_file), std::move(input_thumbnail), nullptr, start_timestamp, td::vector<int32>(), duration,
+        width, height, supports_streaming, std::move(caption), show_caption_above_media, nullptr, has_spoiler);
   }
   if (type == "animation") {
     if (for_album) {
@@ -10657,14 +10660,16 @@ td::Status Client::process_send_video_query(PromisedQueryPtr &query) {
   int32 duration = get_integer_arg(query.get(), "duration", 0, 0, MAX_DURATION);
   int32 width = get_integer_arg(query.get(), "width", 0, 0, MAX_LENGTH);
   int32 height = get_integer_arg(query.get(), "height", 0, 0, MAX_LENGTH);
+  int32 start_timestamp = get_integer_arg(query.get(), "start_timestamp", 0, 0, MAX_DURATION);
   bool supports_streaming = to_bool(query->arg("supports_streaming"));
   TRY_RESULT(caption, get_caption(query.get()));
   auto show_caption_above_media = to_bool(query->arg("show_caption_above_media"));
   auto has_spoiler = to_bool(query->arg("has_spoiler"));
-  do_send_message(make_object<td_api::inputMessageVideo>(
-                      std::move(video), std::move(thumbnail), nullptr, 0, td::vector<int32>(), duration, width, height,
-                      supports_streaming, std::move(caption), show_caption_above_media, nullptr, has_spoiler),
-                  std::move(query));
+  do_send_message(
+      make_object<td_api::inputMessageVideo>(std::move(video), std::move(thumbnail), nullptr, start_timestamp,
+                                             td::vector<int32>(), duration, width, height, supports_streaming,
+                                             std::move(caption), show_caption_above_media, nullptr, has_spoiler),
+      std::move(query));
   return td::Status::OK();
 }
 
