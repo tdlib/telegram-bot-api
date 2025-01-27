@@ -1499,8 +1499,8 @@ class Client::JsonChatPhoto final : public td::Jsonable {
 
 class Client::JsonVideo final : public td::Jsonable {
  public:
-  JsonVideo(const td_api::video *video, const td_api::photo *cover, const Client *client)
-      : video_(video), cover_(cover), client_(client) {
+  JsonVideo(const td_api::video *video, const td_api::photo *cover, int32 start_timestamp, const Client *client)
+      : video_(video), cover_(cover), start_timestamp_(start_timestamp), client_(client) {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
@@ -1516,6 +1516,9 @@ class Client::JsonVideo final : public td::Jsonable {
     if (cover_ != nullptr) {
       object("cover", JsonPhoto(cover_, client_));
     }
+    if (start_timestamp_ > 0) {
+      object("start_timestamp", start_timestamp_);
+    }
     client_->json_store_thumbnail(object, video_->thumbnail_.get());
     client_->json_store_file(object, video_->video_.get());
   }
@@ -1523,6 +1526,7 @@ class Client::JsonVideo final : public td::Jsonable {
  private:
   const td_api::video *video_;
   const td_api::photo *cover_;
+  int32 start_timestamp_;
   const Client *client_;
 };
 
@@ -1591,7 +1595,7 @@ class Client::JsonPaidMedia final : public td::Jsonable {
       case td_api::paidMediaVideo::ID: {
         auto media = static_cast<const td_api::paidMediaVideo *>(paid_media_);
         object("type", "video");
-        object("video", JsonVideo(media->video_.get(), media->cover_.get(), client_));
+        object("video", JsonVideo(media->video_.get(), media->cover_.get(), media->start_timestamp_, client_));
         break;
       }
       case td_api::paidMediaUnsupported::ID:
@@ -2810,7 +2814,7 @@ class Client::JsonExternalReplyInfo final : public td::Jsonable {
         }
         case td_api::messageVideo::ID: {
           auto content = static_cast<const td_api::messageVideo *>(reply_->content_.get());
-          object("video", JsonVideo(content->video_.get(), content->cover_.get(), client_));
+          object("video", JsonVideo(content->video_.get(), content->cover_.get(), content->start_timestamp_, client_));
           add_media_spoiler(object, content->has_spoiler_);
           break;
         }
@@ -3068,7 +3072,7 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     }
     case td_api::messageVideo::ID: {
       auto content = static_cast<const td_api::messageVideo *>(message_->content.get());
-      object("video", JsonVideo(content->video_.get(), content->cover_.get(), client_));
+      object("video", JsonVideo(content->video_.get(), content->cover_.get(), content->start_timestamp_, client_));
       add_caption(object, content->caption_, content->show_caption_above_media_);
       add_media_spoiler(object, content->has_spoiler_);
       break;
