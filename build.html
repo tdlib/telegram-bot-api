@@ -202,11 +202,8 @@
       <option>CentOS 7</option>
       <option>CentOS 8</option>
       <option>CentOS Stream 9</option>
-      <option>Debian 8/9</option>
       <option>Debian 10+</option>
       <option>Fedora 21+</option>
-      <option>Ubuntu 14</option>
-      <option>Ubuntu 16</option>
       <option>Ubuntu 18</option>
       <option>Ubuntu 20</option>
       <option>Ubuntu 22</option>
@@ -491,8 +488,6 @@ function onOptionsChanged() {
 
   function getClangVersionSuffix() {
     switch (linux_distro) {
-      case 'Ubuntu 14':
-        return '-3.9';
       case 'Ubuntu 18':
         return '-6.0';
       case 'Ubuntu 20':
@@ -556,10 +551,7 @@ function onOptionsChanged() {
         var packages = 'gperf gcc-c++ make git zlib-devel openssl-devel cmake';
         commands.push(sudo + 'dnf install -y ' + packages);
         break;
-      case 'Debian 8/9':
       case 'Debian 10+':
-      case 'Ubuntu 14':
-      case 'Ubuntu 16':
       case 'Ubuntu 18':
       case 'Ubuntu 20':
       case 'Ubuntu 22':
@@ -567,17 +559,9 @@ function onOptionsChanged() {
         if (linux_distro.includes('Debian') && !use_root) {
           commands.push('su -');
         }
-        if (linux_distro === 'Ubuntu 14' && !use_clang) {
-          commands.push(sudo + 'add-apt-repository ppa:ubuntu-toolchain-r/test');
-        }
         commands.push(sudo + 'apt-get update');
         commands.push(sudo + 'apt-get upgrade');
-        var packages = 'make git zlib1g-dev libssl-dev gperf';
-        if (linux_distro === 'Ubuntu 14') {
-          packages += ' cmake3';
-        } else {
-          packages += ' cmake';
-        }
+        var packages = 'make git zlib1g-dev libssl-dev gperf cmake';
         if (use_clang) {
           packages += ' clang' + getClangVersionSuffix() + ' libc++' + getLibcplusplusVersionSuffix() + '-dev';
           if (linux_distro === 'Debian 10+' || linux_distro === 'Ubuntu 18' || linux_distro === 'Ubuntu 20' || linux_distro === 'Ubuntu 22' || linux_distro === 'Ubuntu 24') {
@@ -585,9 +569,6 @@ function onOptionsChanged() {
           }
         } else {
           packages += ' g++';
-          if (linux_distro === 'Ubuntu 14') {
-            packages += '-4.9';
-          }
         }
         commands.push(sudo + 'apt-get install ' + packages);
         if (linux_distro.includes('Debian') && !use_root) {
@@ -669,8 +650,6 @@ function onOptionsChanged() {
       if (use_clang) {
         var clang_version_suffix = getClangVersionSuffix();
         prefix = 'CXXFLAGS="-stdlib=libc++" CC=/usr/bin/clang' + clang_version_suffix + ' CXX=/usr/bin/clang++' + clang_version_suffix + ' ';
-      } else if (linux_distro === 'Ubuntu 14') {
-        prefix = 'CC=/usr/bin/gcc-4.9 CXX=/usr/bin/g++-4.9 ';
       } else if (linux_distro === 'CentOS 7') {
         prefix = 'CC=/opt/rh/devtoolset-9/root/usr/bin/gcc CXX=/opt/rh/devtoolset-9/root/usr/bin/g++ ';
       }
