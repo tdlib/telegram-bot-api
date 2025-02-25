@@ -1,17 +1,6 @@
-cmake_minimum_required(VERSION 3.0.2 FATAL_ERROR)
-
-if (POLICY CMP0065)
-  # do not export symbols from executables
-  # affects compiler checks in project(), so must be set before it
-  cmake_policy(SET CMP0065 NEW)
-endif()
+cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
 
 project(TelegramBotApi VERSION 8.3 LANGUAGES CXX)
-
-if (POLICY CMP0069)
-  option(TELEGRAM_BOT_API_ENABLE_LTO "Use \"ON\" to enable Link Time Optimization.")
-  set(TD_ENABLE_LTO "${TELEGRAM_BOT_API_ENABLE_LTO}" CACHE STRING "Enable LTO" FORCE)
-endif()
 
 add_subdirectory(td EXCLUDE_FROM_ALL)
 
@@ -24,14 +13,6 @@ if (NOT DEFINED CMAKE_INSTALL_BINDIR)
   set(CMAKE_INSTALL_BINDIR "bin")
 endif()
 
-if (POLICY CMP0054)
-  # do not expand quoted arguments
-  cmake_policy(SET CMP0054 NEW)
-endif()
-if (POLICY CMP0060)
-  # link libraries by full path
-  cmake_policy(SET CMP0060 NEW)
-endif()
 if (POLICY CMP0074)
   # use environment variables to find libraries
   cmake_policy(SET CMP0074 NEW)
@@ -40,8 +21,7 @@ endif()
 include(PreventInSourceBuild)
 prevent_in_source_build()
 
-if (POLICY CMP0069 AND TELEGRAM_BOT_API_ENABLE_LTO)
-  cmake_policy(SET CMP0069 NEW)
+if (TELEGRAM_BOT_API_ENABLE_LTO)
   include(CheckIPOSupported)
   check_ipo_supported(RESULT IPO_SUPPORTED LANGUAGES CXX)
   if (IPO_SUPPORTED)
