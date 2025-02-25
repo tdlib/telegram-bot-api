@@ -707,6 +707,44 @@ class Client::JsonLocation final : public td::Jsonable {
   int32 proximity_alert_radius_;
 };
 
+class Client::JsonGift final : public td::Jsonable {
+ public:
+  JsonGift(const td_api::gift *gift, const Client *client) : gift_(gift), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("id", td::to_string(gift_->id_));
+    object("sticker", JsonSticker(gift_->sticker_.get(), client_));
+    object("star_count", gift_->star_count_);
+    if (gift_->upgrade_star_count_ > 0) {
+      object("upgrade_star_count", gift_->upgrade_star_count_);
+    }
+    if (gift_->total_count_ > 0) {
+      object("remaining_count", gift_->remaining_count_);
+      object("total_count", gift_->total_count_);
+    }
+  }
+
+ private:
+  const td_api::gift *gift_;
+  const Client *client_;
+};
+
+class Client::JsonGifts final : public td::Jsonable {
+ public:
+  JsonGifts(const td_api::gifts *gifts, const Client *client) : gifts_(gifts), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("gifts",
+           td::json_array(gifts_->gifts_, [client = client_](auto &gift) { return JsonGift(gift.get(), client); }));
+  }
+
+ private:
+  const td_api::gifts *gifts_;
+  const Client *client_;
+};
+
 class Client::JsonReactionType final : public td::Jsonable {
  public:
   explicit JsonReactionType(const td_api::ReactionType *reaction_type) : reaction_type_(reaction_type) {
@@ -2148,6 +2186,41 @@ class Client::JsonRefundedPayment final : public td::Jsonable {
   const td_api::messagePaymentRefunded *refunded_payment_;
 };
 
+class Client::JsonGiftMessage final : public td::Jsonable {
+ public:
+  JsonGiftMessage(const td_api::messageGift *gift, const Client *client) : gift_(gift), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("gift", JsonGift(gift_->gift_.get(), client_));
+    if (!gift_->received_gift_id_.empty()) {
+      object("owned_gift_id", gift_->received_gift_id_);
+    }
+    if (gift_->sell_star_count_ > 0) {
+      object("convert_star_count", gift_->sell_star_count_);
+    }
+    if (gift_->prepaid_upgrade_star_count_ > 0) {
+      object("prepaid_upgrade_star_count", gift_->prepaid_upgrade_star_count_);
+    }
+    if (gift_->can_be_upgraded_) {
+      object("can_be_upgraded", td::JsonTrue());
+    }
+    if (!gift_->text_->text_.empty()) {
+      object("text", gift_->text_->text_);
+      if (!gift_->text_->entities_.empty()) {
+        object("entities", JsonVectorEntities(gift_->text_->entities_, client_));
+      }
+    }
+    if (gift_->is_private_) {
+      object("is_private", td::JsonTrue());
+    }
+  }
+
+ private:
+  const td_api::messageGift *gift_;
+  const Client *client_;
+};
+
 class Client::JsonEncryptedPassportElement final : public td::Jsonable {
  public:
   JsonEncryptedPassportElement(const td_api::encryptedPassportElement *element, const Client *client)
@@ -3406,8 +3479,11 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       break;
     case td_api::messageGiveawayPrizeStars::ID:
       break;
-    case td_api::messageGift::ID:
+    case td_api::messageGift::ID: {
+      auto content = static_cast<const td_api::messageGift *>(message_->content.get());
+      object("gift", JsonGiftMessage(content, client_));
       break;
+    }
     case td_api::messageUpgradedGift::ID:
       break;
     case td_api::messageRefundedUpgradedGift::ID:
@@ -4095,44 +4171,6 @@ class Client::JsonGameHighScore final : public td::Jsonable {
 
  private:
   const td_api::gameHighScore *score_;
-  const Client *client_;
-};
-
-class Client::JsonGift final : public td::Jsonable {
- public:
-  JsonGift(const td_api::gift *gift, const Client *client) : gift_(gift), client_(client) {
-  }
-  void store(td::JsonValueScope *scope) const {
-    auto object = scope->enter_object();
-    object("id", td::to_string(gift_->id_));
-    object("sticker", JsonSticker(gift_->sticker_.get(), client_));
-    object("star_count", gift_->star_count_);
-    if (gift_->upgrade_star_count_ > 0) {
-      object("upgrade_star_count", gift_->upgrade_star_count_);
-    }
-    if (gift_->total_count_ > 0) {
-      object("remaining_count", gift_->remaining_count_);
-      object("total_count", gift_->total_count_);
-    }
-  }
-
- private:
-  const td_api::gift *gift_;
-  const Client *client_;
-};
-
-class Client::JsonGifts final : public td::Jsonable {
- public:
-  JsonGifts(const td_api::gifts *gifts, const Client *client) : gifts_(gifts), client_(client) {
-  }
-  void store(td::JsonValueScope *scope) const {
-    auto object = scope->enter_object();
-    object("gifts",
-           td::json_array(gifts_->gifts_, [client = client_](auto &gift) { return JsonGift(gift.get(), client); }));
-  }
-
- private:
-  const td_api::gifts *gifts_;
   const Client *client_;
 };
 
@@ -14400,8 +14438,6 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageGiftedStars::ID:
       return true;
     case td_api::messageGiveawayPrizeStars::ID:
-      return true;
-    case td_api::messageGift::ID:
       return true;
     case td_api::messageUpgradedGift::ID:
       return true;
