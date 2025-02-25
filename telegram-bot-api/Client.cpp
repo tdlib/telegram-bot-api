@@ -2221,6 +2221,20 @@ class Client::JsonGiftMessage final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonRefundedUpgradedGiftMessage final : public td::Jsonable {
+ public:
+  JsonRefundedUpgradedGiftMessage(const td_api::messageRefundedUpgradedGift *gift, const Client *client) : gift_(gift), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("gift", JsonGift(gift_->gift_.get(), client_));
+  }
+
+ private:
+  const td_api::messageRefundedUpgradedGift *gift_;
+  const Client *client_;
+};
+
 class Client::JsonEncryptedPassportElement final : public td::Jsonable {
  public:
   JsonEncryptedPassportElement(const td_api::encryptedPassportElement *element, const Client *client)
@@ -3486,8 +3500,11 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     }
     case td_api::messageUpgradedGift::ID:
       break;
-    case td_api::messageRefundedUpgradedGift::ID:
+    case td_api::messageRefundedUpgradedGift::ID: {
+      auto content = static_cast<const td_api::messageRefundedUpgradedGift *>(message_->content.get());
+      object("gift", JsonRefundedUpgradedGiftMessage(content, client_));
       break;
+    }
     default:
       UNREACHABLE();
   }
@@ -14440,8 +14457,6 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageGiveawayPrizeStars::ID:
       return true;
     case td_api::messageUpgradedGift::ID:
-      return true;
-    case td_api::messageRefundedUpgradedGift::ID:
       return true;
     default:
       break;
