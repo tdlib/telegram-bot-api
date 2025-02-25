@@ -745,6 +745,89 @@ class Client::JsonGifts final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonUniqueGiftModel final : public td::Jsonable {
+ public:
+  JsonUniqueGiftModel(const td_api::upgradedGiftModel *model, const Client *client) : model_(model), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("name", model_->name_);
+    object("sticker", JsonSticker(model_->sticker_.get(), client_));
+    object("rarity_per_mille", model_->rarity_per_mille_);
+  }
+
+ private:
+  const td_api::upgradedGiftModel *model_;
+  const Client *client_;
+};
+
+class Client::JsonUniqueGiftSymbol final : public td::Jsonable {
+ public:
+  JsonUniqueGiftSymbol(const td_api::upgradedGiftSymbol *symbol, const Client *client)
+      : symbol_(symbol), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("name", symbol_->name_);
+    object("sticker", JsonSticker(symbol_->sticker_.get(), client_));
+    object("rarity_per_mille", symbol_->rarity_per_mille_);
+  }
+
+ private:
+  const td_api::upgradedGiftSymbol *symbol_;
+  const Client *client_;
+};
+
+class Client::JsonUniqueGiftBackdropColors final : public td::Jsonable {
+ public:
+  explicit JsonUniqueGiftBackdropColors(const td_api::upgradedGiftBackdropColors *colors) : colors_(colors) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("center_color", colors_->center_color_);
+    object("edge_color", colors_->edge_color_);
+    object("symbol_color", colors_->symbol_color_);
+    object("text_color", colors_->text_color_);
+  }
+
+ private:
+  const td_api::upgradedGiftBackdropColors *colors_;
+};
+
+class Client::JsonUniqueGiftBackdrop final : public td::Jsonable {
+ public:
+  explicit JsonUniqueGiftBackdrop(const td_api::upgradedGiftBackdrop *backdrop) : backdrop_(backdrop) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("name", backdrop_->name_);
+    object("colors", JsonUniqueGiftBackdropColors(backdrop_->colors_.get()));
+    object("rarity_per_mille", backdrop_->rarity_per_mille_);
+  }
+
+ private:
+  const td_api::upgradedGiftBackdrop *backdrop_;
+};
+
+class Client::JsonUniqueGift final : public td::Jsonable {
+ public:
+  JsonUniqueGift(const td_api::upgradedGift *gift, const Client *client) : gift_(gift), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("base_name", gift_->title_);
+    object("name", gift_->name_);
+    object("number", gift_->number_);
+    object("model", JsonUniqueGiftModel(gift_->model_.get(), client_));
+    object("symbol", JsonUniqueGiftSymbol(gift_->symbol_.get(), client_));
+    object("backdrop", JsonUniqueGiftBackdrop(gift_->backdrop_.get()));
+  }
+
+ private:
+  const td_api::upgradedGift *gift_;
+  const Client *client_;
+};
+
 class Client::JsonReactionType final : public td::Jsonable {
  public:
   explicit JsonReactionType(const td_api::ReactionType *reaction_type) : reaction_type_(reaction_type) {
@@ -2223,7 +2306,8 @@ class Client::JsonGiftMessage final : public td::Jsonable {
 
 class Client::JsonRefundedUpgradedGiftMessage final : public td::Jsonable {
  public:
-  JsonRefundedUpgradedGiftMessage(const td_api::messageRefundedUpgradedGift *gift, const Client *client) : gift_(gift), client_(client) {
+  JsonRefundedUpgradedGiftMessage(const td_api::messageRefundedUpgradedGift *gift, const Client *client)
+      : gift_(gift), client_(client) {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
@@ -2232,6 +2316,27 @@ class Client::JsonRefundedUpgradedGiftMessage final : public td::Jsonable {
 
  private:
   const td_api::messageRefundedUpgradedGift *gift_;
+  const Client *client_;
+};
+
+class Client::JsonUniqueGiftMessage final : public td::Jsonable {
+ public:
+  JsonUniqueGiftMessage(const td_api::messageUpgradedGift *gift, const Client *client) : gift_(gift), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("gift", JsonUniqueGift(gift_->gift_.get(), client_));
+    if (!gift_->received_gift_id_.empty()) {
+      object("owned_gift_id", gift_->received_gift_id_);
+      if (gift_->can_be_transferred_) {
+        object("transfer_star_count", gift_->transfer_star_count_);
+      }
+    }
+    object("origin", gift_->is_upgrade_ ? td::Slice("upgrade") : td::Slice("transfer"));
+  }
+
+ private:
+  const td_api::messageUpgradedGift *gift_;
   const Client *client_;
 };
 
@@ -3498,8 +3603,11 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("gift", JsonGiftMessage(content, client_));
       break;
     }
-    case td_api::messageUpgradedGift::ID:
+    case td_api::messageUpgradedGift::ID: {
+      auto content = static_cast<const td_api::messageUpgradedGift *>(message_->content.get());
+      object("unique_gift", JsonUniqueGiftMessage(content, client_));
       break;
+    }
     case td_api::messageRefundedUpgradedGift::ID: {
       auto content = static_cast<const td_api::messageRefundedUpgradedGift *>(message_->content.get());
       object("gift", JsonRefundedUpgradedGiftMessage(content, client_));
@@ -14455,8 +14563,6 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageGiftedStars::ID:
       return true;
     case td_api::messageGiveawayPrizeStars::ID:
-      return true;
-    case td_api::messageUpgradedGift::ID:
       return true;
     default:
       break;

@@ -172,6 +172,11 @@ class Client final : public WebhookActor::Callback {
   class JsonGameHighScore;
   class JsonGift;
   class JsonGifts;
+  class JsonUniqueGiftModel;
+  class JsonUniqueGiftSymbol;
+  class JsonUniqueGiftBackdropColors;
+  class JsonUniqueGiftBackdrop;
+  class JsonUniqueGift;
   class JsonMessageReactionUpdated;
   class JsonMessageReactionCountUpdated;
   class JsonBusinessConnection;
@@ -186,6 +191,7 @@ class Client final : public WebhookActor::Callback {
   class JsonRefundedPayment;
   class JsonGiftMessage;
   class JsonRefundedUpgradedGiftMessage;
+  class JsonUniqueGiftMessage;
   class JsonEncryptedPassportElement;
   class JsonEncryptedCredentials;
   class JsonPassportData;
