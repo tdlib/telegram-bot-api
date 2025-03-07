@@ -3127,9 +3127,6 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
   if (!message_->author_signature.empty()) {
     object("author_signature", message_->author_signature);
   }
-  if (message_->sender_boost_count != 0) {
-    object("sender_boost_count", message_->sender_boost_count);
-  }
   if (message_->sender_chat_id != 0) {
     object("sender_chat", JsonChat(message_->sender_chat_id, client_));
   }
@@ -3633,6 +3630,12 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
   }
   if (message_->effect_id != 0) {
     object("effect_id", td::to_string(message_->effect_id));
+  }
+  if (message_->sender_boost_count != 0) {
+    object("sender_boost_count", message_->sender_boost_count);
+  }
+  if (message_->paid_message_star_count != 0) {
+    object("paid_star_count", message_->paid_message_star_count);
   }
 }
 
@@ -15080,6 +15083,7 @@ void Client::init_message(MessageInfo *message_info, object_ptr<td_api::message>
   message_info->is_topic_message = message->is_topic_message_;
   message_info->author_signature = std::move(message->author_signature_);
   message_info->sender_boost_count = message->sender_boost_count_;
+  message_info->paid_message_star_count = message->paid_message_star_count_;
   message_info->effect_id = message->effect_id_;
 
   drop_internal_reply_to_message_in_another_chat(message);
