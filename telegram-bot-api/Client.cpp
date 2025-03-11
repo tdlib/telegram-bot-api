@@ -6932,6 +6932,9 @@ bool Client::is_chat_member(const object_ptr<td_api::ChatMemberStatus> &status) 
 }
 
 bool Client::have_message_access(int64 chat_id) const {
+  if (chat_id > 0) {
+    return true;  // for unknown private chats during paid broadcasts
+  }
   auto chat_info = get_chat(chat_id);
   CHECK(chat_info != nullptr);
   switch (chat_info->type) {
