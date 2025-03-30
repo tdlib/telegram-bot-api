@@ -1001,7 +1001,7 @@ class Client final : public WebhookActor::Callback {
     int64 user_id_ = 0;
     int64 user_chat_id_ = 0;
     int32 date_ = 0;
-    bool can_reply_ = false;
+    object_ptr<td_api::businessBotRights> rights_;
     bool is_enabled_ = false;
   };
   const BusinessConnection *add_business_connection(object_ptr<td_api::businessConnection> &&business_connection,

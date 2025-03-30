@@ -83,9 +83,6 @@ td::vector<StatItem> ServerCpuStat::as_vector(double now) {
   return res;
 }
 
-constexpr int ServerCpuStat::DURATIONS[SIZE];
-constexpr const char *ServerCpuStat::DESCR[SIZE];
-
 void ServerBotStat::normalize(double duration) {
   if (duration == 0) {
     return;
@@ -200,8 +197,5 @@ td::int64 BotStatActor::get_active_file_upload_count() const {
 bool BotStatActor::is_active(double now) const {
   return last_activity_timestamp_ > now - 86400;
 }
-
-constexpr int BotStatActor::DURATIONS[SIZE];
-constexpr const char *BotStatActor::DESCR[SIZE];
 
 }  // namespace telegram_bot_api

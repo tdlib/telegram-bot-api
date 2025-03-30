@@ -3610,6 +3610,10 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("gift", JsonRefundedUpgradedGiftMessage(content, client_));
       break;
     }
+    case td_api::messagePaidMessagesRefunded::ID:
+      break;
+    case td_api::messagePaidMessagePriceChanged::ID:
+      break;
     default:
       UNREACHABLE();
   }
@@ -4367,7 +4371,7 @@ class Client::JsonBusinessConnection final : public td::Jsonable {
     object("user", JsonUser(connection_->user_id_, client_));
     object("user_chat_id", connection_->user_chat_id_);
     object("date", connection_->date_);
-    object("can_reply", td::JsonBool(connection_->can_reply_));
+    object("can_reply", td::JsonBool(connection_->rights_->can_reply_));
     object("is_enabled", td::JsonBool(connection_->is_enabled_));
   }
 
@@ -13799,7 +13803,7 @@ const Client::BusinessConnection *Client::add_business_connection(
   connection->user_id_ = business_connection->user_id_;
   connection->user_chat_id_ = business_connection->user_chat_id_;
   connection->date_ = business_connection->date_;
-  connection->can_reply_ = business_connection->can_reply_;
+  connection->rights_ = std::move(business_connection->rights_);
   connection->is_enabled_ = business_connection->is_enabled_;
   return connection.get();
 }
@@ -14570,6 +14574,10 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       return true;
     case td_api::messageGiveawayPrizeStars::ID:
       return true;
+    case td_api::messagePaidMessagesRefunded::ID:
+      return true;
+    case td_api::messagePaidMessagePriceChanged::ID:
+      return true;
     default:
       break;
   }
@@ -15327,13 +15335,6 @@ td::int64 Client::get_status_custom_emoji_id(const object_ptr<td_api::emojiStatu
       return 0;
   }
 }
-
-constexpr Client::int64 Client::GENERAL_MESSAGE_THREAD_ID;
-
-constexpr Client::int64 Client::GREAT_MINDS_SET_ID;
-constexpr td::Slice Client::GREAT_MINDS_SET_NAME;
-
-constexpr td::Slice Client::MASK_POINTS[MASK_POINTS_SIZE];
 
 td::FlatHashMap<td::string, td::Status (Client::*)(PromisedQueryPtr &query)> Client::methods_;
 

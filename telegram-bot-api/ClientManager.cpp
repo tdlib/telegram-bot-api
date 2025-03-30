@@ -590,6 +590,4 @@ void ClientManager::finish_close() {
   stop();
 }
 
-constexpr double ClientManager::WATCHDOG_TIMEOUT;
-
 }  // namespace telegram_bot_api
