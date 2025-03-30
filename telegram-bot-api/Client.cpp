@@ -280,6 +280,7 @@ bool Client::init_methods() {
   methods_.emplace("setbusinessaccountname", &Client::process_set_business_account_name_query);
   methods_.emplace("setbusinessaccountusername", &Client::process_set_business_account_username_query);
   methods_.emplace("setbusinessaccountbio", &Client::process_set_business_account_bio_query);
+  methods_.emplace("setbusinessaccountprofilephoto", &Client::process_set_business_account_profile_photo_query);
   methods_.emplace("setuseremojistatus", &Client::process_set_user_emoji_status_query);
   methods_.emplace("getchat", &Client::process_get_chat_query);
   methods_.emplace("setchatphoto", &Client::process_set_chat_photo_query);
@@ -10461,6 +10462,50 @@ td::Result<td::vector<td_api::object_ptr<td_api::ReactionType>>> Client::get_rea
   return std::move(reaction_types);
 }
 
+td::Result<td_api::object_ptr<td_api::InputChatPhoto>> Client::get_input_chat_photo(const Query *query,
+                                                                                    td::JsonValue &&value) const {
+  if (value.type() != td::JsonValue::Type::Object) {
+    return td::Status::Error(400, "Object expected as profile photo");
+  }
+  auto &object = value.get_object();
+
+  TRY_RESULT(type, object.get_required_string_field("type"));
+  if (type == "static") {
+    TRY_RESULT(photo, object.get_required_string_field("photo"));
+    auto input_file = get_input_file(query, td::Slice(), photo, true);
+    if (input_file == nullptr) {
+      return td::Status::Error(400, "Photo must be uploaded as a file");
+    }
+    return make_object<td_api::inputChatPhotoStatic>(std::move(input_file));
+  }
+  if (type == "animated") {
+    TRY_RESULT(animation, object.get_required_string_field("animation"));
+    TRY_RESULT(main_frame_timestamp, object.get_optional_double_field("main_frame_timestamp"));
+    auto input_file = get_input_file(query, td::Slice(), animation, true);
+    if (input_file == nullptr) {
+      return td::Status::Error(400, "Photo must be uploaded as a file");
+    }
+    return make_object<td_api::inputChatPhotoAnimation>(std::move(input_file), main_frame_timestamp);
+  }
+  return td::Status::Error(400, "Invalid profile photo type specified");
+}
+
+td::Result<td_api::object_ptr<td_api::InputChatPhoto>> Client::get_input_chat_photo(const Query *query) const {
+  auto photo = query->arg("photo");
+  if (photo.empty()) {
+    return td::Status::Error(400, "Photo isn't specified");
+  }
+
+  LOG(INFO) << "Parsing JSON object: " << photo;
+  auto r_value = json_decode(photo);
+  if (r_value.is_error()) {
+    LOG(INFO) << "Can't parse JSON object: " << r_value.error();
+    return td::Status::Error(400, "Can't parse photo JSON object");
+  }
+
+  return get_input_chat_photo(query, r_value.move_as_ok());
+}
+
 td::int32 Client::get_integer_arg(const Query *query, td::Slice field_name, int32 default_value, int32 min_value,
                                   int32 max_value) {
   auto s_arg = query->arg(field_name);
@@ -12126,6 +12171,20 @@ td::Status Client::process_set_business_account_bio_query(PromisedQueryPtr &quer
                               send_request(
                                   make_object<td_api::setBusinessAccountBio>(business_connection->id_, bio.str()),
                                   td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+                            });
+  return td::Status::OK();
+}
+
+td::Status Client::process_set_business_account_profile_photo_query(PromisedQueryPtr &query) {
+  auto business_connection_id = query->arg("business_connection_id").str();
+  TRY_RESULT(photo, get_input_chat_photo(query.get()));
+  auto is_public = to_bool(query->arg("is_public"));
+  check_business_connection(business_connection_id, std::move(query),
+                            [this, photo = std::move(photo), is_public](const BusinessConnection *business_connection,
+                                                                        PromisedQueryPtr query) mutable {
+                              send_request(make_object<td_api::setBusinessAccountProfilePhoto>(
+                                               business_connection->id_, std::move(photo), is_public),
+                                           td::make_unique<TdOnOkQueryCallback>(std::move(query)));
                             });
   return td::Status::OK();
 }

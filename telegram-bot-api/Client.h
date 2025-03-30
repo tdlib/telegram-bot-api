@@ -617,6 +617,10 @@ class Client final : public WebhookActor::Callback {
 
   static td::Result<td::vector<object_ptr<td_api::ReactionType>>> get_reaction_types(const Query *query);
 
+  td::Result<object_ptr<td_api::InputChatPhoto>> get_input_chat_photo(const Query *query, td::JsonValue &&value) const;
+
+  td::Result<object_ptr<td_api::InputChatPhoto>> get_input_chat_photo(const Query *query) const;
+
   static int32 get_integer_arg(const Query *query, td::Slice field_name, int32 default_value,
                                int32 min_value = std::numeric_limits<int32>::min(),
                                int32 max_value = std::numeric_limits<int32>::max());
@@ -725,6 +729,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_set_business_account_name_query(PromisedQueryPtr &query);
   td::Status process_set_business_account_username_query(PromisedQueryPtr &query);
   td::Status process_set_business_account_bio_query(PromisedQueryPtr &query);
+  td::Status process_set_business_account_profile_photo_query(PromisedQueryPtr &query);
   td::Status process_set_user_emoji_status_query(PromisedQueryPtr &query);
   td::Status process_get_chat_query(PromisedQueryPtr &query);
   td::Status process_set_chat_photo_query(PromisedQueryPtr &query);
