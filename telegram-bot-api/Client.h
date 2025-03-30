@@ -93,6 +93,7 @@ class Client final : public WebhookActor::Callback {
   class JsonUsers;
   class JsonReactionType;
   class JsonReactionCount;
+  class JsonAcceptedGiftTypes;
   class JsonBirthdate;
   class JsonBusinessStartPage;
   class JsonBusinessLocation;
@@ -870,6 +871,7 @@ class Client final : public WebhookActor::Callback {
     td::string bio;
     object_ptr<td_api::birthdate> birthdate;
     object_ptr<td_api::businessInfo> business_info;
+    object_ptr<td_api::acceptedGiftTypes> accepted_gift_types;
     int64 personal_chat_id = 0;
 
     bool have_access = false;

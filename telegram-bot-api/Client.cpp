@@ -871,6 +871,29 @@ class Client::JsonReactionCount final : public td::Jsonable {
   const td_api::messageReaction *message_reaction_;
 };
 
+class Client::JsonAcceptedGiftTypes final : public td::Jsonable {
+ public:
+  JsonAcceptedGiftTypes(bool unlimited_gifts, bool limited_gifts, bool upgraded_gifts, bool premium_subscription)
+      : unlimited_gifts_(unlimited_gifts)
+      , limited_gifts_(limited_gifts)
+      , upgraded_gifts_(upgraded_gifts)
+      , premium_subscription_(premium_subscription) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("unlimited_gifts", td::JsonBool(unlimited_gifts_));
+    object("limited_gifts", td::JsonBool(limited_gifts_));
+    object("unique_gifts", td::JsonBool(upgraded_gifts_));
+    object("premium_subscription", td::JsonBool(premium_subscription_));
+  }
+
+ private:
+  bool unlimited_gifts_;
+  bool limited_gifts_;
+  bool upgraded_gifts_;
+  bool premium_subscription_;
+};
+
 class Client::JsonBirthdate final : public td::Jsonable {
  public:
   explicit JsonBirthdate(const td_api::birthdate *birthdate) : birthdate_(birthdate) {
@@ -1125,6 +1148,11 @@ class Client::JsonChat final : public td::Jsonable {
               object("business_opening_hours", JsonBusinessOpeningHours(business_info->opening_hours_.get()));
             }
           }
+          CHECK(user_info->accepted_gift_types != nullptr);
+          object("accepted_gift_types", JsonAcceptedGiftTypes(user_info->accepted_gift_types->unlimited_gifts_,
+                                                              user_info->accepted_gift_types->limited_gifts_,
+                                                              user_info->accepted_gift_types->upgraded_gifts_,
+                                                              user_info->accepted_gift_types->premium_subscription_));
           if (user_info->birthdate != nullptr) {
             object("birthdate", JsonBirthdate(user_info->birthdate.get()));
           }
@@ -1159,6 +1187,7 @@ class Client::JsonChat final : public td::Jsonable {
             permissions->can_send_other_messages_ && permissions->can_add_link_previews_ &&
             permissions->can_change_info_ && permissions->can_invite_users_ && permissions->can_pin_messages_;
         object("all_members_are_administrators", td::JsonBool(everyone_is_administrator));
+        object("accepted_gift_types", JsonAcceptedGiftTypes(false, false, false, false));
         photo = group_info->photo.get();
         break;
       }
@@ -1245,6 +1274,9 @@ class Client::JsonChat final : public td::Jsonable {
           if (supergroup_info->has_paid_media_allowed && !supergroup_info->is_supergroup) {
             object("can_send_paid_media", td::JsonTrue());
           }
+          object("accepted_gift_types",
+                 JsonAcceptedGiftTypes(supergroup_info->can_send_gift, supergroup_info->can_send_gift,
+                                       supergroup_info->can_send_gift, false));
         }
         photo = supergroup_info->photo.get();
         break;
@@ -7622,6 +7654,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       user_info->bio = full_info->bio_ != nullptr ? std::move(full_info->bio_->text_) : td::string();
       user_info->birthdate = std::move(full_info->birthdate_);
       user_info->business_info = std::move(full_info->business_info_);
+      user_info->accepted_gift_types = std::move(full_info->gift_settings_->accepted_gift_types_);
       user_info->personal_chat_id = full_info->personal_chat_id_;
       user_info->has_private_forwards = full_info->has_private_forwards_;
       user_info->has_restricted_voice_and_video_messages = full_info->has_restricted_voice_and_video_note_messages_;
