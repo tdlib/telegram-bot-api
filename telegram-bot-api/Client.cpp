@@ -4360,6 +4360,60 @@ class Client::JsonMessageReactionCountUpdated final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonBusinessBotRights final : public td::Jsonable {
+ public:
+  explicit JsonBusinessBotRights(const td_api::businessBotRights *rights) : rights_(rights) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    if (rights_->can_reply_) {
+      object("can_reply", td::JsonTrue());
+    }
+    if (rights_->can_read_messages_) {
+      object("can_read_messages", td::JsonTrue());
+    }
+    if (rights_->can_delete_sent_messages_) {
+      object("can_delete_sent_messages", td::JsonTrue());
+    }
+    if (rights_->can_delete_all_messages_) {
+      object("can_delete_all_messages", td::JsonTrue());
+    }
+    if (rights_->can_edit_name_) {
+      object("can_edit_name", td::JsonTrue());
+    }
+    if (rights_->can_edit_bio_) {
+      object("can_edit_bio", td::JsonTrue());
+    }
+    if (rights_->can_edit_profile_photo_) {
+      object("can_edit_profile_photo", td::JsonTrue());
+    }
+    if (rights_->can_edit_username_) {
+      object("can_edit_username", td::JsonTrue());
+    }
+    if (rights_->can_view_gifts_and_stars_) {
+      object("can_view_gifts_and_stars", td::JsonTrue());
+    }
+    if (rights_->can_sell_gifts_) {
+      object("can_convert_gifts_to_stars", td::JsonTrue());
+    }
+    if (rights_->can_change_gift_settings_) {
+      object("can_change_gift_settings", td::JsonTrue());
+    }
+    if (rights_->can_transfer_and_upgrade_gifts_) {
+      object("can_transfer_and_upgrade_gifts", td::JsonTrue());
+    }
+    if (rights_->can_transfer_stars_) {
+      object("can_transfer_stars", td::JsonTrue());
+    }
+    if (rights_->can_manage_stories_) {
+      object("can_manage_stories", td::JsonTrue());
+    }
+  }
+
+ private:
+  const td_api::businessBotRights *rights_;
+};
+
 class Client::JsonBusinessConnection final : public td::Jsonable {
  public:
   JsonBusinessConnection(const BusinessConnection *connection, const Client *client)
@@ -4371,8 +4425,13 @@ class Client::JsonBusinessConnection final : public td::Jsonable {
     object("user", JsonUser(connection_->user_id_, client_));
     object("user_chat_id", connection_->user_chat_id_);
     object("date", connection_->date_);
-    object("can_reply", td::JsonBool(connection_->rights_->can_reply_));
     object("is_enabled", td::JsonBool(connection_->is_enabled_));
+    if (connection_->rights_ != nullptr) {
+      object("can_reply", td::JsonBool(connection_->rights_->can_reply_));
+      object("rights", JsonBusinessBotRights(connection_->rights_.get()));
+    } else {
+      object("can_reply", td::JsonBool(false));
+    }
   }
 
  private:

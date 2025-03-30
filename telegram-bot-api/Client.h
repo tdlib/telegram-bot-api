@@ -179,6 +179,7 @@ class Client final : public WebhookActor::Callback {
   class JsonUniqueGift;
   class JsonMessageReactionUpdated;
   class JsonMessageReactionCountUpdated;
+  class JsonBusinessBotRights;
   class JsonBusinessConnection;
   class JsonBusinessMessagesDeleted;
   class JsonAddress;
