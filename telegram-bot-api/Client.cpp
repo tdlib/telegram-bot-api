@@ -281,6 +281,7 @@ bool Client::init_methods() {
   methods_.emplace("setbusinessaccountusername", &Client::process_set_business_account_username_query);
   methods_.emplace("setbusinessaccountbio", &Client::process_set_business_account_bio_query);
   methods_.emplace("setbusinessaccountprofilephoto", &Client::process_set_business_account_profile_photo_query);
+  methods_.emplace("removebusinessaccountprofilephoto", &Client::process_remove_business_account_profile_photo_query);
   methods_.emplace("setuseremojistatus", &Client::process_set_user_emoji_status_query);
   methods_.emplace("getchat", &Client::process_get_chat_query);
   methods_.emplace("setchatphoto", &Client::process_set_chat_photo_query);
@@ -12186,6 +12187,18 @@ td::Status Client::process_set_business_account_profile_photo_query(PromisedQuer
                                                business_connection->id_, std::move(photo), is_public),
                                            td::make_unique<TdOnOkQueryCallback>(std::move(query)));
                             });
+  return td::Status::OK();
+}
+
+td::Status Client::process_remove_business_account_profile_photo_query(PromisedQueryPtr &query) {
+  auto business_connection_id = query->arg("business_connection_id").str();
+  auto is_public = to_bool(query->arg("is_public"));
+  check_business_connection(
+      business_connection_id, std::move(query),
+      [this, is_public](const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
+        send_request(make_object<td_api::setBusinessAccountProfilePhoto>(business_connection->id_, nullptr, is_public),
+                     td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+      });
   return td::Status::OK();
 }
 

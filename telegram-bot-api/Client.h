@@ -730,6 +730,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_set_business_account_username_query(PromisedQueryPtr &query);
   td::Status process_set_business_account_bio_query(PromisedQueryPtr &query);
   td::Status process_set_business_account_profile_photo_query(PromisedQueryPtr &query);
+  td::Status process_remove_business_account_profile_photo_query(PromisedQueryPtr &query);
   td::Status process_set_user_emoji_status_query(PromisedQueryPtr &query);
   td::Status process_get_chat_query(PromisedQueryPtr &query);
   td::Status process_set_chat_photo_query(PromisedQueryPtr &query);
