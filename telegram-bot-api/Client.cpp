@@ -276,6 +276,7 @@ bool Client::init_methods() {
   methods_.emplace("revokechatinvitelink", &Client::process_revoke_chat_invite_link_query);
   methods_.emplace("getbusinessconnection", &Client::process_get_business_connection_query);
   methods_.emplace("readbusinessmessage", &Client::process_read_business_message_query);
+  methods_.emplace("deletebusinessmessages", &Client::process_delete_business_messages_query);
   methods_.emplace("setuseremojistatus", &Client::process_set_user_emoji_status_query);
   methods_.emplace("getchat", &Client::process_get_chat_query);
   methods_.emplace("setchatphoto", &Client::process_set_chat_photo_query);
@@ -12070,6 +12071,19 @@ td::Status Client::process_read_business_message_query(PromisedQueryPtr &query) 
       business_connection_id, chat_id_str, std::move(query),
       [this, message_id](const BusinessConnection *business_connection, int64 chat_id, PromisedQueryPtr query) mutable {
         send_request(make_object<td_api::readBusinessMessage>(business_connection->id_, chat_id, message_id),
+                     td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+      });
+  return td::Status::OK();
+}
+
+td::Status Client::process_delete_business_messages_query(PromisedQueryPtr &query) {
+  auto business_connection_id = query->arg("business_connection_id").str();
+  TRY_RESULT(message_ids, get_message_ids(query.get(), 100));
+  check_business_connection(
+      business_connection_id, std::move(query),
+      [this, message_ids = std::move(message_ids)](const BusinessConnection *business_connection,
+                                                   PromisedQueryPtr query) mutable {
+        send_request(make_object<td_api::deleteBusinessMessages>(business_connection->id_, std::move(message_ids)),
                      td::make_unique<TdOnOkQueryCallback>(std::move(query)));
       });
   return td::Status::OK();
