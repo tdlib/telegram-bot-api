@@ -2837,6 +2837,20 @@ class Client::JsonChatBoostAdded final : public td::Jsonable {
   const td_api::messageChatBoost *chat_boost_;
 };
 
+class Client::JsonPaidMessagePriceChanged final : public td::Jsonable {
+ public:
+  explicit JsonPaidMessagePriceChanged(const td_api::messagePaidMessagePriceChanged *price_changed)
+      : price_changed_(price_changed) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("paid_message_star_count", price_changed_->paid_message_star_count_);
+  }
+
+ private:
+  const td_api::messagePaidMessagePriceChanged *price_changed_;
+};
+
 class Client::JsonWebAppInfo final : public td::Jsonable {
  public:
   explicit JsonWebAppInfo(const td::string &url) : url_(url) {
@@ -3644,8 +3658,11 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     }
     case td_api::messagePaidMessagesRefunded::ID:
       break;
-    case td_api::messagePaidMessagePriceChanged::ID:
+    case td_api::messagePaidMessagePriceChanged::ID: {
+      auto content = static_cast<const td_api::messagePaidMessagePriceChanged *>(message_->content.get());
+      object("paid_message_price_changed", JsonPaidMessagePriceChanged(content));
       break;
+    }
     default:
       UNREACHABLE();
   }
@@ -14674,8 +14691,6 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageGiveawayPrizeStars::ID:
       return true;
     case td_api::messagePaidMessagesRefunded::ID:
-      return true;
-    case td_api::messagePaidMessagePriceChanged::ID:
       return true;
     default:
       break;
