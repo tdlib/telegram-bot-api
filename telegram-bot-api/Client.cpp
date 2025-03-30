@@ -283,6 +283,7 @@ bool Client::init_methods() {
   methods_.emplace("setbusinessaccountprofilephoto", &Client::process_set_business_account_profile_photo_query);
   methods_.emplace("removebusinessaccountprofilephoto", &Client::process_remove_business_account_profile_photo_query);
   methods_.emplace("setbusinessaccountgiftsettings", &Client::process_set_business_account_gift_settings_query);
+  methods_.emplace("getbusinessaccountstarbalance", &Client::process_get_business_account_star_balance_query);
   methods_.emplace("setuseremojistatus", &Client::process_set_user_emoji_status_query);
   methods_.emplace("getchat", &Client::process_get_chat_query);
   methods_.emplace("setchatphoto", &Client::process_set_chat_photo_query);
@@ -4513,6 +4514,22 @@ class Client::JsonBusinessMessagesDeleted final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonStarAmount final : public td::Jsonable {
+ public:
+  explicit JsonStarAmount(const td_api::starAmount *amount) : amount_(amount) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("star_count", amount_->star_count_);
+    if (amount_->nanostar_count_ != 0) {
+      object("nanostar_count", amount_->nanostar_count_);
+    }
+  }
+
+ private:
+  const td_api::starAmount *amount_;
+};
+
 class Client::JsonRevenueWithdrawalState final : public td::Jsonable {
  public:
   explicit JsonRevenueWithdrawalState(const td_api::RevenueWithdrawalState *state) : state_(state) {
@@ -6247,9 +6264,28 @@ class Client::TdOnGetChatInviteLinkCallback final : public TdQueryCallback {
   PromisedQueryPtr query_;
 };
 
-class Client::TdOnGetStarTransactionsQueryCallback final : public TdQueryCallback {
+class Client::TdOnGetStarAmountCallback final : public TdQueryCallback {
  public:
-  TdOnGetStarTransactionsQueryCallback(const Client *client, PromisedQueryPtr query)
+  explicit TdOnGetStarAmountCallback(PromisedQueryPtr query) : query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::starAmount::ID);
+    auto amount = move_object_as<td_api::starAmount>(result);
+    answer_query(JsonStarAmount(amount.get()), std::move(query_));
+  }
+
+ private:
+  PromisedQueryPtr query_;
+};
+
+class Client::TdOnGetStarTransactionsCallback final : public TdQueryCallback {
+ public:
+  TdOnGetStarTransactionsCallback(const Client *client, PromisedQueryPtr query)
       : client_(client), query_(std::move(query)) {
   }
 
@@ -11771,7 +11807,7 @@ td::Status Client::process_get_star_transactions_query(PromisedQueryPtr &query) 
   auto limit = get_integer_arg(query.get(), "limit", 100, 1, 100);
   send_request(make_object<td_api::getStarTransactions>(make_object<td_api::messageSenderUser>(my_id_), td::string(),
                                                         nullptr, td::to_string(offset), limit),
-               td::make_unique<TdOnGetStarTransactionsQueryCallback>(this, std::move(query)));
+               td::make_unique<TdOnGetStarTransactionsCallback>(this, std::move(query)));
   return td::Status::OK();
 }
 
@@ -12243,6 +12279,16 @@ td::Status Client::process_set_business_account_gift_settings_query(PromisedQuer
         send_request(make_object<td_api::setBusinessAccountGiftSettings>(business_connection->id_, std::move(settings)),
                      td::make_unique<TdOnOkQueryCallback>(std::move(query)));
       });
+  return td::Status::OK();
+}
+
+td::Status Client::process_get_business_account_star_balance_query(PromisedQueryPtr &query) {
+  auto business_connection_id = query->arg("business_connection_id").str();
+  check_business_connection(business_connection_id, std::move(query),
+                            [this](const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
+                              send_request(make_object<td_api::getBusinessAccountStarAmount>(business_connection->id_),
+                                           td::make_unique<TdOnGetStarAmountCallback>(std::move(query)));
+                            });
   return td::Status::OK();
 }
 
