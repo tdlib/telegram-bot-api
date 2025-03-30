@@ -282,6 +282,7 @@ bool Client::init_methods() {
   methods_.emplace("setbusinessaccountbio", &Client::process_set_business_account_bio_query);
   methods_.emplace("setbusinessaccountprofilephoto", &Client::process_set_business_account_profile_photo_query);
   methods_.emplace("removebusinessaccountprofilephoto", &Client::process_remove_business_account_profile_photo_query);
+  methods_.emplace("setbusinessaccountgiftsettings", &Client::process_set_business_account_gift_settings_query);
   methods_.emplace("setuseremojistatus", &Client::process_set_user_emoji_status_query);
   methods_.emplace("getchat", &Client::process_get_chat_query);
   methods_.emplace("setchatphoto", &Client::process_set_chat_photo_query);
@@ -10507,6 +10508,35 @@ td::Result<td_api::object_ptr<td_api::InputChatPhoto>> Client::get_input_chat_ph
   return get_input_chat_photo(query, r_value.move_as_ok());
 }
 
+td::Result<td_api::object_ptr<td_api::acceptedGiftTypes>> Client::get_accepted_gift_types(td::JsonValue &&value) {
+  if (value.type() != td::JsonValue::Type::Object) {
+    return td::Status::Error(400, "Object expected as accepted gift types");
+  }
+  auto &object = value.get_object();
+
+  TRY_RESULT(unlimited_gifts, object.get_required_bool_field("unlimited_gifts"));
+  TRY_RESULT(limited_gifts, object.get_required_bool_field("limited_gifts"));
+  TRY_RESULT(upgraded_gifts, object.get_required_bool_field("unique_gifts"));
+  TRY_RESULT(premium_subscription, object.get_required_bool_field("premium_subscription"));
+  return make_object<td_api::acceptedGiftTypes>(unlimited_gifts, limited_gifts, upgraded_gifts, premium_subscription);
+}
+
+td::Result<td_api::object_ptr<td_api::acceptedGiftTypes>> Client::get_accepted_gift_types(const Query *query) {
+  auto types = query->arg("accepted_gift_types");
+  if (types.empty()) {
+    return td::Status::Error(400, "Accepted gift types aren't specified");
+  }
+
+  LOG(INFO) << "Parsing JSON object: " << types;
+  auto r_value = json_decode(types);
+  if (r_value.is_error()) {
+    LOG(INFO) << "Can't parse JSON object: " << r_value.error();
+    return td::Status::Error(400, "Can't parse accepted gift types JSON object");
+  }
+
+  return get_accepted_gift_types(r_value.move_as_ok());
+}
+
 td::int32 Client::get_integer_arg(const Query *query, td::Slice field_name, int32 default_value, int32 min_value,
                                   int32 max_value) {
   auto s_arg = query->arg(field_name);
@@ -12197,6 +12227,20 @@ td::Status Client::process_remove_business_account_profile_photo_query(PromisedQ
       business_connection_id, std::move(query),
       [this, is_public](const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
         send_request(make_object<td_api::setBusinessAccountProfilePhoto>(business_connection->id_, nullptr, is_public),
+                     td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+      });
+  return td::Status::OK();
+}
+
+td::Status Client::process_set_business_account_gift_settings_query(PromisedQueryPtr &query) {
+  auto business_connection_id = query->arg("business_connection_id").str();
+  auto show_gift_button = to_bool(query->arg("show_gift_button"));
+  TRY_RESULT(accepted_gift_types, get_accepted_gift_types(query.get()));
+  check_business_connection(
+      business_connection_id, std::move(query),
+      [this, settings = td_api::make_object<td_api::giftSettings>(show_gift_button, std::move(accepted_gift_types))](
+          const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
+        send_request(make_object<td_api::setBusinessAccountGiftSettings>(business_connection->id_, std::move(settings)),
                      td::make_unique<TdOnOkQueryCallback>(std::move(query)));
       });
   return td::Status::OK();
