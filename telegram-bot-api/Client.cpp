@@ -277,6 +277,7 @@ bool Client::init_methods() {
   methods_.emplace("getbusinessconnection", &Client::process_get_business_connection_query);
   methods_.emplace("readbusinessmessage", &Client::process_read_business_message_query);
   methods_.emplace("deletebusinessmessages", &Client::process_delete_business_messages_query);
+  methods_.emplace("setbusinessaccountname", &Client::process_set_business_account_name_query);
   methods_.emplace("setuseremojistatus", &Client::process_set_user_emoji_status_query);
   methods_.emplace("getchat", &Client::process_get_chat_query);
   methods_.emplace("setchatphoto", &Client::process_set_chat_photo_query);
@@ -12085,6 +12086,20 @@ td::Status Client::process_delete_business_messages_query(PromisedQueryPtr &quer
                                                    PromisedQueryPtr query) mutable {
         send_request(make_object<td_api::deleteBusinessMessages>(business_connection->id_, std::move(message_ids)),
                      td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+      });
+  return td::Status::OK();
+}
+
+td::Status Client::process_set_business_account_name_query(PromisedQueryPtr &query) {
+  auto business_connection_id = query->arg("business_connection_id").str();
+  TRY_RESULT(first_name, get_required_string_arg(query.get(), "first_name"));
+  auto last_name = query->arg("last_name");
+  check_business_connection(
+      business_connection_id, std::move(query),
+      [this, first_name, last_name](const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
+        send_request(
+            make_object<td_api::setBusinessAccountName>(business_connection->id_, first_name.str(), last_name.str()),
+            td::make_unique<TdOnOkQueryCallback>(std::move(query)));
       });
   return td::Status::OK();
 }
