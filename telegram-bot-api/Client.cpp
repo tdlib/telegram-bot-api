@@ -10694,6 +10694,110 @@ td::Result<td::vector<td_api::object_ptr<td_api::ReactionType>>> Client::get_rea
   return std::move(reaction_types);
 }
 
+td::Result<td_api::object_ptr<td_api::InputStoryAreaType>> Client::get_input_story_area_type(td::JsonValue &&value) {
+  CHECK(value.type() == td::JsonValue::Type::Object);
+  auto &object = value.get_object();
+
+  TRY_RESULT(type, object.get_required_string_field("type"));
+  if (type == "location") {
+    TRY_RESULT(latitude, object.get_required_double_field("latitude"));
+    TRY_RESULT(longitude, object.get_required_double_field("longitude"));
+    object_ptr<td_api::locationAddress> location_address;
+    TRY_RESULT(address, object.extract_optional_field("address", td::JsonValue::Type::Object));
+    if (address.type() == td::JsonValue::Type::Object) {
+      auto &address_object = address.get_object();
+      TRY_RESULT(country_code, address_object.get_required_string_field("country_code"));
+      TRY_RESULT(state, address_object.get_optional_string_field("state"));
+      TRY_RESULT(city, address_object.get_optional_string_field("city"));
+      TRY_RESULT(street, address_object.get_optional_string_field("street"));
+      location_address = make_object<td_api::locationAddress>(country_code, state, city, street);
+    }
+    return make_object<td_api::inputStoryAreaTypeLocation>(make_object<td_api::location>(latitude, longitude, 0.0),
+                                                           std::move(location_address));
+  }
+  if (type == "suggested_reaction") {
+    TRY_RESULT(reaction_type, object.extract_required_field("reaction_type", td::JsonValue::Type::Object));
+    auto r_reaction_type = get_reaction_type(std::move(reaction_type));
+    if (r_reaction_type.is_error()) {
+      return td::Status::Error(400, PSLICE() << "can't parse ReactionType: " << r_reaction_type.error().message());
+    }
+    TRY_RESULT(is_dark, object.get_optional_bool_field("is_dark"));
+    TRY_RESULT(is_flipped, object.get_optional_bool_field("is_flipped"));
+    return make_object<td_api::inputStoryAreaTypeSuggestedReaction>(r_reaction_type.move_as_ok(), is_dark, is_flipped);
+  }
+  if (type == "link") {
+    TRY_RESULT(url, object.get_required_string_field("url"));
+    return make_object<td_api::inputStoryAreaTypeLink>(url);
+  }
+  if (type == "weather") {
+    TRY_RESULT(temperature, object.get_required_double_field("temperature"));
+    TRY_RESULT(emoji, object.get_required_string_field("emoji"));
+    TRY_RESULT(background_color, object.get_required_long_field("background_color"));
+    if (background_color < 0 || background_color > 0xFFFFFFFF) {
+      return td::Status::Error(400, "invalid background color specified");
+    }
+    return make_object<td_api::inputStoryAreaTypeWeather>(
+        temperature, emoji, static_cast<td::int32>(static_cast<td::uint32>(background_color)));
+  }
+  if (type == "unique_gift") {
+    TRY_RESULT(name, object.get_required_string_field("name"));
+    return make_object<td_api::inputStoryAreaTypeUpgradedGift>(name);
+  }
+  return td::Status::Error(400, "invalid story area type specified");
+}
+
+td::Result<td_api::object_ptr<td_api::inputStoryArea>> Client::get_input_story_area(td::JsonValue &&value) {
+  if (value.type() != td::JsonValue::Type::Object) {
+    return td::Status::Error(400, "expected an Object");
+  }
+
+  auto &object = value.get_object();
+
+  TRY_RESULT(position, object.extract_required_field("position", td::JsonValue::Type::Object));
+  auto &position_object = position.get_object();
+  TRY_RESULT(x_percentage, position_object.get_required_double_field("x_percentage"));
+  TRY_RESULT(y_percentage, position_object.get_required_double_field("y_percentage"));
+  TRY_RESULT(width_percentage, position_object.get_required_double_field("width_percentage"));
+  TRY_RESULT(height_percentage, position_object.get_required_double_field("height_percentage"));
+  TRY_RESULT(rotation_angle, position_object.get_required_double_field("rotation_angle"));
+  TRY_RESULT(corner_radius_percentage, position_object.get_required_double_field("corner_radius_percentage"));
+  TRY_RESULT(type, object.extract_required_field("type", td::JsonValue::Type::Object));
+  TRY_RESULT(input_type, get_input_story_area_type(std::move(type)));
+
+  return make_object<td_api::inputStoryArea>(
+      make_object<td_api::storyAreaPosition>(x_percentage, y_percentage, width_percentage, height_percentage,
+                                             rotation_angle, corner_radius_percentage),
+      std::move(input_type));
+}
+
+td::Result<td_api::object_ptr<td_api::inputStoryAreas>> Client::get_input_story_areas(const Query *query) {
+  auto areas = query->arg("areas");
+  if (areas.empty()) {
+    return nullptr;
+  }
+  LOG(INFO) << "Parsing JSON object: " << areas;
+  auto r_value = json_decode(areas);
+  if (r_value.is_error()) {
+    LOG(INFO) << "Can't parse JSON object: " << r_value.error();
+    return td::Status::Error(400, "Can't parse story areas JSON object");
+  }
+
+  auto value = r_value.move_as_ok();
+  if (value.type() != td::JsonValue::Type::Array) {
+    return td::Status::Error(400, "Expected an Array of InputStoryArea");
+  }
+
+  td::vector<object_ptr<td_api::inputStoryArea>> input_story_areas;
+  for (auto &area : value.get_array()) {
+    auto r_input_story_area = get_input_story_area(std::move(area));
+    if (r_input_story_area.is_error()) {
+      return td::Status::Error(400, PSLICE() << "Can't parse InputStoryArea: " << r_input_story_area.error().message());
+    }
+    input_story_areas.push_back(r_input_story_area.move_as_ok());
+  }
+  return make_object<td_api::inputStoryAreas>(std::move(input_story_areas));
+}
+
 td::Result<td_api::object_ptr<td_api::InputChatPhoto>> Client::get_input_chat_photo(const Query *query,
                                                                                     td::JsonValue &&value) const {
   if (value.type() != td::JsonValue::Type::Object) {
@@ -12046,35 +12150,38 @@ td::Status Client::process_delete_messages_query(PromisedQueryPtr &query) {
 td::Status Client::process_post_story_query(PromisedQueryPtr &query) {
   auto business_connection_id = query->arg("business_connection_id").str();
   TRY_RESULT(content, get_input_story_content(query.get()));
+  TRY_RESULT(areas, get_input_story_areas(query.get()));
   TRY_RESULT(caption, get_formatted_text(query->arg("caption").str(), query->arg("parse_mode").str(),
                                          get_input_entities(query.get(), "caption_entities")));
-  check_business_connection(business_connection_id, std::move(query),
-                            [this, content = std::move(content), caption = std::move(caption)](
-                                const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
-                              auto active_period = get_integer_arg(query.get(), "active_period", 0, 0, 1000000000);
-                              auto is_posted_to_chat_page = to_bool(query->arg("post_to_chat_page"));
-                              auto protect_content = to_bool(query->arg("protect_content"));
-                              send_request(make_object<td_api::sendStory>(
-                                               business_connection->user_chat_id_, std::move(content), td::Auto(),
-                                               std::move(caption), make_object<td_api::storyPrivacySettingsEveryone>(),
-                                               active_period, nullptr, is_posted_to_chat_page, protect_content),
-                                           td::make_unique<TdOnPostStoryCallback>(this, std::move(query)));
-                            });
+  check_business_connection(
+      business_connection_id, std::move(query),
+      [this, content = std::move(content), areas = std::move(areas), caption = std::move(caption)](
+          const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
+        auto active_period = get_integer_arg(query.get(), "active_period", 0, 0, 1000000000);
+        auto is_posted_to_chat_page = to_bool(query->arg("post_to_chat_page"));
+        auto protect_content = to_bool(query->arg("protect_content"));
+        send_request(
+            make_object<td_api::sendStory>(business_connection->user_chat_id_, std::move(content), std::move(areas),
+                                           std::move(caption), make_object<td_api::storyPrivacySettingsEveryone>(),
+                                           active_period, nullptr, is_posted_to_chat_page, protect_content),
+            td::make_unique<TdOnPostStoryCallback>(this, std::move(query)));
+      });
   return td::Status::OK();
 }
 
 td::Status Client::process_edit_story_query(PromisedQueryPtr &query) {
   auto business_connection_id = query->arg("business_connection_id").str();
   TRY_RESULT(content, get_input_story_content(query.get()));
+  TRY_RESULT(areas, get_input_story_areas(query.get()));
   TRY_RESULT(caption, get_formatted_text(query->arg("caption").str(), query->arg("parse_mode").str(),
                                          get_input_entities(query.get(), "caption_entities")));
   check_business_connection(
       business_connection_id, std::move(query),
-      [this, content = std::move(content), caption = std::move(caption)](const BusinessConnection *business_connection,
-                                                                         PromisedQueryPtr query) mutable {
+      [this, content = std::move(content), areas = std::move(areas), caption = std::move(caption)](
+          const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
         auto story_id = get_integer_arg(query.get(), "story_id", 0, 0, 1000000000);
         send_request(make_object<td_api::editBusinessStory>(business_connection->user_chat_id_, story_id,
-                                                            std::move(content), td::Auto(), std::move(caption),
+                                                            std::move(content), std::move(areas), std::move(caption),
                                                             make_object<td_api::storyPrivacySettingsEveryone>()),
                      td::make_unique<TdOnGetStoryCallback>(this, std::move(query)));
       });

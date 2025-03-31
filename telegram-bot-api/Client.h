@@ -625,6 +625,12 @@ class Client final : public WebhookActor::Callback {
 
   static td::Result<td::vector<object_ptr<td_api::ReactionType>>> get_reaction_types(const Query *query);
 
+  static td::Result<object_ptr<td_api::InputStoryAreaType>> get_input_story_area_type(td::JsonValue &&value);
+
+  static td::Result<object_ptr<td_api::inputStoryArea>> get_input_story_area(td::JsonValue &&value);
+
+  static td::Result<object_ptr<td_api::inputStoryAreas>> get_input_story_areas(const Query *query);
+
   td::Result<object_ptr<td_api::InputChatPhoto>> get_input_chat_photo(const Query *query, td::JsonValue &&value) const;
 
   td::Result<object_ptr<td_api::InputChatPhoto>> get_input_chat_photo(const Query *query) const;
