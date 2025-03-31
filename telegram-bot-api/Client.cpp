@@ -287,6 +287,7 @@ bool Client::init_methods() {
   methods_.emplace("getbusinessaccountgifts", &Client::process_get_business_account_gifts_query);
   methods_.emplace("convertgifttostars", &Client::process_convert_gift_to_stars_query);
   methods_.emplace("upgradegift", &Client::process_upgrade_gift_query);
+  methods_.emplace("transfergift", &Client::process_transfer_gift_query);
   methods_.emplace("setuseremojistatus", &Client::process_set_user_emoji_status_query);
   methods_.emplace("getchat", &Client::process_get_chat_query);
   methods_.emplace("setchatphoto", &Client::process_set_chat_photo_query);
@@ -12478,6 +12479,22 @@ td::Status Client::process_upgrade_gift_query(PromisedQueryPtr &query) {
                                                                    keep_original_details, star_count),
                                   td::make_unique<TdOnUpgradeGiftCallback>(std::move(query)));
                             });
+  return td::Status::OK();
+}
+
+td::Status Client::process_transfer_gift_query(PromisedQueryPtr &query) {
+  auto business_connection_id = query->arg("business_connection_id").str();
+  auto owned_gift_id = query->arg("owned_gift_id");
+  auto chat_id_str = query->arg("new_owner_chat_id").str();
+  auto star_count = get_integer_arg(query.get(), "star_count", 0, 0, 1000000);
+  check_business_connection_chat_id(
+      business_connection_id, chat_id_str, std::move(query),
+      [this, owned_gift_id, star_count](const BusinessConnection *business_connection, int64 chat_id,
+                                        PromisedQueryPtr query) mutable {
+        send_request(make_object<td_api::transferGift>(business_connection->id_, owned_gift_id.str(),
+                                                       make_object<td_api::messageSenderChat>(chat_id), star_count),
+                     td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+      });
   return td::Status::OK();
 }
 
