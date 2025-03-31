@@ -286,6 +286,7 @@ bool Client::init_methods() {
   methods_.emplace("getbusinessaccountstarbalance", &Client::process_get_business_account_star_balance_query);
   methods_.emplace("getbusinessaccountgifts", &Client::process_get_business_account_gifts_query);
   methods_.emplace("convertgifttostars", &Client::process_convert_gift_to_stars_query);
+  methods_.emplace("upgradegift", &Client::process_upgrade_gift_query);
   methods_.emplace("setuseremojistatus", &Client::process_set_user_emoji_status_query);
   methods_.emplace("getchat", &Client::process_get_chat_query);
   methods_.emplace("setchatphoto", &Client::process_set_chat_photo_query);
@@ -6362,6 +6363,23 @@ class Client::TdOnGetChatInviteLinkCallback final : public TdQueryCallback {
 
  private:
   const Client *client_;
+  PromisedQueryPtr query_;
+};
+
+class Client::TdOnUpgradeGiftCallback final : public TdQueryCallback {
+ public:
+  explicit TdOnUpgradeGiftCallback(PromisedQueryPtr query) : query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    answer_query(td::JsonTrue(), std::move(query_));
+  }
+
+ private:
   PromisedQueryPtr query_;
 };
 
@@ -12444,6 +12462,22 @@ td::Status Client::process_convert_gift_to_stars_query(PromisedQueryPtr &query) 
         send_request(make_object<td_api::sellGift>(business_connection->id_, owned_gift_id.str()),
                      td::make_unique<TdOnOkQueryCallback>(std::move(query)));
       });
+  return td::Status::OK();
+}
+
+td::Status Client::process_upgrade_gift_query(PromisedQueryPtr &query) {
+  auto business_connection_id = query->arg("business_connection_id").str();
+  auto owned_gift_id = query->arg("owned_gift_id");
+  auto keep_original_details = to_bool(query->arg("keep_original_details"));
+  auto star_count = get_integer_arg(query.get(), "star_count", 0, 0, 1000000);
+  check_business_connection(business_connection_id, std::move(query),
+                            [this, owned_gift_id, keep_original_details, star_count](
+                                const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
+                              send_request(
+                                  make_object<td_api::upgradeGift>(business_connection->id_, owned_gift_id.str(),
+                                                                   keep_original_details, star_count),
+                                  td::make_unique<TdOnUpgradeGiftCallback>(std::move(query)));
+                            });
   return td::Status::OK();
 }
 
