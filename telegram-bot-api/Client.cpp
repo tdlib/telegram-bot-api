@@ -284,6 +284,7 @@ bool Client::init_methods() {
   methods_.emplace("removebusinessaccountprofilephoto", &Client::process_remove_business_account_profile_photo_query);
   methods_.emplace("setbusinessaccountgiftsettings", &Client::process_set_business_account_gift_settings_query);
   methods_.emplace("getbusinessaccountstarbalance", &Client::process_get_business_account_star_balance_query);
+  methods_.emplace("getbusinessaccountgifts", &Client::process_get_business_account_gifts_query);
   methods_.emplace("setuseremojistatus", &Client::process_set_user_emoji_status_query);
   methods_.emplace("getchat", &Client::process_get_chat_query);
   methods_.emplace("setchatphoto", &Client::process_set_chat_photo_query);
@@ -4530,6 +4531,105 @@ class Client::JsonStarAmount final : public td::Jsonable {
   const td_api::starAmount *amount_;
 };
 
+class Client::JsonReceivedGift final : public td::Jsonable {
+ public:
+  JsonReceivedGift(const td_api::receivedGift *received_gift, const Client *client)
+      : received_gift_(received_gift), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("owned_gift_id", received_gift_->received_gift_id_);
+    switch (received_gift_->gift_->get_id()) {
+      case td_api::sentGiftRegular::ID: {
+        auto gift = static_cast<const td_api::sentGiftRegular *>(received_gift_->gift_.get());
+        object("type", "regular");
+        object("gift", JsonGift(gift->gift_.get(), client_));
+        break;
+      }
+      case td_api::sentGiftUpgraded::ID: {
+        auto gift = static_cast<const td_api::sentGiftUpgraded *>(received_gift_->gift_.get());
+        object("type", "unique");
+        object("gift", JsonUniqueGift(gift->gift_.get(), client_));
+        break;
+      }
+      default:
+        UNREACHABLE();
+    }
+    if (received_gift_->sender_id_ != nullptr) {
+      switch (received_gift_->sender_id_->get_id()) {
+        case td_api::messageSenderUser::ID: {
+          auto sender_id = static_cast<const td_api::messageSenderUser *>(received_gift_->sender_id_.get());
+          object("sender_user", JsonUser(sender_id->user_id_, client_));
+          break;
+        }
+        case td_api::messageSenderChat::ID: {
+          auto sender_id = static_cast<const td_api::messageSenderChat *>(received_gift_->sender_id_.get());
+          object("sender_chat", JsonChat(sender_id->chat_id_, client_));
+          break;
+        }
+        default:
+          UNREACHABLE();
+      }
+    }
+    object("send_date", received_gift_->date_);
+    if (!received_gift_->text_->text_.empty()) {
+      object("text", received_gift_->text_->text_);
+    }
+    if (!received_gift_->text_->entities_.empty()) {
+      object("entities", JsonVectorEntities(received_gift_->text_->entities_, client_));
+    }
+    if (received_gift_->is_private_) {
+      object("is_private", td::JsonTrue());
+    }
+    if (received_gift_->is_saved_) {
+      object("is_saved", td::JsonTrue());
+    }
+    if (received_gift_->can_be_upgraded_) {
+      object("can_be_upgraded", td::JsonTrue());
+    }
+    if (received_gift_->can_be_transferred_) {
+      object("can_be_transferred", td::JsonTrue());
+    }
+    if (received_gift_->was_refunded_) {
+      object("was_refunded", td::JsonTrue());
+    }
+    if (received_gift_->sell_star_count_ > 0) {
+      object("convert_star_count", received_gift_->sell_star_count_);
+    }
+    if (received_gift_->prepaid_upgrade_star_count_ > 0) {
+      object("prepaid_upgrade_star_count", received_gift_->prepaid_upgrade_star_count_);
+    }
+    if (received_gift_->transfer_star_count_ > 0) {
+      object("transfer_star_count", received_gift_->transfer_star_count_);
+    }
+  }
+
+ private:
+  const td_api::receivedGift *received_gift_;
+  const Client *client_;
+};
+
+class Client::JsonReceivedGifts final : public td::Jsonable {
+ public:
+  JsonReceivedGifts(const td_api::receivedGifts *received_gifts, const Client *client)
+      : received_gifts_(received_gifts), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("total_count", received_gifts_->total_count_);
+    object("gifts", td::json_array(received_gifts_->gifts_, [client = client_](const auto &received_gift) {
+             return JsonReceivedGift(received_gift.get(), client);
+           }));
+    if (!received_gifts_->next_offset_.empty()) {
+      object("next_offset", received_gifts_->next_offset_);
+    }
+  }
+
+ private:
+  const td_api::receivedGifts *received_gifts_;
+  const Client *client_;
+};
+
 class Client::JsonRevenueWithdrawalState final : public td::Jsonable {
  public:
   explicit JsonRevenueWithdrawalState(const td_api::RevenueWithdrawalState *state) : state_(state) {
@@ -6280,6 +6380,27 @@ class Client::TdOnGetStarAmountCallback final : public TdQueryCallback {
   }
 
  private:
+  PromisedQueryPtr query_;
+};
+
+class Client::TdOnGetReceivedGiftsCallback final : public TdQueryCallback {
+ public:
+  TdOnGetReceivedGiftsCallback(const Client *client, PromisedQueryPtr query)
+      : client_(client), query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::receivedGifts::ID);
+    auto gifts = move_object_as<td_api::receivedGifts>(result);
+    answer_query(JsonReceivedGifts(gifts.get(), client_), std::move(query_));
+  }
+
+ private:
+  const Client *client_;
   PromisedQueryPtr query_;
 };
 
@@ -12288,6 +12409,27 @@ td::Status Client::process_get_business_account_star_balance_query(PromisedQuery
                             [this](const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
                               send_request(make_object<td_api::getBusinessAccountStarAmount>(business_connection->id_),
                                            td::make_unique<TdOnGetStarAmountCallback>(std::move(query)));
+                            });
+  return td::Status::OK();
+}
+
+td::Status Client::process_get_business_account_gifts_query(PromisedQueryPtr &query) {
+  auto business_connection_id = query->arg("business_connection_id").str();
+  check_business_connection(business_connection_id, std::move(query),
+                            [this](const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
+                              auto exclude_unsaved = to_bool(query->arg("exclude_unsaved"));
+                              auto exclude_saved = to_bool(query->arg("exclude_saved"));
+                              auto exclude_unlimited = to_bool(query->arg("exclude_unlimited"));
+                              auto exclude_limited = to_bool(query->arg("exclude_limited"));
+                              auto exclude_upgraded = to_bool(query->arg("exclude_unique"));
+                              auto sort_by_price = to_bool(query->arg("sort_by_price"));
+                              auto offset = query->arg("offset");
+                              auto limit = get_integer_arg(query.get(), "limit", 100, 1, 100);
+                              send_request(make_object<td_api::getReceivedGifts>(
+                                               business_connection->id_, make_object<td_api::messageSenderUser>(my_id_),
+                                               exclude_unsaved, exclude_saved, exclude_unlimited, exclude_limited,
+                                               exclude_upgraded, sort_by_price, offset.str(), limit),
+                                           td::make_unique<TdOnGetReceivedGiftsCallback>(this, std::move(query)));
                             });
   return td::Status::OK();
 }
