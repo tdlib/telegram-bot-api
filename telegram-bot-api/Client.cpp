@@ -250,6 +250,7 @@ bool Client::init_methods() {
   methods_.emplace("editmessagereplymarkup", &Client::process_edit_message_reply_markup_query);
   methods_.emplace("deletemessage", &Client::process_delete_message_query);
   methods_.emplace("deletemessages", &Client::process_delete_messages_query);
+  methods_.emplace("poststory", &Client::process_post_story_query);
   methods_.emplace("createinvoicelink", &Client::process_create_invoice_link_query);
   methods_.emplace("getstartransactions", &Client::process_get_star_transactions_query);
   methods_.emplace("refundstarpayment", &Client::process_refund_star_payment_query);
@@ -5344,6 +5345,45 @@ class Client::TdOnStopBusinessPollCallback final : public TdQueryCallback {
   PromisedQueryPtr query_;
 };
 
+class Client::TdOnPostStoryCallback final : public TdQueryCallback {
+ public:
+  TdOnPostStoryCallback(Client *client, PromisedQueryPtr query) : client_(client), query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::story::ID);
+    client_->on_sent_story(move_object_as<td_api::story>(result), std::move(query_));
+  }
+
+ private:
+  Client *client_;
+  PromisedQueryPtr query_;
+};
+
+class Client::TdOnGetStoryCallback final : public TdQueryCallback {
+ public:
+  TdOnGetStoryCallback(Client *client, PromisedQueryPtr query) : client_(client), query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::story::ID);
+    auto story = static_cast<const td_api::story *>(result.get());
+    answer_query(JsonStory(story->sender_chat_id_, story->id_, client_), std::move(query_));
+  }
+
+ private:
+  Client *client_;
+  PromisedQueryPtr query_;
+};
+
 class Client::TdOnOkQueryCallback final : public TdQueryCallback {
  public:
   explicit TdOnOkQueryCallback(PromisedQueryPtr query) : query_(std::move(query)) {
@@ -7691,6 +7731,16 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       auto update = move_object_as<td_api::updateMessageSendFailed>(result);
       on_message_send_failed(update->message_->chat_id_, update->old_message_id_, update->message_->id_,
                              std::move(update->error_));
+      break;
+    }
+    case td_api::updateStorySendSucceeded::ID: {
+      auto update = move_object_as<td_api::updateStorySendSucceeded>(result);
+      on_story_send_succeeded(std::move(update->story_), update->old_story_id_);
+      break;
+    }
+    case td_api::updateStorySendFailed::ID: {
+      auto update = move_object_as<td_api::updateStorySendFailed>(result);
+      on_story_send_failed(update->story_->sender_chat_id_, update->story_->id_, std::move(update->error_));
       break;
     }
     case td_api::updateMessageContent::ID: {
@@ -10686,6 +10736,53 @@ td::Result<td_api::object_ptr<td_api::InputChatPhoto>> Client::get_input_chat_ph
   return get_input_chat_photo(query, r_value.move_as_ok());
 }
 
+td::Result<td_api::object_ptr<td_api::InputStoryContent>> Client::get_input_story_content(const Query *query,
+                                                                                          td::JsonValue &&value) const {
+  if (value.type() != td::JsonValue::Type::Object) {
+    return td::Status::Error(400, "Object expected as story content");
+  }
+  auto &object = value.get_object();
+
+  TRY_RESULT(type, object.get_required_string_field("type"));
+  if (type == "photo") {
+    TRY_RESULT(photo, object.get_required_string_field("photo"));
+    auto input_file = get_input_file(query, td::Slice(), photo, true);
+    if (input_file == nullptr) {
+      return td::Status::Error(400, "Story photo must be uploaded as a file");
+    }
+    return make_object<td_api::inputStoryContentPhoto>(std::move(input_file), td::vector<int32>());
+  }
+  if (type == "video") {
+    TRY_RESULT(video, object.get_required_string_field("video"));
+    TRY_RESULT(duration, object.get_optional_double_field("duration"));
+    TRY_RESULT(cover_frame_timestamp, object.get_optional_double_field("cover_frame_timestamp"));
+    TRY_RESULT(is_animation, object.get_optional_bool_field("is_animation"));
+    auto input_file = get_input_file(query, td::Slice(), video, true);
+    if (input_file == nullptr) {
+      return td::Status::Error(400, "Story video must be uploaded as a file");
+    }
+    return make_object<td_api::inputStoryContentVideo>(std::move(input_file), td::vector<int32>(), duration,
+                                                       cover_frame_timestamp, is_animation);
+  }
+  return td::Status::Error(400, "Invalid story content type specified");
+}
+
+td::Result<td_api::object_ptr<td_api::InputStoryContent>> Client::get_input_story_content(const Query *query) const {
+  auto content = query->arg("content");
+  if (content.empty()) {
+    return td::Status::Error(400, "Story content isn't specified");
+  }
+
+  LOG(INFO) << "Parsing JSON object: " << content;
+  auto r_value = json_decode(content);
+  if (r_value.is_error()) {
+    LOG(INFO) << "Can't parse JSON object: " << r_value.error();
+    return td::Status::Error(400, "Can't parse story content JSON object");
+  }
+
+  return get_input_story_content(query, r_value.move_as_ok());
+}
+
 td::Result<td_api::object_ptr<td_api::acceptedGiftTypes>> Client::get_accepted_gift_types(td::JsonValue &&value) {
   if (value.type() != td::JsonValue::Type::Object) {
     return td::Status::Error(400, "Object expected as accepted gift types");
@@ -10894,6 +10991,24 @@ void Client::on_message_send_failed(int64 chat_id, int64 old_message_id, int64 n
     send_request(make_object<td_api::deleteMessages>(chat_id, td::vector<int64>{new_message_id}, false),
                  td::make_unique<TdOnDeleteFailedToSendMessageCallback>(this, chat_id, new_message_id));
   }
+}
+
+void Client::on_story_send_succeeded(object_ptr<td_api::story> &&story, int64 old_story_id) {
+  auto full_story_id = FullMessageId{story->sender_chat_id_, old_story_id};
+  auto yet_unsent_story_it = yet_unsent_stories_.find(full_story_id);
+  CHECK(yet_unsent_story_it != yet_unsent_stories_.end());
+  auto query = std::move(yet_unsent_story_it->second.query);
+  yet_unsent_stories_.erase(yet_unsent_story_it);
+  answer_query(JsonStory(story->sender_chat_id_, story->id_, this), std::move(query));
+}
+
+void Client::on_story_send_failed(int64 chat_id, int64 story_id, object_ptr<td_api::error> &&error) {
+  auto full_story_id = FullMessageId{chat_id, story_id};
+  auto yet_unsent_story_it = yet_unsent_stories_.find(full_story_id);
+  CHECK(yet_unsent_story_it != yet_unsent_stories_.end());
+  auto query = std::move(yet_unsent_story_it->second.query);
+  yet_unsent_stories_.erase(yet_unsent_story_it);
+  fail_query_with_error(std::move(query), std::move(error));
 }
 
 void Client::on_cmd(PromisedQueryPtr query, bool force) {
@@ -11926,6 +12041,26 @@ td::Status Client::process_delete_messages_query(PromisedQueryPtr &query) {
   return td::Status::OK();
 }
 
+td::Status Client::process_post_story_query(PromisedQueryPtr &query) {
+  auto business_connection_id = query->arg("business_connection_id").str();
+  TRY_RESULT(content, get_input_story_content(query.get()));
+  TRY_RESULT(caption, get_formatted_text(query->arg("caption").str(), query->arg("parse_mode").str(),
+                                         get_input_entities(query.get(), "caption_entities")));
+  check_business_connection(business_connection_id, std::move(query),
+                            [this, content = std::move(content), caption = std::move(caption)](
+                                const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
+                              auto active_period = get_integer_arg(query.get(), "active_period", 0, 0, 1000000000);
+                              auto is_posted_to_chat_page = to_bool(query->arg("post_to_chat_page"));
+                              auto protect_content = to_bool(query->arg("protect_content"));
+                              send_request(make_object<td_api::sendStory>(
+                                               business_connection->user_chat_id_, std::move(content), td::Auto(),
+                                               std::move(caption), make_object<td_api::storyPrivacySettingsEveryone>(),
+                                               active_period, nullptr, is_posted_to_chat_page, protect_content),
+                                           td::make_unique<TdOnPostStoryCallback>(this, std::move(query)));
+                            });
+  return td::Status::OK();
+}
+
 td::Status Client::process_create_invoice_link_query(PromisedQueryPtr &query) {
   TRY_RESULT(input_message_invoice, get_input_message_invoice(query.get()));
   auto business_connection_id = query->arg("business_connection_id").str();
@@ -12429,7 +12564,7 @@ td::Status Client::process_set_business_account_gift_settings_query(PromisedQuer
   auto business_connection_id = query->arg("business_connection_id").str();
   auto show_gift_button = to_bool(query->arg("show_gift_button"));
   TRY_RESULT(accepted_gift_types, get_accepted_gift_types(query.get()));
-  auto settings = td_api::make_object<td_api::giftSettings>(show_gift_button, std::move(accepted_gift_types));
+  auto settings = make_object<td_api::giftSettings>(show_gift_button, std::move(accepted_gift_types));
   check_business_connection(
       business_connection_id, std::move(query),
       [this, settings = std::move(settings)](const BusinessConnection *business_connection,
@@ -13948,6 +14083,18 @@ void Client::on_sent_message(object_ptr<td_api::message> &&message, int64 query_
   auto &query = *pending_send_message_queries_[query_id];
   query.awaited_message_count++;
   query.total_message_count++;
+}
+
+void Client::on_sent_story(object_ptr<td_api::story> &&story, PromisedQueryPtr query) {
+  CHECK(story != nullptr);
+  int64 chat_id = story->sender_chat_id_;
+  int64 story_id = story->id_;
+
+  FullMessageId full_story_id{chat_id, story_id};
+  YetUnsentStory yet_unsent_story;
+  yet_unsent_story.query = std::move(query);
+  auto emplace_result = yet_unsent_stories_.emplace(full_story_id, std::move(yet_unsent_story));
+  CHECK(emplace_result.second);
 }
 
 void Client::abort_long_poll(bool from_set_webhook) {

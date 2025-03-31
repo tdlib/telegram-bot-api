@@ -243,6 +243,8 @@ class Client final : public WebhookActor::Callback {
   class TdOnEditInlineMessageCallback;
   class TdOnStopPollCallback;
   class TdOnStopBusinessPollCallback;
+  class TdOnPostStoryCallback;
+  class TdOnGetStoryCallback;
   class TdOnOkQueryCallback;
   class TdOnGetReplyMessageCallback;
   class TdOnGetEditedMessageCallback;
@@ -627,6 +629,11 @@ class Client final : public WebhookActor::Callback {
 
   td::Result<object_ptr<td_api::InputChatPhoto>> get_input_chat_photo(const Query *query) const;
 
+  td::Result<object_ptr<td_api::InputStoryContent>> get_input_story_content(const Query *query,
+                                                                            td::JsonValue &&value) const;
+
+  td::Result<object_ptr<td_api::InputStoryContent>> get_input_story_content(const Query *query) const;
+
   static td::Result<object_ptr<td_api::acceptedGiftTypes>> get_accepted_gift_types(td::JsonValue &&value);
 
   static td::Result<object_ptr<td_api::acceptedGiftTypes>> get_accepted_gift_types(const Query *query);
@@ -655,6 +662,10 @@ class Client final : public WebhookActor::Callback {
 
   void on_message_send_failed(int64 chat_id, int64 old_message_id, int64 new_message_id,
                               object_ptr<td_api::error> &&error);
+
+  void on_story_send_succeeded(object_ptr<td_api::story> &&story, int64 old_story_id);
+
+  void on_story_send_failed(int64 chat_id, int64 story_id, object_ptr<td_api::error> &&error);
 
   static bool init_methods();
 
@@ -709,6 +720,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_edit_message_reply_markup_query(PromisedQueryPtr &query);
   td::Status process_delete_message_query(PromisedQueryPtr &query);
   td::Status process_delete_messages_query(PromisedQueryPtr &query);
+  td::Status process_post_story_query(PromisedQueryPtr &query);
   td::Status process_create_invoice_link_query(PromisedQueryPtr &query);
   td::Status process_get_star_transactions_query(PromisedQueryPtr &query);
   td::Status process_refund_star_payment_query(PromisedQueryPtr &query);
@@ -834,6 +846,8 @@ class Client final : public WebhookActor::Callback {
   int64 get_send_message_query_id(PromisedQueryPtr query, bool is_multisend);
 
   void on_sent_message(object_ptr<td_api::message> &&message, int64 query_id);
+
+  void on_sent_story(object_ptr<td_api::story> &&story, PromisedQueryPtr query);
 
   void do_get_file(object_ptr<td_api::file> file, PromisedQueryPtr query);
 
@@ -1299,6 +1313,11 @@ class Client final : public WebhookActor::Callback {
   td::FlatHashMap<FullMessageId, YetUnsentMessage, FullMessageIdHash> yet_unsent_messages_;
 
   td::FlatHashMap<int64, int32> yet_unsent_message_count_;  // chat_id -> count
+
+  struct YetUnsentStory {
+    PromisedQueryPtr query;
+  };
+  td::FlatHashMap<FullMessageId, YetUnsentStory, FullMessageIdHash> yet_unsent_stories_;
 
   struct PendingSendMessageQuery {
     PromisedQueryPtr query;
