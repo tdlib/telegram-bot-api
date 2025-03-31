@@ -256,6 +256,7 @@ bool Client::init_methods() {
   methods_.emplace("edituserstarsubscription", &Client::process_edit_user_star_subscription_query);
   methods_.emplace("getavailablegifts", &Client::process_get_available_gifts_query);
   methods_.emplace("sendgift", &Client::process_send_gift_query);
+  methods_.emplace("giftpremiumsubscription", &Client::process_gift_premium_subscription_query);
   methods_.emplace("verifyuser", &Client::process_verify_user_query);
   methods_.emplace("verifychat", &Client::process_verify_chat_query);
   methods_.emplace("removeuserverification", &Client::process_remove_user_verification_query);
@@ -12005,6 +12006,21 @@ td::Status Client::process_send_gift_query(PromisedQueryPtr &query) {
                               td::make_unique<TdOnOkQueryCallback>(std::move(query)));
                });
   }
+  return td::Status::OK();
+}
+
+td::Status Client::process_gift_premium_subscription_query(PromisedQueryPtr &query) {
+  TRY_RESULT(user_id, get_user_id(query.get()));
+  auto star_count = td::to_integer<int64>(query->arg("star_count"));
+  auto month_count = get_integer_arg(query.get(), "month_count", 0, 0, 1000);
+  TRY_RESULT(text, get_formatted_text(query->arg("text").str(), query->arg("text_parse_mode").str(),
+                                      get_input_entities(query.get(), "text_entities")));
+  check_user(user_id, std::move(query),
+             [this, star_count, month_count, user_id, text = std::move(text)](PromisedQueryPtr query) mutable {
+               send_request(
+                   make_object<td_api::giftPremiumWithStars>(user_id, star_count, month_count, std::move(text)),
+                   td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+             });
   return td::Status::OK();
 }
 
