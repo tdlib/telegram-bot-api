@@ -252,6 +252,7 @@ bool Client::init_methods() {
   methods_.emplace("deletemessages", &Client::process_delete_messages_query);
   methods_.emplace("poststory", &Client::process_post_story_query);
   methods_.emplace("editstory", &Client::process_edit_story_query);
+  methods_.emplace("deletestory", &Client::process_delete_story_query);
   methods_.emplace("createinvoicelink", &Client::process_create_invoice_link_query);
   methods_.emplace("getstartransactions", &Client::process_get_star_transactions_query);
   methods_.emplace("refundstarpayment", &Client::process_refund_star_payment_query);
@@ -12077,6 +12078,17 @@ td::Status Client::process_edit_story_query(PromisedQueryPtr &query) {
                                                             make_object<td_api::storyPrivacySettingsEveryone>()),
                      td::make_unique<TdOnGetStoryCallback>(this, std::move(query)));
       });
+  return td::Status::OK();
+}
+
+td::Status Client::process_delete_story_query(PromisedQueryPtr &query) {
+  auto business_connection_id = query->arg("business_connection_id").str();
+  check_business_connection(business_connection_id, std::move(query),
+                            [this](const BusinessConnection *business_connection, PromisedQueryPtr query) {
+                              auto story_id = get_integer_arg(query.get(), "story_id", 0, 0, 1000000000);
+                              send_request(make_object<td_api::deleteBusinessStory>(business_connection->id_, story_id),
+                                           td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+                            });
   return td::Status::OK();
 }
 
