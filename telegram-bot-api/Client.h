@@ -721,6 +721,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_delete_message_query(PromisedQueryPtr &query);
   td::Status process_delete_messages_query(PromisedQueryPtr &query);
   td::Status process_post_story_query(PromisedQueryPtr &query);
+  td::Status process_edit_story_query(PromisedQueryPtr &query);
   td::Status process_create_invoice_link_query(PromisedQueryPtr &query);
   td::Status process_get_star_transactions_query(PromisedQueryPtr &query);
   td::Status process_refund_star_payment_query(PromisedQueryPtr &query);

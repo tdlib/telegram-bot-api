@@ -251,6 +251,7 @@ bool Client::init_methods() {
   methods_.emplace("deletemessage", &Client::process_delete_message_query);
   methods_.emplace("deletemessages", &Client::process_delete_messages_query);
   methods_.emplace("poststory", &Client::process_post_story_query);
+  methods_.emplace("editstory", &Client::process_edit_story_query);
   methods_.emplace("createinvoicelink", &Client::process_create_invoice_link_query);
   methods_.emplace("getstartransactions", &Client::process_get_star_transactions_query);
   methods_.emplace("refundstarpayment", &Client::process_refund_star_payment_query);
@@ -12058,6 +12059,24 @@ td::Status Client::process_post_story_query(PromisedQueryPtr &query) {
                                                active_period, nullptr, is_posted_to_chat_page, protect_content),
                                            td::make_unique<TdOnPostStoryCallback>(this, std::move(query)));
                             });
+  return td::Status::OK();
+}
+
+td::Status Client::process_edit_story_query(PromisedQueryPtr &query) {
+  auto business_connection_id = query->arg("business_connection_id").str();
+  TRY_RESULT(content, get_input_story_content(query.get()));
+  TRY_RESULT(caption, get_formatted_text(query->arg("caption").str(), query->arg("parse_mode").str(),
+                                         get_input_entities(query.get(), "caption_entities")));
+  check_business_connection(
+      business_connection_id, std::move(query),
+      [this, content = std::move(content), caption = std::move(caption)](const BusinessConnection *business_connection,
+                                                                         PromisedQueryPtr query) mutable {
+        auto story_id = get_integer_arg(query.get(), "story_id", 0, 0, 1000000000);
+        send_request(make_object<td_api::editBusinessStory>(business_connection->user_chat_id_, story_id,
+                                                            std::move(content), td::Auto(), std::move(caption),
+                                                            make_object<td_api::storyPrivacySettingsEveryone>()),
+                     td::make_unique<TdOnGetStoryCallback>(this, std::move(query)));
+      });
   return td::Status::OK();
 }
 
