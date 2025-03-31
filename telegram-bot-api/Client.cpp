@@ -10975,7 +10975,7 @@ td::Status Client::process_get_my_commands_query(PromisedQueryPtr &query) {
   TRY_RESULT(scope, get_bot_command_scope(query.get()));
 
   check_bot_command_scope(std::move(scope), std::move(query),
-                          [this](object_ptr<td_api::BotCommandScope> &&scope, PromisedQueryPtr query) mutable {
+                          [this](object_ptr<td_api::BotCommandScope> &&scope, PromisedQueryPtr query) {
                             auto language_code = query->arg("language_code").str();
                             send_request(make_object<td_api::getCommands>(std::move(scope), language_code),
                                          td::make_unique<TdOnGetMyCommandsCallback>(std::move(query)));
@@ -11002,7 +11002,7 @@ td::Status Client::process_delete_my_commands_query(PromisedQueryPtr &query) {
   TRY_RESULT(scope, get_bot_command_scope(query.get()));
 
   check_bot_command_scope(std::move(scope), std::move(query),
-                          [this](object_ptr<td_api::BotCommandScope> &&scope, PromisedQueryPtr query) mutable {
+                          [this](object_ptr<td_api::BotCommandScope> &&scope, PromisedQueryPtr query) {
                             auto language_code = query->arg("language_code").str();
                             send_request(make_object<td_api::deleteCommands>(std::move(scope), language_code),
                                          td::make_unique<TdOnOkQueryCallback>(std::move(query)));
@@ -12313,7 +12313,7 @@ td::Status Client::process_revoke_chat_invite_link_query(PromisedQueryPtr &query
 td::Status Client::process_get_business_connection_query(PromisedQueryPtr &query) {
   auto business_connection_id = query->arg("business_connection_id");
   check_business_connection(business_connection_id.str(), std::move(query),
-                            [this](const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
+                            [this](const BusinessConnection *business_connection, PromisedQueryPtr query) {
                               answer_query(JsonBusinessConnection(business_connection, this), std::move(query));
                             });
   return td::Status::OK();
@@ -12325,7 +12325,7 @@ td::Status Client::process_read_business_message_query(PromisedQueryPtr &query) 
   auto message_id = get_message_id(query.get());
   check_business_connection_chat_id(
       business_connection_id, chat_id_str, std::move(query),
-      [this, message_id](const BusinessConnection *business_connection, int64 chat_id, PromisedQueryPtr query) mutable {
+      [this, message_id](const BusinessConnection *business_connection, int64 chat_id, PromisedQueryPtr query) {
         send_request(make_object<td_api::readBusinessMessage>(business_connection->id_, chat_id, message_id),
                      td::make_unique<TdOnOkQueryCallback>(std::move(query)));
       });
@@ -12351,7 +12351,7 @@ td::Status Client::process_set_business_account_name_query(PromisedQueryPtr &que
   auto last_name = query->arg("last_name");
   check_business_connection(
       business_connection_id, std::move(query),
-      [this, first_name, last_name](const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
+      [this, first_name, last_name](const BusinessConnection *business_connection, PromisedQueryPtr query) {
         send_request(
             make_object<td_api::setBusinessAccountName>(business_connection->id_, first_name.str(), last_name.str()),
             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
@@ -12364,7 +12364,7 @@ td::Status Client::process_set_business_account_username_query(PromisedQueryPtr 
   auto username = query->arg("username");
   check_business_connection(
       business_connection_id, std::move(query),
-      [this, username](const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
+      [this, username](const BusinessConnection *business_connection, PromisedQueryPtr query) {
         send_request(make_object<td_api::setBusinessAccountUsername>(business_connection->id_, username.str()),
                      td::make_unique<TdOnOkQueryCallback>(std::move(query)));
       });
@@ -12375,7 +12375,7 @@ td::Status Client::process_set_business_account_bio_query(PromisedQueryPtr &quer
   auto business_connection_id = query->arg("business_connection_id").str();
   auto bio = query->arg("bio");
   check_business_connection(business_connection_id, std::move(query),
-                            [this, bio](const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
+                            [this, bio](const BusinessConnection *business_connection, PromisedQueryPtr query) {
                               send_request(
                                   make_object<td_api::setBusinessAccountBio>(business_connection->id_, bio.str()),
                                   td::make_unique<TdOnOkQueryCallback>(std::move(query)));
@@ -12402,7 +12402,7 @@ td::Status Client::process_remove_business_account_profile_photo_query(PromisedQ
   auto is_public = to_bool(query->arg("is_public"));
   check_business_connection(
       business_connection_id, std::move(query),
-      [this, is_public](const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
+      [this, is_public](const BusinessConnection *business_connection, PromisedQueryPtr query) {
         send_request(make_object<td_api::setBusinessAccountProfilePhoto>(business_connection->id_, nullptr, is_public),
                      td::make_unique<TdOnOkQueryCallback>(std::move(query)));
       });
@@ -12413,10 +12413,11 @@ td::Status Client::process_set_business_account_gift_settings_query(PromisedQuer
   auto business_connection_id = query->arg("business_connection_id").str();
   auto show_gift_button = to_bool(query->arg("show_gift_button"));
   TRY_RESULT(accepted_gift_types, get_accepted_gift_types(query.get()));
+  auto settings = td_api::make_object<td_api::giftSettings>(show_gift_button, std::move(accepted_gift_types));
   check_business_connection(
       business_connection_id, std::move(query),
-      [this, settings = td_api::make_object<td_api::giftSettings>(show_gift_button, std::move(accepted_gift_types))](
-          const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
+      [this, settings = std::move(settings)](const BusinessConnection *business_connection,
+                                             PromisedQueryPtr query) mutable {
         send_request(make_object<td_api::setBusinessAccountGiftSettings>(business_connection->id_, std::move(settings)),
                      td::make_unique<TdOnOkQueryCallback>(std::move(query)));
       });
@@ -12426,7 +12427,7 @@ td::Status Client::process_set_business_account_gift_settings_query(PromisedQuer
 td::Status Client::process_get_business_account_star_balance_query(PromisedQueryPtr &query) {
   auto business_connection_id = query->arg("business_connection_id").str();
   check_business_connection(business_connection_id, std::move(query),
-                            [this](const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
+                            [this](const BusinessConnection *business_connection, PromisedQueryPtr query) {
                               send_request(make_object<td_api::getBusinessAccountStarAmount>(business_connection->id_),
                                            td::make_unique<TdOnGetStarAmountCallback>(std::move(query)));
                             });
@@ -12436,7 +12437,7 @@ td::Status Client::process_get_business_account_star_balance_query(PromisedQuery
 td::Status Client::process_get_business_account_gifts_query(PromisedQueryPtr &query) {
   auto business_connection_id = query->arg("business_connection_id").str();
   check_business_connection(business_connection_id, std::move(query),
-                            [this](const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
+                            [this](const BusinessConnection *business_connection, PromisedQueryPtr query) {
                               auto exclude_unsaved = to_bool(query->arg("exclude_unsaved"));
                               auto exclude_saved = to_bool(query->arg("exclude_saved"));
                               auto exclude_unlimited = to_bool(query->arg("exclude_unlimited"));
@@ -12459,7 +12460,7 @@ td::Status Client::process_convert_gift_to_stars_query(PromisedQueryPtr &query) 
   auto owned_gift_id = query->arg("owned_gift_id");
   check_business_connection(
       business_connection_id, std::move(query),
-      [this, owned_gift_id](const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
+      [this, owned_gift_id](const BusinessConnection *business_connection, PromisedQueryPtr query) {
         send_request(make_object<td_api::sellGift>(business_connection->id_, owned_gift_id.str()),
                      td::make_unique<TdOnOkQueryCallback>(std::move(query)));
       });
@@ -12473,7 +12474,7 @@ td::Status Client::process_upgrade_gift_query(PromisedQueryPtr &query) {
   auto star_count = get_integer_arg(query.get(), "star_count", 0, 0, 1000000);
   check_business_connection(business_connection_id, std::move(query),
                             [this, owned_gift_id, keep_original_details, star_count](
-                                const BusinessConnection *business_connection, PromisedQueryPtr query) mutable {
+                                const BusinessConnection *business_connection, PromisedQueryPtr query) {
                               send_request(
                                   make_object<td_api::upgradeGift>(business_connection->id_, owned_gift_id.str(),
                                                                    keep_original_details, star_count),
@@ -12490,7 +12491,7 @@ td::Status Client::process_transfer_gift_query(PromisedQueryPtr &query) {
   check_business_connection_chat_id(
       business_connection_id, chat_id_str, std::move(query),
       [this, owned_gift_id, star_count](const BusinessConnection *business_connection, int64 chat_id,
-                                        PromisedQueryPtr query) mutable {
+                                        PromisedQueryPtr query) {
         send_request(make_object<td_api::transferGift>(business_connection->id_, owned_gift_id.str(),
                                                        make_object<td_api::messageSenderChat>(chat_id), star_count),
                      td::make_unique<TdOnOkQueryCallback>(std::move(query)));
@@ -12502,18 +12503,17 @@ td::Status Client::process_set_user_emoji_status_query(PromisedQueryPtr &query) 
   TRY_RESULT(user_id, get_user_id(query.get()));
   auto emoji_status_custom_emoji_id = td::to_integer<int64>(query->arg("emoji_status_custom_emoji_id"));
   auto emoji_status_expiration_date = td::to_integer<int32>(query->arg("emoji_status_expiration_date"));
-  check_user(
-      user_id, std::move(query),
-      [this, user_id, emoji_status_custom_emoji_id, emoji_status_expiration_date](PromisedQueryPtr query) mutable {
-        send_request(
-            make_object<td_api::setUserEmojiStatus>(
-                user_id, emoji_status_custom_emoji_id == 0
-                             ? nullptr
-                             : make_object<td_api::emojiStatus>(
-                                   make_object<td_api::emojiStatusTypeCustomEmoji>(emoji_status_custom_emoji_id),
-                                   emoji_status_expiration_date)),
-            td::make_unique<TdOnOkQueryCallback>(std::move(query)));
-      });
+  check_user(user_id, std::move(query),
+             [this, user_id, emoji_status_custom_emoji_id, emoji_status_expiration_date](PromisedQueryPtr query) {
+               send_request(
+                   make_object<td_api::setUserEmojiStatus>(
+                       user_id, emoji_status_custom_emoji_id == 0
+                                    ? nullptr
+                                    : make_object<td_api::emojiStatus>(
+                                          make_object<td_api::emojiStatusTypeCustomEmoji>(emoji_status_custom_emoji_id),
+                                          emoji_status_expiration_date)),
+                   td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+             });
   return td::Status::OK();
 }
 
@@ -13774,7 +13774,7 @@ void Client::do_set_webhook(PromisedQueryPtr query, bool was_deleted) {
         td::Scheduler::instance()->run_on_scheduler(
             SharedData::get_webhook_certificate_scheduler_id(),
             [actor_id = actor_id(this), from_path = cert_file_ptr->temp_file_name,
-             to_path = get_webhook_certificate_path(), size](td::Unit) mutable {
+             to_path = get_webhook_certificate_path(), size](td::Unit) {
               LOG(INFO) << "Copy certificate to " << to_path;
               auto status = td::copy_file(from_path, to_path, size);
               send_closure(actor_id, &Client::on_webhook_certificate_copied, std::move(status));
