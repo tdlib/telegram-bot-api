@@ -743,6 +743,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_set_business_account_gift_settings_query(PromisedQueryPtr &query);
   td::Status process_get_business_account_star_balance_query(PromisedQueryPtr &query);
   td::Status process_get_business_account_gifts_query(PromisedQueryPtr &query);
+  td::Status process_convert_gift_to_stars_query(PromisedQueryPtr &query);
   td::Status process_set_user_emoji_status_query(PromisedQueryPtr &query);
   td::Status process_get_chat_query(PromisedQueryPtr &query);
   td::Status process_set_chat_photo_query(PromisedQueryPtr &query);
