@@ -4801,6 +4801,12 @@ class Client::JsonStarTransactionType final : public td::Jsonable {
         object("premium_subscription_duration", type->month_count_);
         break;
       }
+      case td_api::starTransactionTypeBusinessBotTransferReceive::ID: {
+        auto type = static_cast<const td_api::starTransactionTypeBusinessBotTransferReceive *>(type_);
+        object("type", "user");
+        object("user", JsonUser(type->user_id_, client_));
+        break;
+      }
       case td_api::starTransactionTypeAffiliateProgramCommission::ID: {
         auto type = static_cast<const td_api::starTransactionTypeAffiliateProgramCommission *>(type_);
         object("type", "affiliate_program");
