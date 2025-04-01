@@ -288,6 +288,7 @@ bool Client::init_methods() {
   methods_.emplace("removebusinessaccountprofilephoto", &Client::process_remove_business_account_profile_photo_query);
   methods_.emplace("setbusinessaccountgiftsettings", &Client::process_set_business_account_gift_settings_query);
   methods_.emplace("getbusinessaccountstarbalance", &Client::process_get_business_account_star_balance_query);
+  methods_.emplace("transferbusinessaccountstars", &Client::process_transfer_business_account_stars_query);
   methods_.emplace("getbusinessaccountgifts", &Client::process_get_business_account_gifts_query);
   methods_.emplace("convertgifttostars", &Client::process_convert_gift_to_stars_query);
   methods_.emplace("upgradegift", &Client::process_upgrade_gift_query);
@@ -12726,6 +12727,18 @@ td::Status Client::process_get_business_account_star_balance_query(PromisedQuery
                               send_request(make_object<td_api::getBusinessAccountStarAmount>(business_connection->id_),
                                            td::make_unique<TdOnGetStarAmountCallback>(std::move(query)));
                             });
+  return td::Status::OK();
+}
+
+td::Status Client::process_transfer_business_account_stars_query(PromisedQueryPtr &query) {
+  auto business_connection_id = query->arg("business_connection_id").str();
+  auto star_count = get_integer_arg(query.get(), "star_count", 0, 0, 1000000000);
+  check_business_connection(
+      business_connection_id, std::move(query),
+      [this, star_count](const BusinessConnection *business_connection, PromisedQueryPtr query) {
+        send_request(make_object<td_api::transferBusinessAccountStars>(business_connection->id_, star_count),
+                     td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+      });
   return td::Status::OK();
 }
 
