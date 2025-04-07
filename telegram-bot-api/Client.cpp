@@ -7195,12 +7195,12 @@ void Client::check_chat_no_fail(td::Slice chat_id_str, PromisedQueryPtr query, O
 
 td::Result<td::int64> Client::get_business_connection_chat_id(td::Slice chat_id_str) {
   if (chat_id_str.empty()) {
-    return td::Status::Error(400, "Bad Request: chat_id is empty");
+    return td::Status::Error(400, "Bad Request: chat identifier is empty");
   }
 
   auto r_chat_id = td::to_integer_safe<int64>(chat_id_str);
   if (r_chat_id.is_error()) {
-    return td::Status::Error(400, "Bad Request: chat_id must be a valid Integer");
+    return td::Status::Error(400, "Bad Request: chat identifier must be a valid Integer");
   }
   return r_chat_id.move_as_ok();
 }
