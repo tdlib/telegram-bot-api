@@ -4715,6 +4715,7 @@ class Client::JsonStarTransactionType final : public td::Jsonable {
       }
       case td_api::starTransactionTypeBotPaidMediaSale::ID: {
         auto type = static_cast<const td_api::starTransactionTypeBotPaidMediaSale *>(type_);
+        object("transaction_type", "paid_media_payment");
         object("type", "user");
         object("user", JsonUser(type->user_id_, client_));
         object("paid_media", td::json_array(type->media_, [client = client_](auto &media) {
@@ -4730,6 +4731,7 @@ class Client::JsonStarTransactionType final : public td::Jsonable {
       }
       case td_api::starTransactionTypeBotInvoiceSale::ID: {
         auto type = static_cast<const td_api::starTransactionTypeBotInvoiceSale *>(type_);
+        object("transaction_type", "invoice_payment");
         object("type", "user");
         object("user", JsonUser(type->user_id_, client_));
         if (!type->invoice_payload_.empty()) {
@@ -4747,6 +4749,7 @@ class Client::JsonStarTransactionType final : public td::Jsonable {
       }
       case td_api::starTransactionTypeBotSubscriptionSale::ID: {
         auto type = static_cast<const td_api::starTransactionTypeBotSubscriptionSale *>(type_);
+        object("transaction_type", "invoice_payment");
         object("type", "user");
         object("user", JsonUser(type->user_id_, client_));
         if (!type->invoice_payload_.empty()) {
@@ -4779,6 +4782,7 @@ class Client::JsonStarTransactionType final : public td::Jsonable {
         switch (type->owner_id_->get_id()) {
           case td_api::messageSenderUser::ID: {
             auto owner_id = static_cast<const td_api::messageSenderUser *>(type->owner_id_.get());
+            object("transaction_type", "gift_purchase");
             object("type", "user");
             object("user", JsonUser(owner_id->user_id_, client_));
             break;
@@ -4797,6 +4801,7 @@ class Client::JsonStarTransactionType final : public td::Jsonable {
       }
       case td_api::starTransactionTypePremiumPurchase::ID: {
         auto type = static_cast<const td_api::starTransactionTypePremiumPurchase *>(type_);
+        object("transaction_type", "premium_purchase");
         object("type", "user");
         object("user", JsonUser(type->user_id_, client_));
         object("premium_subscription_duration", type->month_count_);
@@ -4804,6 +4809,7 @@ class Client::JsonStarTransactionType final : public td::Jsonable {
       }
       case td_api::starTransactionTypeBusinessBotTransferReceive::ID: {
         auto type = static_cast<const td_api::starTransactionTypeBusinessBotTransferReceive *>(type_);
+        object("transaction_type", "business_account_transfer");
         object("type", "user");
         object("user", JsonUser(type->user_id_, client_));
         break;
