@@ -3134,7 +3134,7 @@ class Client::JsonExternalReplyInfo final : public td::Jsonable {
         }
         case td_api::messageStory::ID: {
           auto content = static_cast<const td_api::messageStory *>(reply_->content_.get());
-          object("story", JsonStory(content->story_sender_chat_id_, content->story_id_, client_));
+          object("story", JsonStory(content->story_poster_chat_id_, content->story_id_, client_));
           break;
         }
         default:
@@ -3267,7 +3267,7 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
   }
   if (message_->reply_to_story != nullptr) {
     object("reply_to_story",
-           JsonStory(message_->reply_to_story->story_sender_chat_id_, message_->reply_to_story->story_id_, client_));
+           JsonStory(message_->reply_to_story->story_poster_chat_id_, message_->reply_to_story->story_id_, client_));
   }
   if (message_->media_album_id != 0) {
     object("media_group_id", td::to_string(message_->media_album_id));
@@ -3615,7 +3615,7 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     }
     case td_api::messageStory::ID: {
       auto content = static_cast<const td_api::messageStory *>(message_->content.get());
-      object("story", JsonStory(content->story_sender_chat_id_, content->story_id_, client_));
+      object("story", JsonStory(content->story_poster_chat_id_, content->story_id_, client_));
       break;
     }
     case td_api::messageChatSetBackground::ID: {
@@ -3681,6 +3681,8 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("paid_message_price_changed", JsonPaidMessagePriceChanged(content));
       break;
     }
+    case td_api::messageGroupCall::ID:
+      break;
     default:
       UNREACHABLE();
   }
@@ -5391,7 +5393,7 @@ class Client::TdOnGetStoryCallback final : public TdQueryCallback {
 
     CHECK(result->get_id() == td_api::story::ID);
     auto story = static_cast<const td_api::story *>(result.get());
-    answer_query(JsonStory(story->sender_chat_id_, story->id_, client_), std::move(query_));
+    answer_query(JsonStory(story->poster_chat_id_, story->id_, client_), std::move(query_));
   }
 
  private:
@@ -7748,14 +7750,14 @@ void Client::on_update(object_ptr<td_api::Object> result) {
                              std::move(update->error_));
       break;
     }
-    case td_api::updateStorySendSucceeded::ID: {
-      auto update = move_object_as<td_api::updateStorySendSucceeded>(result);
+    case td_api::updateStoryPostSucceeded::ID: {
+      auto update = move_object_as<td_api::updateStoryPostSucceeded>(result);
       on_story_send_succeeded(std::move(update->story_), update->old_story_id_);
       break;
     }
-    case td_api::updateStorySendFailed::ID: {
-      auto update = move_object_as<td_api::updateStorySendFailed>(result);
-      on_story_send_failed(update->story_->sender_chat_id_, update->story_->id_, std::move(update->error_));
+    case td_api::updateStoryPostFailed::ID: {
+      auto update = move_object_as<td_api::updateStoryPostFailed>(result);
+      on_story_send_failed(update->story_->poster_chat_id_, update->story_->id_, std::move(update->error_));
       break;
     }
     case td_api::updateMessageContent::ID: {
@@ -11113,12 +11115,12 @@ void Client::on_message_send_failed(int64 chat_id, int64 old_message_id, int64 n
 }
 
 void Client::on_story_send_succeeded(object_ptr<td_api::story> &&story, int64 old_story_id) {
-  auto full_story_id = FullMessageId{story->sender_chat_id_, old_story_id};
+  auto full_story_id = FullMessageId{story->poster_chat_id_, old_story_id};
   auto yet_unsent_story_it = yet_unsent_stories_.find(full_story_id);
   CHECK(yet_unsent_story_it != yet_unsent_stories_.end());
   auto query = std::move(yet_unsent_story_it->second.query);
   yet_unsent_stories_.erase(yet_unsent_story_it);
-  answer_query(JsonStory(story->sender_chat_id_, story->id_, this), std::move(query));
+  answer_query(JsonStory(story->poster_chat_id_, story->id_, this), std::move(query));
 }
 
 void Client::on_story_send_failed(int64 chat_id, int64 story_id, object_ptr<td_api::error> &&error) {
@@ -12174,7 +12176,7 @@ td::Status Client::process_post_story_query(PromisedQueryPtr &query) {
         auto is_posted_to_chat_page = to_bool(query->arg("post_to_chat_page"));
         auto protect_content = to_bool(query->arg("protect_content"));
         send_request(
-            make_object<td_api::sendStory>(business_connection->user_chat_id_, std::move(content), std::move(areas),
+            make_object<td_api::postStory>(business_connection->user_chat_id_, std::move(content), std::move(areas),
                                            std::move(caption), make_object<td_api::storyPrivacySettingsEveryone>(),
                                            active_period, nullptr, is_posted_to_chat_page, protect_content),
             td::make_unique<TdOnPostStoryCallback>(this, std::move(query)));
@@ -14250,7 +14252,7 @@ void Client::on_sent_message(object_ptr<td_api::message> &&message, int64 query_
 
 void Client::on_sent_story(object_ptr<td_api::story> &&story, PromisedQueryPtr query) {
   CHECK(story != nullptr);
-  int64 chat_id = story->sender_chat_id_;
+  int64 chat_id = story->poster_chat_id_;
   int64 story_id = story->id_;
 
   FullMessageId full_story_id{chat_id, story_id};
@@ -15454,6 +15456,8 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageGiveawayPrizeStars::ID:
       return true;
     case td_api::messagePaidMessagesRefunded::ID:
+      return true;
+    case td_api::messageGroupCall::ID:
       return true;
     default:
       break;
