@@ -4531,9 +4531,9 @@ class Client::JsonStarAmount final : public td::Jsonable {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
-    object("star_count", amount_->star_count_);
+    object("amount", amount_->star_count_);
     if (amount_->nanostar_count_ != 0) {
-      object("nanostar_count", amount_->nanostar_count_);
+      object("nanostar_amount", amount_->nanostar_count_);
     }
   }
 
