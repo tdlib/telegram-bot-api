@@ -4612,6 +4612,9 @@ class Client::JsonReceivedGift final : public td::Jsonable {
     if (received_gift_->transfer_star_count_ > 0) {
       object("transfer_star_count", received_gift_->transfer_star_count_);
     }
+    if (received_gift_->next_transfer_date_ > 0) {
+      object("next_transfer_date", received_gift_->next_transfer_date_);
+    }
   }
 
  private:
