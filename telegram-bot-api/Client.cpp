@@ -2385,7 +2385,12 @@ class Client::JsonUniqueGiftMessage final : public td::Jsonable {
         }
       }
     }
-    object("origin", gift_->is_upgrade_ ? td::Slice("upgrade") : td::Slice("transfer"));
+    if (gift_->last_resale_star_count_) {
+      object("origin", "resale");
+      object("last_resale_star_count", gift_->last_resale_star_count_);
+    } else {
+      object("origin", gift_->is_upgrade_ ? td::Slice("upgrade") : td::Slice("transfer"));
+    }
   }
 
  private:
