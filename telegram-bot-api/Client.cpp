@@ -2380,6 +2380,9 @@ class Client::JsonUniqueGiftMessage final : public td::Jsonable {
       object("owned_gift_id", gift_->received_gift_id_);
       if (gift_->can_be_transferred_) {
         object("transfer_star_count", gift_->transfer_star_count_);
+        if (gift_->next_transfer_date_ > 0) {
+          object("next_transfer_date", gift_->next_transfer_date_);
+        }
       }
     }
     object("origin", gift_->is_upgrade_ ? td::Slice("upgrade") : td::Slice("transfer"));
