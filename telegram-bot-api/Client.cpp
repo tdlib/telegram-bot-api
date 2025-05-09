@@ -750,16 +750,16 @@ class Client::JsonGift final : public td::Jsonable {
 
 class Client::JsonGifts final : public td::Jsonable {
  public:
-  JsonGifts(const td_api::gifts *gifts, const Client *client) : gifts_(gifts), client_(client) {
+  JsonGifts(const td::vector<td_api::object_ptr<td_api::gift>> &gifts, const Client *client)
+      : gifts_(gifts), client_(client) {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
-    object("gifts",
-           td::json_array(gifts_->gifts_, [client = client_](auto &gift) { return JsonGift(gift.get(), client); }));
+    object("gifts", td::json_array(gifts_, [client = client_](auto &gift) { return JsonGift(gift.get(), client); }));
   }
 
  private:
-  const td_api::gifts *gifts_;
+  const td::vector<td_api::object_ptr<td_api::gift>> &gifts_;
   const Client *client_;
 };
 
@@ -6594,11 +6594,11 @@ class Client::TdOnGetGiftsCallback final : public TdQueryCallback {
       return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
     }
 
-    CHECK(result->get_id() == td_api::gifts::ID);
-    auto gifts = move_object_as<td_api::gifts>(result);
-    td::remove_if(gifts->gifts_,
-                  [](const auto &gift) { return gift->total_count_ > 0 && gift->remaining_count_ == 0; });
-    answer_query(JsonGifts(gifts.get(), client_), std::move(query_));
+    CHECK(result->get_id() == td_api::availableGifts::ID);
+    auto available_gifts = move_object_as<td_api::availableGifts>(result);
+    auto gifts = td::transform(std::move(available_gifts->gifts_), [](auto &&gift) { return std::move(gift->gift_); });
+    td::remove_if(gifts, [](const auto &gift) { return gift->total_count_ > 0 && gift->remaining_count_ == 0; });
+    answer_query(JsonGifts(gifts, client_), std::move(query_));
   }
 
  private:
