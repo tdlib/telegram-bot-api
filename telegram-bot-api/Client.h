@@ -1035,6 +1035,7 @@ class Client final : public WebhookActor::Callback {
     td::unique_ptr<MessageInfo> business_reply_to_message;
     object_ptr<td_api::messageReplyToMessage> reply_to_message;
     object_ptr<td_api::messageReplyToStory> reply_to_story;
+    object_ptr<td_api::MessageTopic> topic_id;
     int64 media_album_id = 0;
     int64 via_bot_user_id = 0;
     object_ptr<td_api::MessageContent> content;
@@ -1045,7 +1046,6 @@ class Client final : public WebhookActor::Callback {
 
     bool can_be_saved = false;
     bool is_automatic_forward = false;
-    bool is_topic_message = false;
     bool is_from_offline = false;
     bool is_scheduled = false;
     mutable bool is_content_changed = false;
@@ -1169,6 +1169,8 @@ class Client final : public WebhookActor::Callback {
   static int64 get_basic_group_chat_id(int64 basic_group_id);
 
   static int64 get_status_custom_emoji_id(const object_ptr<td_api::emojiStatus> &emoji_status);
+
+  static bool is_topic_message(const object_ptr<td_api::MessageTopic> &topic);
 
   void add_update_poll(object_ptr<td_api::updatePoll> &&update);
 

@@ -3691,6 +3691,8 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     }
     case td_api::messageGroupCall::ID:
       break;
+    case td_api::messageDirectMessagePriceChanged::ID:
+      break;
     default:
       UNREACHABLE();
   }
@@ -3703,7 +3705,7 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
   if (!message_->can_be_saved) {
     object("has_protected_content", td::JsonTrue());
   }
-  if (message_->is_topic_message) {
+  if (is_topic_message(message_->topic_id)) {
     object("is_topic_message", td::JsonTrue());
   }
   if (message_->is_from_offline) {
@@ -5731,7 +5733,7 @@ class Client::TdOnCheckMessageThreadCallback final : public TdQueryCallback {
     if (message_info->message_thread_id != message_thread_id_) {
       return fail_query_with_error(std::move(query_), 400, "MESSAGE_THREAD_INVALID", "Message thread not found");
     }
-    if (!message_info->is_topic_message) {
+    if (!is_topic_message(message_info->topic_id)) {
       return fail_query_with_error(std::move(query_), 400, "MESSAGE_THREAD_INVALID",
                                    "Message thread is not a forum topic thread");
     }
@@ -8986,8 +8988,8 @@ td_api::object_ptr<td_api::messageSendOptions> Client::get_message_send_options(
                                                                                 bool protect_content,
                                                                                 bool allow_paid_broadcast,
                                                                                 int64 effect_id) {
-  return make_object<td_api::messageSendOptions>(disable_notification, false, protect_content, allow_paid_broadcast, 0,
-                                                 false, nullptr, effect_id, 0, false);
+  return make_object<td_api::messageSendOptions>(0, disable_notification, false, protect_content, allow_paid_broadcast,
+                                                 0, false, nullptr, effect_id, 0, false);
 }
 
 td::Result<td_api::object_ptr<td_api::inlineQueryResultsButton>> Client::get_inline_query_results_button(
@@ -15470,6 +15472,8 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       return true;
     case td_api::messageGroupCall::ID:
       return true;
+    case td_api::messageDirectMessagePriceChanged::ID:
+      return true;
     default:
       break;
   }
@@ -15983,7 +15987,7 @@ void Client::init_message(MessageInfo *message_info, object_ptr<td_api::message>
   message_info->can_be_saved = message->can_be_saved_;
   message_info->is_scheduled = message->scheduling_state_ != nullptr;
   message_info->is_from_offline = message->is_from_offline_;
-  message_info->is_topic_message = message->is_topic_message_;
+  message_info->topic_id = std::move(message->topic_id_);
   message_info->author_signature = std::move(message->author_signature_);
   message_info->sender_boost_count = message->sender_boost_count_;
   message_info->paid_message_star_count = message->paid_message_star_count_;
@@ -16226,6 +16230,11 @@ td::int64 Client::get_status_custom_emoji_id(const object_ptr<td_api::emojiStatu
       UNREACHABLE();
       return 0;
   }
+}
+
+bool Client::is_topic_message(const object_ptr<td_api::MessageTopic> &topic_id) {
+  return topic_id != nullptr && topic_id->get_id() == td_api::messageTopicForum::ID &&
+         static_cast<const td_api::messageTopicForum *>(topic_id.get())->forum_topic_id_ != GENERAL_MESSAGE_THREAD_ID;
 }
 
 td::FlatHashMap<td::string, td::Status (Client::*)(PromisedQueryPtr &query)> Client::methods_;
