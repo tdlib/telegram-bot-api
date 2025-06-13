@@ -272,6 +272,7 @@ class Client final : public WebhookActor::Callback {
   class TdOnUpgradeGiftCallback;
   class TdOnGetStarAmountCallback;
   class TdOnGetReceivedGiftsCallback;
+  class TdOnGetMyStarBalanceCallback;
   class TdOnGetStarTransactionsCallback;
   class TdOnReplacePrimaryChatInviteLinkCallback;
   class TdOnGetChatInviteLinkCallback;
@@ -730,6 +731,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_edit_story_query(PromisedQueryPtr &query);
   td::Status process_delete_story_query(PromisedQueryPtr &query);
   td::Status process_create_invoice_link_query(PromisedQueryPtr &query);
+  td::Status process_get_my_star_balance_query(PromisedQueryPtr &query);
   td::Status process_get_star_transactions_query(PromisedQueryPtr &query);
   td::Status process_refund_star_payment_query(PromisedQueryPtr &query);
   td::Status process_edit_user_star_subscription_query(PromisedQueryPtr &query);

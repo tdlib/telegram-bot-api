@@ -254,6 +254,7 @@ bool Client::init_methods() {
   methods_.emplace("editstory", &Client::process_edit_story_query);
   methods_.emplace("deletestory", &Client::process_delete_story_query);
   methods_.emplace("createinvoicelink", &Client::process_create_invoice_link_query);
+  methods_.emplace("getmystarbalance", &Client::process_get_my_star_balance_query);
   methods_.emplace("getstartransactions", &Client::process_get_star_transactions_query);
   methods_.emplace("refundstarpayment", &Client::process_refund_star_payment_query);
   methods_.emplace("edituserstarsubscription", &Client::process_edit_user_star_subscription_query);
@@ -6495,6 +6496,25 @@ class Client::TdOnGetReceivedGiftsCallback final : public TdQueryCallback {
   PromisedQueryPtr query_;
 };
 
+class Client::TdOnGetMyStarBalanceCallback final : public TdQueryCallback {
+ public:
+  explicit TdOnGetMyStarBalanceCallback(PromisedQueryPtr query) : query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::starTransactions::ID);
+    auto transactions = move_object_as<td_api::starTransactions>(result);
+    answer_query(JsonStarAmount(transactions->star_amount_.get()), std::move(query_));
+  }
+
+ private:
+  PromisedQueryPtr query_;
+};
+
 class Client::TdOnGetStarTransactionsCallback final : public TdQueryCallback {
  public:
   TdOnGetStarTransactionsCallback(const Client *client, PromisedQueryPtr query)
@@ -12242,6 +12262,13 @@ td::Status Client::process_create_invoice_link_query(PromisedQueryPtr &query) {
   }
   send_request(make_object<td_api::createInvoiceLink>(td::string(), std::move(input_message_invoice)),
                td::make_unique<TdOnCreateInvoiceLinkCallback>(std::move(query)));
+  return td::Status::OK();
+}
+
+td::Status Client::process_get_my_star_balance_query(PromisedQueryPtr &query) {
+  send_request(make_object<td_api::getStarTransactions>(make_object<td_api::messageSenderUser>(my_id_), td::string(),
+                                                        nullptr, td::string(), 0),
+               td::make_unique<TdOnGetMyStarBalanceCallback>(std::move(query)));
   return td::Status::OK();
 }
 
