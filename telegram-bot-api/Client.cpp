@@ -2886,6 +2886,23 @@ class Client::JsonPaidMessagePriceChanged final : public td::Jsonable {
   const td_api::messagePaidMessagePriceChanged *price_changed_;
 };
 
+class Client::JsonDirectMessagePriceChanged final : public td::Jsonable {
+ public:
+  explicit JsonDirectMessagePriceChanged(const td_api::messageDirectMessagePriceChanged *price_changed)
+      : price_changed_(price_changed) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("are_direct_messages_enabled", td::JsonBool(price_changed_->is_enabled_));
+    if (price_changed_->paid_message_star_count_ > 0) {
+      object("direct_message_star_count", price_changed_->paid_message_star_count_);
+    }
+  }
+
+ private:
+  const td_api::messageDirectMessagePriceChanged *price_changed_;
+};
+
 class Client::JsonWebAppInfo final : public td::Jsonable {
  public:
   explicit JsonWebAppInfo(const td::string &url) : url_(url) {
@@ -3700,8 +3717,11 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     }
     case td_api::messageGroupCall::ID:
       break;
-    case td_api::messageDirectMessagePriceChanged::ID:
+    case td_api::messageDirectMessagePriceChanged::ID: {
+      auto content = static_cast<const td_api::messageDirectMessagePriceChanged *>(message_->content.get());
+      object("direct_message_price_changed", JsonDirectMessagePriceChanged(content));
       break;
+    }
     default:
       UNREACHABLE();
   }
@@ -15508,8 +15528,6 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messagePaidMessagesRefunded::ID:
       return true;
     case td_api::messageGroupCall::ID:
-      return true;
-    case td_api::messageDirectMessagePriceChanged::ID:
       return true;
     default:
       break;
