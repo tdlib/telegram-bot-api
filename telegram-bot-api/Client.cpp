@@ -3218,6 +3218,11 @@ class Client::JsonExternalReplyInfo final : public td::Jsonable {
           object("story", JsonStory(content->story_poster_chat_id_, content->story_id_, client_));
           break;
         }
+        case td_api::messageChecklist::ID: {
+          auto content = static_cast<const td_api::messageChecklist *>(reply_->content_.get());
+          object("checklist", JsonChecklist(content->list_.get(), client_));
+          break;
+        }
         default:
           LOG(ERROR) << "Receive external reply with " << to_string(reply_->content_);
       }
