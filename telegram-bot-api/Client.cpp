@@ -2074,6 +2074,35 @@ class Client::JsonChecklist final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonChecklistTasksDone final : public td::Jsonable {
+ public:
+  JsonChecklistTasksDone(const td_api::messageChecklistTasksDone *checklist_tasks_done, int64 chat_id,
+                         const Client *client)
+      : checklist_tasks_done_(checklist_tasks_done), chat_id_(chat_id), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    const MessageInfo *checklist_message =
+        client_->get_message(chat_id_, checklist_tasks_done_->checklist_message_id_, true);
+    if (checklist_message != nullptr) {
+      object("checklist_message", JsonMessage(checklist_message, false, "checklist tasks done", client_));
+    }
+    if (!checklist_tasks_done_->marked_as_done_task_ids_.empty()) {
+      object("marked_as_done_task_ids",
+             td::json_array(checklist_tasks_done_->marked_as_done_task_ids_, [](int32 task_id) { return task_id; }));
+    }
+    if (!checklist_tasks_done_->marked_as_not_done_task_ids_.empty()) {
+      object("marked_as_not_done_task_ids", td::json_array(checklist_tasks_done_->marked_as_not_done_task_ids_,
+                                                           [](int32 task_id) { return task_id; }));
+    }
+  }
+
+ private:
+  const td_api::messageChecklistTasksDone *checklist_tasks_done_;
+  int64 chat_id_;
+  const Client *client_;
+};
+
 class Client::JsonStory final : public td::Jsonable {
  public:
   JsonStory(int64 chat_id, int32 story_id, const Client *client)
@@ -3779,8 +3808,11 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("checklist", JsonChecklist(content->list_.get(), client_));
       break;
     }
-    case td_api::messageChecklistTasksDone::ID:
+    case td_api::messageChecklistTasksDone::ID: {
+      auto content = static_cast<const td_api::messageChecklistTasksDone *>(message_->content.get());
+      object("checklist_tasks_done", JsonChecklistTasksDone(content, message_->chat_id, client_));
       break;
+    }
     case td_api::messageChecklistTasksAdded::ID:
       break;
     default:
@@ -15589,8 +15621,6 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messagePaidMessagesRefunded::ID:
       return true;
     case td_api::messageGroupCall::ID:
-      return true;
-    case td_api::messageChecklistTasksDone::ID:
       return true;
     case td_api::messageChecklistTasksAdded::ID:
       return true;
