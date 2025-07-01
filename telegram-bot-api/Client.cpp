@@ -235,6 +235,7 @@ bool Client::init_methods() {
   methods_.emplace("sendcontact", &Client::process_send_contact_query);
   methods_.emplace("sendpoll", &Client::process_send_poll_query);
   methods_.emplace("stoppoll", &Client::process_stop_poll_query);
+  methods_.emplace("sendchecklist", &Client::process_send_checklist_query);
   methods_.emplace("copymessage", &Client::process_copy_message_query);
   methods_.emplace("copymessages", &Client::process_copy_messages_query);
   methods_.emplace("forwardmessage", &Client::process_forward_message_query);
@@ -10493,6 +10494,77 @@ td::Result<td_api::object_ptr<td_api::chatPermissions>> Client::get_chat_permiss
                                               can_change_info, can_invite_users, can_pin_messages, can_manage_topics);
 }
 
+td::Result<td_api::object_ptr<td_api::inputChecklistTask>> Client::get_input_checklist_task(
+    td::JsonValue &&input_task) const {
+  if (input_task.type() != td::JsonValue::Type::Object) {
+    return td::Status::Error("expected an Object");
+  }
+
+  auto &object = input_task.get_object();
+  TRY_RESULT(id, object.get_required_int_field("id"));
+  TRY_RESULT(input_text, object.get_required_string_field("text"));
+  TRY_RESULT(parse_mode, object.get_optional_string_field("parse_mode"));
+  auto entities = object.extract_field("text_entities");
+  TRY_RESULT(text, get_formatted_text(std::move(input_text), std::move(parse_mode), std::move(entities)));
+
+  return make_object<td_api::inputChecklistTask>(id, std::move(text));
+}
+
+td::Result<td::vector<td_api::object_ptr<td_api::inputChecklistTask>>> Client::get_input_checklist_tasks(
+    td::JsonValue &&value) const {
+  if (value.type() != td::JsonValue::Type::Array) {
+    return td::Status::Error(400, "Expected an Array of InputChecklistTask");
+  }
+
+  td::vector<object_ptr<td_api::inputChecklistTask>> tasks;
+  for (auto &input_task : value.get_array()) {
+    auto r_task = get_input_checklist_task(std::move(input_task));
+    if (r_task.is_error()) {
+      return td::Status::Error(400, PSLICE() << "Can't parse InputChecklistTask: " << r_task.error().message());
+    }
+    tasks.push_back(r_task.move_as_ok());
+  }
+  return std::move(tasks);
+}
+
+td::Result<td_api::object_ptr<td_api::inputChecklist>> Client::get_input_checklist(
+    const Query *query, td::JsonValue &&input_checklist) const {
+  if (input_checklist.type() != td::JsonValue::Type::Object) {
+    return td::Status::Error("expected an Object");
+  }
+
+  auto &object = input_checklist.get_object();
+  TRY_RESULT(input_title, object.get_required_string_field("title"));
+  TRY_RESULT(parse_mode, object.get_optional_string_field("parse_mode"));
+  auto entities = object.extract_field("title_entities");
+  TRY_RESULT(title, get_formatted_text(std::move(input_title), std::move(parse_mode), std::move(entities)));
+  TRY_RESULT(others_can_add_tasks, object.get_optional_bool_field("others_can_add_tasks"));
+  TRY_RESULT(others_can_mark_tasks_as_done, object.get_optional_bool_field("others_can_mark_tasks_as_done"));
+  TRY_RESULT(input_tasks, object.extract_required_field("tasks", td::JsonValue::Type::Array));
+  TRY_RESULT(tasks, get_input_checklist_tasks(std::move(input_tasks)));
+
+  return make_object<td_api::inputChecklist>(std::move(title), std::move(tasks), others_can_add_tasks,
+                                             others_can_mark_tasks_as_done);
+}
+
+td::Result<td_api::object_ptr<td_api::inputChecklist>> Client::get_input_checklist(const Query *query,
+                                                                                   td::Slice field_name) const {
+  TRY_RESULT(checklist, get_required_string_arg(query, field_name));
+
+  LOG(INFO) << "Parsing JSON object: " << checklist;
+  auto r_value = json_decode(checklist);
+  if (r_value.is_error()) {
+    LOG(INFO) << "Can't parse JSON object: " << r_value.error();
+    return td::Status::Error(400, "Can't parse InputChecklist JSON object");
+  }
+
+  auto r_input_checklist = get_input_checklist(query, r_value.move_as_ok());
+  if (r_input_checklist.is_error()) {
+    return td::Status::Error(400, PSLICE() << "Can't parse InputChecklist: " << r_input_checklist.error().message());
+  }
+  return r_input_checklist.move_as_ok();
+}
+
 td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_media(const Query *query,
                                                                                     td::JsonValue &&input_media,
                                                                                     bool for_album) const {
@@ -11821,6 +11893,12 @@ td::Status Client::process_stop_poll_query(PromisedQueryPtr &query) {
                             td::make_unique<TdOnStopPollCallback>(this, chat_id, message_id, std::move(query)));
                       });
       });
+  return td::Status::OK();
+}
+
+td::Status Client::process_send_checklist_query(PromisedQueryPtr &query) {
+  TRY_RESULT(input_checklist, get_input_checklist(query.get(), "checklist"));
+  do_send_message(make_object<td_api::inputMessageChecklist>(std::move(input_checklist)), std::move(query));
   return td::Status::OK();
 }
 

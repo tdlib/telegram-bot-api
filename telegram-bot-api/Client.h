@@ -597,6 +597,15 @@ class Client final : public WebhookActor::Callback {
   static td::Result<object_ptr<td_api::chatPermissions>> get_chat_permissions(const Query *query, bool &allow_legacy,
                                                                               bool use_independent_chat_permissions);
 
+  td::Result<object_ptr<td_api::inputChecklistTask>> get_input_checklist_task(td::JsonValue &&input_task) const;
+
+  td::Result<td::vector<object_ptr<td_api::inputChecklistTask>>> get_input_checklist_tasks(td::JsonValue &&value) const;
+
+  td::Result<object_ptr<td_api::inputChecklist>> get_input_checklist(const Query *query,
+                                                                     td::JsonValue &&input_checklist) const;
+
+  td::Result<object_ptr<td_api::inputChecklist>> get_input_checklist(const Query *query, td::Slice field_name) const;
+
   td::Result<object_ptr<td_api::InputMessageContent>> get_input_media(const Query *query, td::JsonValue &&input_media,
                                                                       bool for_album) const;
 
@@ -718,6 +727,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_send_contact_query(PromisedQueryPtr &query);
   td::Status process_send_poll_query(PromisedQueryPtr &query);
   td::Status process_stop_poll_query(PromisedQueryPtr &query);
+  td::Status process_send_checklist_query(PromisedQueryPtr &query);
   td::Status process_copy_message_query(PromisedQueryPtr &query);
   td::Status process_copy_messages_query(PromisedQueryPtr &query);
   td::Status process_forward_message_query(PromisedQueryPtr &query);
