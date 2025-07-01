@@ -248,6 +248,7 @@ bool Client::init_methods() {
   methods_.emplace("stopmessagelivelocation", &Client::process_edit_message_live_location_query);
   methods_.emplace("editmessagemedia", &Client::process_edit_message_media_query);
   methods_.emplace("editmessagecaption", &Client::process_edit_message_caption_query);
+  methods_.emplace("editmessagechecklist", &Client::process_edit_message_checklist_query);
   methods_.emplace("editmessagereplymarkup", &Client::process_edit_message_reply_markup_query);
   methods_.emplace("deletemessage", &Client::process_delete_message_query);
   methods_.emplace("deletemessages", &Client::process_delete_messages_query);
@@ -12340,6 +12341,42 @@ td::Status Client::process_edit_message_caption_query(PromisedQueryPtr &query) {
                         });
         });
   }
+  return td::Status::OK();
+}
+
+td::Status Client::process_edit_message_checklist_query(PromisedQueryPtr &query) {
+  auto business_connection_id = query->arg("business_connection_id");
+  auto chat_id = query->arg("chat_id");
+  auto message_id = get_message_id(query.get());
+  TRY_RESULT(reply_markup, get_reply_markup(query.get(), bot_user_ids_));
+  TRY_RESULT(input_checklist, get_input_checklist(query.get(), "checklist"));
+
+  resolve_reply_markup_bot_usernames(
+      std::move(reply_markup), std::move(query),
+      [this, business_connection_id = business_connection_id.str(), chat_id_str = chat_id.str(), message_id,
+       input_checklist = std::move(input_checklist)](object_ptr<td_api::ReplyMarkup> reply_markup,
+                                                     PromisedQueryPtr query) mutable {
+        if (!business_connection_id.empty()) {
+          return check_business_connection_chat_id(
+              business_connection_id, chat_id_str, std::move(query),
+              [this, message_id, reply_markup = std::move(reply_markup), input_checklist = std::move(input_checklist)](
+                  const BusinessConnection *business_connection, int64 chat_id, PromisedQueryPtr query) mutable {
+                send_request(make_object<td_api::editBusinessMessageChecklist>(business_connection->id_, chat_id,
+                                                                               message_id, std::move(reply_markup),
+                                                                               std::move(input_checklist)),
+                             td::make_unique<TdOnReturnBusinessMessageCallback>(this, business_connection->id_,
+                                                                                std::move(query)));
+              });
+        }
+
+        check_message(chat_id_str, message_id, false, AccessRights::Edit, "message to edit", std::move(query),
+                      [this, reply_markup = std::move(reply_markup), input_checklist = std::move(input_checklist)](
+                          int64 chat_id, int64 message_id, PromisedQueryPtr query) mutable {
+                        send_request(make_object<td_api::editMessageChecklist>(
+                                         chat_id, message_id, std::move(reply_markup), std::move(input_checklist)),
+                                     td::make_unique<TdOnEditMessageCallback>(this, std::move(query)));
+                      });
+      });
   return td::Status::OK();
 }
 

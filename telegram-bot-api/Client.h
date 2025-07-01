@@ -739,6 +739,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_edit_message_live_location_query(PromisedQueryPtr &query);
   td::Status process_edit_message_media_query(PromisedQueryPtr &query);
   td::Status process_edit_message_caption_query(PromisedQueryPtr &query);
+  td::Status process_edit_message_checklist_query(PromisedQueryPtr &query);
   td::Status process_edit_message_reply_markup_query(PromisedQueryPtr &query);
   td::Status process_delete_message_query(PromisedQueryPtr &query);
   td::Status process_delete_messages_query(PromisedQueryPtr &query);
