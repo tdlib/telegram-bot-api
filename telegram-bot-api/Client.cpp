@@ -3722,6 +3722,12 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("direct_message_price_changed", JsonDirectMessagePriceChanged(content));
       break;
     }
+    case td_api::messageChecklist::ID:
+      break;
+    case td_api::messageChecklistTasksDone::ID:
+      break;
+    case td_api::messageChecklistTasksAdded::ID:
+      break;
     default:
       UNREACHABLE();
   }
@@ -15529,6 +15535,12 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       return true;
     case td_api::messageGroupCall::ID:
       return true;
+    case td_api::messageChecklist::ID:
+      return true;
+    case td_api::messageChecklistTasksDone::ID:
+      return true;
+    case td_api::messageChecklistTasksAdded::ID:
+      return true;
     default:
       break;
   }
@@ -15585,6 +15597,10 @@ td::int64 Client::get_same_chat_reply_to_message_id(const object_ptr<td_api::mes
         const auto *content = static_cast<const td_api::messagePaymentSuccessful *>(message->content_.get());
         return content->invoice_chat_id_ == message->chat_id_ ? content->invoice_message_id_ : static_cast<int64>(0);
       }
+      case td_api::messageChecklistTasksDone::ID:
+        return static_cast<const td_api::messageChecklistTasksDone *>(message->content_.get())->checklist_message_id_;
+      case td_api::messageChecklistTasksAdded::ID:
+        return static_cast<const td_api::messageChecklistTasksAdded *>(message->content_.get())->checklist_message_id_;
       default:
         return static_cast<int64>(0);
     }
