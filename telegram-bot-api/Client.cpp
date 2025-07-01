@@ -2027,6 +2027,53 @@ class Client::JsonPollAnswer final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonChecklistTask final : public td::Jsonable {
+ public:
+  JsonChecklistTask(const td_api::checklistTask *task, const Client *client) : task_(task), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("id", task_->id_);
+    object("text", task_->text_->text_);
+    if (!task_->text_->entities_.empty()) {
+      object("text_entities", JsonVectorEntities(task_->text_->entities_, client_));
+    }
+    if (task_->completed_by_user_id_ != 0 && task_->completion_date_ != 0) {
+      object("completed_by_user", JsonUser(task_->completed_by_user_id_, client_));
+      object("completion_date", task_->completion_date_);
+    }
+  }
+
+ private:
+  const td_api::checklistTask *task_;
+  const Client *client_;
+};
+
+class Client::JsonChecklist final : public td::Jsonable {
+ public:
+  JsonChecklist(const td_api::checklist *checklist, const Client *client) : checklist_(checklist), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("title", checklist_->title_->text_);
+    if (!checklist_->title_->entities_.empty()) {
+      object("title_entities", JsonVectorEntities(checklist_->title_->entities_, client_));
+    }
+    object("tasks", td::json_array(checklist_->tasks_,
+                                   [client = client_](auto &task) { return JsonChecklistTask(task.get(), client); }));
+    if (checklist_->others_can_add_tasks_) {
+      object("others_can_add_tasks", td::JsonTrue());
+    }
+    if (checklist_->others_can_mark_tasks_as_done_) {
+      object("others_can_mark_tasks_as_done", td::JsonTrue());
+    }
+  }
+
+ private:
+  const td_api::checklist *checklist_;
+  const Client *client_;
+};
+
 class Client::JsonStory final : public td::Jsonable {
  public:
   JsonStory(int64 chat_id, int32 story_id, const Client *client)
@@ -3722,8 +3769,11 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("direct_message_price_changed", JsonDirectMessagePriceChanged(content));
       break;
     }
-    case td_api::messageChecklist::ID:
+    case td_api::messageChecklist::ID: {
+      auto content = static_cast<const td_api::messageChecklist *>(message_->content.get());
+      object("checklist", JsonChecklist(content->list_.get(), client_));
       break;
+    }
     case td_api::messageChecklistTasksDone::ID:
       break;
     case td_api::messageChecklistTasksAdded::ID:
@@ -15534,8 +15584,6 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messagePaidMessagesRefunded::ID:
       return true;
     case td_api::messageGroupCall::ID:
-      return true;
-    case td_api::messageChecklist::ID:
       return true;
     case td_api::messageChecklistTasksDone::ID:
       return true;
