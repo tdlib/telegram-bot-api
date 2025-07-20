@@ -1,4 +1,4 @@
-name: Build Telegram Bot API
+name: Build Telegram Bot API Static
 
 on:
   push:
@@ -19,11 +19,11 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y build-essential g++ cmake libssl-dev zlib1g-dev gperf
 
-    - name: Build Telegram Bot API
+    - name: Build Telegram Bot API Statically
       run: |
         mkdir build
         cd build
-        cmake -DCMAKE_BUILD_TYPE=Release ..
+        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_EXE_LINKER_FLAGS="-static" ..
         cmake --build . --target install
 
     - name: Upload artifact
