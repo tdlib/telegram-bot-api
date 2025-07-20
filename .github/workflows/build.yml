@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -17,13 +17,28 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential g++ cmake libssl-dev zlib1g-dev gperf
+        sudo apt-get install -y build-essential g++ cmake zlib1g-dev gperf
+
+    - name: Build and install OpenSSL statically
+      run: |
+        wget https://www.openssl.org/source/openssl-3.2.1.tar.gz
+        tar -xvzf openssl-3.2.1.tar.gz
+        cd openssl-3.2.1
+        ./config no-shared --prefix=/usr/local/openssl
+        make
+        sudo make install
+        cd ..
 
     - name: Build Telegram Bot API Statically
       run: |
         mkdir build
         cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_EXE_LINKER_FLAGS="-static" ..
+        cmake -DCMAKE_BUILD_TYPE=Release \
+              -DBUILD_SHARED_LIBS=OFF \
+              -DCMAKE_EXE_LINKER_FLAGS="-static" \
+              -DOPENSSL_ROOT_DIR=/usr/local/openssl \
+              -DOPENSSL_USE_STATIC_LIBS=ON \
+              ..
         cmake --build . --target install
 
     - name: Upload artifact
