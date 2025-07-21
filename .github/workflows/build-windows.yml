@@ -14,53 +14,37 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Install MSYS2
-      uses: msys2/setup-msys2@v2
-      with:
-        msystem: MINGW64
-        update: true
-        install: mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake mingw-w64-x86_64-make mingw-w64-x86_64-gperf
-
-    - name: Build and install zlib statically
-      shell: msys2 {0}
+    - name: Install Visual Studio Build Tools
       run: |
-        curl -L -O https://zlib.net/zlib-1.3.1.tar.gz
-        tar -xvzf zlib-1.3.1.tar.gz
-        cd zlib-1.3.1
-        ./configure --static --prefix=/mingw64
-        make
-        make install
-        cd ..
+        choco install visualstudio2019buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
+      env:
+        choco: choco.exe
 
-    - name: Build and install OpenSSL statically
-      shell: msys2 {0}
+    - name: Setup vcpkg
       run: |
-        curl -L -O https://www.openssl.org/source/openssl-3.2.1.tar.gz
-        tar -xvzf openssl-3.2.1.tar.gz
-        cd openssl-3.2.1
-        ./Configure mingw64 no-shared --prefix=/mingw64
-        make
-        make install
+        git clone https://github.com/Microsoft/vcpkg.git
+        cd vcpkg
+        .\bootstrap-vcpkg.bat
+        .\vcpkg.exe install gperf:x64-windows-static openssl:x64-windows-static zlib:x64-windows-static
         cd ..
 
     - name: Build Telegram Bot API Statically
-      shell: msys2 {0}
       run: |
+        Remove-Item build -Force -Recurse -ErrorAction SilentlyContinue
         mkdir build
         cd build
-        cmake -G "MinGW Makefiles" \
-              -DCMAKE_BUILD_TYPE=Release \
+        cmake -A x64 -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_TOOLCHAIN_FILE:FILEPATH=../vcpkg/scripts/buildsystems/vcpkg.cmake \
+              -DVCPKG_TARGET_TRIPLET=x64-windows-static \
               -DBUILD_SHARED_LIBS=OFF \
-              -DCMAKE_EXE_LINKER_FLAGS="-static -static-libgcc -static-libstdc++" \
-              -DOPENSSL_ROOT_DIR=/mingw64 \
+              -DCMAKE_EXE_LINKER_FLAGS="/LTCG /LINK /LIBPATH:../vcpkg/installed/x64-windows-static/lib -static -static-libgcc -static-libstdc++" \
               -DOPENSSL_USE_STATIC_LIBS=ON \
-              -DZLIB_ROOT=/mingw64 \
               -DZLIB_USE_STATIC_LIBS=ON \
               ..
-        mingw32-make install
+        cmake --build . --target install --config Release
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: telegram-bot-api-windows
-        path: C:/msys64/mingw64/bin/telegram-bot-api.exe
+        path: bin/telegram-bot-api.exe
