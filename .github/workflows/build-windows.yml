@@ -1,4 +1,4 @@
-name: Build Telegram Bot API Static for Window
+name: Build Telegram Bot API Static for Windows
 
 on:
   push:
