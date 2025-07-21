@@ -28,6 +28,7 @@ jobs:
         dir
         .\bootstrap-vcpkg.bat -disableMetrics
         .\vcpkg.exe integrate install
+        set PATH=%CD%;%PATH%
         .\vcpkg.exe install gperf:x64-windows-static openssl:x64-windows-static zlib:x64-windows-static --triplet x64-windows-static
         dir installed\x64-windows-static
         cd ..
@@ -45,6 +46,7 @@ jobs:
               -DBUILD_SHARED_LIBS=OFF ^
               -DOPENSSL_USE_STATIC_LIBS=ON ^
               -DZLIB_USE_STATIC_LIBS=ON ^
+              -DGPERF_EXECUTABLE=..\vcpkg\installed\x64-windows-static\tools\gperf\gperf.exe ^
               ..
         cmake --build . --target install --config Release
         dir bin
