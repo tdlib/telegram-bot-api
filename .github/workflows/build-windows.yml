@@ -13,38 +13,43 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
+        path: telegram-bot-api
 
-    - name: Install Visual Studio Build Tools
+    - name: Install Chocolatey and Visual Studio Build Tools
       run: |
-        choco install visualstudio2019buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
+        choco install visualstudio2022buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --add Microsoft.VisualStudio.Workload.MSBuild --includeRecommended --includeOptional" -y
       env:
         choco: choco.exe
 
     - name: Setup vcpkg
       run: |
-        git clone https://github.com/Microsoft/vcpkg.git
+        git clone --branch 2025.07.21 https://github.com/Microsoft/vcpkg.git
         cd vcpkg
-        .\bootstrap-vcpkg.bat
-        .\vcpkg.exe install gperf:x64-windows-static openssl:x64-windows-static zlib:x64-windows-static
+        .\bootstrap-vcpkg.bat -disableMetrics
+        .\vcpkg.exe integrate install
+        .\vcpkg.exe install gperf:x64-windows-static openssl:x64-windows-static zlib:x64-windows-static --triplet x64-windows-static
+        dir installed\x64-windows-static
         cd ..
+      shell: cmd
 
     - name: Build Telegram Bot API Statically
       run: |
+        cd telegram-bot-api
         Remove-Item build -Force -Recurse -ErrorAction SilentlyContinue
         mkdir build
         cd build
-        cmake -A x64 -DCMAKE_BUILD_TYPE=Release \
-              -DCMAKE_TOOLCHAIN_FILE:FILEPATH=../vcpkg/scripts/buildsystems/vcpkg.cmake \
-              -DVCPKG_TARGET_TRIPLET=x64-windows-static \
-              -DBUILD_SHARED_LIBS=OFF \
-              -DCMAKE_EXE_LINKER_FLAGS="/LTCG /LINK /LIBPATH:../vcpkg/installed/x64-windows-static/lib -static -static-libgcc -static-libstdc++" \
-              -DOPENSSL_USE_STATIC_LIBS=ON \
-              -DZLIB_USE_STATIC_LIBS=ON \
+        cmake -A x64 -DCMAKE_BUILD_TYPE=Release ^
+              -DCMAKE_TOOLCHAIN_FILE=..\vcpkg\scripts\buildsystems\vcpkg.cmake ^
+              -DVCPKG_TARGET_TRIPLET=x64-windows-static ^
+              -DBUILD_SHARED_LIBS=OFF ^
+              -DOPENSSL_USE_STATIC_LIBS=ON ^
+              -DZLIB_USE_STATIC_LIBS=ON ^
               ..
         cmake --build . --target install --config Release
+        dir bin
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: telegram-bot-api-windows
-        path: bin/telegram-bot-api.exe
+        path: telegram-bot-api/bin/telegram-bot-api.exe
