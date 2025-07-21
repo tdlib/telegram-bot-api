@@ -23,7 +23,7 @@ jobs:
 
     - name: Setup vcpkg
       run: |
-        git clone --branch main https://github.com/Microsoft/vcpkg.git
+        git clone --branch master https://github.com/Microsoft/vcpkg.git
         cd vcpkg
         dir
         .\bootstrap-vcpkg.bat -disableMetrics
