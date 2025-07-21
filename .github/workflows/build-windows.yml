@@ -10,56 +10,47 @@ jobs:
     runs-on: windows-latest
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-        path: telegram-bot-api
+      run: git clone --recursive https://github.com/tdlib/telegram-bot-api.git
+      shell: powershell
 
-    - name: Install Chocolatey and Visual Studio Build Tools
-      run: |
-        choco install visualstudio2022buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --add Microsoft.VisualStudio.Workload.MSBuild --includeRecommended --includeOptional" -y
+    - name: Install Visual Studio Build Tools
+      run: choco install visualstudio2022buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --includeOptional" -y
       env:
         choco: choco.exe
+      shell: powershell
 
-    - name: Setup vcpkg
-      run: |
-        git clone --branch master https://github.com/Microsoft/vcpkg.git || git clone https://github.com/Microsoft/vcpkg.git
-        cd vcpkg
-        dir
-        if not exist bootstrap-vcpkg.bat (
-          echo Error: bootstrap-vcpkg.bat not found, cloning failed. Exiting...
-          exit /b 1
-        )
-        .\bootstrap-vcpkg.bat -disableMetrics
-        .\vcpkg.exe integrate install
-        set PATH=%CD%;%PATH%
-        .\vcpkg.exe install gperf:x64-windows-static openssl:x64-windows-static zlib:x64-windows-static --triplet x64-windows-static
-        dir installed\x64-windows-static
-        if not exist installed\x64-windows-static\lib\zlibstatic.lib (
-          echo Error: zlibstatic.lib not found
-          exit /b 1
-        )
-        cd ..
-      shell: cmd
+    - name: Install CMake
+      run: choco install cmake --install-directory="C:\Program Files\CMake" -y
+      env:
+        choco: choco.exe
+      shell: powershell
 
-    - name: Build Telegram Bot API Statically
+    - name: Install Git
+      run: choco install git -y
+      env:
+        choco: choco.exe
+      shell: powershell
+
+    - name: Refresh PATH
+      run: $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User"); $env:Path = $env:Path -replace ";;", ";"
+      shell: powershell
+
+    - name: Build and Install Telegram Bot API
       run: |
         cd telegram-bot-api
-        if exist build rmdir /S /Q build
+        git clone https://github.com/Microsoft/vcpkg.git
+        cd vcpkg
+        ./bootstrap-vcpkg.bat
+        ./vcpkg.exe install gperf:x64-windows openssl:x64-windows zlib:x64-windows
+        cd ..
+        Remove-Item build -Force -Recurse -ErrorAction SilentlyContinue
         mkdir build
         cd build
-        cmake -A x64 -DCMAKE_BUILD_TYPE=Release ^
-              -DCMAKE_TOOLCHAIN_FILE=..\vcpkg\scripts\buildsystems\vcpkg.cmake ^
-              -DVCPKG_TARGET_TRIPLET=x64-windows-static ^
-              -DBUILD_SHARED_LIBS=OFF ^
-              -DOPENSSL_USE_STATIC_LIBS=ON ^
-              -DZLIB_USE_STATIC_LIBS=ON ^
-              -DGPERF_EXECUTABLE=..\vcpkg\installed\x64-windows-static\tools\gperf\gperf.exe ^
-              -DZLIB_ROOT=..\vcpkg\installed\x64-windows-static ^
-              ..
+        cmake -A x64 -DCMAKE_INSTALL_PREFIX:PATH=.. -DCMAKE_TOOLCHAIN_FILE:FILEPATH=../vcpkg/scripts/buildsystems/vcpkg.cmake ..
         cmake --build . --target install --config Release
-        dir bin
-      shell: cmd
+        cd ../..
+        dir telegram-bot-api/bin/telegram-bot-api*
+      shell: powershell
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
