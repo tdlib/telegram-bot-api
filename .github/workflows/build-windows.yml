@@ -36,7 +36,7 @@ jobs:
     - name: Build Telegram Bot API Statically
       run: |
         cd telegram-bot-api
-        Remove-Item build -Force -Recurse -ErrorAction SilentlyContinue
+        if exist build rmdir /S /Q build
         mkdir build
         cd build
         cmake -A x64 -DCMAKE_BUILD_TYPE=Release ^
@@ -48,6 +48,7 @@ jobs:
               ..
         cmake --build . --target install --config Release
         dir bin
+      shell: cmd
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
