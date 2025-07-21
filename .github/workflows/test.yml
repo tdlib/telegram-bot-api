@@ -8,4 +8,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Test
-      run: echo "This is a test"
+      run: echo "This is a tesst"
