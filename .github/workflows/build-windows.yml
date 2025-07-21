@@ -23,8 +23,9 @@ jobs:
 
     - name: Setup vcpkg
       run: |
-        git clone --branch 2025.07.21 https://github.com/Microsoft/vcpkg.git
+        git clone --branch main https://github.com/Microsoft/vcpkg.git
         cd vcpkg
+        dir
         .\bootstrap-vcpkg.bat -disableMetrics
         .\vcpkg.exe integrate install
         .\vcpkg.exe install gperf:x64-windows-static openssl:x64-windows-static zlib:x64-windows-static --triplet x64-windows-static
