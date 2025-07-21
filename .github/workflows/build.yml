@@ -4,10 +4,11 @@ on:
   push:
     branches:
       - master
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-lastest
+    runs-on: ubuntu-22.04
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -35,7 +36,7 @@ jobs:
         cd build
         cmake -DCMAKE_BUILD_TYPE=Release \
               -DBUILD_SHARED_LIBS=OFF \
-              -DCMAKE_EXE_LINKER_FLAGS="-static" \
+              -DCMAKE_EXE_LINKER_FLAGS="-static -static-libgcc -static-libstdc++" \
               -DOPENSSL_ROOT_DIR=/usr/local/openssl \
               -DOPENSSL_USE_STATIC_LIBS=ON \
               ..
