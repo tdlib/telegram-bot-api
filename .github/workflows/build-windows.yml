@@ -32,7 +32,9 @@ jobs:
       shell: powershell
 
     - name: Refresh PATH
-      run: refreshenv
+      run: |
+        Import-Module "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"
+        Update-SessionEnvironment
       shell: powershell
 
     - name: Build and Install Telegram Bot API
