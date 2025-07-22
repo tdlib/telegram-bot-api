@@ -11,6 +11,7 @@
 #include "telegram-bot-api/HttpStatConnection.h"
 #include "telegram-bot-api/Stats.h"
 #include "telegram-bot-api/Watchdog.h"
+#include "telegram-bot-api/Query.h" // اضافه شده برای Query
 
 #include "td/db/binlog/Binlog.h"
 
@@ -45,12 +46,7 @@
 #include "td/utils/Status.h"
 #include "td/utils/Time.h"
 #include <td/telegram/td_api.h>
-
-#include <atomic>
-#include <cstdlib>
-#include <memory>
-#include <tuple>
-#include <string> // اضافه شده برای std::string::find
+#include <string>
 
 namespace telegram_bot_api {
 
@@ -137,7 +133,7 @@ static void sigsegv_signal_handler(int signum, void *addr) {
 }
 
 // تابع کمکی برای تجزیه آرگومان پروکسی
-static td::Status parse_proxy(const td::Slice &proxy_str, td::string &type, td::string &server, int &port) {
+static td::Status parse_proxy(const td::Slice &proxy_str, td::string &type, td::string &server, td::td_api::int32 &port) {
   // فرمت: type://server:port
   std::string proxy = proxy_str.str(); // تبدیل به std::string
   size_t proto_end = proxy.find("://");
@@ -153,7 +149,7 @@ static td::Status parse_proxy(const td::Slice &proxy_str, td::string &type, td::
   }
   
   server = rest.substr(0, port_sep);
-  TRY_RESULT(port_val, td::to_integer_safe<int>(td::Slice(rest.c_str() + port_sep + 1)));
+  TRY_RESULT(port_val, td::to_integer_safe<td::td_api::int32>(td::Slice(rest.c_str() + port_sep + 1)));
   port = port_val;
   return td::Status::OK();
 }
@@ -216,7 +212,7 @@ int main(int argc, char *argv[]) {
   ClientManager::TokenRange token_range{0, 1};
   td::string proxy_type;
   td::string proxy_server;
-  int proxy_port = 0;
+  td::td_api::int32 proxy_port = 0;
 
   parameters->api_id_ = [](auto x) -> td::int32 {
     if (x) {
@@ -505,9 +501,10 @@ int main(int argc, char *argv[]) {
     }
     
     auto set_proxy = td::td_api::make_object<td::td_api::addProxy>(
-        proxy->server_, proxy->port_, std::move(proxy->type_), true);
+        proxy->server_, proxy->port_, true, std::move(proxy->type_));
     
-    send_closure(client_manager, &ClientManager::send, 0, std::move(set_proxy));
+    auto query = std::make_unique<Query>(0, std::move(set_proxy), nullptr);
+    send_closure(client_manager, &ClientManager::send, std::move(query));
   }
 
   sched
