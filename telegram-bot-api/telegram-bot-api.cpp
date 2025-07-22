@@ -50,6 +50,7 @@
 #include <cstdlib>
 #include <memory>
 #include <tuple>
+#include <string> // اضافه شده برای std::string::find
 
 namespace telegram_bot_api {
 
@@ -138,20 +139,21 @@ static void sigsegv_signal_handler(int signum, void *addr) {
 // تابع کمکی برای تجزیه آرگومان پروکسی
 static td::Status parse_proxy(const td::Slice &proxy_str, td::string &type, td::string &server, int &port) {
   // فرمت: type://server:port
-  size_t proto_end = proxy_str.find_substr("://");
-  if (proto_end == td::Slice::npos) {
+  std::string proxy = proxy_str.str(); // تبدیل به std::string
+  size_t proto_end = proxy.find("://");
+  if (proto_end == std::string::npos) {
     return td::Status::Error("Invalid proxy format: missing '://'");
   }
   
-  type = proxy_str.substr(0, proto_end).str();
-  td::Slice rest = proxy_str.substr(proto_end + 3);
+  type = proxy.substr(0, proto_end);
+  std::string rest = proxy.substr(proto_end + 3);
   size_t port_sep = rest.find(':');
-  if (port_sep == td::Slice::npos) {
+  if (port_sep == std::string::npos) {
     return td::Status::Error("Invalid proxy format: missing port");
   }
   
-  server = rest.substr(0, port_sep).str();
-  TRY_RESULT(port_val, td::to_integer_safe<int>(rest.substr(port_sep + 1)));
+  server = rest.substr(0, port_sep);
+  TRY_RESULT(port_val, td::to_integer_safe<int>(td::Slice(rest.c_str() + port_sep + 1)));
   port = port_val;
   return td::Status::OK();
 }
@@ -431,7 +433,7 @@ int main(int argc, char *argv[]) {
       auto r_temp_file = td::mkstemp(temp_dir);
       if (r_temp_file.is_error()) {
         return td::Status::Error(PSLICE()
-                                 << "Can’t create files in the directory \"" << temp_dir
+                                 << "Can't create files in the directory \"" << temp_dir
                                  << "\". Use --temp-dir option to specify another directory for temporary files");
       }
       r_temp_file.ok_ref().first.close();
@@ -442,7 +444,7 @@ int main(int argc, char *argv[]) {
       if (td::PathView(log_file_path).is_relative()) {
         log_file_path = working_directory + log_file_path;
       }
-      TRY_STATUS_PREFIX(file_log.init(log_file_path, log_max_file_size), "Can’t open log file: ");
+      TRY_STATUS_PREFIX(file_log.init(log_file_path, log_max_file_size), "Can't open log file: ");
       log.set_first(&file_log);
     }
 
