@@ -10,8 +10,9 @@ jobs:
     runs-on: windows-latest
     steps:
     - name: Checkout repository
-      run: git clone --recursive https://github.com/tdlib/telegram-bot-api.git
-      shell: powershell
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
 
     - name: Install Visual Studio Build Tools
       run: choco install visualstudio2022buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --includeOptional" -y
@@ -39,7 +40,6 @@ jobs:
 
     - name: Build and Install Telegram Bot API
       run: |
-        cd telegram-bot-api
         git clone https://github.com/Microsoft/vcpkg.git
         cd vcpkg
         ./bootstrap-vcpkg.bat
@@ -50,12 +50,12 @@ jobs:
         cd build
         cmake -A x64 -DCMAKE_INSTALL_PREFIX:PATH=.. -DCMAKE_TOOLCHAIN_FILE:FILEPATH=../vcpkg/scripts/buildsystems/vcpkg.cmake ..
         cmake --build . --target install --config Release
-        cd ../..
-        dir telegram-bot-api/bin/telegram-bot-api*
+        cd ..
+        dir bin/telegram-bot-api*
       shell: powershell
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: telegram-bot-api-windows
-        path: telegram-bot-api/bin/telegram-bot-api.exe
+        path: bin/telegram-bot-api.exe
