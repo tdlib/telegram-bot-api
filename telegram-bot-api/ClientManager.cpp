@@ -148,20 +148,6 @@ void ClientManager::send(PromisedQueryPtr query) {
                std::move(query));  // will send 429 if the client is already closed
 }
 
-void ClientManager::send_raw_query(td::td_api::object_ptr<td::td_api::Function> query) {
-  if (close_flag_) {
-    LOG(WARNING) << "Cannot send raw query: ClientManager is closing";
-    return;
-  }
-  if (default_client_id_ == 0) {
-    LOG(WARNING) << "No default client available for raw query";
-    return;
-  }
-  auto *client_info = clients_.get(default_client_id_);
-  CHECK(client_info);
-  send_closure(client_info->client_, &Client::send_no_query, std::move(query));
-}
-
 ClientManager::TopClients ClientManager::get_top_clients(std::size_t max_count, td::Slice token_filter) {
   auto now = td::Time::now();
   TopClients result;
@@ -377,22 +363,6 @@ void ClientManager::start_up() {
 
     auto query = get_webhook_restore_query(key_value.first, key_value.second, parameters_->shared_data_);
     send_closure_later(actor_id(this), &ClientManager::send, std::move(query));
-  }
-
-  // ایجاد کلاینت پیش‌فرض برای درخواست‌های سیستمی
-  {
-    td::string default_token = "system:default"; // توکن مصنوعی برای کلاینت پیش‌فرض
-    td::int64 default_user_id = 0; // user_id صفر برای کلاینت پیش‌فرض
-    bool is_test_dc = false;
-    auto tqueue_id = get_tqueue_id(default_user_id, is_test_dc);
-    default_client_id_ =
-        clients_.create(ClientInfo{BotStatActor(stat_.actor_id(&stat_)), default_token, tqueue_id, td::ActorOwn<Client>()});
-    auto *client_info = clients_.get(default_client_id_);
-    client_info->client_ = td::create_actor<Client>(PSLICE() << "Client/" << default_token, actor_shared(this, default_client_id_),
-                                                    default_token, is_test_dc, tqueue_id, parameters_,
-                                                    client_info->stat_.actor_id(&client_info->stat_));
-    token_to_id_.emplace(default_token, default_client_id_);
-    LOG(WARNING) << "Created default client for system queries with ID " << default_client_id_;
   }
 
   // launch watchdog
