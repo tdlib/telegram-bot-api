@@ -12,6 +12,7 @@
 #include "telegram-bot-api/Watchdog.h"
 
 #include "td/actor/actor.h"
+#include "td/telegram/td_api.h"
 
 #include "td/utils/buffer.h"
 #include "td/utils/common.h"
@@ -46,6 +47,9 @@ class ClientManager final : public td::Actor {
 
   void send(PromisedQueryPtr query);
 
+  // اضافه کردن متد جدید برای ارسال درخواست‌های خام TDLib
+  void send_raw_query(td::td_api::object_ptr<td::td_api::Function> query);
+
   void get_stats(td::Promise<td::BufferSlice> promise, td::vector<std::pair<td::string, td::string>> args);
 
   void close(td::Promise<td::Unit> &&promise);
@@ -75,6 +79,9 @@ class ClientManager final : public td::Actor {
   double next_tqueue_gc_time_ = 0.0;
   td::int64 tqueue_deleted_events_ = 0;
   td::int64 last_tqueue_deleted_events_ = 0;
+
+  // اضافه کردن ID کلاینت پیش‌فرض
+  td::uint64 default_client_id_ = 0;
 
   static constexpr double WATCHDOG_TIMEOUT = 0.25;
 
