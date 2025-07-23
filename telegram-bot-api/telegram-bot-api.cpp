@@ -11,7 +11,6 @@
 #include "telegram-bot-api/HttpStatConnection.h"
 #include "telegram-bot-api/Stats.h"
 #include "telegram-bot-api/Watchdog.h"
-#include "telegram-bot-api/Query.h" // اضافه شده برای Query
 
 #include "td/db/binlog/Binlog.h"
 
@@ -429,7 +428,7 @@ int main(int argc, char *argv[]) {
       auto r_temp_file = td::mkstemp(temp_dir);
       if (r_temp_file.is_error()) {
         return td::Status::Error(PSLICE()
-                                 << "Can't create files in the directory \"" << temp_dir
+                                 << "Can’t create files in the directory \"" << temp_dir
                                  << "\". Use --temp-dir option to specify another directory for temporary files");
       }
       r_temp_file.ok_ref().first.close();
@@ -440,7 +439,7 @@ int main(int argc, char *argv[]) {
       if (td::PathView(log_file_path).is_relative()) {
         log_file_path = working_directory + log_file_path;
       }
-      TRY_STATUS_PREFIX(file_log.init(log_file_path, log_max_file_size), "Can't open log file: ");
+      TRY_STATUS_PREFIX(file_log.init(log_file_path, log_max_file_size), "Can’t open log file: ");
       log.set_first(&file_log);
     }
 
@@ -503,8 +502,7 @@ int main(int argc, char *argv[]) {
     auto set_proxy = td::td_api::make_object<td::td_api::addProxy>(
         proxy->server_, proxy->port_, true, std::move(proxy->type_));
     
-    auto query = std::make_unique<Query>(0, std::move(set_proxy), nullptr);
-    send_closure(client_manager, &ClientManager::send, std::move(query));
+    send_closure(client_manager, &ClientManager::send_no_query, std::move(set_proxy));
   }
 
   sched
