@@ -44,8 +44,11 @@
 #include "td/utils/SliceBuilder.h"
 #include "td/utils/Status.h"
 #include "td/utils/Time.h"
-#include <td/telegram/td_api.h>
-#include <string>
+
+#include <atomic>
+#include <cstdlib>
+#include <memory>
+#include <tuple>
 
 namespace telegram_bot_api {
 
@@ -131,28 +134,6 @@ static void sigsegv_signal_handler(int signum, void *addr) {
   fail_signal_handler(signum);
 }
 
-// تابع کمکی برای تجزیه آرگومان پروکسی
-static td::Status parse_proxy(const td::Slice &proxy_str, td::string &type, td::string &server, td::td_api::int32 &port) {
-  // فرمت: type://server:port
-  std::string proxy = proxy_str.str(); // تبدیل به std::string
-  size_t proto_end = proxy.find("://");
-  if (proto_end == std::string::npos) {
-    return td::Status::Error("Invalid proxy format: missing '://'");
-  }
-  
-  type = proxy.substr(0, proto_end);
-  std::string rest = proxy.substr(proto_end + 3);
-  size_t port_sep = rest.find(':');
-  if (port_sep == std::string::npos) {
-    return td::Status::Error("Invalid proxy format: missing port");
-  }
-  
-  server = rest.substr(0, port_sep);
-  TRY_RESULT(port_val, td::to_integer_safe<td::td_api::int32>(td::Slice(rest.c_str() + port_sep + 1)));
-  port = port_val;
-  return td::Status::OK();
-}
-
 int main(int argc, char *argv[]) {
   SET_VERBOSITY_LEVEL(VERBOSITY_NAME(FATAL));
   td::ExitGuard exit_guard;
@@ -209,9 +190,6 @@ int main(int argc, char *argv[]) {
   td::uint64 cpu_affinity = 0;
   td::uint64 main_thread_affinity = 0;
   ClientManager::TokenRange token_range{0, 1};
-  td::string proxy_type;
-  td::string proxy_server;
-  td::td_api::int32 proxy_port = 0;
 
   parameters->api_id_ = [](auto x) -> td::int32 {
     if (x) {
@@ -281,6 +259,7 @@ int main(int argc, char *argv[]) {
                                http_stat_ip_address = ip_address.str();
                                return td::Status::OK();
                              });
+
   options.add_option('l', "log", "path to the file where the log will be written",
                      td::OptionParser::parse_string(log_file_path));
   options.add_checked_option('v', "verbosity", "log verbosity level",
@@ -292,6 +271,7 @@ int main(int argc, char *argv[]) {
       PSLICE() << "maximum size of the log file in bytes before it will be auto-rotated (default is "
                << log_max_file_size << ")",
       td::OptionParser::parse_integer(log_max_file_size));
+
   options.add_option('u', "username", "effective user name to switch to", td::OptionParser::parse_string(username));
   options.add_option('g', "groupname", "effective group name to switch to", td::OptionParser::parse_string(groupname));
   options.add_checked_option('c', "max-connections", "maximum number of open file descriptors",
@@ -307,12 +287,17 @@ int main(int argc, char *argv[]) {
   (void)cpu_affinity;
   (void)main_thread_affinity;
 #endif
-  options.add_checked_option('\0', "proxy",
-                             "Proxy server for TDLib in the format type://server:port (e.g., socks5://127.0.0.1:1080)",
-                             [&](td::Slice proxy_str) {
-                               return parse_proxy(proxy_str, proxy_type, proxy_server, proxy_port);
-                             });
 
+  options.add_checked_option('\0', "proxy",
+                             "HTTP proxy server for outgoing webhook requests in the format http://host:port",
+                             [&](td::Slice address) {
+                               if (td::begins_with(address, "http://")) {
+                                 address.remove_prefix(7);
+                               } else if (td::begins_with(address, "https://")) {
+                                 address.remove_prefix(8);
+                               }
+                               return parameters->webhook_proxy_ip_address_.init_host_port(address.str());
+                             });
   options.add_check([&] {
     if (parameters->api_id_ <= 0 || parameters->api_hash_.empty()) {
       return td::Status::Error("You must provide valid api-id and api-hash obtained at https://my.telegram.org");
@@ -416,6 +401,9 @@ int main(int argc, char *argv[]) {
     }
 
     if (!temporary_directory.empty()) {
+      if (td::PathView(temporary_directory).is_relative()) {
+        temporary_directory = working_directory + temporary_directory;
+      }
       TRY_STATUS_PREFIX(td::set_temporary_dir(temporary_directory), "Can't set temporary directory: ");
     }
 
@@ -428,7 +416,7 @@ int main(int argc, char *argv[]) {
       auto r_temp_file = td::mkstemp(temp_dir);
       if (r_temp_file.is_error()) {
         return td::Status::Error(PSLICE()
-                                 << "Can’t create files in the directory \"" << temp_dir
+                                 << "Can't create files in the directory \"" << temp_dir
                                  << "\". Use --temp-dir option to specify another directory for temporary files");
       }
       r_temp_file.ok_ref().first.close();
@@ -439,7 +427,7 @@ int main(int argc, char *argv[]) {
       if (td::PathView(log_file_path).is_relative()) {
         log_file_path = working_directory + log_file_path;
       }
-      TRY_STATUS_PREFIX(file_log.init(log_file_path, log_max_file_size), "Can’t open log file: ");
+      TRY_STATUS_PREFIX(file_log.init(log_file_path, log_max_file_size), "Can't open log file: ");
       log.set_first(&file_log);
     }
 
@@ -483,27 +471,6 @@ int main(int argc, char *argv[]) {
                             .create_actor_unsafe<ClientManager>(SharedData::get_client_scheduler_id(), "ClientManager",
                                                                 std::move(parameters), token_range)
                             .release();
-
-  // تنظیم پروکسی برای TDLib
-  if (!proxy_type.empty()) {
-    auto proxy = td::td_api::make_object<td::td_api::proxy>();
-    proxy->server_ = proxy_server;
-    proxy->port_ = proxy_port;
-    
-    if (proxy_type == "socks5") {
-      proxy->type_ = td::td_api::make_object<td::td_api::proxyTypeSocks5>();
-    } else if (proxy_type == "http") {
-      proxy->type_ = td::td_api::make_object<td::td_api::proxyTypeHttp>();
-    } else {
-      LOG(ERROR) << "Unsupported proxy type: " << proxy_type;
-      return 1;
-    }
-    
-    auto set_proxy = td::td_api::make_object<td::td_api::addProxy>(
-        proxy->server_, proxy->port_, true, std::move(proxy->type_));
-    
-    send_closure_later(client_manager, &ClientManager::send_raw_query, std::move(set_proxy));
-  }
 
   sched
       .create_actor_unsafe<HttpServer>(
