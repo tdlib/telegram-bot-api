@@ -502,7 +502,7 @@ int main(int argc, char *argv[]) {
     auto set_proxy = td::td_api::make_object<td::td_api::addProxy>(
         proxy->server_, proxy->port_, true, std::move(proxy->type_));
     
-    send_closure(client_manager, &ClientManager::send_no_query, std::move(set_proxy));
+    send_closure_later(client_manager, &ClientManager::send_raw_query, std::move(set_proxy));
   }
 
   sched
