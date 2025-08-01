@@ -3892,6 +3892,9 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
   if (message_->paid_message_star_count != 0) {
     object("paid_star_count", message_->paid_message_star_count);
   }
+  if (message_->is_paid_post) {
+    object("is_paid_post", td::JsonTrue());
+  }
 }
 
 class Client::JsonMessageId final : public td::Jsonable {
@@ -16352,6 +16355,7 @@ void Client::init_message(MessageInfo *message_info, object_ptr<td_api::message>
   message_info->sender_boost_count = message->sender_boost_count_;
   message_info->paid_message_star_count = message->paid_message_star_count_;
   message_info->effect_id = message->effect_id_;
+  message_info->is_paid_post = message->is_paid_star_suggested_post_ || message->is_paid_ton_suggested_post_;
 
   drop_internal_reply_to_message_in_another_chat(message);
 

@@ -1068,6 +1068,7 @@ class Client final : public WebhookActor::Callback {
     bool is_automatic_forward = false;
     bool is_from_offline = false;
     bool is_scheduled = false;
+    bool is_paid_post = false;
     mutable bool is_content_changed = false;
   };
 
