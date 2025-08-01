@@ -7577,39 +7577,40 @@ void Client::check_reply_parameters(td::Slice chat_id_str, InputReplyParameters 
       chat_id_str, AccessRights::Write, std::move(query),
       [this, reply_parameters = std::move(reply_parameters), message_thread_id, on_success = std::move(on_success)](
           int64 chat_id, PromisedQueryPtr query) mutable {
-        auto on_reply_message_resolved = [this, chat_id, message_thread_id, quote = std::move(reply_parameters.quote),
-                                          on_success = std::move(on_success)](int64 reply_in_chat_id,
-                                                                              int64 reply_to_message_id,
-                                                                              PromisedQueryPtr query) mutable {
-          CheckedReplyParameters reply_parameters;
-          reply_parameters.reply_to_message_id = reply_to_message_id;
-          if (reply_to_message_id > 0) {
-            reply_parameters.reply_in_chat_id = reply_in_chat_id;
-            reply_parameters.quote = std::move(quote);
-          }
+        auto on_reply_message_resolved =
+            [this, chat_id, message_thread_id, quote = std::move(reply_parameters.quote),
+             checklist_task_id = reply_parameters.checklist_task_id, on_success = std::move(on_success)](
+                int64 reply_in_chat_id, int64 reply_to_message_id, PromisedQueryPtr query) mutable {
+              CheckedReplyParameters reply_parameters;
+              reply_parameters.reply_to_message_id = reply_to_message_id;
+              if (reply_to_message_id > 0) {
+                reply_parameters.reply_in_chat_id = reply_in_chat_id;
+                reply_parameters.quote = std::move(quote);
+                reply_parameters.checklist_task_id = checklist_task_id;
+              }
 
-          if (message_thread_id <= 0) {
-            // if message thread isn't specified, then the message to be replied can be only from a different chat
-            if (reply_parameters.reply_in_chat_id == chat_id) {
-              reply_parameters.reply_in_chat_id = 0;
-            }
-            return on_success(chat_id, 0, std::move(reply_parameters), std::move(query));
-          }
+              if (message_thread_id <= 0) {
+                // if message thread isn't specified, then the message to be replied can be only from a different chat
+                if (reply_parameters.reply_in_chat_id == chat_id) {
+                  reply_parameters.reply_in_chat_id = 0;
+                }
+                return on_success(chat_id, 0, std::move(reply_parameters), std::move(query));
+              }
 
-          // reply_in_chat_id must be non-zero only for replies in different chats or different topics
-          if (reply_to_message_id > 0 && reply_parameters.reply_in_chat_id == chat_id) {
-            const MessageInfo *message_info = get_message(reply_in_chat_id, reply_to_message_id, true);
-            CHECK(message_info != nullptr);
-            if (message_info->message_thread_id == message_thread_id) {
-              reply_parameters.reply_in_chat_id = 0;
-            }
-          }
+              // reply_in_chat_id must be non-zero only for replies in different chats or different topics
+              if (reply_to_message_id > 0 && reply_parameters.reply_in_chat_id == chat_id) {
+                const MessageInfo *message_info = get_message(reply_in_chat_id, reply_to_message_id, true);
+                CHECK(message_info != nullptr);
+                if (message_info->message_thread_id == message_thread_id) {
+                  reply_parameters.reply_in_chat_id = 0;
+                }
+              }
 
-          send_request(make_object<td_api::getMessage>(chat_id, message_thread_id),
-                       td::make_unique<TdOnCheckMessageThreadCallback<OnSuccess>>(
-                           this, chat_id, message_thread_id, std::move(reply_parameters), std::move(query),
-                           std::move(on_success)));
-        };
+              send_request(make_object<td_api::getMessage>(chat_id, message_thread_id),
+                           td::make_unique<TdOnCheckMessageThreadCallback<OnSuccess>>(
+                               this, chat_id, message_thread_id, std::move(reply_parameters), std::move(query),
+                               std::move(on_success)));
+            };
         if (reply_parameters.reply_to_message_id <= 0) {
           return on_reply_message_resolved(0, 0, std::move(query));
         }
@@ -8454,12 +8455,12 @@ td_api::object_ptr<td_api::InputMessageReplyTo> Client::get_input_message_reply_
     CheckedReplyParameters &&reply_parameters) {
   if (reply_parameters.reply_to_message_id > 0) {
     if (reply_parameters.reply_in_chat_id != 0) {
-      return make_object<td_api::inputMessageReplyToExternalMessage>(reply_parameters.reply_in_chat_id,
-                                                                     reply_parameters.reply_to_message_id,
-                                                                     std::move(reply_parameters.quote), 0);
+      return make_object<td_api::inputMessageReplyToExternalMessage>(
+          reply_parameters.reply_in_chat_id, reply_parameters.reply_to_message_id, std::move(reply_parameters.quote),
+          reply_parameters.checklist_task_id);
     }
-    return make_object<td_api::inputMessageReplyToMessage>(reply_parameters.reply_to_message_id,
-                                                           std::move(reply_parameters.quote), 0);
+    return make_object<td_api::inputMessageReplyToMessage>(
+        reply_parameters.reply_to_message_id, std::move(reply_parameters.quote), reply_parameters.checklist_task_id);
   }
   return nullptr;
 }
@@ -8467,8 +8468,8 @@ td_api::object_ptr<td_api::InputMessageReplyTo> Client::get_input_message_reply_
 td_api::object_ptr<td_api::InputMessageReplyTo> Client::get_input_message_reply_to(
     InputReplyParameters &&reply_parameters) {
   if (reply_parameters.reply_in_chat_id.empty() && reply_parameters.reply_to_message_id > 0) {
-    return make_object<td_api::inputMessageReplyToMessage>(reply_parameters.reply_to_message_id,
-                                                           std::move(reply_parameters.quote), 0);
+    return make_object<td_api::inputMessageReplyToMessage>(
+        reply_parameters.reply_to_message_id, std::move(reply_parameters.quote), reply_parameters.checklist_task_id);
   }
   return nullptr;
 }
@@ -8512,12 +8513,14 @@ td::Result<Client::InputReplyParameters> Client::get_reply_parameters(td::JsonVa
   TRY_RESULT(quote,
              get_formatted_text(std::move(input_quote), std::move(parse_mode), object.extract_field("quote_entities")));
   TRY_RESULT(quote_position, object.get_optional_int_field("quote_position"));
+  TRY_RESULT(checklist_task_id, object.get_optional_int_field("checklist_task_id"));
 
   InputReplyParameters result;
   result.reply_in_chat_id = std::move(chat_id);
   result.reply_to_message_id = as_tdlib_message_id(td::max(message_id, 0));
   result.allow_sending_without_reply = allow_sending_without_reply;
   result.quote = make_object<td_api::inputTextQuote>(std::move(quote), quote_position);
+  result.checklist_task_id = checklist_task_id;
   return std::move(result);
 }
 
