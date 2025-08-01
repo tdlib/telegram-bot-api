@@ -3415,6 +3415,9 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
   if (message_->reply_to_message != nullptr && message_->reply_to_message->quote_ != nullptr) {
     object("quote", JsonTextQuote(message_->reply_to_message->quote_.get(), client_));
   }
+  if (message_->reply_to_message != nullptr && message_->reply_to_message->checklist_task_id_ != 0) {
+    object("reply_to_checklist_task_id", message_->reply_to_message->checklist_task_id_);
+  }
   if (message_->reply_to_story != nullptr) {
     object("reply_to_story",
            JsonStory(message_->reply_to_story->story_poster_chat_id_, message_->reply_to_story->story_id_, client_));
