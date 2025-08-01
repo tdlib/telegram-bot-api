@@ -728,127 +728,6 @@ class Client::JsonLocation final : public td::Jsonable {
   int32 proximity_alert_radius_;
 };
 
-class Client::JsonGift final : public td::Jsonable {
- public:
-  JsonGift(const td_api::gift *gift, const Client *client) : gift_(gift), client_(client) {
-  }
-  void store(td::JsonValueScope *scope) const {
-    auto object = scope->enter_object();
-    object("id", td::to_string(gift_->id_));
-    object("sticker", JsonSticker(gift_->sticker_.get(), client_));
-    object("star_count", gift_->star_count_);
-    if (gift_->upgrade_star_count_ > 0) {
-      object("upgrade_star_count", gift_->upgrade_star_count_);
-    }
-    if (gift_->total_count_ > 0) {
-      object("remaining_count", gift_->remaining_count_);
-      object("total_count", gift_->total_count_);
-    }
-  }
-
- private:
-  const td_api::gift *gift_;
-  const Client *client_;
-};
-
-class Client::JsonGifts final : public td::Jsonable {
- public:
-  JsonGifts(const td::vector<td_api::object_ptr<td_api::gift>> &gifts, const Client *client)
-      : gifts_(gifts), client_(client) {
-  }
-  void store(td::JsonValueScope *scope) const {
-    auto object = scope->enter_object();
-    object("gifts", td::json_array(gifts_, [client = client_](auto &gift) { return JsonGift(gift.get(), client); }));
-  }
-
- private:
-  const td::vector<td_api::object_ptr<td_api::gift>> &gifts_;
-  const Client *client_;
-};
-
-class Client::JsonUniqueGiftModel final : public td::Jsonable {
- public:
-  JsonUniqueGiftModel(const td_api::upgradedGiftModel *model, const Client *client) : model_(model), client_(client) {
-  }
-  void store(td::JsonValueScope *scope) const {
-    auto object = scope->enter_object();
-    object("name", model_->name_);
-    object("sticker", JsonSticker(model_->sticker_.get(), client_));
-    object("rarity_per_mille", model_->rarity_per_mille_);
-  }
-
- private:
-  const td_api::upgradedGiftModel *model_;
-  const Client *client_;
-};
-
-class Client::JsonUniqueGiftSymbol final : public td::Jsonable {
- public:
-  JsonUniqueGiftSymbol(const td_api::upgradedGiftSymbol *symbol, const Client *client)
-      : symbol_(symbol), client_(client) {
-  }
-  void store(td::JsonValueScope *scope) const {
-    auto object = scope->enter_object();
-    object("name", symbol_->name_);
-    object("sticker", JsonSticker(symbol_->sticker_.get(), client_));
-    object("rarity_per_mille", symbol_->rarity_per_mille_);
-  }
-
- private:
-  const td_api::upgradedGiftSymbol *symbol_;
-  const Client *client_;
-};
-
-class Client::JsonUniqueGiftBackdropColors final : public td::Jsonable {
- public:
-  explicit JsonUniqueGiftBackdropColors(const td_api::upgradedGiftBackdropColors *colors) : colors_(colors) {
-  }
-  void store(td::JsonValueScope *scope) const {
-    auto object = scope->enter_object();
-    object("center_color", colors_->center_color_);
-    object("edge_color", colors_->edge_color_);
-    object("symbol_color", colors_->symbol_color_);
-    object("text_color", colors_->text_color_);
-  }
-
- private:
-  const td_api::upgradedGiftBackdropColors *colors_;
-};
-
-class Client::JsonUniqueGiftBackdrop final : public td::Jsonable {
- public:
-  explicit JsonUniqueGiftBackdrop(const td_api::upgradedGiftBackdrop *backdrop) : backdrop_(backdrop) {
-  }
-  void store(td::JsonValueScope *scope) const {
-    auto object = scope->enter_object();
-    object("name", backdrop_->name_);
-    object("colors", JsonUniqueGiftBackdropColors(backdrop_->colors_.get()));
-    object("rarity_per_mille", backdrop_->rarity_per_mille_);
-  }
-
- private:
-  const td_api::upgradedGiftBackdrop *backdrop_;
-};
-
-class Client::JsonUniqueGift final : public td::Jsonable {
- public:
-  JsonUniqueGift(const td_api::upgradedGift *gift, const Client *client) : gift_(gift), client_(client) {
-  }
-  void store(td::JsonValueScope *scope) const {
-    auto object = scope->enter_object();
-    object("base_name", gift_->title_);
-    object("name", gift_->name_);
-    object("number", gift_->number_);
-    object("model", JsonUniqueGiftModel(gift_->model_.get(), client_));
-    object("symbol", JsonUniqueGiftSymbol(gift_->symbol_.get(), client_));
-    object("backdrop", JsonUniqueGiftBackdrop(gift_->backdrop_.get()));
-  }
-
- private:
-  const td_api::upgradedGift *gift_;
-  const Client *client_;
-};
-
 class Client::JsonReactionType final : public td::Jsonable {
  public:
   explicit JsonReactionType(const td_api::ReactionType *reaction_type) : reaction_type_(reaction_type) {
@@ -1390,6 +1269,133 @@ class Client::JsonChat final : public td::Jsonable {
   const Client *client_;
   bool is_full_;
   int64 pinned_message_id_;
+};
+
+class Client::JsonGift final : public td::Jsonable {
+ public:
+  JsonGift(const td_api::gift *gift, const Client *client) : gift_(gift), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("id", td::to_string(gift_->id_));
+    object("sticker", JsonSticker(gift_->sticker_.get(), client_));
+    object("star_count", gift_->star_count_);
+    if (gift_->upgrade_star_count_ > 0) {
+      object("upgrade_star_count", gift_->upgrade_star_count_);
+    }
+    if (gift_->total_count_ > 0) {
+      object("remaining_count", gift_->remaining_count_);
+      object("total_count", gift_->total_count_);
+    }
+    if (gift_->publisher_chat_id_ != 0) {
+      object("publisher_chat", JsonChat(gift_->publisher_chat_id_, client_));
+    }
+  }
+
+ private:
+  const td_api::gift *gift_;
+  const Client *client_;
+};
+
+class Client::JsonGifts final : public td::Jsonable {
+ public:
+  JsonGifts(const td::vector<td_api::object_ptr<td_api::gift>> &gifts, const Client *client)
+      : gifts_(gifts), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("gifts", td::json_array(gifts_, [client = client_](auto &gift) { return JsonGift(gift.get(), client); }));
+  }
+
+ private:
+  const td::vector<td_api::object_ptr<td_api::gift>> &gifts_;
+  const Client *client_;
+};
+
+class Client::JsonUniqueGiftModel final : public td::Jsonable {
+ public:
+  JsonUniqueGiftModel(const td_api::upgradedGiftModel *model, const Client *client) : model_(model), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("name", model_->name_);
+    object("sticker", JsonSticker(model_->sticker_.get(), client_));
+    object("rarity_per_mille", model_->rarity_per_mille_);
+  }
+
+ private:
+  const td_api::upgradedGiftModel *model_;
+  const Client *client_;
+};
+
+class Client::JsonUniqueGiftSymbol final : public td::Jsonable {
+ public:
+  JsonUniqueGiftSymbol(const td_api::upgradedGiftSymbol *symbol, const Client *client)
+      : symbol_(symbol), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("name", symbol_->name_);
+    object("sticker", JsonSticker(symbol_->sticker_.get(), client_));
+    object("rarity_per_mille", symbol_->rarity_per_mille_);
+  }
+
+ private:
+  const td_api::upgradedGiftSymbol *symbol_;
+  const Client *client_;
+};
+
+class Client::JsonUniqueGiftBackdropColors final : public td::Jsonable {
+ public:
+  explicit JsonUniqueGiftBackdropColors(const td_api::upgradedGiftBackdropColors *colors) : colors_(colors) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("center_color", colors_->center_color_);
+    object("edge_color", colors_->edge_color_);
+    object("symbol_color", colors_->symbol_color_);
+    object("text_color", colors_->text_color_);
+  }
+
+ private:
+  const td_api::upgradedGiftBackdropColors *colors_;
+};
+
+class Client::JsonUniqueGiftBackdrop final : public td::Jsonable {
+ public:
+  explicit JsonUniqueGiftBackdrop(const td_api::upgradedGiftBackdrop *backdrop) : backdrop_(backdrop) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("name", backdrop_->name_);
+    object("colors", JsonUniqueGiftBackdropColors(backdrop_->colors_.get()));
+    object("rarity_per_mille", backdrop_->rarity_per_mille_);
+  }
+
+ private:
+  const td_api::upgradedGiftBackdrop *backdrop_;
+};
+
+class Client::JsonUniqueGift final : public td::Jsonable {
+ public:
+  JsonUniqueGift(const td_api::upgradedGift *gift, const Client *client) : gift_(gift), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("base_name", gift_->title_);
+    object("name", gift_->name_);
+    object("number", gift_->number_);
+    object("model", JsonUniqueGiftModel(gift_->model_.get(), client_));
+    object("symbol", JsonUniqueGiftSymbol(gift_->symbol_.get(), client_));
+    object("backdrop", JsonUniqueGiftBackdrop(gift_->backdrop_.get()));
+    if (gift_->publisher_chat_id_ != 0) {
+      object("publisher_chat", JsonChat(gift_->publisher_chat_id_, client_));
+    }
+  }
+
+ private:
+  const td_api::upgradedGift *gift_;
+  const Client *client_;
 };
 
 class Client::JsonInaccessibleMessage final : public td::Jsonable {
