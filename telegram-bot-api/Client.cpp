@@ -2218,6 +2218,32 @@ class Client::JsonSuggestedPostApprovalFailed final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonSuggestedPostApproved final : public td::Jsonable {
+ public:
+  JsonSuggestedPostApproved(const td_api::messageSuggestedPostApproved *suggested_post_approved, int64 chat_id,
+                            const Client *client)
+      : suggested_post_approved_(suggested_post_approved), chat_id_(chat_id), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    const MessageInfo *suggested_post_message =
+        client_->get_message(chat_id_, suggested_post_approved_->suggested_post_message_id_, true);
+    if (suggested_post_message != nullptr) {
+      object("suggested_post_message",
+             JsonMessage(suggested_post_message, false, "suggested post approval added", client_));
+    }
+    if (suggested_post_approved_->price_ != nullptr) {
+      object("price", JsonSuggestedPostPrice(suggested_post_approved_->price_.get()));
+    }
+    object("send_date", suggested_post_approved_->send_date_);
+  }
+
+ private:
+  const td_api::messageSuggestedPostApproved *suggested_post_approved_;
+  int64 chat_id_;
+  const Client *client_;
+};
+
 class Client::JsonStory final : public td::Jsonable {
  public:
   JsonStory(int64 chat_id, int32 story_id, const Client *client)
@@ -3953,8 +3979,11 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("suggested_post_approval_failed", JsonSuggestedPostApprovalFailed(content, message_->chat_id, client_));
       break;
     }
-    case td_api::messageSuggestedPostApproved::ID:
+    case td_api::messageSuggestedPostApproved::ID: {
+      auto content = static_cast<const td_api::messageSuggestedPostApproved *>(message_->content.get());
+      object("suggested_post_approved", JsonSuggestedPostApproved(content, message_->chat_id, client_));
       break;
+    }
     case td_api::messageSuggestedPostDeclined::ID:
       break;
     case td_api::messageSuggestedPostPaid::ID:
@@ -15908,8 +15937,6 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageGroupCall::ID:
       return true;
     case td_api::messageGiftedTon::ID:
-      return true;
-    case td_api::messageSuggestedPostApproved::ID:
       return true;
     case td_api::messageSuggestedPostDeclined::ID:
       return true;
