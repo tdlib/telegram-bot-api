@@ -140,6 +140,7 @@ class Client final : public WebhookActor::Callback {
   class JsonSuggestedPostApprovalFailed;
   class JsonSuggestedPostApproved;
   class JsonSuggestedPostDeclined;
+  class JsonSuggestedPostPaid;
   class JsonEntity;
   class JsonVectorEntities;
   class JsonWebAppInfo;

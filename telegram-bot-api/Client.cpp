@@ -1398,6 +1398,22 @@ class Client::JsonUniqueGift final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonStarAmount final : public td::Jsonable {
+ public:
+  explicit JsonStarAmount(const td_api::starAmount *amount) : amount_(amount) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("amount", amount_->star_count_);
+    if (amount_->nanostar_count_ != 0) {
+      object("nanostar_amount", amount_->nanostar_count_);
+    }
+  }
+
+ private:
+  const td_api::starAmount *amount_;
+};
+
 class Client::JsonSuggestedPostPrice final : public td::Jsonable {
  public:
   explicit JsonSuggestedPostPrice(const td_api::SuggestedPostPrice *suggested_post_price)
@@ -2265,6 +2281,36 @@ class Client::JsonSuggestedPostDeclined final : public td::Jsonable {
 
  private:
   const td_api::messageSuggestedPostDeclined *suggested_post_declined_;
+  int64 chat_id_;
+  const Client *client_;
+};
+
+class Client::JsonSuggestedPostPaid final : public td::Jsonable {
+ public:
+  JsonSuggestedPostPaid(const td_api::messageSuggestedPostPaid *suggested_post_paid, int64 chat_id,
+                        const Client *client)
+      : suggested_post_paid_(suggested_post_paid), chat_id_(chat_id), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    const MessageInfo *suggested_post_message =
+        client_->get_message(chat_id_, suggested_post_paid_->suggested_post_message_id_, true);
+    if (suggested_post_message != nullptr) {
+      object("suggested_post_message",
+             JsonMessage(suggested_post_message, false, "suggested post approval added", client_));
+    }
+    if (suggested_post_paid_->star_amount_->star_count_ != 0 ||
+        suggested_post_paid_->star_amount_->nanostar_count_ != 0) {
+      object("currency", "XTR");
+      object("star_amount", JsonStarAmount(suggested_post_paid_->star_amount_.get()));
+    } else {
+      object("currency", "TON");
+      object("amount", suggested_post_paid_->ton_amount_);
+    }
+  }
+
+ private:
+  const td_api::messageSuggestedPostPaid *suggested_post_paid_;
   int64 chat_id_;
   const Client *client_;
 };
@@ -4014,8 +4060,11 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("suggested_post_declined", JsonSuggestedPostDeclined(content, message_->chat_id, client_));
       break;
     }
-    case td_api::messageSuggestedPostPaid::ID:
+    case td_api::messageSuggestedPostPaid::ID: {
+      auto content = static_cast<const td_api::messageSuggestedPostPaid *>(message_->content.get());
+      object("suggested_post_paid", JsonSuggestedPostPaid(content, message_->chat_id, client_));
       break;
+    }
     case td_api::messageSuggestedPostRefunded::ID:
       break;
     default:
@@ -4864,22 +4913,6 @@ class Client::JsonBusinessMessagesDeleted final : public td::Jsonable {
  private:
   const td_api::updateBusinessMessagesDeleted *update_;
   const Client *client_;
-};
-
-class Client::JsonStarAmount final : public td::Jsonable {
- public:
-  explicit JsonStarAmount(const td_api::starAmount *amount) : amount_(amount) {
-  }
-  void store(td::JsonValueScope *scope) const {
-    auto object = scope->enter_object();
-    object("amount", amount_->star_count_);
-    if (amount_->nanostar_count_ != 0) {
-      object("nanostar_amount", amount_->nanostar_count_);
-    }
-  }
-
- private:
-  const td_api::starAmount *amount_;
 };
 
 class Client::JsonReceivedGift final : public td::Jsonable {
@@ -15965,8 +15998,6 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageGroupCall::ID:
       return true;
     case td_api::messageGiftedTon::ID:
-      return true;
-    case td_api::messageSuggestedPostPaid::ID:
       return true;
     case td_api::messageSuggestedPostRefunded::ID:
       return true;
