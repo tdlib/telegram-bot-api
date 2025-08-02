@@ -8046,6 +8046,12 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       update_message_content(update->chat_id_, update->message_id_, std::move(update->new_content_));
       break;
     }
+    case td_api::updateMessageSuggestedPostInfo::ID: {
+      auto update = move_object_as<td_api::updateMessageSuggestedPostInfo>(result);
+      on_update_message_suggested_post_info(update->chat_id_, update->message_id_,
+                                            std::move(update->suggested_post_info_));
+      break;
+    }
     case td_api::updateMessageEdited::ID: {
       auto update = move_object_as<td_api::updateMessageEdited>(result);
       auto chat_id = update->chat_id_;
@@ -16530,6 +16536,16 @@ void Client::update_message_content(int64 chat_id, int64 message_id, object_ptr<
 
   message_info->content = std::move(content);
   message_info->is_content_changed = true;
+}
+
+void Client::on_update_message_suggested_post_info(int64 chat_id, int64 message_id,
+                                                   object_ptr<td_api::suggestedPostInfo> &&suggested_post_info) {
+  auto message_info = get_message_editable(chat_id, message_id);
+  if (message_info == nullptr) {
+    return;
+  }
+
+  set_message_suggested_post_info(message_info, std::move(suggested_post_info));
 }
 
 void Client::on_update_message_edited(int64 chat_id, int64 message_id, int32 edit_date,
