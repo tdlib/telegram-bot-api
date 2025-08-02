@@ -137,6 +137,7 @@ class Client final : public WebhookActor::Callback {
   class JsonChecklist;
   class JsonChecklistTasksDone;
   class JsonChecklistTasksAdded;
+  class JsonSuggestedPostApprovalFailed;
   class JsonEntity;
   class JsonVectorEntities;
   class JsonWebAppInfo;
