@@ -1398,6 +1398,67 @@ class Client::JsonUniqueGift final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonSuggestedPostPrice final : public td::Jsonable {
+ public:
+  explicit JsonSuggestedPostPrice(const td_api::SuggestedPostPrice *suggested_post_price)
+      : suggested_post_price_(suggested_post_price) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    switch (suggested_post_price_->get_id()) {
+      case td_api::suggestedPostPriceStar::ID:
+        object("currency", "XTR");
+        object("amount", static_cast<const td_api::suggestedPostPriceStar *>(suggested_post_price_)->star_count_);
+        break;
+      case td_api::suggestedPostPriceTon::ID:
+        object("currency", "TON");
+        object(
+            "amount",
+            static_cast<const td_api::suggestedPostPriceTon *>(suggested_post_price_)->toncoin_cent_count_ * 10000000);
+        break;
+      default:
+        UNREACHABLE();
+        break;
+    }
+  }
+
+ private:
+  const td_api::SuggestedPostPrice *suggested_post_price_;
+};
+
+class Client::JsonSuggestedPostInfo final : public td::Jsonable {
+ public:
+  explicit JsonSuggestedPostInfo(const td_api::suggestedPostInfo *suggested_post_info)
+      : suggested_post_info_(suggested_post_info) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    if (suggested_post_info_->price_ != nullptr) {
+      object("price", JsonSuggestedPostPrice(suggested_post_info_->price_.get()));
+    }
+    if (suggested_post_info_->send_date_ != 0) {
+      object("send_date", suggested_post_info_->send_date_);
+    }
+    switch (suggested_post_info_->state_->get_id()) {
+      case td_api::suggestedPostStatePending::ID:
+        object("state", "pending");
+        break;
+      case td_api::suggestedPostStateApproved::ID:
+        object("state", "approved");
+        break;
+      case td_api::suggestedPostStateDeclined::ID:
+        object("state", "declined");
+        break;
+      default:
+        UNREACHABLE();
+        break;
+    }
+  }
+
+ private:
+  const td_api::suggestedPostInfo *suggested_post_info_;
+};
+
 class Client::JsonInaccessibleMessage final : public td::Jsonable {
  public:
   JsonInaccessibleMessage(int64 chat_id, int64 message_id, const Client *client)
@@ -3903,6 +3964,9 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
   }
   if (message_->is_paid_post) {
     object("is_paid_post", td::JsonTrue());
+  }
+  if (message_->suggested_post_info != nullptr) {
+    object("suggested_post_info", JsonSuggestedPostInfo(message_->suggested_post_info.get()));
   }
 }
 
@@ -15981,6 +16045,46 @@ td::CSlice Client::get_callback_data(const object_ptr<td_api::InlineKeyboardButt
   }
 }
 
+bool Client::are_equal_suggested_post_prices(const td_api::SuggestedPostPrice *lhs,
+                                             const td_api::SuggestedPostPrice *rhs) {
+  if (lhs == nullptr) {
+    return rhs == nullptr;
+  }
+  if (rhs == nullptr) {
+    return false;
+  }
+  if (lhs->get_id() != rhs->get_id()) {
+    return false;
+  }
+  switch (lhs->get_id()) {
+    case td_api::suggestedPostPriceStar::ID:
+      return static_cast<const td_api::suggestedPostPriceStar *>(lhs)->star_count_ ==
+             static_cast<const td_api::suggestedPostPriceStar *>(rhs)->star_count_;
+    case td_api::suggestedPostPriceTon::ID:
+      return static_cast<const td_api::suggestedPostPriceTon *>(lhs)->toncoin_cent_count_ ==
+             static_cast<const td_api::suggestedPostPriceTon *>(rhs)->toncoin_cent_count_;
+    default:
+      UNREACHABLE();
+      return false;
+  }
+}
+
+void Client::set_message_suggested_post_info(MessageInfo *message_info,
+                                             object_ptr<td_api::suggestedPostInfo> &&suggested_post_info) {
+  if (suggested_post_info == nullptr && message_info->suggested_post_info == nullptr) {
+    return;
+  }
+  if (suggested_post_info != nullptr && message_info->suggested_post_info != nullptr &&
+      suggested_post_info->send_date_ == message_info->suggested_post_info->send_date_ &&
+      suggested_post_info->state_->get_id() == message_info->suggested_post_info->state_->get_id() &&
+      are_equal_suggested_post_prices(suggested_post_info->price_.get(),
+                                      message_info->suggested_post_info->price_.get())) {
+    return;
+  }
+  message_info->suggested_post_info = std::move(suggested_post_info);
+  message_info->is_content_changed = true;
+}
+
 bool Client::are_equal_inline_keyboard_buttons(const td_api::inlineKeyboardButton *lhs,
                                                const td_api::inlineKeyboardButton *rhs) {
   CHECK(lhs != nullptr);
@@ -16394,6 +16498,7 @@ void Client::init_message(MessageInfo *message_info, object_ptr<td_api::message>
   } else if (message->content_->get_id() == td_api::messagePoll::ID) {
     message_info->content = std::move(message->content_);
   }
+  set_message_suggested_post_info(message_info, std::move(message->suggested_post_info_));
   set_message_reply_markup(message_info, std::move(message->reply_markup_));
 
   message = nullptr;

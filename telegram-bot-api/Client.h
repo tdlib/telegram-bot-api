@@ -144,6 +144,8 @@ class Client final : public WebhookActor::Callback {
   class JsonInlineKeyboardButton;
   class JsonInlineKeyboard;
   class JsonReplyMarkup;
+  class JsonSuggestedPostPrice;
+  class JsonSuggestedPostInfo;
   class JsonMessage;
   class JsonMessages;
   class JsonInaccessibleMessage;
@@ -1061,6 +1063,7 @@ class Client final : public WebhookActor::Callback {
     int64 media_album_id = 0;
     int64 via_bot_user_id = 0;
     object_ptr<td_api::MessageContent> content;
+    object_ptr<td_api::suggestedPostInfo> suggested_post_info;
     object_ptr<td_api::ReplyMarkup> reply_markup;
     td::string business_connection_id;
     int64 sender_business_bot_user_id = 0;
@@ -1103,6 +1106,12 @@ class Client final : public WebhookActor::Callback {
   static td::Result<object_ptr<td_api::StickerType>> get_sticker_type(td::Slice type);
 
   static td::CSlice get_callback_data(const object_ptr<td_api::InlineKeyboardButtonType> &type);
+
+  static bool are_equal_suggested_post_prices(const td_api::SuggestedPostPrice *lhs,
+                                              const td_api::SuggestedPostPrice *rhs);
+
+  static void set_message_suggested_post_info(MessageInfo *message_info,
+                                              object_ptr<td_api::suggestedPostInfo> &&suggested_post_info);
 
   static bool are_equal_inline_keyboard_buttons(const td_api::inlineKeyboardButton *lhs,
                                                 const td_api::inlineKeyboardButton *rhs);
