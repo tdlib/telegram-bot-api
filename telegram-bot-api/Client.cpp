@@ -2223,7 +2223,7 @@ class Client::JsonSuggestedPostApprovalFailed final : public td::Jsonable {
         client_->get_message(chat_id_, suggested_post_approval_failed_->suggested_post_message_id_, true);
     if (suggested_post_message != nullptr) {
       object("suggested_post_message",
-             JsonMessage(suggested_post_message, false, "suggested post approval added", client_));
+             JsonMessage(suggested_post_message, false, "suggested post approval failed", client_));
     }
     object("price", JsonSuggestedPostPrice(suggested_post_approval_failed_->price_.get()));
   }
@@ -2245,8 +2245,7 @@ class Client::JsonSuggestedPostApproved final : public td::Jsonable {
     const MessageInfo *suggested_post_message =
         client_->get_message(chat_id_, suggested_post_approved_->suggested_post_message_id_, true);
     if (suggested_post_message != nullptr) {
-      object("suggested_post_message",
-             JsonMessage(suggested_post_message, false, "suggested post approval added", client_));
+      object("suggested_post_message", JsonMessage(suggested_post_message, false, "suggested post approved", client_));
     }
     if (suggested_post_approved_->price_ != nullptr) {
       object("price", JsonSuggestedPostPrice(suggested_post_approved_->price_.get()));
@@ -2271,8 +2270,7 @@ class Client::JsonSuggestedPostDeclined final : public td::Jsonable {
     const MessageInfo *suggested_post_message =
         client_->get_message(chat_id_, suggested_post_declined_->suggested_post_message_id_, true);
     if (suggested_post_message != nullptr) {
-      object("suggested_post_message",
-             JsonMessage(suggested_post_message, false, "suggested post approval added", client_));
+      object("suggested_post_message", JsonMessage(suggested_post_message, false, "suggested post declined", client_));
     }
     if (!suggested_post_declined_->comment_.empty()) {
       object("comment", suggested_post_declined_->comment_);
@@ -2296,8 +2294,7 @@ class Client::JsonSuggestedPostPaid final : public td::Jsonable {
     const MessageInfo *suggested_post_message =
         client_->get_message(chat_id_, suggested_post_paid_->suggested_post_message_id_, true);
     if (suggested_post_message != nullptr) {
-      object("suggested_post_message",
-             JsonMessage(suggested_post_message, false, "suggested post approval added", client_));
+      object("suggested_post_message", JsonMessage(suggested_post_message, false, "suggested post paid", client_));
     }
     if (suggested_post_paid_->star_amount_->star_count_ != 0 ||
         suggested_post_paid_->star_amount_->nanostar_count_ != 0) {
@@ -2311,6 +2308,37 @@ class Client::JsonSuggestedPostPaid final : public td::Jsonable {
 
  private:
   const td_api::messageSuggestedPostPaid *suggested_post_paid_;
+  int64 chat_id_;
+  const Client *client_;
+};
+
+class Client::JsonSuggestedPostRefunded final : public td::Jsonable {
+ public:
+  JsonSuggestedPostRefunded(const td_api::messageSuggestedPostRefunded *suggested_post_refunded, int64 chat_id,
+                            const Client *client)
+      : suggested_post_refunded_(suggested_post_refunded), chat_id_(chat_id), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    const MessageInfo *suggested_post_message =
+        client_->get_message(chat_id_, suggested_post_refunded_->suggested_post_message_id_, true);
+    if (suggested_post_message != nullptr) {
+      object("suggested_post_message", JsonMessage(suggested_post_message, false, "suggested post refunded", client_));
+    }
+    switch (suggested_post_refunded_->reason_->get_id()) {
+      case td_api::suggestedPostRefundReasonPostDeleted::ID:
+        object("reason", "post_deleted");
+        break;
+      case td_api::suggestedPostRefundReasonPaymentRefunded::ID:
+        object("reason", "payment_refunded");
+        break;
+      default:
+        UNREACHABLE();
+    }
+  }
+
+ private:
+  const td_api::messageSuggestedPostRefunded *suggested_post_refunded_;
   int64 chat_id_;
   const Client *client_;
 };
@@ -4065,8 +4093,11 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("suggested_post_paid", JsonSuggestedPostPaid(content, message_->chat_id, client_));
       break;
     }
-    case td_api::messageSuggestedPostRefunded::ID:
+    case td_api::messageSuggestedPostRefunded::ID: {
+      auto content = static_cast<const td_api::messageSuggestedPostRefunded *>(message_->content.get());
+      object("suggested_post_refunded", JsonSuggestedPostRefunded(content, message_->chat_id, client_));
       break;
+    }
     default:
       UNREACHABLE();
   }
@@ -15998,8 +16029,6 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageGroupCall::ID:
       return true;
     case td_api::messageGiftedTon::ID:
-      return true;
-    case td_api::messageSuggestedPostRefunded::ID:
       return true;
     default:
       break;
