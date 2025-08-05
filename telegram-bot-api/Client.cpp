@@ -3372,6 +3372,21 @@ class Client::JsonReplyMarkup final : public td::Jsonable {
   const td_api::ReplyMarkup *reply_markup_;
 };
 
+class Client::JsonDirectMessagesTopic final : public td::Jsonable {
+ public:
+  JsonDirectMessagesTopic(int64 topic_id, const Client *client) : topic_id_(topic_id), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("topic_id", topic_id_);
+    object("user", JsonUser(topic_id_, client_));
+  }
+
+ private:
+  int64 topic_id_;
+  const Client *client_;
+};
+
 class Client::JsonExternalReplyInfo final : public td::Jsonable {
  public:
   JsonExternalReplyInfo(const td_api::messageReplyToMessage *reply, const Client *client)
@@ -4112,6 +4127,16 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
   }
   if (is_topic_message(message_->topic_id)) {
     object("is_topic_message", td::JsonTrue());
+  }
+  if (message_->topic_id != nullptr && message_->topic_id->get_id() == td_api::messageTopicDirectMessages::ID) {
+    auto topic_id = static_cast<const td_api::messageTopicDirectMessages *>(message_->topic_id.get())
+                        ->direct_messages_chat_topic_id_;
+    const auto *user_info = client_->get_user_info(topic_id);
+    if (user_info == nullptr) {
+      LOG(ERROR) << "Can't find user " << topic_id << " for direct messages topic";
+    } else {
+      object("direct_messages_topic", JsonDirectMessagesTopic(topic_id, client_));
+    }
   }
   if (message_->is_from_offline) {
     object("is_from_offline", td::JsonTrue());
