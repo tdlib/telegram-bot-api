@@ -12224,8 +12224,10 @@ td::Status Client::process_copy_messages_query(PromisedQueryPtr &query) {
   auto direct_messages_topic_id = td::to_integer<int64>(query->arg("direct_messages_topic_id"));
   auto remove_caption = to_bool(query->arg("remove_caption"));
 
+  auto send_options =
+      get_message_send_options(disable_notification, protect_content, false, 0, direct_messages_topic_id);
   auto on_success = [this, from_chat_id = from_chat_id.str(), message_ids = std::move(message_ids),
-                     disable_notification, protect_content, direct_messages_topic_id,
+                     send_options = std::move(send_options),
                      remove_caption](int64 chat_id, int64 message_thread_id, CheckedReplyParameters,
                                      PromisedQueryPtr query) mutable {
     auto it = yet_unsent_message_count_.find(chat_id);
@@ -12235,8 +12237,8 @@ td::Status Client::process_copy_messages_query(PromisedQueryPtr &query) {
 
     check_messages(
         from_chat_id, std::move(message_ids), true, AccessRights::Read, "message to forward", std::move(query),
-        [this, chat_id, message_thread_id, disable_notification, protect_content, direct_messages_topic_id,
-         remove_caption](int64 from_chat_id, td::vector<int64> message_ids, PromisedQueryPtr query) {
+        [this, chat_id, message_thread_id, send_options = std::move(send_options), remove_caption](
+            int64 from_chat_id, td::vector<int64> message_ids, PromisedQueryPtr query) mutable {
           auto &count = yet_unsent_message_count_[chat_id];
           if (count >= MAX_CONCURRENTLY_SENT_CHAT_MESSAGES) {
             return fail_query_flood_limit_exceeded(std::move(query));
@@ -12246,10 +12248,8 @@ td::Status Client::process_copy_messages_query(PromisedQueryPtr &query) {
           count += static_cast<int32>(message_count);
 
           send_request(
-              make_object<td_api::forwardMessages>(
-                  chat_id, message_thread_id, from_chat_id, std::move(message_ids),
-                  get_message_send_options(disable_notification, protect_content, false, 0, direct_messages_topic_id),
-                  true, remove_caption),
+              make_object<td_api::forwardMessages>(chat_id, message_thread_id, from_chat_id, std::move(message_ids),
+                                                   std::move(send_options), true, remove_caption),
               td::make_unique<TdOnForwardMessagesCallback>(this, chat_id, message_count, std::move(query)));
         });
   };
@@ -12287,10 +12287,11 @@ td::Status Client::process_forward_messages_query(PromisedQueryPtr &query) {
   auto protect_content = to_bool(query->arg("protect_content"));
   auto direct_messages_topic_id = td::to_integer<int64>(query->arg("direct_messages_topic_id"));
 
+  auto send_options =
+      get_message_send_options(disable_notification, protect_content, false, 0, direct_messages_topic_id);
   auto on_success = [this, from_chat_id = from_chat_id.str(), message_ids = std::move(message_ids),
-                     disable_notification, protect_content,
-                     direct_messages_topic_id](int64 chat_id, int64 message_thread_id, CheckedReplyParameters,
-                                               PromisedQueryPtr query) mutable {
+                     send_options = std::move(send_options)](int64 chat_id, int64 message_thread_id,
+                                                             CheckedReplyParameters, PromisedQueryPtr query) mutable {
     auto it = yet_unsent_message_count_.find(chat_id);
     if (it != yet_unsent_message_count_.end() && it->second >= MAX_CONCURRENTLY_SENT_CHAT_MESSAGES) {
       return fail_query_flood_limit_exceeded(std::move(query));
@@ -12298,8 +12299,8 @@ td::Status Client::process_forward_messages_query(PromisedQueryPtr &query) {
 
     check_messages(
         from_chat_id, std::move(message_ids), true, AccessRights::Read, "message to forward", std::move(query),
-        [this, chat_id, message_thread_id, disable_notification, protect_content, direct_messages_topic_id](
-            int64 from_chat_id, td::vector<int64> message_ids, PromisedQueryPtr query) {
+        [this, chat_id, message_thread_id, send_options = std::move(send_options)](
+            int64 from_chat_id, td::vector<int64> message_ids, PromisedQueryPtr query) mutable {
           auto &count = yet_unsent_message_count_[chat_id];
           if (count >= MAX_CONCURRENTLY_SENT_CHAT_MESSAGES) {
             return fail_query_flood_limit_exceeded(std::move(query));
@@ -12309,10 +12310,8 @@ td::Status Client::process_forward_messages_query(PromisedQueryPtr &query) {
           count += static_cast<int32>(message_count);
 
           send_request(
-              make_object<td_api::forwardMessages>(
-                  chat_id, message_thread_id, from_chat_id, std::move(message_ids),
-                  get_message_send_options(disable_notification, protect_content, false, 0, direct_messages_topic_id),
-                  false, false),
+              make_object<td_api::forwardMessages>(chat_id, message_thread_id, from_chat_id, std::move(message_ids),
+                                                   std::move(send_options), false, false),
               td::make_unique<TdOnForwardMessagesCallback>(this, chat_id, message_count, std::move(query)));
         });
   };
@@ -12335,11 +12334,13 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
   auto reply_markup = nullptr;
   TRY_RESULT(input_message_contents, get_input_message_contents(query.get(), "media"));
 
+  auto send_options = get_message_send_options(disable_notification, protect_content, allow_paid_broadcast, effect_id,
+                                               direct_messages_topic_id);
   resolve_reply_markup_bot_usernames(
       std::move(reply_markup), std::move(query),
       [this, chat_id_str = chat_id.str(), message_thread_id, business_connection_id = business_connection_id.str(),
        reply_parameters = std::move(reply_parameters), disable_notification, protect_content, allow_paid_broadcast,
-       effect_id, direct_messages_topic_id, input_message_contents = std::move(input_message_contents)](
+       effect_id, send_options = std::move(send_options), input_message_contents = std::move(input_message_contents)](
           object_ptr<td_api::ReplyMarkup> reply_markup, PromisedQueryPtr query) mutable {
         if (!business_connection_id.empty()) {
           return check_business_connection_chat_id(
@@ -12356,8 +12357,8 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
               });
         }
 
-        auto on_success = [this, disable_notification, protect_content, allow_paid_broadcast, effect_id,
-                           direct_messages_topic_id, input_message_contents = std::move(input_message_contents),
+        auto on_success = [this, send_options = std::move(send_options),
+                           input_message_contents = std::move(input_message_contents),
                            reply_markup = std::move(reply_markup)](int64 chat_id, int64 message_thread_id,
                                                                    CheckedReplyParameters reply_parameters,
                                                                    PromisedQueryPtr query) mutable {
@@ -12370,9 +12371,7 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
 
           send_request(make_object<td_api::sendMessageAlbum>(
                            chat_id, message_thread_id, get_input_message_reply_to(std::move(reply_parameters)),
-                           get_message_send_options(disable_notification, protect_content, allow_paid_broadcast,
-                                                    effect_id, direct_messages_topic_id),
-                           std::move(input_message_contents)),
+                           std::move(send_options), std::move(input_message_contents)),
                        td::make_unique<TdOnSendMessageAlbumCallback>(this, chat_id, message_count, std::move(query)));
         };
         check_reply_parameters(chat_id_str, std::move(reply_parameters), message_thread_id, std::move(query),
@@ -14775,11 +14774,13 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
   }
   auto reply_markup = r_reply_markup.move_as_ok();
 
+  auto send_options = get_message_send_options(disable_notification, protect_content, allow_paid_broadcast, effect_id,
+                                               direct_messages_topic_id);
   resolve_reply_markup_bot_usernames(
       std::move(reply_markup), std::move(query),
       [this, chat_id_str = chat_id.str(), message_thread_id, business_connection_id = business_connection_id.str(),
        reply_parameters = std::move(reply_parameters), disable_notification, protect_content, allow_paid_broadcast,
-       effect_id, direct_messages_topic_id, input_message_content = std::move(input_message_content)](
+       effect_id, send_options = std::move(send_options), input_message_content = std::move(input_message_content)](
           object_ptr<td_api::ReplyMarkup> reply_markup, PromisedQueryPtr query) mutable {
         if (!business_connection_id.empty()) {
           return check_business_connection_chat_id(
@@ -14796,8 +14797,8 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
               });
         }
 
-        auto on_success = [this, disable_notification, protect_content, allow_paid_broadcast, effect_id,
-                           direct_messages_topic_id, input_message_content = std::move(input_message_content),
+        auto on_success = [this, send_options = std::move(send_options),
+                           input_message_content = std::move(input_message_content),
                            reply_markup = std::move(reply_markup)](int64 chat_id, int64 message_thread_id,
                                                                    CheckedReplyParameters reply_parameters,
                                                                    PromisedQueryPtr query) mutable {
@@ -14809,9 +14810,7 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
 
           send_request(make_object<td_api::sendMessage>(
                            chat_id, message_thread_id, get_input_message_reply_to(std::move(reply_parameters)),
-                           get_message_send_options(disable_notification, protect_content, allow_paid_broadcast,
-                                                    effect_id, direct_messages_topic_id),
-                           std::move(reply_markup), std::move(input_message_content)),
+                           std::move(send_options), std::move(reply_markup), std::move(input_message_content)),
                        td::make_unique<TdOnSendMessageCallback>(this, chat_id, std::move(query)));
         };
         check_reply_parameters(chat_id_str, std::move(reply_parameters), message_thread_id, std::move(query),
