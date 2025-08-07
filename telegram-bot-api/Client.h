@@ -472,6 +472,12 @@ class Client final : public WebhookActor::Callback {
 
   static td::Result<object_ptr<td_api::ReplyMarkup>> get_reply_markup(td::JsonValue &&value, BotUserIds &bot_user_ids);
 
+  static td::Result<object_ptr<td_api::SuggestedPostPrice>> get_suggested_post_price(td::JsonValue &&value);
+
+  static td::Result<object_ptr<td_api::inputSuggestedPostInfo>> get_input_suggested_post_info(const Query *query);
+
+  static td::Result<object_ptr<td_api::inputSuggestedPostInfo>> get_input_suggested_post_info(td::JsonValue &&value);
+
   static td::Result<object_ptr<td_api::labeledPricePart>> get_labeled_price_part(td::JsonValue &value);
 
   static td::Result<td::vector<object_ptr<td_api::labeledPricePart>>> get_labeled_price_parts(td::JsonValue &value);
@@ -640,10 +646,9 @@ class Client final : public WebhookActor::Callback {
 
   td::Result<object_ptr<td_api::inputMessageInvoice>> get_input_message_invoice(const Query *query) const;
 
-  static object_ptr<td_api::messageSendOptions> get_message_send_options(bool disable_notification,
-                                                                         bool protect_content,
-                                                                         bool allow_paid_broadcast, int64 effect_id,
-                                                                         int64 direct_messages_topic_id);
+  static object_ptr<td_api::messageSendOptions> get_message_send_options(
+      bool disable_notification, bool protect_content, bool allow_paid_broadcast, int64 effect_id,
+      int64 direct_messages_topic_id, object_ptr<td_api::inputSuggestedPostInfo> &&input_suggested_post_info);
 
   static td::Result<td::vector<object_ptr<td_api::formattedText>>> get_poll_options(const Query *query);
 

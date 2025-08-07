@@ -9096,6 +9096,61 @@ td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(td:
   return std::move(result);
 }
 
+td::Result<td_api::object_ptr<td_api::SuggestedPostPrice>> Client::get_suggested_post_price(td::JsonValue &&value) {
+  if (value.type() != td::JsonValue::Type::Object) {
+    return td::Status::Error(400, "Object expected as suggested post price");
+  }
+  auto &object = value.get_object();
+
+  TRY_RESULT(currency, object.get_required_string_field("currency"));
+  TRY_RESULT(amount, object.get_required_long_field("amount"));
+
+  if (currency == "XTR") {
+    return make_object<td_api::suggestedPostPriceStar>(amount);
+  }
+  if (currency == "TON") {
+    if (amount % 10000000 != 0) {
+      return td::Status::Error(400, "Suggested post price must be divisible by 10000000 nanotoncoins");
+    }
+    return make_object<td_api::suggestedPostPriceTon>(amount / 10000000);
+  }
+  return td::Status::Error(400, "Invalid suggested post price currency specified");
+}
+
+td::Result<td_api::object_ptr<td_api::inputSuggestedPostInfo>> Client::get_input_suggested_post_info(
+    const Query *query) {
+  auto suggested_post = query->arg("suggested_post_parameters");
+  if (suggested_post.empty()) {
+    return nullptr;
+  }
+
+  LOG(INFO) << "Parsing JSON object: " << suggested_post;
+  auto r_value = json_decode(suggested_post);
+  if (r_value.is_error()) {
+    LOG(INFO) << "Can't parse JSON object: " << r_value.error();
+    return td::Status::Error(400, "Can't parse suggested post parameters JSON object");
+  }
+
+  return get_input_suggested_post_info(r_value.move_as_ok());
+}
+
+td::Result<td_api::object_ptr<td_api::inputSuggestedPostInfo>> Client::get_input_suggested_post_info(
+    td::JsonValue &&value) {
+  if (value.type() != td::JsonValue::Type::Object) {
+    return td::Status::Error(400, "Object expected as suggested post parameters");
+  }
+  auto &object = value.get_object();
+
+  TRY_RESULT(send_date, object.get_optional_int_field("send_date"));
+
+  object_ptr<td_api::SuggestedPostPrice> price;
+  TRY_RESULT(input_price, object.extract_optional_field("price", td::JsonValue::Type::Object));
+  if (input_price.type() == td::JsonValue::Type::Object) {
+    TRY_RESULT_ASSIGN(price, get_suggested_post_price(std::move(input_price)));
+  }
+  return make_object<td_api::inputSuggestedPostInfo>(std::move(price), send_date);
+}
+
 td::Result<td_api::object_ptr<td_api::labeledPricePart>> Client::get_labeled_price_part(td::JsonValue &value) {
   if (value.type() != td::JsonValue::Type::Object) {
     return td::Status::Error(400, "LabeledPrice must be an Object");
@@ -9434,14 +9489,12 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
   return nullptr;
 }
 
-td_api::object_ptr<td_api::messageSendOptions> Client::get_message_send_options(bool disable_notification,
-                                                                                bool protect_content,
-                                                                                bool allow_paid_broadcast,
-                                                                                int64 effect_id,
-                                                                                int64 direct_messages_topic_id) {
-  return make_object<td_api::messageSendOptions>(direct_messages_topic_id, nullptr, disable_notification, false,
-                                                 protect_content, allow_paid_broadcast, 0, false, nullptr, effect_id, 0,
-                                                 false);
+td_api::object_ptr<td_api::messageSendOptions> Client::get_message_send_options(
+    bool disable_notification, bool protect_content, bool allow_paid_broadcast, int64 effect_id,
+    int64 direct_messages_topic_id, object_ptr<td_api::inputSuggestedPostInfo> &&input_suggested_post_info) {
+  return make_object<td_api::messageSendOptions>(direct_messages_topic_id, std::move(input_suggested_post_info),
+                                                 disable_notification, false, protect_content, allow_paid_broadcast, 0,
+                                                 false, nullptr, effect_id, 0, false);
 }
 
 td::Result<td_api::object_ptr<td_api::inlineQueryResultsButton>> Client::get_inline_query_results_button(
@@ -12222,10 +12275,11 @@ td::Status Client::process_copy_messages_query(PromisedQueryPtr &query) {
   auto disable_notification = to_bool(query->arg("disable_notification"));
   auto protect_content = to_bool(query->arg("protect_content"));
   auto direct_messages_topic_id = td::to_integer<int64>(query->arg("direct_messages_topic_id"));
+  TRY_RESULT(input_suggested_post_info, get_input_suggested_post_info(query.get()));
   auto remove_caption = to_bool(query->arg("remove_caption"));
 
-  auto send_options =
-      get_message_send_options(disable_notification, protect_content, false, 0, direct_messages_topic_id);
+  auto send_options = get_message_send_options(disable_notification, protect_content, false, 0,
+                                               direct_messages_topic_id, std::move(input_suggested_post_info));
   auto on_success = [this, from_chat_id = from_chat_id.str(), message_ids = std::move(message_ids),
                      send_options = std::move(send_options),
                      remove_caption](int64 chat_id, int64 message_thread_id, CheckedReplyParameters,
@@ -12286,9 +12340,10 @@ td::Status Client::process_forward_messages_query(PromisedQueryPtr &query) {
   auto disable_notification = to_bool(query->arg("disable_notification"));
   auto protect_content = to_bool(query->arg("protect_content"));
   auto direct_messages_topic_id = td::to_integer<int64>(query->arg("direct_messages_topic_id"));
+  TRY_RESULT(input_suggested_post_info, get_input_suggested_post_info(query.get()));
 
-  auto send_options =
-      get_message_send_options(disable_notification, protect_content, false, 0, direct_messages_topic_id);
+  auto send_options = get_message_send_options(disable_notification, protect_content, false, 0,
+                                               direct_messages_topic_id, std::move(input_suggested_post_info));
   auto on_success = [this, from_chat_id = from_chat_id.str(), message_ids = std::move(message_ids),
                      send_options = std::move(send_options)](int64 chat_id, int64 message_thread_id,
                                                              CheckedReplyParameters, PromisedQueryPtr query) mutable {
@@ -12330,12 +12385,13 @@ td::Status Client::process_send_media_group_query(PromisedQueryPtr &query) {
   auto allow_paid_broadcast = to_bool(query->arg("allow_paid_broadcast"));
   auto effect_id = td::to_integer<int64>(query->arg("message_effect_id"));
   auto direct_messages_topic_id = td::to_integer<int64>(query->arg("direct_messages_topic_id"));
+  TRY_RESULT(input_suggested_post_info, get_input_suggested_post_info(query.get()));
   // TRY_RESULT(reply_markup, get_reply_markup(query.get(), bot_user_ids_));
   auto reply_markup = nullptr;
   TRY_RESULT(input_message_contents, get_input_message_contents(query.get(), "media"));
 
   auto send_options = get_message_send_options(disable_notification, protect_content, allow_paid_broadcast, effect_id,
-                                               direct_messages_topic_id);
+                                               direct_messages_topic_id, std::move(input_suggested_post_info));
   resolve_reply_markup_bot_usernames(
       std::move(reply_markup), std::move(query),
       [this, chat_id_str = chat_id.str(), message_thread_id, business_connection_id = business_connection_id.str(),
@@ -14768,6 +14824,10 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
   auto allow_paid_broadcast = to_bool(query->arg("allow_paid_broadcast"));
   auto effect_id = td::to_integer<int64>(query->arg("message_effect_id"));
   auto direct_messages_topic_id = td::to_integer<int64>(query->arg("direct_messages_topic_id"));
+  auto r_input_suggested_post_info = get_input_suggested_post_info(query.get());
+  if (r_input_suggested_post_info.is_error()) {
+    return fail_query_with_error(std::move(query), 400, r_input_suggested_post_info.error().message());
+  }
   auto r_reply_markup = get_reply_markup(query.get(), bot_user_ids_);
   if (r_reply_markup.is_error()) {
     return fail_query_with_error(std::move(query), 400, r_reply_markup.error().message());
@@ -14775,7 +14835,7 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
   auto reply_markup = r_reply_markup.move_as_ok();
 
   auto send_options = get_message_send_options(disable_notification, protect_content, allow_paid_broadcast, effect_id,
-                                               direct_messages_topic_id);
+                                               direct_messages_topic_id, r_input_suggested_post_info.move_as_ok());
   resolve_reply_markup_bot_usernames(
       std::move(reply_markup), std::move(query),
       [this, chat_id_str = chat_id.str(), message_thread_id, business_connection_id = business_connection_id.str(),
