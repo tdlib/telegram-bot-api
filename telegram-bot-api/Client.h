@@ -813,6 +813,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_pin_chat_message_query(PromisedQueryPtr &query);
   td::Status process_unpin_chat_message_query(PromisedQueryPtr &query);
   td::Status process_unpin_all_chat_messages_query(PromisedQueryPtr &query);
+  td::Status process_approve_suggested_post_query(PromisedQueryPtr &query);
   td::Status process_set_chat_sticker_set_query(PromisedQueryPtr &query);
   td::Status process_delete_chat_sticker_set_query(PromisedQueryPtr &query);
   td::Status process_get_forum_topic_icon_stickers_query(PromisedQueryPtr &query);

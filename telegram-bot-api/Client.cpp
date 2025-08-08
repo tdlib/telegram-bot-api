@@ -306,6 +306,7 @@ bool Client::init_methods() {
   methods_.emplace("pinchatmessage", &Client::process_pin_chat_message_query);
   methods_.emplace("unpinchatmessage", &Client::process_unpin_chat_message_query);
   methods_.emplace("unpinallchatmessages", &Client::process_unpin_all_chat_messages_query);
+  methods_.emplace("approvesuggestedpost", &Client::process_approve_suggested_post_query);
   methods_.emplace("setchatstickerset", &Client::process_set_chat_sticker_set_query);
   methods_.emplace("deletechatstickerset", &Client::process_delete_chat_sticker_set_query);
   methods_.emplace("getforumtopiciconstickers", &Client::process_get_forum_topic_icon_stickers_query);
@@ -13635,6 +13636,19 @@ td::Status Client::process_unpin_all_chat_messages_query(PromisedQueryPtr &query
     send_request(make_object<td_api::unpinAllChatMessages>(chat_id),
                  td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   });
+  return td::Status::OK();
+}
+
+td::Status Client::process_approve_suggested_post_query(PromisedQueryPtr &query) {
+  auto chat_id = query->arg("chat_id");
+  auto message_id = get_message_id(query.get());
+  auto send_date = td::to_integer<int32>(query->arg("send_date"));
+
+  check_message(chat_id, message_id, false, AccessRights::Write, "suggested post", std::move(query),
+                [this, send_date](int64 chat_id, int64 message_id, PromisedQueryPtr query) {
+                  send_request(make_object<td_api::approveSuggestedPost>(chat_id, message_id, send_date),
+                               td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+                });
   return td::Status::OK();
 }
 
