@@ -1,4 +1,4 @@
-name: Build Telegram Bot API Static
+name: Build Telegram Bot API Static for Linux
 
 on:
   push:
