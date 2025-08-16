@@ -137,6 +137,11 @@ class Client final : public WebhookActor::Callback {
   class JsonChecklist;
   class JsonChecklistTasksDone;
   class JsonChecklistTasksAdded;
+  class JsonSuggestedPostApprovalFailed;
+  class JsonSuggestedPostApproved;
+  class JsonSuggestedPostDeclined;
+  class JsonSuggestedPostPaid;
+  class JsonSuggestedPostRefunded;
   class JsonEntity;
   class JsonVectorEntities;
   class JsonWebAppInfo;
@@ -144,6 +149,9 @@ class Client final : public WebhookActor::Callback {
   class JsonInlineKeyboardButton;
   class JsonInlineKeyboard;
   class JsonReplyMarkup;
+  class JsonDirectMessagesTopic;
+  class JsonSuggestedPostPrice;
+  class JsonSuggestedPostInfo;
   class JsonMessage;
   class JsonMessages;
   class JsonInaccessibleMessage;
@@ -322,12 +330,14 @@ class Client final : public WebhookActor::Callback {
     int64 reply_to_message_id = 0;
     bool allow_sending_without_reply = false;
     object_ptr<td_api::inputTextQuote> quote;
+    int32 checklist_task_id = 0;
   };
 
   struct CheckedReplyParameters {
     int64 reply_in_chat_id = 0;
     int64 reply_to_message_id = 0;
     object_ptr<td_api::inputTextQuote> quote;
+    int32 checklist_task_id = 0;
   };
 
   struct UserInfo;
@@ -461,6 +471,12 @@ class Client final : public WebhookActor::Callback {
   static td::Result<object_ptr<td_api::ReplyMarkup>> get_reply_markup(const Query *query, BotUserIds &bot_user_ids);
 
   static td::Result<object_ptr<td_api::ReplyMarkup>> get_reply_markup(td::JsonValue &&value, BotUserIds &bot_user_ids);
+
+  static td::Result<object_ptr<td_api::SuggestedPostPrice>> get_suggested_post_price(td::JsonValue &&value);
+
+  static td::Result<object_ptr<td_api::inputSuggestedPostInfo>> get_input_suggested_post_info(const Query *query);
+
+  static td::Result<object_ptr<td_api::inputSuggestedPostInfo>> get_input_suggested_post_info(td::JsonValue &&value);
 
   static td::Result<object_ptr<td_api::labeledPricePart>> get_labeled_price_part(td::JsonValue &value);
 
@@ -630,9 +646,9 @@ class Client final : public WebhookActor::Callback {
 
   td::Result<object_ptr<td_api::inputMessageInvoice>> get_input_message_invoice(const Query *query) const;
 
-  static object_ptr<td_api::messageSendOptions> get_message_send_options(bool disable_notification,
-                                                                         bool protect_content,
-                                                                         bool allow_paid_broadcast, int64 effect_id);
+  static object_ptr<td_api::messageSendOptions> get_message_send_options(
+      bool disable_notification, bool protect_content, bool allow_paid_broadcast, int64 effect_id,
+      int64 direct_messages_topic_id, object_ptr<td_api::inputSuggestedPostInfo> &&input_suggested_post_info);
 
   static td::Result<td::vector<object_ptr<td_api::formattedText>>> get_poll_options(const Query *query);
 
@@ -797,6 +813,8 @@ class Client final : public WebhookActor::Callback {
   td::Status process_pin_chat_message_query(PromisedQueryPtr &query);
   td::Status process_unpin_chat_message_query(PromisedQueryPtr &query);
   td::Status process_unpin_all_chat_messages_query(PromisedQueryPtr &query);
+  td::Status process_approve_suggested_post_query(PromisedQueryPtr &query);
+  td::Status process_decline_suggested_post_query(PromisedQueryPtr &query);
   td::Status process_set_chat_sticker_set_query(PromisedQueryPtr &query);
   td::Status process_delete_chat_sticker_set_query(PromisedQueryPtr &query);
   td::Status process_get_forum_topic_icon_stickers_query(PromisedQueryPtr &query);
@@ -1059,6 +1077,7 @@ class Client final : public WebhookActor::Callback {
     int64 media_album_id = 0;
     int64 via_bot_user_id = 0;
     object_ptr<td_api::MessageContent> content;
+    object_ptr<td_api::suggestedPostInfo> suggested_post_info;
     object_ptr<td_api::ReplyMarkup> reply_markup;
     td::string business_connection_id;
     int64 sender_business_bot_user_id = 0;
@@ -1068,6 +1087,7 @@ class Client final : public WebhookActor::Callback {
     bool is_automatic_forward = false;
     bool is_from_offline = false;
     bool is_scheduled = false;
+    bool is_paid_post = false;
     mutable bool is_content_changed = false;
   };
 
@@ -1100,6 +1120,12 @@ class Client final : public WebhookActor::Callback {
   static td::Result<object_ptr<td_api::StickerType>> get_sticker_type(td::Slice type);
 
   static td::CSlice get_callback_data(const object_ptr<td_api::InlineKeyboardButtonType> &type);
+
+  static bool are_equal_suggested_post_prices(const td_api::SuggestedPostPrice *lhs,
+                                              const td_api::SuggestedPostPrice *rhs);
+
+  static void set_message_suggested_post_info(MessageInfo *message_info,
+                                              object_ptr<td_api::suggestedPostInfo> &&suggested_post_info);
 
   static bool are_equal_inline_keyboard_buttons(const td_api::inlineKeyboardButton *lhs,
                                                 const td_api::inlineKeyboardButton *rhs);
@@ -1172,6 +1198,9 @@ class Client final : public WebhookActor::Callback {
                                                       object_ptr<td_api::businessMessage> &&message);
 
   void update_message_content(int64 chat_id, int64 message_id, object_ptr<td_api::MessageContent> &&content);
+
+  void on_update_message_suggested_post_info(int64 chat_id, int64 message_id,
+                                             object_ptr<td_api::suggestedPostInfo> &&suggested_post_info);
 
   void on_update_message_edited(int64 chat_id, int64 message_id, int32 edit_date,
                                 object_ptr<td_api::ReplyMarkup> &&reply_markup);
