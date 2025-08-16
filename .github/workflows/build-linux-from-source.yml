@@ -1,0 +1,61 @@
+name: Build Telegram Bot API Static for Linux from Source
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        repository: tdlib/telegram-bot-api
+        submodules: recursive
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential g++ cmake gperf
+
+    - name: Build and install zlib statically
+      run: |
+        wget https://zlib.net/zlib-1.3.1.tar.gz
+        tar -xvzf zlib-1.3.1.tar.gz
+        cd zlib-1.3.1
+        ./configure --static --prefix=/usr/local/zlib
+        make
+        sudo make install
+        cd ..
+
+    - name: Build and install OpenSSL statically
+      run: |
+        wget https://www.openssl.org/source/openssl-3.2.1.tar.gz
+        tar -xvzf openssl-3.2.1.tar.gz
+        cd openssl-3.2.1
+        ./config no-shared --prefix=/usr/local/openssl
+        make
+        sudo make install
+        cd ..
+
+    - name: Build Telegram Bot API Statically
+      run: |
+        mkdir build
+        cd build
+        cmake -DCMAKE_BUILD_TYPE=Release \
+              -DBUILD_SHARED_LIBS=OFF \
+              -DCMAKE_EXE_LINKER_FLAGS="-static -static-libgcc -static-libstdc++" \
+              -DOPENSSL_ROOT_DIR=/usr/local/openssl \
+              -DOPENSSL_USE_STATIC_LIBS=ON \
+              -DZLIB_ROOT=/usr/local/zlib \
+              -DZLIB_USE_STATIC_LIBS=ON \
+              ..
+        cmake --build . --target install
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: telegram-bot-api
+        path: /usr/local/bin/telegram-bot-api
