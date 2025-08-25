@@ -1,0 +1,18 @@
+from telegram import Update
+from telegram.ext import Application, CommandHandler, ContextTypes
+
+# BotFather ကယူထားတဲ့ API Token
+TOKEN =8487771996:AAF5wD05fmevM0myTT-BD7NwE0OXomAE8B4
+
+# /start ကွန်မန်းနာ့လုပ်ဆောင်ချက်
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("မင်္ဂလာပါ 😃 ဒီ Bot က စတင်သွားပါပြီ!")
+
+# Bot run
+def main():
+    app = Application.builder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
