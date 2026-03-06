@@ -6559,18 +6559,6 @@ class Client::TdOnCheckForumTopicCallback final : public TdQueryCallback {
     auto forum_topic = move_object_as<td_api::forumTopic>(result);
     CHECK(forum_topic->info_->chat_id_ == chat_id_);
     CHECK(forum_topic->info_->forum_topic_id_ == forum_topic_id_);
-    auto message_id = as_tdlib_message_id(forum_topic_id_);
-    if (client_->get_chat_type(chat_id_) == ChatType::Supergroup &&
-        client_->get_message(chat_id_, message_id, false) == nullptr) {
-      auto on_check_message = [forum_topic_id = forum_topic_id_, on_success = std::move(on_success_)](
-                                  int64 chat_id, int64 message_id, PromisedQueryPtr query) mutable {
-        on_success(chat_id, make_object<td_api::messageTopicForum>(forum_topic_id), std::move(query));
-      };
-      return client_->send_request(make_object<td_api::getMessage>(chat_id_, message_id),
-                                   td::make_unique<TdOnCheckMessageCallback<decltype(on_check_message)>>(
-                                       client_, chat_id_, message_id, true, "top forum topic message",
-                                       std::move(query_), std::move(on_check_message)));
-    }
     on_success_(chat_id_, make_object<td_api::messageTopicForum>(forum_topic_id_), std::move(query_));
   }
 
