@@ -100,6 +100,7 @@ void Client::fail_query_with_error(PromisedQueryPtr query, int32 error_code, td:
       error_code = 400;
     }
   }
+  td::string error_buf;
   if (error_code == 400) {
     if (!default_message.empty()) {
       error_message = default_message;
@@ -148,6 +149,15 @@ void Client::fail_query_with_error(PromisedQueryPtr query, int32 error_code, td:
     } else if (error_message == "MESSAGE_DELETE_FORBIDDEN") {
       error_code = 400;
       error_message = td::Slice("message can't be deleted");
+    } else if (error_message == "RANK_CHANGE_FORBIDDEN" || error_message == "RANK_EMOJI_NOT_ALLOWED" ||
+               error_message == "RANK_INVALID") {
+      error_code = 400;
+      if (query->method() == "setchatmembertag") {
+        error_buf = PSTRING() << "TAG" << error_message.substr(4);
+      } else {
+        error_buf = PSTRING() << "CUSTOM_TITLE" << error_message.substr(4);
+      }
+      error_message = error_buf;
     }
   }
   td::Slice prefix;
@@ -14666,25 +14676,25 @@ td::Status Client::process_set_chat_administrator_custom_title_query(PromisedQue
       return fail_query(400, "Bad Request: method is available only for groups and supergroups", std::move(query));
     }
 
-    get_chat_member(
-        chat_id, user_id, std::move(query),
-        [this, chat_id, user_id](object_ptr<td_api::chatMember> &&chat_member, PromisedQueryPtr query) {
-          if (chat_member->status_->get_id() == td_api::chatMemberStatusCreator::ID) {
-            return fail_query(400, "Bad Request: only creator can edit their custom title", std::move(query));
-          }
-          if (chat_member->status_->get_id() != td_api::chatMemberStatusAdministrator::ID) {
-            return fail_query(400, "Bad Request: user is not an administrator", std::move(query));
-          }
-          auto administrator = move_object_as<td_api::chatMemberStatusAdministrator>(chat_member->status_);
-          if (!administrator->can_be_edited_) {
-            return fail_query(400, "Bad Request: not enough rights to change custom title of the user",
-                              std::move(query));
-          }
+    get_chat_member(chat_id, user_id, std::move(query),
+                    [this, chat_id, user_id](object_ptr<td_api::chatMember> &&chat_member, PromisedQueryPtr query) {
+                      if (chat_member->status_->get_id() == td_api::chatMemberStatusCreator::ID) {
+                        return fail_query(400, "Bad Request: only the owner can edit their custom title",
+                                          std::move(query));
+                      }
+                      if (chat_member->status_->get_id() != td_api::chatMemberStatusAdministrator::ID) {
+                        return fail_query(400, "Bad Request: user is not an administrator", std::move(query));
+                      }
+                      auto administrator = move_object_as<td_api::chatMemberStatusAdministrator>(chat_member->status_);
+                      if (!administrator->can_be_edited_) {
+                        return fail_query(400, "Bad Request: not enough rights to change custom title of the user",
+                                          std::move(query));
+                      }
 
-          auto custom_title = query->arg("custom_title").str();
-          send_request(make_object<td_api::setChatMemberTag>(chat_id, user_id, custom_title),
-                       td::make_unique<TdOnOkQueryCallback>(std::move(query)));
-        });
+                      auto custom_title = query->arg("custom_title").str();
+                      send_request(make_object<td_api::setChatMemberTag>(chat_id, user_id, custom_title),
+                                   td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+                    });
   });
   return td::Status::OK();
 }
