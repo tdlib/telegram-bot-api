@@ -2272,14 +2272,13 @@ class Client::JsonPoll final : public td::Jsonable {
     }
     object("is_closed", td::JsonBool(poll_->is_closed_));
     object("is_anonymous", td::JsonBool(poll_->is_anonymous_));
+    object("allows_multiple_answers", td::JsonBool(poll_->allows_multiple_answers_));
     switch (poll_->type_->get_id()) {
       case td_api::pollTypeQuiz::ID: {
         object("type", "quiz");
-        object("allows_multiple_answers", td::JsonFalse());
         auto quiz = static_cast<const td_api::pollTypeQuiz *>(poll_->type_.get());
-        int32 correct_option_id = quiz->correct_option_id_;
-        if (correct_option_id != -1) {
-          object("correct_option_id", correct_option_id);
+        if (quiz->correct_option_ids_.size() == 1u) {
+          object("correct_option_id", quiz->correct_option_ids_[0]);
         }
         auto *explanation = quiz->explanation_.get();
         if (!explanation->text_.empty()) {
@@ -2290,8 +2289,6 @@ class Client::JsonPoll final : public td::Jsonable {
       }
       case td_api::pollTypeRegular::ID:
         object("type", "regular");
-        object("allows_multiple_answers",
-               td::JsonBool(static_cast<const td_api::pollTypeRegular *>(poll_->type_.get())->allow_multiple_answers_));
         break;
       default:
         UNREACHABLE();
@@ -2326,7 +2323,7 @@ class Client::JsonPollAnswer final : public td::Jsonable {
       default:
         UNREACHABLE();
     }
-    object("option_ids", td::json_array(poll_answer_->option_ids_, [](int32 option_id) { return option_id; }));
+    object("option_ids", td::json_array(poll_answer_->option_positions_, [](int32 option_id) { return option_id; }));
   }
 
  private:
@@ -4473,6 +4470,12 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     case td_api::messageChatHasProtectedContentToggled::ID:
       break;
     case td_api::messageChatHasProtectedContentDisableRequested::ID:
+      break;
+    case td_api::messagePollOptionAdded::ID:
+      break;
+    case td_api::messagePollOptionDeleted::ID:
+      break;
+    case td_api::messageManagedBotCreated::ID:
       break;
     default:
       UNREACHABLE();
@@ -9181,10 +9184,11 @@ td_api::object_ptr<td_api::InputMessageReplyTo> Client::get_input_message_reply_
     if (reply_parameters.reply_in_chat_id != 0) {
       return make_object<td_api::inputMessageReplyToExternalMessage>(
           reply_parameters.reply_in_chat_id, reply_parameters.reply_to_message_id, std::move(reply_parameters.quote),
-          reply_parameters.checklist_task_id);
+          reply_parameters.checklist_task_id, td::string());
     }
-    return make_object<td_api::inputMessageReplyToMessage>(
-        reply_parameters.reply_to_message_id, std::move(reply_parameters.quote), reply_parameters.checklist_task_id);
+    return make_object<td_api::inputMessageReplyToMessage>(reply_parameters.reply_to_message_id,
+                                                           std::move(reply_parameters.quote),
+                                                           reply_parameters.checklist_task_id, td::string());
   }
   return nullptr;
 }
@@ -9192,8 +9196,9 @@ td_api::object_ptr<td_api::InputMessageReplyTo> Client::get_input_message_reply_
 td_api::object_ptr<td_api::InputMessageReplyTo> Client::get_input_message_reply_to(
     InputReplyParameters &&reply_parameters) {
   if (reply_parameters.reply_in_chat_id.empty() && reply_parameters.reply_to_message_id > 0) {
-    return make_object<td_api::inputMessageReplyToMessage>(
-        reply_parameters.reply_to_message_id, std::move(reply_parameters.quote), reply_parameters.checklist_task_id);
+    return make_object<td_api::inputMessageReplyToMessage>(reply_parameters.reply_to_message_id,
+                                                           std::move(reply_parameters.quote),
+                                                           reply_parameters.checklist_task_id, td::string());
   }
   return nullptr;
 }
@@ -10304,8 +10309,9 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
     }
 
     if (input_message_content == nullptr) {
-      input_message_content = make_object<td_api::inputMessagePhoto>(
-          nullptr, nullptr, td::vector<int32>(), 0, 0, std::move(caption), show_caption_above_media, nullptr, false);
+      input_message_content =
+          make_object<td_api::inputMessagePhoto>(nullptr, nullptr, nullptr, td::vector<int32>(), 0, 0,
+                                                 std::move(caption), show_caption_above_media, nullptr, false);
     }
     return make_object<td_api::inputInlineQueryResultPhoto>(id, title, description, thumbnail_url, photo_url,
                                                             photo_width, photo_height, std::move(reply_markup),
@@ -11488,7 +11494,7 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
 
   TRY_RESULT(type, object.get_required_string_field("type"));
   if (type == "photo") {
-    return make_object<td_api::inputMessagePhoto>(std::move(input_file), nullptr, td::vector<int32>(), 0, 0,
+    return make_object<td_api::inputMessagePhoto>(std::move(input_file), nullptr, nullptr, td::vector<int32>(), 0, 0,
                                                   std::move(caption), show_caption_above_media, nullptr, has_spoiler);
   }
   if (type == "video") {
@@ -11619,7 +11625,7 @@ td::Result<td_api::object_ptr<td_api::inputPaidMedia>> Client::get_input_paid_me
   object_ptr<td_api::InputPaidMediaType> media_type;
   TRY_RESULT(type, object.get_required_string_field("type"));
   if (type == "photo") {
-    media_type = make_object<td_api::inputPaidMediaTypePhoto>();
+    media_type = make_object<td_api::inputPaidMediaTypePhoto>(nullptr);
   } else if (type == "video") {
     TRY_RESULT(duration, object.get_optional_int_field("duration"));
     TRY_RESULT(supports_streaming, object.get_optional_bool_field("supports_streaming"));
@@ -11764,7 +11770,7 @@ td::Result<td_api::object_ptr<td_api::inputMessageInvoice>> Client::get_input_me
       std::move(paid_media_caption));
 }
 
-td::Result<td::vector<td_api::object_ptr<td_api::formattedText>>> Client::get_poll_options(const Query *query) {
+td::Result<td::vector<td_api::object_ptr<td_api::inputPollOption>>> Client::get_input_poll_options(const Query *query) {
   auto input_options = query->arg("options");
   LOG(INFO) << "Parsing JSON object: " << input_options;
   auto r_value = json_decode(input_options);
@@ -11778,7 +11784,7 @@ td::Result<td::vector<td_api::object_ptr<td_api::formattedText>>> Client::get_po
     return td::Status::Error(400, "Expected an Array of String as options");
   }
 
-  td::vector<object_ptr<td_api::formattedText>> options;
+  td::vector<object_ptr<td_api::inputPollOption>> options;
   for (auto &input_option : value.get_array()) {
     if (input_option.type() != td::JsonValue::Type::String) {
       if (input_option.type() == td::JsonValue::Type::Object) {
@@ -11787,13 +11793,14 @@ td::Result<td::vector<td_api::object_ptr<td_api::formattedText>>> Client::get_po
         TRY_RESULT(parse_mode, object.get_optional_string_field("text_parse_mode"));
         TRY_RESULT(option_text,
                    get_formatted_text(std::move(text), std::move(parse_mode), object.extract_field("text_entities")));
-        options.push_back(std::move(option_text));
+        options.push_back(make_object<td_api::inputPollOption>(std::move(option_text)));
         continue;
       }
 
       return td::Status::Error(400, "Expected an option to be of type String");
     }
-    options.push_back(make_object<td_api::formattedText>(input_option.get_string().str(), td::Auto()));
+    options.push_back(make_object<td_api::inputPollOption>(
+        make_object<td_api::formattedText>(input_option.get_string().str(), td::Auto())));
   }
   return std::move(options);
 }
@@ -12613,8 +12620,8 @@ td::Status Client::process_send_photo_query(PromisedQueryPtr &query) {
   auto show_caption_above_media = to_bool(query->arg("show_caption_above_media"));
   auto has_spoiler = to_bool(query->arg("has_spoiler"));
   do_send_message(
-      make_object<td_api::inputMessagePhoto>(std::move(photo), nullptr, td::vector<int32>(), 0, 0, std::move(caption),
-                                             show_caption_above_media, nullptr, has_spoiler),
+      make_object<td_api::inputMessagePhoto>(std::move(photo), nullptr, nullptr, td::vector<int32>(), 0, 0,
+                                             std::move(caption), show_caption_above_media, nullptr, has_spoiler),
       std::move(query));
   return td::Status::OK();
 }
@@ -12760,30 +12767,32 @@ td::Status Client::process_send_contact_query(PromisedQueryPtr &query) {
 td::Status Client::process_send_poll_query(PromisedQueryPtr &query) {
   TRY_RESULT(question, get_formatted_text(query->arg("question").str(), query->arg("question_parse_mode").str(),
                                           get_input_entities(query.get(), "question_entities")));
-  TRY_RESULT(options, get_poll_options(query.get()));
+  TRY_RESULT(options, get_input_poll_options(query.get()));
   bool is_anonymous = true;
   if (query->has_arg("is_anonymous")) {
     is_anonymous = to_bool(query->arg("is_anonymous"));
   }
 
-  object_ptr<td_api::PollType> poll_type;
+  auto allows_multiple_answers = to_bool(query->arg("allows_multiple_answers"));
+  object_ptr<td_api::InputPollType> poll_type;
   auto type = query->arg("type");
   if (type == "quiz") {
     TRY_RESULT(explanation,
                get_formatted_text(query->arg("explanation").str(), query->arg("explanation_parse_mode").str(),
                                   get_input_entities(query.get(), "explanation_entities")));
 
-    poll_type = make_object<td_api::pollTypeQuiz>(get_integer_arg(query.get(), "correct_option_id", -1),
-                                                  std::move(explanation));
+    poll_type = make_object<td_api::inputPollTypeQuiz>(
+        td::vector<int32>{get_integer_arg(query.get(), "correct_option_id", -1)}, std::move(explanation));
   } else if (type.empty() || type == "regular") {
-    poll_type = make_object<td_api::pollTypeRegular>(to_bool(query->arg("allows_multiple_answers")));
+    poll_type = make_object<td_api::inputPollTypeRegular>(false);
   } else {
     return td::Status::Error(400, "Unsupported poll type specified");
   }
   int32 open_period = get_integer_arg(query.get(), "open_period", 0, 0, 10 * 60);
   int32 close_date = get_integer_arg(query.get(), "close_date", 0);
   auto is_closed = to_bool(query->arg("is_closed"));
-  do_send_message(make_object<td_api::inputMessagePoll>(std::move(question), std::move(options), is_anonymous,
+  do_send_message(make_object<td_api::inputMessagePoll>(std::move(question), std::move(options), nullptr, is_anonymous,
+                                                        allows_multiple_answers, type != "quiz", false, false,
                                                         std::move(poll_type), open_period, close_date, is_closed),
                   std::move(query));
   return td::Status::OK();
@@ -16771,6 +16780,8 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
       case td_api::messageSuggestedPostDeclined::ID:
       case td_api::messageSuggestedPostPaid::ID:
       case td_api::messageSuggestedPostRefunded::ID:
+      case td_api::messagePollOptionAdded::ID:
+      case td_api::messagePollOptionDeleted::ID:
         // don't skip
         break;
       default:
@@ -16873,6 +16884,9 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageUpgradedGiftPurchaseOfferRejected::ID:
     case td_api::messageChatHasProtectedContentToggled::ID:
     case td_api::messageChatHasProtectedContentDisableRequested::ID:
+    case td_api::messagePollOptionAdded::ID:
+    case td_api::messagePollOptionDeleted::ID:
+    case td_api::messageManagedBotCreated::ID:
       return true;
     default:
       break;
@@ -16962,6 +16976,10 @@ td::int64 Client::get_same_chat_reply_to_message_id(const object_ptr<td_api::mes
       case td_api::messageChatHasProtectedContentToggled::ID:
         return static_cast<const td_api::messageChatHasProtectedContentToggled *>(message->content_.get())
             ->request_message_id_;
+      case td_api::messagePollOptionAdded::ID:
+        return static_cast<const td_api::messagePollOptionAdded *>(message->content_.get())->poll_message_id_;
+      case td_api::messagePollOptionDeleted::ID:
+        return static_cast<const td_api::messagePollOptionDeleted *>(message->content_.get())->poll_message_id_;
       default:
         return static_cast<int64>(0);
     }
@@ -17468,7 +17486,10 @@ void Client::init_message(MessageInfo *message_info, object_ptr<td_api::message>
   message_info->topic_id = std::move(message->topic_id_);
   message_info->author_signature = std::move(message->author_signature_);
   message_info->sender_boost_count = message->sender_boost_count_;
-  message_info->sender_tag = std::move(message->sender_tag_);
+  if (message_info->sender_tag != message->sender_tag_) {
+    message_info->sender_tag = std::move(message->sender_tag_);
+    message_info->is_content_changed = true;
+  }
   message_info->paid_message_star_count = message->paid_message_star_count_;
   message_info->effect_id = message->effect_id_;
   message_info->is_paid_post = message->is_paid_star_suggested_post_ || message->is_paid_ton_suggested_post_;
