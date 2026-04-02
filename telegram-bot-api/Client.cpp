@@ -12912,10 +12912,12 @@ td::Status Client::process_send_poll_query(PromisedQueryPtr &query) {
   int32 open_period = get_integer_arg(query.get(), "open_period", 0, 0, 10 * 60);
   int32 close_date = get_integer_arg(query.get(), "close_date", 0);
   auto is_closed = to_bool(query->arg("is_closed"));
-  do_send_message(make_object<td_api::inputMessagePoll>(std::move(question), std::move(options), nullptr, is_anonymous,
-                                                        allows_multiple_answers, allows_revoting, false, false,
-                                                        std::move(poll_type), open_period, close_date, is_closed),
-                  std::move(query));
+  auto shuffle_options = to_bool(query->arg("shuffle_options"));
+  do_send_message(
+      make_object<td_api::inputMessagePoll>(std::move(question), std::move(options), nullptr, is_anonymous,
+                                            allows_multiple_answers, allows_revoting, shuffle_options, false,
+                                            std::move(poll_type), open_period, close_date, is_closed),
+      std::move(query));
   return td::Status::OK();
 }
 
