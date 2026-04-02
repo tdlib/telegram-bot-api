@@ -2297,6 +2297,10 @@ class Client::JsonPoll final : public td::Jsonable {
         if (quiz->correct_option_ids_.size() == 1u) {
           object("correct_option_id", quiz->correct_option_ids_[0]);
         }
+        if (!quiz->correct_option_ids_.empty()) {
+          object("correct_option_ids",
+                 td::json_array(quiz->correct_option_ids_, [](int32 option_id) { return option_id; }));
+        }
         auto *explanation = quiz->explanation_.get();
         if (!explanation->text_.empty()) {
           object("explanation", explanation->text_);
