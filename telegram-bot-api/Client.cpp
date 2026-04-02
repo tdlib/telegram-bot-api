@@ -2361,6 +2361,34 @@ class Client::JsonPollAnswer final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonPollOptionAdded final : public td::Jsonable {
+ public:
+  JsonPollOptionAdded(const td_api::messagePollOptionAdded *poll_option_added, int64 chat_id, bool need_reply,
+                      const Client *client)
+      : poll_option_added_(poll_option_added), chat_id_(chat_id), need_reply_(need_reply), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    const MessageInfo *poll_message = client_->get_message(chat_id_, poll_option_added_->poll_message_id_, true);
+    if (poll_message != nullptr) {
+      object("poll_message", JsonMessage(poll_message, false, "poll option added", client_));
+    } else if (need_reply_) {
+      object("poll_message", JsonInaccessibleMessage(chat_id_, poll_option_added_->poll_message_id_, client_));
+    }
+    object("option_persistent_id", poll_option_added_->option_id_);
+    object("option_text", poll_option_added_->text_->text_);
+    if (!poll_option_added_->text_->entities_.empty()) {
+      object("option_entities", JsonVectorEntities(poll_option_added_->text_->entities_, client_));
+    }
+  }
+
+ private:
+  const td_api::messagePollOptionAdded *poll_option_added_;
+  int64 chat_id_;
+  bool need_reply_;
+  const Client *client_;
+};
+
 class Client::JsonChecklistTask final : public td::Jsonable {
  public:
   JsonChecklistTask(const td_api::checklistTask *task, const Client *client) : task_(task), client_(client) {
@@ -4504,8 +4532,11 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       break;
     case td_api::messageChatHasProtectedContentDisableRequested::ID:
       break;
-    case td_api::messagePollOptionAdded::ID:
+    case td_api::messagePollOptionAdded::ID: {
+      auto content = static_cast<const td_api::messagePollOptionAdded *>(message_->content.get());
+      object("poll_option_added", JsonPollOptionAdded(content, message_->chat_id, need_reply_, client_));
       break;
+    }
     case td_api::messagePollOptionDeleted::ID:
       break;
     case td_api::messageManagedBotCreated::ID:
@@ -16921,7 +16952,6 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageUpgradedGiftPurchaseOfferRejected::ID:
     case td_api::messageChatHasProtectedContentToggled::ID:
     case td_api::messageChatHasProtectedContentDisableRequested::ID:
-    case td_api::messagePollOptionAdded::ID:
     case td_api::messagePollOptionDeleted::ID:
     case td_api::messageManagedBotCreated::ID:
       return true;
