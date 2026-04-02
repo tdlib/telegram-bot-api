@@ -2354,6 +2354,8 @@ class Client::JsonPollAnswer final : public td::Jsonable {
         UNREACHABLE();
     }
     object("option_ids", td::json_array(poll_answer_->option_positions_, [](int32 option_id) { return option_id; }));
+    object("option_persistent_ids",
+           td::json_array(poll_answer_->option_ids_, [](const td::string &option_id) { return option_id; }));
   }
 
  private:
