@@ -280,6 +280,7 @@ bool Client::init_methods() {
   methods_.emplace("getavailablegifts", &Client::process_get_available_gifts_query);
   methods_.emplace("sendgift", &Client::process_send_gift_query);
   methods_.emplace("giftpremiumsubscription", &Client::process_gift_premium_subscription_query);
+  methods_.emplace("getmanagedbottoken", &Client::process_get_managed_bot_token_query);
   methods_.emplace("verifyuser", &Client::process_verify_user_query);
   methods_.emplace("verifychat", &Client::process_verify_chat_query);
   methods_.emplace("removeuserverification", &Client::process_remove_user_verification_query);
@@ -7350,6 +7351,25 @@ class Client::TdOnGetSupergroupMemberCountCallback final : public TdQueryCallbac
   PromisedQueryPtr query_;
 };
 
+class Client::TdOnGetBotTokenCallback final : public TdQueryCallback {
+ public:
+  explicit TdOnGetBotTokenCallback(PromisedQueryPtr query) : query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::text::ID);
+    auto text = move_object_as<td_api::text>(result);
+    answer_query(td::VirtuallyJsonableString(text->text_), std::move(query_));
+  }
+
+ private:
+  PromisedQueryPtr query_;
+};
+
 class Client::TdOnCreateInvoiceLinkCallback final : public TdQueryCallback {
  public:
   explicit TdOnCreateInvoiceLinkCallback(PromisedQueryPtr query) : query_(std::move(query)) {
@@ -13783,6 +13803,15 @@ td::Status Client::process_gift_premium_subscription_query(PromisedQueryPtr &que
                    make_object<td_api::giftPremiumWithStars>(user_id, star_count, month_count, std::move(text)),
                    td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
+  return td::Status::OK();
+}
+
+td::Status Client::process_get_managed_bot_token_query(PromisedQueryPtr &query) {
+  TRY_RESULT(user_id, get_user_id(query.get()));
+  check_user(user_id, std::move(query), [this, user_id](PromisedQueryPtr query) {
+    send_request(make_object<td_api::getBotToken>(user_id, false),
+                 td::make_unique<TdOnGetBotTokenCallback>(std::move(query)));
+  });
   return td::Status::OK();
 }
 
