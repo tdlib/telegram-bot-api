@@ -817,6 +817,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_send_gift_query(PromisedQueryPtr &query);
   td::Status process_gift_premium_subscription_query(PromisedQueryPtr &query);
   td::Status process_get_managed_bot_token_query(PromisedQueryPtr &query);
+  td::Status process_replace_managed_bot_token_query(PromisedQueryPtr &query);
   td::Status process_verify_user_query(PromisedQueryPtr &query);
   td::Status process_verify_chat_query(PromisedQueryPtr &query);
   td::Status process_remove_user_verification_query(PromisedQueryPtr &query);

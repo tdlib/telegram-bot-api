@@ -281,6 +281,7 @@ bool Client::init_methods() {
   methods_.emplace("sendgift", &Client::process_send_gift_query);
   methods_.emplace("giftpremiumsubscription", &Client::process_gift_premium_subscription_query);
   methods_.emplace("getmanagedbottoken", &Client::process_get_managed_bot_token_query);
+  methods_.emplace("replacemanagedbottoken", &Client::process_replace_managed_bot_token_query);
   methods_.emplace("verifyuser", &Client::process_verify_user_query);
   methods_.emplace("verifychat", &Client::process_verify_chat_query);
   methods_.emplace("removeuserverification", &Client::process_remove_user_verification_query);
@@ -13810,6 +13811,15 @@ td::Status Client::process_get_managed_bot_token_query(PromisedQueryPtr &query) 
   TRY_RESULT(user_id, get_user_id(query.get()));
   check_user(user_id, std::move(query), [this, user_id](PromisedQueryPtr query) {
     send_request(make_object<td_api::getBotToken>(user_id, false),
+                 td::make_unique<TdOnGetBotTokenCallback>(std::move(query)));
+  });
+  return td::Status::OK();
+}
+
+td::Status Client::process_replace_managed_bot_token_query(PromisedQueryPtr &query) {
+  TRY_RESULT(user_id, get_user_id(query.get()));
+  check_user(user_id, std::move(query), [this, user_id](PromisedQueryPtr query) {
+    send_request(make_object<td_api::getBotToken>(user_id, true),
                  td::make_unique<TdOnGetBotTokenCallback>(std::move(query)));
   });
   return td::Status::OK();
