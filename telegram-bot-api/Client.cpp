@@ -9478,6 +9478,15 @@ td::Result<td_api::object_ptr<td_api::KeyboardButtonType>> Client::get_keyboard_
         request_title, request_username, request_photo);
   }
 
+  if (object.has_field("request_managed_bot")) {
+    TRY_RESULT(request_managed_bot, object.extract_required_field("request_managed_bot", td::JsonValue::Type::Object));
+    auto &request_managed_bot_object = request_managed_bot.get_object();
+    TRY_RESULT(id, request_managed_bot_object.get_required_int_field("request_id"));
+    TRY_RESULT(suggested_name, request_managed_bot_object.get_optional_string_field("suggested_name"));
+    TRY_RESULT(suggested_username, request_managed_bot_object.get_optional_string_field("suggested_username"));
+    return make_object<td_api::keyboardButtonTypeRequestManagedBot>(id, suggested_name, suggested_username);
+  }
+
   return nullptr;
 }
 
