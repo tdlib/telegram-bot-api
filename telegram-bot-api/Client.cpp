@@ -12897,9 +12897,32 @@ td::Status Client::process_send_poll_query(PromisedQueryPtr &query) {
     TRY_RESULT(explanation,
                get_formatted_text(query->arg("explanation").str(), query->arg("explanation_parse_mode").str(),
                                   get_input_entities(query.get(), "explanation_entities")));
+    td::vector<int32> correct_option_ids;
+    if (query->has_arg("correct_option_ids")) {
+      auto r_value = json_decode(query->arg("correct_option_ids"));
+      if (r_value.is_error()) {
+        return td::Status::Error(400, "Can't parse correct option identifiers JSON object");
+      }
+      auto value = r_value.move_as_ok();
+      if (value.type() != td::JsonValue::Type::Array) {
+        return td::Status::Error(400, "Expected an Array of correct option identifiers");
+      }
 
-    poll_type = make_object<td_api::inputPollTypeQuiz>(
-        td::vector<int32>{get_integer_arg(query.get(), "correct_option_id", -1)}, std::move(explanation));
+      for (auto &correct_option_id : value.get_array()) {
+        if (correct_option_id.type() != td::JsonValue::Type::Number) {
+          return td::Status::Error(400, "Correct option identifier must be of type Number");
+        }
+        auto parsed_id = td::to_integer_safe<int32>(correct_option_id.get_number());
+        if (parsed_id.is_error()) {
+          return td::Status::Error(400, "Invalid correct option identifier specified");
+        }
+        correct_option_ids.push_back(parsed_id.ok());
+      }
+    } else if (query->has_arg("correct_option_id")) {
+      correct_option_ids.push_back(get_integer_arg(query.get(), "correct_option_id", -1));
+    }
+
+    poll_type = make_object<td_api::inputPollTypeQuiz>(std::move(correct_option_ids), std::move(explanation));
   } else if (type.empty() || type == "regular") {
     poll_type = make_object<td_api::inputPollTypeRegular>(to_bool(query->arg("allow_adding_options")));
   } else {
