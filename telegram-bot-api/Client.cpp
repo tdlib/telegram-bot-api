@@ -8338,7 +8338,8 @@ void Client::check_reply_parameters(td::Slice chat_id_str, InputReplyParameters 
           int64 chat_id, object_ptr<td_api::MessageTopic> &&topic_id, PromisedQueryPtr query) mutable {
         auto on_reply_message_resolved =
             [this, chat_id, topic_id = std::move(topic_id), quote = std::move(reply_parameters.quote),
-             checklist_task_id = reply_parameters.checklist_task_id, on_success = std::move(on_success)](
+             checklist_task_id = reply_parameters.checklist_task_id,
+             poll_option_id = std::move(reply_parameters.poll_option_id), on_success = std::move(on_success)](
                 int64 reply_in_chat_id, int64 reply_to_message_id, PromisedQueryPtr query) mutable {
               CheckedReplyParameters reply_parameters;
               reply_parameters.reply_to_message_id = reply_to_message_id;
@@ -8346,6 +8347,7 @@ void Client::check_reply_parameters(td::Slice chat_id_str, InputReplyParameters 
                 reply_parameters.reply_in_chat_id = reply_in_chat_id;
                 reply_parameters.quote = std::move(quote);
                 reply_parameters.checklist_task_id = checklist_task_id;
+                reply_parameters.poll_option_id = std::move(poll_option_id);
               }
 
               // reply_in_chat_id must be non-zero only for replies in different chats or different topics
@@ -9214,11 +9216,11 @@ td_api::object_ptr<td_api::InputMessageReplyTo> Client::get_input_message_reply_
     if (reply_parameters.reply_in_chat_id != 0) {
       return make_object<td_api::inputMessageReplyToExternalMessage>(
           reply_parameters.reply_in_chat_id, reply_parameters.reply_to_message_id, std::move(reply_parameters.quote),
-          reply_parameters.checklist_task_id, td::string());
+          reply_parameters.checklist_task_id, std::move(reply_parameters.poll_option_id));
     }
-    return make_object<td_api::inputMessageReplyToMessage>(reply_parameters.reply_to_message_id,
-                                                           std::move(reply_parameters.quote),
-                                                           reply_parameters.checklist_task_id, td::string());
+    return make_object<td_api::inputMessageReplyToMessage>(
+        reply_parameters.reply_to_message_id, std::move(reply_parameters.quote), reply_parameters.checklist_task_id,
+        std::move(reply_parameters.poll_option_id));
   }
   return nullptr;
 }
@@ -9226,9 +9228,9 @@ td_api::object_ptr<td_api::InputMessageReplyTo> Client::get_input_message_reply_
 td_api::object_ptr<td_api::InputMessageReplyTo> Client::get_input_message_reply_to(
     InputReplyParameters &&reply_parameters) {
   if (reply_parameters.reply_in_chat_id.empty() && reply_parameters.reply_to_message_id > 0) {
-    return make_object<td_api::inputMessageReplyToMessage>(reply_parameters.reply_to_message_id,
-                                                           std::move(reply_parameters.quote),
-                                                           reply_parameters.checklist_task_id, td::string());
+    return make_object<td_api::inputMessageReplyToMessage>(
+        reply_parameters.reply_to_message_id, std::move(reply_parameters.quote), reply_parameters.checklist_task_id,
+        std::move(reply_parameters.poll_option_id));
   }
   return nullptr;
 }
@@ -9273,6 +9275,7 @@ td::Result<Client::InputReplyParameters> Client::get_reply_parameters(td::JsonVa
              get_formatted_text(std::move(input_quote), std::move(parse_mode), object.extract_field("quote_entities")));
   TRY_RESULT(quote_position, object.get_optional_int_field("quote_position"));
   TRY_RESULT(checklist_task_id, object.get_optional_int_field("checklist_task_id"));
+  TRY_RESULT(poll_option_id, object.get_optional_string_field("poll_option_id"));
 
   InputReplyParameters result;
   result.reply_in_chat_id = std::move(chat_id);
@@ -9280,6 +9283,7 @@ td::Result<Client::InputReplyParameters> Client::get_reply_parameters(td::JsonVa
   result.allow_sending_without_reply = allow_sending_without_reply;
   result.quote = make_object<td_api::inputTextQuote>(std::move(quote), quote_position);
   result.checklist_task_id = checklist_task_id;
+  result.poll_option_id = std::move(poll_option_id);
   return std::move(result);
 }
 
