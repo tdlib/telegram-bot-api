@@ -251,6 +251,7 @@ class Client final : public WebhookActor::Callback {
   class JsonStickerSet;
   class JsonSentWebAppMessage;
   class JsonPreparedInlineMessageId;
+  class JsonPreparedKeyboardButton;
   class JsonCustomJson;
 
   class TdOnOkCallback;
@@ -306,6 +307,7 @@ class Client final : public WebhookActor::Callback {
   class TdOnGetGameHighScoresCallback;
   class TdOnAnswerWebAppQueryCallback;
   class TdOnSavePreparedInlineMessageCallback;
+  class TdOnSavePreparedKeyboardButtonCallback;
   class TdOnReturnFileCallback;
   class TdOnReturnStickerSetCallback;
   class TdOnGetStickerSetPromiseCallback;
@@ -827,6 +829,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_answer_web_app_query_query(PromisedQueryPtr &query);
   td::Status process_answer_inline_query_query(PromisedQueryPtr &query);
   td::Status process_save_prepared_inline_message_query(PromisedQueryPtr &query);
+  td::Status process_save_prepared_keyboard_button_query(PromisedQueryPtr &query);
   td::Status process_answer_callback_query_query(PromisedQueryPtr &query);
   td::Status process_answer_shipping_query_query(PromisedQueryPtr &query);
   td::Status process_answer_pre_checkout_query_query(PromisedQueryPtr &query);
