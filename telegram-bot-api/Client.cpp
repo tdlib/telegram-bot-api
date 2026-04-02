@@ -3426,6 +3426,21 @@ class Client::JsonChatShared final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonManagedBotCreated final : public td::Jsonable {
+ public:
+  JsonManagedBotCreated(const td_api::messageManagedBotCreated *managed_bot_created, const Client *client)
+      : managed_bot_created_(managed_bot_created), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("bot", JsonUser(managed_bot_created_->bot_user_id_, client_));
+  }
+
+ private:
+  const td_api::messageManagedBotCreated *managed_bot_created_;
+  const Client *client_;
+};
+
 class Client::JsonGiveawayCreated final : public td::Jsonable {
  public:
   explicit JsonGiveawayCreated(const td_api::messageGiveawayCreated *giveaway_created)
@@ -4570,8 +4585,11 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("poll_option_deleted", JsonPollOptionDeleted(content, message_->chat_id, need_reply_, client_));
       break;
     }
-    case td_api::messageManagedBotCreated::ID:
+    case td_api::messageManagedBotCreated::ID: {
+      auto content = static_cast<const td_api::messageManagedBotCreated *>(message_->content.get());
+      object("managed_bot_created", JsonManagedBotCreated(content, client_));
       break;
+    }
     default:
       UNREACHABLE();
   }
@@ -16983,7 +17001,6 @@ bool Client::need_skip_update_message(int64 chat_id, const object_ptr<td_api::me
     case td_api::messageUpgradedGiftPurchaseOfferRejected::ID:
     case td_api::messageChatHasProtectedContentToggled::ID:
     case td_api::messageChatHasProtectedContentDisableRequested::ID:
-    case td_api::messageManagedBotCreated::ID:
       return true;
     default:
       break;
