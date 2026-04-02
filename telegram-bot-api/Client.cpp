@@ -12905,11 +12905,15 @@ td::Status Client::process_send_poll_query(PromisedQueryPtr &query) {
   } else {
     return td::Status::Error(400, "Unsupported poll type specified");
   }
+  bool allows_revoting = type != "quiz";
+  if (query->has_arg("allows_revoting")) {
+    allows_revoting = to_bool(query->arg("allows_revoting"));
+  }
   int32 open_period = get_integer_arg(query.get(), "open_period", 0, 0, 10 * 60);
   int32 close_date = get_integer_arg(query.get(), "close_date", 0);
   auto is_closed = to_bool(query->arg("is_closed"));
   do_send_message(make_object<td_api::inputMessagePoll>(std::move(question), std::move(options), nullptr, is_anonymous,
-                                                        allows_multiple_answers, type != "quiz", false, false,
+                                                        allows_multiple_answers, allows_revoting, false, false,
                                                         std::move(poll_type), open_period, close_date, is_closed),
                   std::move(query));
   return td::Status::OK();
