@@ -2244,7 +2244,22 @@ class Client::JsonPollOption final : public td::Jsonable {
       object("text_entities", JsonVectorEntities(option_->text_->entities_, client_));
     }
     object("voter_count", option_->voter_count_);
-    // ignore is_chosen
+    if (option_->author_ != nullptr && option_->addition_date_ > 0) {
+      switch (option_->author_->get_id()) {
+        case td_api::messageSenderUser::ID: {
+          auto user_id = static_cast<const td_api::messageSenderUser *>(option_->author_.get())->user_id_;
+          object("added_by_user", JsonUser(user_id, client_));
+          break;
+        }
+        case td_api::messageSenderChat::ID: {
+          auto chat_id = static_cast<const td_api::messageSenderChat *>(option_->author_.get())->chat_id_;
+          object("added_by_chat", JsonChat(chat_id, client_));
+          break;
+        }
+        default:
+          UNREACHABLE();
+      }
+    }
   }
 
  private:
