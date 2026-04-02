@@ -12901,7 +12901,7 @@ td::Status Client::process_send_poll_query(PromisedQueryPtr &query) {
     poll_type = make_object<td_api::inputPollTypeQuiz>(
         td::vector<int32>{get_integer_arg(query.get(), "correct_option_id", -1)}, std::move(explanation));
   } else if (type.empty() || type == "regular") {
-    poll_type = make_object<td_api::inputPollTypeRegular>(false);
+    poll_type = make_object<td_api::inputPollTypeRegular>(to_bool(query->arg("allow_adding_options")));
   } else {
     return td::Status::Error(400, "Unsupported poll type specified");
   }
