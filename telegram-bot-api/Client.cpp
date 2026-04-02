@@ -3444,6 +3444,22 @@ class Client::JsonManagedBotCreated final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonManagedBotUpdated final : public td::Jsonable {
+ public:
+  JsonManagedBotUpdated(const td_api::updateManagedBot *update_managed_bot, const Client *client)
+      : update_managed_bot_(update_managed_bot), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("user", JsonUser(update_managed_bot_->user_id_, client_));
+    object("bot", JsonUser(update_managed_bot_->bot_user_id_, client_));
+  }
+
+ private:
+  const td_api::updateManagedBot *update_managed_bot_;
+  const Client *client_;
+};
+
 class Client::JsonGiveawayCreated final : public td::Jsonable {
  public:
   explicit JsonGiveawayCreated(const td_api::messageGiveawayCreated *giveaway_created)
@@ -9118,6 +9134,9 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       break;
     case td_api::updatePaidMediaPurchased::ID:
       add_update_purchased_paid_media(move_object_as<td_api::updatePaidMediaPurchased>(result));
+      break;
+    case td_api::updateManagedBot::ID:
+      add_update_managed_bot(move_object_as<td_api::updateManagedBot>(result));
       break;
     case td_api::updateNewCustomEvent::ID:
       add_new_custom_event(move_object_as<td_api::updateNewCustomEvent>(result));
@@ -16449,6 +16468,8 @@ td::Slice Client::get_update_type_name(UpdateType update_type) {
       return td::Slice("deleted_business_messages");
     case UpdateType::PurchasedPaidMedia:
       return td::Slice("purchased_paid_media");
+    case UpdateType::ManagedBot:
+      return td::Slice("managed_bot");
     default:
       UNREACHABLE();
       return td::Slice();
@@ -16776,6 +16797,12 @@ void Client::add_update_purchased_paid_media(object_ptr<td_api::updatePaidMediaP
   CHECK(query != nullptr);
   add_update(UpdateType::PurchasedPaidMedia, JsonPaidMediaPurchased(query.get(), this), 86400,
              query->user_id_ + (static_cast<int64>(12) << 33));
+}
+
+void Client::add_update_managed_bot(object_ptr<td_api::updateManagedBot> &&query) {
+  CHECK(query != nullptr);
+  add_update(UpdateType::ManagedBot, JsonManagedBotUpdated(query.get(), this), 86400,
+             query->user_id_ + (static_cast<int64>(13) << 33));
 }
 
 void Client::add_new_custom_event(object_ptr<td_api::updateNewCustomEvent> &&event) {

@@ -230,6 +230,7 @@ class Client final : public WebhookActor::Callback {
   class JsonUsersShared;
   class JsonChatShared;
   class JsonManagedBotCreated;
+  class JsonManagedBotUpdated;
   class JsonGiveawayCreated;
   class JsonGiveaway;
   class JsonGiveawayWinners;
@@ -1313,6 +1314,8 @@ class Client final : public WebhookActor::Callback {
 
   void add_update_purchased_paid_media(object_ptr<td_api::updatePaidMediaPurchased> &&query);
 
+  void add_update_managed_bot(object_ptr<td_api::updateManagedBot> &&query);
+
   void add_new_custom_event(object_ptr<td_api::updateNewCustomEvent> &&event);
 
   void add_new_custom_query(object_ptr<td_api::updateNewCustomQuery> &&query);
@@ -1358,6 +1361,7 @@ class Client final : public WebhookActor::Callback {
     EditedBusinessMessage,
     BusinessMessagesDeleted,
     PurchasedPaidMedia,
+    ManagedBot,
     Size
   };
 
