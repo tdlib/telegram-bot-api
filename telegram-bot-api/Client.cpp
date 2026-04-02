@@ -2238,6 +2238,7 @@ class Client::JsonPollOption final : public td::Jsonable {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
+    object("persistent_id", option_->id_);
     object("text", option_->text_->text_);
     if (!option_->text_->entities_.empty()) {
       object("text_entities", JsonVectorEntities(option_->text_->entities_, client_));
