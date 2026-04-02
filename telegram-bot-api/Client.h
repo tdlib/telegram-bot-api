@@ -1024,6 +1024,7 @@ class Client final : public WebhookActor::Callback {
     bool added_to_attachment_menu = false;
     bool has_topics = false;
     bool allows_users_to_create_topics = false;
+    bool can_manage_bots = false;
   };
   static void add_user(UserInfo *user_info, object_ptr<td_api::user> &&user);
   UserInfo *add_user_info(int64 user_id);
