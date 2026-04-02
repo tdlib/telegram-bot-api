@@ -2290,6 +2290,7 @@ class Client::JsonPoll final : public td::Jsonable {
     object("is_closed", td::JsonBool(poll_->is_closed_));
     object("is_anonymous", td::JsonBool(poll_->is_anonymous_));
     object("allows_multiple_answers", td::JsonBool(poll_->allows_multiple_answers_));
+    object("allows_revoting", td::JsonBool(poll_->allows_revoting_));
     switch (poll_->type_->get_id()) {
       case td_api::pollTypeQuiz::ID: {
         object("type", "quiz");
