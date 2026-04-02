@@ -13020,7 +13020,7 @@ td::Status Client::process_send_poll_query(PromisedQueryPtr &query) {
   if (query->has_arg("allows_revoting")) {
     allows_revoting = to_bool(query->arg("allows_revoting"));
   }
-  int32 open_period = get_integer_arg(query.get(), "open_period", 0, 0, 10 * 60);
+  int32 open_period = get_integer_arg(query.get(), "open_period", 0, 0, 2628000);
   int32 close_date = get_integer_arg(query.get(), "close_date", 0);
   auto is_closed = to_bool(query->arg("is_closed"));
   auto shuffle_options = to_bool(query->arg("shuffle_options"));
