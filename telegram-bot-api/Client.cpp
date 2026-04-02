@@ -12885,6 +12885,9 @@ td::Status Client::process_send_poll_query(PromisedQueryPtr &query) {
   TRY_RESULT(question, get_formatted_text(query->arg("question").str(), query->arg("question_parse_mode").str(),
                                           get_input_entities(query.get(), "question_entities")));
   TRY_RESULT(options, get_input_poll_options(query.get()));
+  TRY_RESULT(description,
+             get_formatted_text(query->arg("description").str(), query->arg("description_parse_mode").str(),
+                                get_input_entities(query.get(), "description_entities")));
   bool is_anonymous = true;
   if (query->has_arg("is_anonymous")) {
     is_anonymous = to_bool(query->arg("is_anonymous"));
@@ -12937,10 +12940,10 @@ td::Status Client::process_send_poll_query(PromisedQueryPtr &query) {
   auto is_closed = to_bool(query->arg("is_closed"));
   auto shuffle_options = to_bool(query->arg("shuffle_options"));
   auto hide_results_until_closes = to_bool(query->arg("hide_results_until_closes"));
-  do_send_message(make_object<td_api::inputMessagePoll>(std::move(question), std::move(options), nullptr, is_anonymous,
-                                                        allows_multiple_answers, allows_revoting, shuffle_options,
-                                                        hide_results_until_closes, std::move(poll_type), open_period,
-                                                        close_date, is_closed),
+  do_send_message(make_object<td_api::inputMessagePoll>(std::move(question), std::move(options), std::move(description),
+                                                        is_anonymous, allows_multiple_answers, allows_revoting,
+                                                        shuffle_options, hide_results_until_closes,
+                                                        std::move(poll_type), open_period, close_date, is_closed),
                   std::move(query));
   return td::Status::OK();
 }
