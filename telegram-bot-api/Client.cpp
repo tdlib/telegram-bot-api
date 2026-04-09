@@ -5115,8 +5115,12 @@ class Client::JsonChatMember final : public td::Jsonable {
 class Client::JsonChatMembers final : public td::Jsonable {
  public:
   JsonChatMembers(const td::vector<object_ptr<td_api::chatMember>> &members, Client::ChatType chat_type,
-                  bool administrators_only, const Client *client)
-      : members_(members), chat_type_(chat_type), administrators_only_(administrators_only), client_(client) {
+                  bool administrators_only, bool return_bots, const Client *client)
+      : members_(members)
+      , chat_type_(chat_type)
+      , administrators_only_(administrators_only)
+      , return_bots_(return_bots)
+      , client_(client) {
   }
   void store(td::JsonValueScope *scope) const {
     auto array = scope->enter_array();
@@ -5126,11 +5130,13 @@ class Client::JsonChatMembers final : public td::Jsonable {
       if (member->member_id_->get_id() != td_api::messageSenderUser::ID) {
         continue;
       }
-      auto user_id = static_cast<const td_api::messageSenderUser *>(member->member_id_.get())->user_id_;
-      auto user_info = client_->get_user_info(user_id);
-      bool is_member_bot = user_info != nullptr && user_info->type == UserInfo::Type::Bot;
-      if (is_member_bot && user_id != client_->my_id_) {
-        continue;
+      if (!return_bots_) {
+        auto user_id = static_cast<const td_api::messageSenderUser *>(member->member_id_.get())->user_id_;
+        auto user_info = client_->get_user_info(user_id);
+        bool is_member_bot = user_info != nullptr && user_info->type == UserInfo::Type::Bot;
+        if (is_member_bot && user_id != client_->my_id_) {
+          continue;
+        }
       }
       if (administrators_only_) {
         auto status = Client::get_chat_member_status(member->status_);
@@ -5146,6 +5152,7 @@ class Client::JsonChatMembers final : public td::Jsonable {
   const td::vector<object_ptr<td_api::chatMember>> &members_;
   Client::ChatType chat_type_;
   bool administrators_only_;
+  bool return_bots_;
   const Client *client_;
 };
 
@@ -7315,8 +7322,10 @@ class Client::TdOnGetGroupMembersCallback final : public TdQueryCallback {
 
     CHECK(result->get_id() == td_api::basicGroupFullInfo::ID);
     auto group_full_info = move_object_as<td_api::basicGroupFullInfo>(result);
-    answer_query(JsonChatMembers(group_full_info->members_, Client::ChatType::Group, administrators_only_, client_),
-                 std::move(query_));
+    auto return_bots = to_bool(query_->arg("return_bots"));
+    answer_query(
+        JsonChatMembers(group_full_info->members_, Client::ChatType::Group, administrators_only_, return_bots, client_),
+        std::move(query_));
   }
 
  private:
@@ -7338,7 +7347,8 @@ class Client::TdOnGetSupergroupMembersCallback final : public TdQueryCallback {
 
     CHECK(result->get_id() == td_api::chatMembers::ID);
     auto chat_members = move_object_as<td_api::chatMembers>(result);
-    answer_query(JsonChatMembers(chat_members->members_, chat_type_, false, client_), std::move(query_));
+    auto return_bots = to_bool(query_->arg("return_bots"));
+    answer_query(JsonChatMembers(chat_members->members_, chat_type_, false, return_bots, client_), std::move(query_));
   }
 
  private:
