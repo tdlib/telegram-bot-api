@@ -5126,12 +5126,6 @@ class Client::JsonChatMembers final : public td::Jsonable {
       if (member->member_id_->get_id() != td_api::messageSenderUser::ID) {
         continue;
       }
-      auto user_id = static_cast<const td_api::messageSenderUser *>(member->member_id_.get())->user_id_;
-      auto user_info = client_->get_user_info(user_id);
-      bool is_member_bot = user_info != nullptr && user_info->type == UserInfo::Type::Bot;
-      if (is_member_bot && user_id != client_->my_id_) {
-        continue;
-      }
       if (administrators_only_) {
         auto status = Client::get_chat_member_status(member->status_);
         if (status != "creator" && status != "administrator") {
