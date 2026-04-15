@@ -6630,10 +6630,10 @@ class Client::TdOnCheckMessageCallback final : public TdQueryCallback {
     }
 
     CHECK(result->get_id() == td_api::message::ID);
-    auto message_full_id = client_->add_message(move_object_as<td_api::message>(result));
-    CHECK(message_full_id.chat_id == chat_id_);
-    CHECK(message_full_id.message_id == message_id_);
-    on_success_(message_full_id.chat_id, message_full_id.message_id, std::move(query_));
+    const auto *message_info = client_->add_message(move_object_as<td_api::message>(result));
+    CHECK(message_info->chat_id == chat_id_);
+    CHECK(message_info->id == message_id_);
+    on_success_(chat_id_, message_id_, std::move(query_));
   }
 
  private:
@@ -6681,9 +6681,9 @@ class Client::TdOnCheckMessagesCallback final : public TdQueryCallback {
         }
         continue;
       }
-      auto message_full_id = client_->add_message(std::move(message));
-      CHECK(message_full_id.chat_id == chat_id_);
-      message_ids.push_back(message_full_id.message_id);
+      const auto *message_info = client_->add_message(std::move(message));
+      CHECK(message_info->chat_id == chat_id_);
+      message_ids.push_back(message_info->id);
     }
     on_success_(chat_id_, std::move(message_ids), std::move(query_));
   }
@@ -6945,13 +6945,10 @@ class Client::TdOnGetChatPinnedMessageCallback final : public TdQueryCallback {
       }
     } else {
       CHECK(result->get_id() == td_api::message::ID);
-      auto message_full_id = client_->add_message(move_object_as<td_api::message>(result));
-      pinned_message_id = message_full_id.message_id;
-      CHECK(message_full_id.chat_id == chat_id_);
-      CHECK(pinned_message_id > 0);
-      auto pinned_message_info = client_->get_message(chat_id_, pinned_message_id, true);
-      CHECK(pinned_message_info != nullptr);
-      sticker_set_ids = get_message_sticker_set_ids(pinned_message_info);
+      const auto *message_info = client_->add_message(move_object_as<td_api::message>(result));
+      pinned_message_id = message_info->id;
+      CHECK(message_info->chat_id == chat_id_);
+      td::append(sticker_set_ids, get_message_sticker_set_ids(message_info));
     }
 
     auto chat_info = client_->get_chat(chat_id_);
@@ -6990,7 +6987,6 @@ class Client::TdOnGetChatPinnedMessageToUnpinCallback final : public TdQueryCall
   }
 
   void on_result(object_ptr<td_api::Object> result) final {
-    int64 pinned_message_id = 0;
     if (result->get_id() == td_api::error::ID) {
       auto error = move_object_as<td_api::error>(result);
       if (is_special_error_code(error->code_)) {
@@ -7001,12 +6997,9 @@ class Client::TdOnGetChatPinnedMessageToUnpinCallback final : public TdQueryCall
     }
 
     CHECK(result->get_id() == td_api::message::ID);
-    auto message_full_id = client_->add_message(move_object_as<td_api::message>(result));
-    pinned_message_id = message_full_id.message_id;
-    CHECK(message_full_id.chat_id == chat_id_);
-    CHECK(pinned_message_id > 0);
-
-    client_->send_request(make_object<td_api::unpinChatMessage>(chat_id_, pinned_message_id),
+    const auto *message_info = client_->add_message(move_object_as<td_api::message>(result));
+    CHECK(message_info->chat_id == chat_id_);
+    client_->send_request(make_object<td_api::unpinChatMessage>(chat_id_, message_info->id),
                           td::make_unique<TdOnOkQueryCallback>(std::move(query_)));
   }
 
@@ -12306,14 +12299,11 @@ td::int64 Client::extract_yet_unsent_message_query_id(int64 chat_id, int64 messa
 }
 
 void Client::on_message_send_succeeded(object_ptr<td_api::message> &&message, int64 old_message_id) {
-  auto message_full_id = add_message(std::move(message), true);
-
-  int64 chat_id = message_full_id.chat_id;
-  int64 new_message_id = message_full_id.message_id;
+  const auto *message_info = add_message(std::move(message), true);
+  int64 chat_id = message_info->chat_id;
+  int64 new_message_id = message_info->id;
   CHECK(new_message_id > 0);
 
-  auto message_info = get_message(chat_id, new_message_id, true);
-  CHECK(message_info != nullptr);
   message_info->is_content_changed = false;
 
   auto query_id = extract_yet_unsent_message_query_id(chat_id, old_message_id);
@@ -17533,10 +17523,7 @@ void Client::process_new_message_queue(int64 chat_id, int state) {
       delayed_update_count_++;
     }
     auto left_time = message_date + 86400 - now;
-    add_message(std::move(message));
-
-    auto message_info = get_message(chat_id, message_id, true);
-    CHECK(message_info != nullptr);
+    const auto *message_info = add_message(std::move(message));
 
     message_info->is_content_changed = false;
     add_update(update_type, JsonMessage(message_info, true, get_update_type_name(update_type).str(), this), left_time,
@@ -17628,7 +17615,7 @@ td::unique_ptr<Client::MessageInfo> Client::delete_message(int64 chat_id, int64 
   return message_info;
 }
 
-Client::MessageFullId Client::add_message(object_ptr<td_api::message> &&message, bool force_update_content) {
+const Client::MessageInfo *Client::add_message(object_ptr<td_api::message> &&message, bool force_update_content) {
   CHECK(message != nullptr);
   CHECK(message->sending_state_ == nullptr);
 
@@ -17643,7 +17630,7 @@ Client::MessageFullId Client::add_message(object_ptr<td_api::message> &&message,
 
   init_message(message_info.get(), std::move(message), force_update_content);
 
-  return {chat_id, message_id};
+  return message_info.get();
 }
 
 void Client::init_message(MessageInfo *message_info, object_ptr<td_api::message> &&message, bool force_update_content) {

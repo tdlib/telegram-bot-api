@@ -1256,7 +1256,7 @@ class Client final : public WebhookActor::Callback {
     }
   };
 
-  MessageFullId add_message(object_ptr<td_api::message> &&message, bool force_update_content = false);
+  const MessageInfo *add_message(object_ptr<td_api::message> &&message, bool force_update_content = false);
 
   void init_message(MessageInfo *message_info, object_ptr<td_api::message> &&message, bool force_update_content);
 
