@@ -6952,7 +6952,7 @@ class Client::TdOnGetChatPinnedMessageCallback final : public TdQueryCallback {
       CHECK(pinned_message_id > 0);
       auto pinned_message_info = client_->get_message(chat_id_, pinned_message_id, true);
       CHECK(pinned_message_info != nullptr);
-      sticker_set_ids.push_back(get_sticker_set_id(pinned_message_info));
+      sticker_set_ids = get_message_sticker_set_ids(pinned_message_info);
     }
 
     auto chat_info = client_->get_chat(chat_id_);
@@ -17378,6 +17378,7 @@ void Client::set_message_reply_markup(MessageInfo *message_info, object_ptr<td_a
 }
 
 td::int64 Client::get_sticker_set_id(const object_ptr<td_api::MessageContent> &content) {
+  CHECK(content != nullptr);
   if (content->get_id() != td_api::messageSticker::ID) {
     return 0;
   }
@@ -17385,12 +17386,23 @@ td::int64 Client::get_sticker_set_id(const object_ptr<td_api::MessageContent> &c
   return static_cast<const td_api::messageSticker *>(content.get())->sticker_->set_id_;
 }
 
-td::int64 Client::get_sticker_set_id(const MessageInfo *message_info) {
-  if (message_info == nullptr || message_info->content == nullptr) {
-    return 0;
+td::vector<td::int64> Client::get_message_sticker_set_ids(const MessageInfo *message_info) {
+  if (message_info == nullptr) {
+    return {};
   }
 
-  return get_sticker_set_id(message_info->content);
+  td::vector<int64> sticker_set_ids;
+  auto content_sticker_set_id = get_sticker_set_id(message_info->content);
+  if (content_sticker_set_id != 0) {
+    sticker_set_ids.push_back(content_sticker_set_id);
+  }
+  if (message_info->reply_to_message != nullptr && message_info->reply_to_message->content_ != nullptr) {
+    auto reply_sticker_set_id = get_sticker_set_id(message_info->reply_to_message->content_);
+    if (reply_sticker_set_id != 0) {
+      sticker_set_ids.push_back(reply_sticker_set_id);
+    }
+  }
+  return sticker_set_ids;
 }
 
 bool Client::have_sticker_set_name(int64 sticker_set_id) const {
