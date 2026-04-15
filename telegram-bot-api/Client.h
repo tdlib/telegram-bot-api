@@ -285,9 +285,6 @@ class Client final : public WebhookActor::Callback {
   class TdOnGetMyDescriptionCallback;
   class TdOnGetMyShortDescriptionCallback;
   class TdOnGetChatFullInfoCallback;
-  class TdOnGetChatStickerSetCallback;
-  class TdOnGetChatCustomEmojiStickerSetCallback;
-  class TdOnGetChatBusinessStartPageStickerSetCallback;
   class TdOnGetChatPinnedMessageCallback;
   class TdOnGetChatPinnedMessageToUnpinCallback;
   class TdOnGetGroupMembersCallback;
@@ -957,6 +954,8 @@ class Client final : public WebhookActor::Callback {
 
   void return_stickers(object_ptr<td_api::stickers> stickers, PromisedQueryPtr query);
 
+  void return_chat_full_info(int64 chat_id, int64 pinned_message_id, PromisedQueryPtr query);
+
   void fix_reply_markup_bot_user_ids(object_ptr<td_api::ReplyMarkup> &reply_markup) const;
   void fix_inline_query_results_bot_user_ids(td::vector<object_ptr<td_api::InputInlineQueryResult>> &results) const;
 
@@ -1200,6 +1199,8 @@ class Client final : public WebhookActor::Callback {
   static void set_message_reply_markup(MessageInfo *message_info, object_ptr<td_api::ReplyMarkup> &&reply_markup);
 
   static int64 get_sticker_set_id(const object_ptr<td_api::MessageContent> &content);
+
+  static int64 get_sticker_set_id(const MessageInfo *message_info);
 
   bool have_sticker_set_name(int64 sticker_set_id) const;
 
