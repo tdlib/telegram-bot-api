@@ -1311,7 +1311,7 @@ class Client final : public WebhookActor::Callback {
 
   void add_new_business_callback_query(object_ptr<td_api::updateNewBusinessCallbackQuery> &&query);
 
-  void process_new_business_callback_query_queue(int64 user_id);
+  void process_new_business_callback_query_queue(int64 user_id, int state);
 
   void add_new_inline_callback_query(object_ptr<td_api::updateNewInlineCallbackQuery> &&query);
 
@@ -1501,8 +1501,12 @@ class Client final : public WebhookActor::Callback {
   };
   td::FlatHashMap<int64, NewCallbackQueryQueue> new_callback_query_queues_;  // sender_user_id -> queue
 
+  struct NewBusinessCallbackQuery {
+    object_ptr<td_api::updateNewBusinessCallbackQuery> update_;
+    td::unique_ptr<MessageInfo> message_info_;
+  };
   struct NewBusinessCallbackQueryQueue {
-    std::queue<object_ptr<td_api::updateNewBusinessCallbackQuery>> queue_;
+    std::queue<NewBusinessCallbackQuery> queue_;
     bool has_active_request_ = false;
   };
   td::FlatHashMap<int64, NewBusinessCallbackQueryQueue> new_business_callback_query_queues_;  // sender_user_id -> queue
