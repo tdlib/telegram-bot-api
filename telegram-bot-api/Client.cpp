@@ -1397,7 +1397,6 @@ class Client::JsonChat final : public td::Jsonable {
         object("photo", JsonChatPhotoInfo(chat_info->photo_info.get()));
       }
       if (pinned_message_id_ != 0) {
-        CHECK(pinned_message_id_ != -1);
         const MessageInfo *pinned_message = client_->get_message(chat_id_, pinned_message_id_, true);
         if (pinned_message != nullptr) {
           object("pinned_message", JsonMessage(pinned_message, false, "pin in JsonChat", client_));
@@ -16638,11 +16637,14 @@ void Client::add_new_callback_query(object_ptr<td_api::updateNewCallbackQuery> &
 void Client::process_new_callback_query_queue(int64 user_id, int state) {
   auto &queue = new_callback_query_queues_[user_id];
   if (queue.has_active_request_) {
-    CHECK(state == 0);
     CHECK(!queue.queue_.empty());
-    LOG(INFO) << "Have an active request in callback query queue of size " << queue.queue_.size() << " for user "
-              << user_id;
-    return;
+    if (state != 0) {
+      queue.has_active_request_ = false;
+    } else {
+      LOG(INFO) << "Have an active request in callback query queue of size " << queue.queue_.size() << " for user "
+                << user_id;
+      return;
+    }
   }
   if (logging_out_ || closing_) {
     LOG(INFO) << "Ignore callback query while closing for user " << user_id;
@@ -16676,27 +16678,19 @@ void Client::process_new_callback_query_queue(int64 user_id, int state) {
       state = 2;
     }
     if (state == 2) {
-      auto message_sticker_set_id = message_info == nullptr ? 0 : get_sticker_set_id(message_info->content);
-      if (!have_sticker_set_name(message_sticker_set_id)) {
-        queue.has_active_request_ = true;
-        return send_request(
-            make_object<td_api::getStickerSetName>(message_sticker_set_id),
-            td::make_unique<TdOnGetStickerSetCallback>(this, message_sticker_set_id, user_id, 0, td::string(), 0));
-      }
+      auto sticker_set_ids = get_message_sticker_set_ids(message_info);
       auto reply_to_message_id = get_same_chat_reply_to_message_id(message_info);
-      if (reply_to_message_id > 0) {
-        auto reply_to_message_info = get_message(chat_id, reply_to_message_id, true);
-        auto reply_sticker_set_id =
-            reply_to_message_info == nullptr ? 0 : get_sticker_set_id(reply_to_message_info->content);
-        if (!have_sticker_set_name(reply_sticker_set_id)) {
-          queue.has_active_request_ = true;
-          return send_request(
-              make_object<td_api::getStickerSetName>(reply_sticker_set_id),
-              td::make_unique<TdOnGetStickerSetCallback>(this, reply_sticker_set_id, user_id, 0, td::string(), 0));
-        }
+      td::combine(sticker_set_ids, get_message_sticker_set_ids(get_message(chat_id, reply_to_message_id, true)));
+      if (!sticker_set_ids.empty()) {
+        queue.has_active_request_ = true;
+        return get_sticker_set_names(std::move(sticker_set_ids),
+                                     td::PromiseCreator::lambda([actor_id = actor_id(this), user_id](td::Unit) mutable {
+                                       send_closure(actor_id, &Client::process_new_callback_query_queue, user_id, 3);
+                                     }));
       }
+      state = 3;
     }
-    CHECK(state == 2);
+    CHECK(state == 3);
 
     CHECK(user_id == query->sender_user_id_);
     add_update(UpdateType::CallbackQuery,
@@ -16764,7 +16758,7 @@ void Client::process_new_business_callback_query_queue(int64 user_id) {
                150, user_id + (static_cast<int64>(3) << 33));
     queue.queue_.pop();
   }
-  new_callback_query_queues_.erase(user_id);
+  new_business_callback_query_queues_.erase(user_id);
 }
 
 void Client::add_new_inline_callback_query(object_ptr<td_api::updateNewInlineCallbackQuery> &&query) {
@@ -17775,6 +17769,9 @@ void Client::on_update_message_edited(int64 chat_id, int64 message_id, int32 edi
 }
 
 const Client::MessageInfo *Client::get_message(int64 chat_id, int64 message_id, bool force_cache) const {
+  if (message_id == 0) {
+    return nullptr;
+  }
   auto message_info = messages_.get_pointer({chat_id, message_id});
   if (message_info == nullptr) {
     LOG(DEBUG) << "Not found message " << message_id << " from chat " << chat_id;
