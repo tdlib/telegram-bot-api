@@ -7726,15 +7726,19 @@ class Client::TdOnReturnStickerSetCallback final : public TdQueryCallback {
   PromisedQueryPtr query_;
 };
 
-class Client::TdOnGetStickerSetPromiseCallback final : public TdQueryCallback {
+class Client::TdOnGetStickerSetNameCallback final : public TdQueryCallback {
  public:
-  TdOnGetStickerSetPromiseCallback(Client *client, int64 sticker_set_id, td::Promise<td::Unit> &&promise)
+  TdOnGetStickerSetNameCallback(Client *client, int64 sticker_set_id, td::Promise<td::Unit> &&promise)
       : client_(client), sticker_set_id_(sticker_set_id), promise_(std::move(promise)) {
   }
 
   void on_result(object_ptr<td_api::Object> result) final {
     if (result->get_id() == td_api::error::ID) {
       auto error = move_object_as<td_api::error>(result);
+      if (error->message_ == "STICKERSET_INVALID") {
+        client_->on_get_sticker_set_name(sticker_set_id_, td::string());
+        return promise_.set_value(td::Unit());
+      }
       return promise_.set_error(td::Status::Error(error->code_, error->message_));
     }
 
@@ -7760,27 +7764,16 @@ class Client::TdOnGetStickersCallback final : public TdQueryCallback {
 
     CHECK(result->get_id() == td_api::stickers::ID);
     auto stickers = move_object_as<td_api::stickers>(result);
-    td::FlatHashSet<int64> sticker_set_ids;
+    td::vector<int64> sticker_set_ids;
     for (const auto &sticker : stickers->stickers_) {
-      if (sticker->set_id_ != 0 && client_->get_sticker_set_name(sticker->set_id_).empty()) {
-        sticker_set_ids.insert(sticker->set_id_);
-      }
+      sticker_set_ids.push_back(sticker->set_id_);
     }
-
-    td::MultiPromiseActorSafe mpas("GetStickerSetsMultiPromiseActor");
-    mpas.add_promise(td::PromiseCreator::lambda([actor_id = client_->actor_id(client_), stickers = std::move(stickers),
-                                                 query = std::move(query_)](td::Unit) mutable {
-      send_closure(actor_id, &Client::return_stickers, std::move(stickers), std::move(query));
-    }));
-    mpas.set_ignore_errors(true);
-
-    auto lock = mpas.get_promise();
-    for (auto sticker_set_id : sticker_set_ids) {
-      client_->send_request(
-          make_object<td_api::getStickerSetName>(sticker_set_id),
-          td::make_unique<TdOnGetStickerSetPromiseCallback>(client_, sticker_set_id, mpas.get_promise()));
-    }
-    lock.set_value(td::Unit());
+    client_->get_sticker_set_names(
+        std::move(sticker_set_ids),
+        td::PromiseCreator::lambda([actor_id = client_->actor_id(client_), stickers = std::move(stickers),
+                                    query = std::move(query_)](td::Unit) mutable {
+          send_closure(actor_id, &Client::return_stickers, std::move(stickers), std::move(query));
+        }));
   }
 
  private:
@@ -8098,6 +8091,30 @@ void Client::on_get_sticker_set(int64 set_id, int64 new_callback_query_user_id, 
   if (new_business_callback_query_user_id != 0) {
     process_new_business_callback_query_queue(new_business_callback_query_user_id);
   }
+}
+
+void Client::get_sticker_set_names(td::vector<int64> sticker_set_ids, td::Promise<td::Unit> &&promise) {
+  td::FlatHashSet<int64> missing_sticker_set_ids;
+  for (auto sticker_set_id : sticker_set_ids) {
+    if (sticker_set_id != 0 && !have_sticker_set_name(sticker_set_id)) {
+      missing_sticker_set_ids.insert(sticker_set_id);
+    }
+  }
+  if (missing_sticker_set_ids.empty()) {
+    // fast pass
+    return promise.set_value(td::Unit());
+  }
+
+  td::MultiPromiseActorSafe mpas("GetStickerSetNamesMultiPromiseActor");
+  mpas.add_promise(std::move(promise));
+  mpas.set_ignore_errors(true);
+
+  auto lock = mpas.get_promise();
+  for (auto sticker_set_id : missing_sticker_set_ids) {
+    send_request(make_object<td_api::getStickerSetName>(sticker_set_id),
+                 td::make_unique<TdOnGetStickerSetNameCallback>(this, sticker_set_id, mpas.get_promise()));
+  }
+  lock.set_value(td::Unit());
 }
 
 void Client::on_get_sticker_set_name(int64 set_id, const td::string &name) {

@@ -310,7 +310,7 @@ class Client final : public WebhookActor::Callback {
   class TdOnSavePreparedKeyboardButtonCallback;
   class TdOnReturnFileCallback;
   class TdOnReturnStickerSetCallback;
-  class TdOnGetStickerSetPromiseCallback;
+  class TdOnGetStickerSetNameCallback;
   class TdOnGetStickersCallback;
   class TdOnDownloadFileCallback;
   class TdOnCancelDownloadFileCallback;
@@ -325,6 +325,8 @@ class Client final : public WebhookActor::Callback {
   void on_get_sticker_set(int64 set_id, int64 new_callback_query_user_id, int64 new_message_chat_id,
                           const td::string &new_message_business_connection_id,
                           int64 new_business_callback_query_user_id, object_ptr<td_api::text> sticker_set_name);
+
+  void get_sticker_set_names(td::vector<int64> sticker_set_ids, td::Promise<td::Unit> &&promise);
 
   void on_get_sticker_set_name(int64 set_id, const td::string &name);
 
