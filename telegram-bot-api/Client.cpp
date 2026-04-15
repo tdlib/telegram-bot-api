@@ -7614,6 +7614,9 @@ class Client::TdOnGetStickerSetNameCallback final : public TdQueryCallback {
         client_->on_get_sticker_set_name(sticker_set_id_, td::string());
         return promise_.set_value(td::Unit());
       }
+      if (error->code_ != 401 && error->code_ != 500) {
+        LOG(ERROR) << "Failed to get name of sticker set " << sticker_set_id_ << ": " << td::oneline(to_string(error));
+      }
       return promise_.set_error(td::Status::Error(error->code_, error->message_));
     }
 
