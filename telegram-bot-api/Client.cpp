@@ -17719,17 +17719,16 @@ void Client::init_message(MessageInfo *message_info, object_ptr<td_api::message>
   if (message_info->content == nullptr || force_update_content) {
     message_info->content = std::move(message->content_);
     message_info->is_content_changed = true;
-
-    auto sticker_set_id = get_sticker_set_id(message_info->content);
-    if (!have_sticker_set_name(sticker_set_id)) {
-      send_request(make_object<td_api::getStickerSetName>(sticker_set_id),
-                   td::make_unique<TdOnGetStickerSetCallback>(this, sticker_set_id, 0, 0, td::string(), 0));
-    }
   } else if (message->content_->get_id() == td_api::messagePoll::ID) {
     message_info->content = std::move(message->content_);
   }
   set_message_suggested_post_info(message_info, std::move(message->suggested_post_info_));
   set_message_reply_markup(message_info, std::move(message->reply_markup_));
+
+  auto sticker_set_ids = get_message_sticker_set_ids(message_info);
+  if (!sticker_set_ids.empty()) {
+    get_sticker_set_names(std::move(sticker_set_ids), td::Promise<td::Unit>());
+  }
 
   message = nullptr;
 }
