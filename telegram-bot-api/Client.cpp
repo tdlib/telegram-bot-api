@@ -6886,47 +6886,6 @@ class Client::TdOnGetCallbackQueryMessageCallback final : public TdQueryCallback
   int state_;
 };
 
-class Client::TdOnGetStickerSetCallback final : public TdQueryCallback {
- public:
-  TdOnGetStickerSetCallback(Client *client, int64 set_id, int64 new_callback_query_user_id, int64 new_message_chat_id,
-                            const td::string &new_message_business_connection_id,
-                            int64 new_business_callback_query_user_id)
-      : client_(client)
-      , set_id_(set_id)
-      , new_callback_query_user_id_(new_callback_query_user_id)
-      , new_message_chat_id_(new_message_chat_id)
-      , new_message_business_connection_id_(new_message_business_connection_id)
-      , new_business_callback_query_user_id_(new_business_callback_query_user_id) {
-  }
-
-  void on_result(object_ptr<td_api::Object> result) final {
-    if (result->get_id() == td_api::error::ID) {
-      auto error = move_object_as<td_api::error>(result);
-      if (error->message_ != "STICKERSET_INVALID" && error->code_ != 401 && error->code_ != 500) {
-        LOG(ERROR) << "Failed to get sticker set " << set_id_ << " from callback query by user "
-                   << new_callback_query_user_id_ << "/new message in chat " << new_message_chat_id_ << ": "
-                   << td::oneline(to_string(error));
-      }
-      return client_->on_get_sticker_set(set_id_, new_callback_query_user_id_, new_message_chat_id_,
-                                         new_message_business_connection_id_, new_business_callback_query_user_id_,
-                                         nullptr);
-    }
-
-    CHECK(result->get_id() == td_api::text::ID);
-    client_->on_get_sticker_set(set_id_, new_callback_query_user_id_, new_message_chat_id_,
-                                new_message_business_connection_id_, new_business_callback_query_user_id_,
-                                move_object_as<td_api::text>(result));
-  }
-
- private:
-  Client *client_;
-  int64 set_id_;
-  int64 new_callback_query_user_id_;
-  int64 new_message_chat_id_;
-  td::string new_message_business_connection_id_;
-  int64 new_business_callback_query_user_id_;
-};
-
 class Client::TdOnGetChatPinnedMessageCallback final : public TdQueryCallback {
  public:
   TdOnGetChatPinnedMessageCallback(Client *client, int64 chat_id, PromisedQueryPtr query)
@@ -7909,60 +7868,6 @@ void Client::on_get_callback_query_message(object_ptr<td_api::message> message, 
     add_message(std::move(message));
   }
   process_new_callback_query_queue(user_id, state + 1);
-}
-
-void Client::on_get_sticker_set(int64 set_id, int64 new_callback_query_user_id, int64 new_message_chat_id,
-                                const td::string &new_message_business_connection_id,
-                                int64 new_business_callback_query_user_id, object_ptr<td_api::text> sticker_set_name) {
-  if (new_callback_query_user_id != 0) {
-    auto &queue = new_callback_query_queues_[new_callback_query_user_id];
-    CHECK(queue.has_active_request_);
-    queue.has_active_request_ = false;
-
-    CHECK(!queue.queue_.empty());
-  }
-  if (new_message_chat_id != 0) {
-    auto &queue = new_message_queues_[new_message_chat_id];
-    CHECK(queue.has_active_request_);
-    queue.has_active_request_ = false;
-
-    CHECK(!queue.queue_.empty());
-  }
-  if (!new_message_business_connection_id.empty()) {
-    auto &queue = new_business_message_queues_[new_message_business_connection_id];
-    CHECK(queue.has_active_request_);
-    queue.has_active_request_ = false;
-
-    CHECK(!queue.queue_.empty());
-  }
-  if (new_business_callback_query_user_id != 0) {
-    auto &queue = new_business_callback_query_queues_[new_business_callback_query_user_id];
-    CHECK(queue.has_active_request_);
-    queue.has_active_request_ = false;
-
-    CHECK(!queue.queue_.empty());
-  }
-
-  CHECK(set_id != 0);
-  if (set_id != GREAT_MINDS_SET_ID) {
-    td::string &set_name = sticker_set_names_[set_id];
-    if (sticker_set_name != nullptr) {
-      set_name = std::move(sticker_set_name->text_);
-    }
-  }
-
-  if (new_callback_query_user_id != 0) {
-    process_new_callback_query_queue(new_callback_query_user_id, 2);
-  }
-  if (new_message_chat_id != 0) {
-    process_new_message_queue(new_message_chat_id, 2);
-  }
-  if (!new_message_business_connection_id.empty()) {
-    process_new_business_message_queue(new_message_business_connection_id, 1);
-  }
-  if (new_business_callback_query_user_id != 0) {
-    process_new_business_callback_query_queue(new_business_callback_query_user_id, 1);
-  }
 }
 
 void Client::get_sticker_set_names(td::vector<int64> sticker_set_ids, td::Promise<td::Unit> &&promise) {

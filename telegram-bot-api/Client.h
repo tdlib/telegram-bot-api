@@ -276,7 +276,6 @@ class Client final : public WebhookActor::Callback {
   class TdOnGetReplyMessageCallback;
   class TdOnGetEditedMessageCallback;
   class TdOnGetCallbackQueryMessageCallback;
-  class TdOnGetStickerSetCallback;
   class TdOnGetForumTopicInfoCallback;
   class TdOnGetMenuButtonCallback;
   class TdOnGetMyCommandsCallback;
@@ -318,10 +317,6 @@ class Client final : public WebhookActor::Callback {
   void on_get_edited_message(object_ptr<td_api::message> edited_message);
 
   void on_get_callback_query_message(object_ptr<td_api::message> message, int64 user_id, int state);
-
-  void on_get_sticker_set(int64 set_id, int64 new_callback_query_user_id, int64 new_message_chat_id,
-                          const td::string &new_message_business_connection_id,
-                          int64 new_business_callback_query_user_id, object_ptr<td_api::text> sticker_set_name);
 
   void get_sticker_set_names(td::vector<int64> sticker_set_ids, td::Promise<td::Unit> &&promise);
 
