@@ -7968,7 +7968,7 @@ void Client::on_get_sticker_set(int64 set_id, int64 new_callback_query_user_id, 
 void Client::get_sticker_set_names(td::vector<int64> sticker_set_ids, td::Promise<td::Unit> &&promise) {
   td::FlatHashSet<int64> missing_sticker_set_ids;
   for (auto sticker_set_id : sticker_set_ids) {
-    if (sticker_set_id != 0 && !have_sticker_set_name(sticker_set_id)) {
+    if (sticker_set_id != 0 && sticker_set_names_.count(sticker_set_id) == 0) {
       missing_sticker_set_ids.insert(sticker_set_id);
     }
   }
@@ -17418,10 +17418,6 @@ td::vector<td::int64> Client::get_message_sticker_set_ids(const object_ptr<td_ap
     }
   }
   return sticker_set_ids;
-}
-
-bool Client::have_sticker_set_name(int64 sticker_set_id) const {
-  return sticker_set_id == 0 || sticker_set_names_.count(sticker_set_id) > 0;
 }
 
 td::string Client::get_sticker_set_name(int64 sticker_set_id) const {
