@@ -1149,6 +1149,9 @@ class Client final : public WebhookActor::Callback {
     bool is_from_offline = false;
     bool is_scheduled = false;
     bool is_paid_post = false;
+    bool is_outgoing = false;
+    bool is_self_destruct = false;
+    bool is_imported = false;
     mutable bool is_content_changed = false;
   };
 
@@ -1208,7 +1211,7 @@ class Client final : public WebhookActor::Callback {
 
   int64 choose_added_member_id(const td_api::messageChatAddMembers *message_add_members) const;
 
-  bool need_skip_update_message(int64 chat_id, const object_ptr<td_api::message> &message, bool is_edited) const;
+  bool need_skip_update_message(int64 chat_id, const MessageInfo *message_info, bool is_edited) const;
 
   void json_store_file(td::JsonObjectScope &object, const td_api::file *file, bool with_path = false) const;
 
