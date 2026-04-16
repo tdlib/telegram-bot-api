@@ -7805,9 +7805,6 @@ void Client::loop() {
 
 void Client::on_get_reply_message(int64 chat_id, object_ptr<td_api::message> reply_to_message) {
   auto &queue = new_message_queues_[chat_id];
-  CHECK(queue.has_active_request_);
-  queue.has_active_request_ = false;
-
   CHECK(!queue.queue_.empty());
   object_ptr<td_api::message> &message = queue.queue_.front().message;
   CHECK(chat_id == message->chat_id_);
@@ -7839,9 +7836,6 @@ void Client::on_get_edited_message(object_ptr<td_api::message> edited_message) {
 void Client::on_get_callback_query_message(object_ptr<td_api::message> message, int64 user_id, int state) {
   CHECK(user_id != 0);
   auto &queue = new_callback_query_queues_[user_id];
-  CHECK(queue.has_active_request_);
-  queue.has_active_request_ = false;
-
   CHECK(!queue.queue_.empty());
   int64 chat_id = queue.queue_.front()->chat_id_;
   int64 message_id = queue.queue_.front()->message_id_;
@@ -16540,6 +16534,8 @@ void Client::process_new_callback_query_queue(int64 user_id, int state) {
                 << user_id;
       return;
     }
+  } else {
+    CHECK(state == 0);
   }
   if (logging_out_ || closing_) {
     LOG(INFO) << "Ignore callback query while closing for user " << user_id;
@@ -16621,6 +16617,8 @@ void Client::process_new_business_callback_query_queue(int64 user_id, int state)
                 << " for user " << user_id;
       return;
     }
+  } else {
+    CHECK(state == 0);
   }
   if (logging_out_ || closing_) {
     LOG(INFO) << "Ignore business callback query while closing for user " << user_id;
@@ -17337,6 +17335,8 @@ void Client::process_new_message_queue(int64 chat_id, int state) {
     } else {
       return;
     }
+  } else {
+    CHECK(state == 0);
   }
   if (logging_out_ || closing_) {
     new_message_queues_.erase(chat_id);
@@ -17442,6 +17442,8 @@ void Client::process_new_business_message_queue(const td::string &connection_id,
     } else {
       return;
     }
+  } else {
+    CHECK(state == 0);
   }
   if (logging_out_ || closing_) {
     new_business_message_queues_.erase(connection_id);
