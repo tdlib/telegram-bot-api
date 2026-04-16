@@ -1237,7 +1237,7 @@ class Client final : public WebhookActor::Callback {
 
   void add_business_message_edited(object_ptr<td_api::updateBusinessMessageEdited> &&update);
 
-  void process_new_business_message_queue(const td::string &connection_id);
+  void process_new_business_message_queue(const td::string &connection_id, int state);
 
   struct MessageFullId {
     int64 chat_id;
@@ -1487,11 +1487,11 @@ class Client final : public WebhookActor::Callback {
   td::FlatHashMap<int64, NewMessageQueue> new_message_queues_;  // chat_id -> queue
 
   struct NewBusinessMessage {
-    object_ptr<td_api::businessMessage> message_;
+    td::unique_ptr<MessageInfo> message_info_;
     bool is_edited_ = false;
 
-    NewBusinessMessage(object_ptr<td_api::businessMessage> &&message, bool is_edited)
-        : message_(std::move(message)), is_edited_(is_edited) {
+    NewBusinessMessage(td::unique_ptr<MessageInfo> &&message_info, bool is_edited)
+        : message_info_(std::move(message_info)), is_edited_(is_edited) {
     }
   };
   struct NewBusinessMessageQueue {
