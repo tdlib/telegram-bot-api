@@ -17520,8 +17520,6 @@ td::unique_ptr<Client::MessageInfo> Client::delete_message(int64 chat_id, int64 
 
 const Client::MessageInfo *Client::add_message(object_ptr<td_api::message> &&message, bool force_update_content) {
   CHECK(message != nullptr);
-  CHECK(message->sending_state_ == nullptr);
-
   int64 chat_id = message->chat_id_;
   int64 message_id = message->id_;
 
@@ -17537,6 +17535,7 @@ const Client::MessageInfo *Client::add_message(object_ptr<td_api::message> &&mes
 }
 
 void Client::init_message(MessageInfo *message_info, object_ptr<td_api::message> &&message, bool force_update_content) {
+  CHECK(message->sending_state_ == nullptr);
   int64 chat_id = message->chat_id_;
   message_info->id = message->id_;
   message_info->chat_id = chat_id;
@@ -17548,10 +17547,6 @@ void Client::init_message(MessageInfo *message_info, object_ptr<td_api::message>
   if (message->forward_info_ != nullptr) {
     message_info->initial_send_date = message->forward_info_->date_;
     message_info->forward_origin = std::move(message->forward_info_->origin_);
-
-    message_info->is_automatic_forward = message->forward_info_->source_ != nullptr &&
-                                         get_chat_type(chat_id) == ChatType::Supergroup &&
-                                         get_chat_type(message->forward_info_->source_->chat_id_) == ChatType::Channel;
   } else if (message->import_info_ != nullptr) {
     message_info->initial_send_date = message->import_info_->date_;
     message_info->forward_origin = make_object<td_api::messageOriginHiddenUser>(message->import_info_->sender_name_);
@@ -17559,6 +17554,10 @@ void Client::init_message(MessageInfo *message_info, object_ptr<td_api::message>
     message_info->initial_send_date = 0;
     message_info->forward_origin = nullptr;
   }
+  message_info->is_automatic_forward = message->forward_info_ != nullptr &&
+                                       message->forward_info_->source_ != nullptr &&
+                                       get_chat_type(chat_id) == ChatType::Supergroup &&
+                                       get_chat_type(message->forward_info_->source_->chat_id_) == ChatType::Channel;
 
   CHECK(message->sender_id_ != nullptr);
   switch (message->sender_id_->get_id()) {
@@ -17566,6 +17565,7 @@ void Client::init_message(MessageInfo *message_info, object_ptr<td_api::message>
       auto sender_id = move_object_as<td_api::messageSenderUser>(message->sender_id_);
       message_info->sender_user_id = sender_id->user_id_;
       CHECK(message_info->sender_user_id > 0);
+      message_info->sender_chat_id = 0;
       break;
     }
     case td_api::messageSenderChat::ID: {
@@ -17582,6 +17582,8 @@ void Client::init_message(MessageInfo *message_info, object_ptr<td_api::message>
           message_info->sender_user_id = channel_bot_user_id_;
         }
         CHECK(message_info->sender_user_id > 0);
+      } else {
+        message_info->sender_user_id = 0;
       }
       break;
     }
