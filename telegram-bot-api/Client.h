@@ -1147,7 +1147,7 @@ class Client final : public WebhookActor::Callback {
     bool is_outgoing = false;
     bool is_self_destruct = false;
     bool is_imported = false;
-    mutable bool is_content_changed = false;
+    mutable bool is_content_changed = true;
   };
 
   struct BusinessConnection {
@@ -1254,7 +1254,7 @@ class Client final : public WebhookActor::Callback {
 
   const MessageInfo *add_message(object_ptr<td_api::message> &&message, bool force_update_content = false);
 
-  void init_message(MessageInfo *message_info, object_ptr<td_api::message> &&message, bool force_update_content);
+  td::unique_ptr<MessageInfo> create_message(object_ptr<td_api::message> message);
 
   const MessageInfo *get_message(int64 chat_id, int64 message_id, bool force_cache) const;
 

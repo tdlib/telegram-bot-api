@@ -17519,23 +17519,30 @@ td::unique_ptr<Client::MessageInfo> Client::delete_message(int64 chat_id, int64 
 }
 
 const Client::MessageInfo *Client::add_message(object_ptr<td_api::message> &&message, bool force_update_content) {
-  CHECK(message != nullptr);
-  int64 chat_id = message->chat_id_;
-  int64 message_id = message->id_;
-
-  LOG(DEBUG) << "Add message " << message_id << " to chat " << chat_id;
-  auto &message_info = messages_[{chat_id, message_id}];
-  if (message_info == nullptr) {
-    message_info = td::make_unique<MessageInfo>();
+  auto new_message_info = create_message(std::move(message));
+  LOG(DEBUG) << "Add message " << new_message_info->id << " to chat " << new_message_info->chat_id;
+  auto &message_info = messages_[{new_message_info->chat_id, new_message_info->id}];
+  if (message_info != nullptr) {
+    new_message_info->is_content_changed = force_update_content || message_info->is_content_changed ||
+                                           message_info->sender_tag != new_message_info->sender_tag;
+    if (!force_update_content && new_message_info->content->get_id() != td_api::messagePoll::ID) {
+      // keep the unchanged old content
+      new_message_info->content = std::move(message_info->content);
+    }
+    std::swap(message_info->suggested_post_info, new_message_info->suggested_post_info);
+    set_message_suggested_post_info(new_message_info.get(), std::move(message_info->suggested_post_info));
+    std::swap(message_info->reply_markup, new_message_info->reply_markup);
+    set_message_reply_markup(new_message_info.get(), std::move(message_info->reply_markup));
   }
-
-  init_message(message_info.get(), std::move(message), force_update_content);
+  message_info = std::move(new_message_info);
 
   return message_info.get();
 }
 
-void Client::init_message(MessageInfo *message_info, object_ptr<td_api::message> &&message, bool force_update_content) {
+td::unique_ptr<Client::MessageInfo> Client::create_message(object_ptr<td_api::message> message) {
+  CHECK(message != nullptr);
   CHECK(message->sending_state_ == nullptr);
+  auto message_info = td::make_unique<MessageInfo>();
   int64 chat_id = message->chat_id_;
   message_info->id = message->id_;
   message_info->chat_id = chat_id;
@@ -17543,21 +17550,18 @@ void Client::init_message(MessageInfo *message_info, object_ptr<td_api::message>
   message_info->edit_date = message->edit_date_;
   message_info->media_album_id = message->media_album_id_;
   message_info->via_bot_user_id = message->via_bot_user_id_;
+  message_info->sender_business_bot_user_id = message->sender_business_bot_user_id_;
 
   if (message->forward_info_ != nullptr) {
     message_info->initial_send_date = message->forward_info_->date_;
     message_info->forward_origin = std::move(message->forward_info_->origin_);
+    message_info->is_automatic_forward = message->forward_info_->source_ != nullptr &&
+                                         get_chat_type(chat_id) == ChatType::Supergroup &&
+                                         get_chat_type(message->forward_info_->source_->chat_id_) == ChatType::Channel;
   } else if (message->import_info_ != nullptr) {
     message_info->initial_send_date = message->import_info_->date_;
     message_info->forward_origin = make_object<td_api::messageOriginHiddenUser>(message->import_info_->sender_name_);
-  } else {
-    message_info->initial_send_date = 0;
-    message_info->forward_origin = nullptr;
   }
-  message_info->is_automatic_forward = message->forward_info_ != nullptr &&
-                                       message->forward_info_->source_ != nullptr &&
-                                       get_chat_type(chat_id) == ChatType::Supergroup &&
-                                       get_chat_type(message->forward_info_->source_->chat_id_) == ChatType::Channel;
 
   CHECK(message->sender_id_ != nullptr);
   switch (message->sender_id_->get_id()) {
@@ -17565,7 +17569,6 @@ void Client::init_message(MessageInfo *message_info, object_ptr<td_api::message>
       auto sender_id = move_object_as<td_api::messageSenderUser>(message->sender_id_);
       message_info->sender_user_id = sender_id->user_id_;
       CHECK(message_info->sender_user_id > 0);
-      message_info->sender_chat_id = 0;
       break;
     }
     case td_api::messageSenderChat::ID: {
@@ -17582,8 +17585,6 @@ void Client::init_message(MessageInfo *message_info, object_ptr<td_api::message>
           message_info->sender_user_id = channel_bot_user_id_;
         }
         CHECK(message_info->sender_user_id > 0);
-      } else {
-        message_info->sender_user_id = 0;
       }
       break;
     }
@@ -17597,10 +17598,7 @@ void Client::init_message(MessageInfo *message_info, object_ptr<td_api::message>
   message_info->topic_id = std::move(message->topic_id_);
   message_info->author_signature = std::move(message->author_signature_);
   message_info->sender_boost_count = message->sender_boost_count_;
-  if (message_info->sender_tag != message->sender_tag_) {
-    message_info->sender_tag = std::move(message->sender_tag_);
-    message_info->is_content_changed = true;
-  }
+  message_info->sender_tag = std::move(message->sender_tag_);
   message_info->paid_message_star_count = message->paid_message_star_count_;
   message_info->effect_id = message->effect_id_;
   message_info->is_paid_post = message->is_paid_star_suggested_post_ || message->is_paid_ton_suggested_post_;
@@ -17610,46 +17608,36 @@ void Client::init_message(MessageInfo *message_info, object_ptr<td_api::message>
 
   drop_internal_reply_to_message_in_another_chat(message);
 
-  if (message->reply_to_ != nullptr && message->reply_to_->get_id() == td_api::messageReplyToMessage::ID) {
-    message_info->reply_to_message = move_object_as<td_api::messageReplyToMessage>(message->reply_to_);
-  } else {
-    message_info->reply_to_message = nullptr;
-  }
-  if (message->reply_to_ != nullptr && message->reply_to_->get_id() == td_api::messageReplyToStory::ID) {
-    message_info->reply_to_story = move_object_as<td_api::messageReplyToStory>(message->reply_to_);
-  } else {
-    message_info->reply_to_story = nullptr;
+  if (message->reply_to_ != nullptr) {
+    switch (message->reply_to_->get_id()) {
+      case td_api::messageReplyToMessage::ID:
+        message_info->reply_to_message = move_object_as<td_api::messageReplyToMessage>(message->reply_to_);
+        break;
+      case td_api::messageReplyToStory::ID:
+        message_info->reply_to_story = move_object_as<td_api::messageReplyToStory>(message->reply_to_);
+        break;
+      default:
+        UNREACHABLE();
+    }
   }
 
-  if (message_info->content == nullptr || force_update_content) {
-    message_info->content = std::move(message->content_);
-    message_info->is_content_changed = true;
-  } else if (message->content_->get_id() == td_api::messagePoll::ID) {
-    message_info->content = std::move(message->content_);
-  }
-  set_message_suggested_post_info(message_info, std::move(message->suggested_post_info_));
-  set_message_reply_markup(message_info, std::move(message->reply_markup_));
+  message_info->content = std::move(message->content_);
+  message_info->suggested_post_info = std::move(message->suggested_post_info_);
+  message_info->reply_markup = std::move(message->reply_markup_);
 
-  auto sticker_set_ids = get_message_sticker_set_ids(message_info);
+  auto sticker_set_ids = get_message_sticker_set_ids(message_info.get());
   if (!sticker_set_ids.empty()) {
     get_sticker_set_names(std::move(sticker_set_ids), td::Promise<td::Unit>());
   }
-
-  message = nullptr;
+  return message_info;
 }
 
 td::unique_ptr<Client::MessageInfo> Client::create_business_message(td::string business_connection_id,
                                                                     object_ptr<td_api::businessMessage> &&message) {
-  auto message_info = td::make_unique<MessageInfo>();
-  CHECK(message != nullptr);
-  message_info->sender_business_bot_user_id = message->message_->sender_business_bot_user_id_;
-  init_message(message_info.get(), std::move(message->message_), true);
+  auto message_info = create_message(std::move(message->message_));
   message_info->business_connection_id = std::move(business_connection_id);
   if (message->reply_to_message_ != nullptr) {
-    message_info->business_reply_to_message = td::make_unique<MessageInfo>();
-    message_info->business_reply_to_message->sender_business_bot_user_id =
-        message->reply_to_message_->sender_business_bot_user_id_;
-    init_message(message_info->business_reply_to_message.get(), std::move(message->reply_to_message_), true);
+    message_info->business_reply_to_message = create_message(std::move(message->reply_to_message_));
     message_info->business_reply_to_message->business_connection_id = message_info->business_connection_id;
   }
   return message_info;
