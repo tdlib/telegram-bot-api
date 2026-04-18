@@ -1254,6 +1254,8 @@ class Client final : public WebhookActor::Callback {
 
   const MessageInfo *add_message(object_ptr<td_api::message> &&message, bool force_update_content = false);
 
+  const MessageInfo *add_message(td::unique_ptr<MessageInfo> &&new_message_info, bool force_update_content);
+
   td::unique_ptr<MessageInfo> create_message(object_ptr<td_api::message> message);
 
   const MessageInfo *get_message(int64 chat_id, int64 message_id, bool force_cache) const;
@@ -1466,11 +1468,11 @@ class Client final : public WebhookActor::Callback {
   int64 current_send_message_query_id_ = 1;
 
   struct NewMessage {
-    object_ptr<td_api::message> message;
-    bool is_edited = false;
+    td::unique_ptr<MessageInfo> message_info_;
+    bool is_edited_ = false;
 
-    NewMessage(object_ptr<td_api::message> &&message, bool is_edited)
-        : message(std::move(message)), is_edited(is_edited) {
+    NewMessage(td::unique_ptr<MessageInfo> &&message_info, bool is_edited)
+        : message_info_(std::move(message_info)), is_edited_(is_edited) {
     }
   };
   struct NewMessageQueue {

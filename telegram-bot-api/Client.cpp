@@ -7806,9 +7806,9 @@ void Client::loop() {
 void Client::on_get_reply_message(int64 chat_id, object_ptr<td_api::message> reply_to_message) {
   auto &queue = new_message_queues_[chat_id];
   CHECK(!queue.queue_.empty());
-  object_ptr<td_api::message> &message = queue.queue_.front().message;
-  CHECK(chat_id == message->chat_id_);
-  int64 reply_to_message_id = get_same_chat_reply_to_message_id(message);
+  auto &message_info = queue.queue_.front().message_info_;
+  CHECK(chat_id == message_info->chat_id);
+  int64 reply_to_message_id = get_same_chat_reply_to_message_id(message_info.get());
   CHECK(reply_to_message_id > 0);
   if (reply_to_message == nullptr) {
     LOG(INFO) << "Can't find message " << reply_to_message_id << " in chat " << chat_id
@@ -16485,7 +16485,7 @@ void Client::add_new_message(object_ptr<td_api::message> &&message, bool is_edit
 
   auto chat_id = message->chat_id_;
   CHECK(chat_id != 0);
-  new_message_queues_[chat_id].queue_.emplace(std::move(message), is_edited);
+  new_message_queues_[chat_id].queue_.emplace(create_message(std::move(message)), is_edited);
   process_new_message_queue(chat_id, 0);
 }
 
@@ -17343,13 +17343,11 @@ void Client::process_new_message_queue(int64 chat_id, int state) {
     return;
   }
   while (!queue.queue_.empty()) {
-    auto &message_ref = queue.queue_.front().message;
-    CHECK(chat_id == message_ref->chat_id_);
-    int64 message_id = message_ref->id_;
+    auto &message_info_ref = queue.queue_.front().message_info_;
+    CHECK(chat_id == message_info_ref->chat_id);
+    int64 message_id = message_info_ref->id;
 
-    drop_internal_reply_to_message_in_another_chat(message_ref);
-
-    int64 reply_to_message_id = get_same_chat_reply_to_message_id(message_ref);
+    int64 reply_to_message_id = get_same_chat_reply_to_message_id(message_info_ref.get());
     if (state == 0) {
       if (reply_to_message_id > 0 && get_message(chat_id, reply_to_message_id, false) == nullptr) {
         queue.has_active_request_ = true;
@@ -17359,7 +17357,7 @@ void Client::process_new_message_queue(int64 chat_id, int state) {
       state = 1;
     }
     if (state == 1) {
-      auto sticker_set_ids = get_message_sticker_set_ids(message_ref);
+      auto sticker_set_ids = get_message_sticker_set_ids(message_info_ref.get());
       td::combine(sticker_set_ids, get_message_sticker_set_ids(get_message(chat_id, reply_to_message_id, true)));
       if (!sticker_set_ids.empty()) {
         queue.has_active_request_ = true;
@@ -17372,11 +17370,10 @@ void Client::process_new_message_queue(int64 chat_id, int state) {
     }
     CHECK(state == 2);
 
-    auto message = std::move(message_ref);
-    auto is_edited = queue.queue_.front().is_edited;
+    const auto *message_info = add_message(std::move(message_info_ref), false);
+    auto is_edited = queue.queue_.front().is_edited_;
     queue.queue_.pop();
     state = 0;
-    const auto *message_info = add_message(std::move(message));
     if (need_skip_update_message(chat_id, message_info, is_edited)) {
       continue;
     }
@@ -17519,7 +17516,11 @@ td::unique_ptr<Client::MessageInfo> Client::delete_message(int64 chat_id, int64 
 }
 
 const Client::MessageInfo *Client::add_message(object_ptr<td_api::message> &&message, bool force_update_content) {
-  auto new_message_info = create_message(std::move(message));
+  return add_message(create_message(std::move(message)), force_update_content);
+}
+
+const Client::MessageInfo *Client::add_message(td::unique_ptr<MessageInfo> &&new_message_info,
+                                               bool force_update_content) {
   LOG(DEBUG) << "Add message " << new_message_info->id << " to chat " << new_message_info->chat_id;
   auto &message_info = messages_[{new_message_info->chat_id, new_message_info->id}];
   if (message_info != nullptr) {
