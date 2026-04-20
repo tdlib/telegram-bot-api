@@ -17224,9 +17224,29 @@ void Client::set_message_reply_markup(MessageInfo *message_info, object_ptr<td_a
   message_info->is_content_changed = true;
 }
 
+td::vector<td::int64> Client::get_gift_sticker_set_ids(const object_ptr<td_api::gift> &gift) {
+  if (gift->sticker_->set_id_ != 0) {
+    return {gift->sticker_->set_id_};
+  }
+  return {};
+}
+
+td::vector<td::int64> Client::get_upgraded_gift_sticker_set_ids(const object_ptr<td_api::upgradedGift> &gift) {
+  td::vector<int64> sticker_set_ids;
+  if (gift->model_->sticker_->set_id_ != 0) {
+    sticker_set_ids.push_back(gift->model_->sticker_->set_id_);
+  }
+  if (gift->symbol_->sticker_->set_id_ != 0) {
+    sticker_set_ids.push_back(gift->symbol_->sticker_->set_id_);
+  }
+  return sticker_set_ids;
+}
+
 td::vector<td::int64> Client::get_message_content_sticker_set_ids(const object_ptr<td_api::MessageContent> &content) {
   CHECK(content != nullptr);
   switch (content->get_id()) {
+    case td_api::messageGift::ID:
+      return get_gift_sticker_set_ids(static_cast<const td_api::messageGift *>(content.get())->gift_);
     case td_api::messagePoll::ID: {
       const auto *poll = static_cast<const td_api::messagePoll *>(content.get())->poll_.get();
       td::vector<int64> sticker_set_ids;
@@ -17242,6 +17262,16 @@ td::vector<td::int64> Client::get_message_content_sticker_set_ids(const object_p
       }
       break;
     }
+    case td_api::messageUpgradedGift::ID:
+      return get_upgraded_gift_sticker_set_ids(static_cast<const td_api::messageUpgradedGift *>(content.get())->gift_);
+    case td_api::messageRefundedUpgradedGift::ID:
+      return get_gift_sticker_set_ids(static_cast<const td_api::messageRefundedUpgradedGift *>(content.get())->gift_);
+    case td_api::messageUpgradedGiftPurchaseOffer::ID:
+      return get_upgraded_gift_sticker_set_ids(
+          static_cast<const td_api::messageUpgradedGiftPurchaseOffer *>(content.get())->gift_);
+    case td_api::messageUpgradedGiftPurchaseOfferRejected::ID:
+      return get_upgraded_gift_sticker_set_ids(
+          static_cast<const td_api::messageUpgradedGiftPurchaseOfferRejected *>(content.get())->gift_);
     default:
       break;
   }
