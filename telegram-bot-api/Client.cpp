@@ -17224,13 +17224,28 @@ void Client::set_message_reply_markup(MessageInfo *message_info, object_ptr<td_a
   message_info->is_content_changed = true;
 }
 
-td::int64 Client::get_sticker_set_id(const object_ptr<td_api::MessageContent> &content) {
+td::vector<td::int64> Client::get_message_content_sticker_set_ids(const object_ptr<td_api::MessageContent> &content) {
   CHECK(content != nullptr);
-  if (content->get_id() != td_api::messageSticker::ID) {
-    return 0;
+  switch (content->get_id()) {
+    case td_api::messagePoll::ID: {
+      const auto *poll = static_cast<const td_api::messagePoll *>(content.get())->poll_.get();
+      td::vector<int64> sticker_set_ids;
+      for (const auto &option : poll->options_) {
+        td::combine(sticker_set_ids, get_message_content_sticker_set_ids(option->media_));
+      }
+      return sticker_set_ids;
+    }
+    case td_api::messageSticker::ID: {
+      auto sticker_set_id = static_cast<const td_api::messageSticker *>(content.get())->sticker_->set_id_;
+      if (sticker_set_id != 0) {
+        return {sticker_set_id};
+      }
+      break;
+    }
+    default:
+      break;
   }
-
-  return static_cast<const td_api::messageSticker *>(content.get())->sticker_->set_id_;
+  return {};
 }
 
 td::vector<td::int64> Client::get_message_sticker_set_ids(const MessageInfo *message_info) {
@@ -17239,15 +17254,9 @@ td::vector<td::int64> Client::get_message_sticker_set_ids(const MessageInfo *mes
   }
 
   td::vector<int64> sticker_set_ids;
-  auto content_sticker_set_id = get_sticker_set_id(message_info->content);
-  if (content_sticker_set_id != 0) {
-    sticker_set_ids.push_back(content_sticker_set_id);
-  }
+  td::combine(sticker_set_ids, get_message_content_sticker_set_ids(message_info->content));
   if (message_info->reply_to_message != nullptr && message_info->reply_to_message->content_ != nullptr) {
-    auto reply_sticker_set_id = get_sticker_set_id(message_info->reply_to_message->content_);
-    if (reply_sticker_set_id != 0) {
-      sticker_set_ids.push_back(reply_sticker_set_id);
-    }
+    td::combine(sticker_set_ids, get_message_content_sticker_set_ids(message_info->reply_to_message->content_));
   }
   if (message_info->business_reply_to_message != nullptr) {
     td::combine(sticker_set_ids, get_message_sticker_set_ids(message_info->business_reply_to_message.get()));

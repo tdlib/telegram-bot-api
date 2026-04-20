@@ -1184,7 +1184,7 @@ class Client final : public WebhookActor::Callback {
 
   static void set_message_reply_markup(MessageInfo *message_info, object_ptr<td_api::ReplyMarkup> &&reply_markup);
 
-  static int64 get_sticker_set_id(const object_ptr<td_api::MessageContent> &content);
+  static td::vector<int64> get_message_content_sticker_set_ids(const object_ptr<td_api::MessageContent> &content);
 
   static td::vector<int64> get_message_sticker_set_ids(const MessageInfo *message_info);
 
