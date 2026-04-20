@@ -7374,8 +7374,7 @@ class Client::TdOnGetMyStarBalanceCallback final : public TdQueryCallback {
 
 class Client::TdOnGetStarTransactionsCallback final : public TdQueryCallback {
  public:
-  TdOnGetStarTransactionsCallback(const Client *client, PromisedQueryPtr query)
-      : client_(client), query_(std::move(query)) {
+  TdOnGetStarTransactionsCallback(Client *client, PromisedQueryPtr query) : client_(client), query_(std::move(query)) {
   }
 
   void on_result(object_ptr<td_api::Object> result) final {
@@ -7385,11 +7384,24 @@ class Client::TdOnGetStarTransactionsCallback final : public TdQueryCallback {
 
     CHECK(result->get_id() == td_api::starTransactions::ID);
     auto transactions = move_object_as<td_api::starTransactions>(result);
-    answer_query(JsonStarTransactions(transactions.get(), client_), std::move(query_));
+    td::vector<int64> sticker_set_ids;
+    for (const auto &transaction : transactions->transactions_) {
+      if (transaction->type_->get_id() == td_api::starTransactionTypeGiftPurchase::ID) {
+        td::combine(sticker_set_ids,
+                    get_gift_sticker_set_ids(
+                        static_cast<const td_api::starTransactionTypeGiftPurchase *>(transaction->type_.get())->gift_));
+      }
+    }
+    client_->get_sticker_set_names(
+        std::move(sticker_set_ids),
+        td::PromiseCreator::lambda([actor_id = client_->actor_id(client_), transactions = std::move(transactions),
+                                    query = std::move(query_)](td::Unit) mutable {
+          send_closure(actor_id, &Client::return_star_transactions, std::move(transactions), std::move(query));
+        }));
   }
 
  private:
-  const Client *client_;
+  Client *client_;
   PromisedQueryPtr query_;
 };
 
@@ -15386,6 +15398,10 @@ void Client::return_gifts(td::vector<object_ptr<td_api::gift>> gifts, PromisedQu
 void Client::return_received_gifts(object_ptr<td_api::receivedGifts> gifts, bool can_be_managed,
                                    PromisedQueryPtr query) {
   answer_query(JsonReceivedGifts(gifts.get(), can_be_managed, this), std::move(query));
+}
+
+void Client::return_star_transactions(object_ptr<td_api::starTransactions> transactions, PromisedQueryPtr query) {
+  answer_query(JsonStarTransactions(transactions.get(), this), std::move(query));
 }
 
 void Client::return_chat_full_info(int64 chat_id, int64 pinned_message_id, PromisedQueryPtr query) {
