@@ -1188,8 +1188,6 @@ class Client final : public WebhookActor::Callback {
 
   static td::vector<int64> get_message_sticker_set_ids(const MessageInfo *message_info);
 
-  static td::vector<int64> get_message_sticker_set_ids(const object_ptr<td_api::message> &message);
-
   td::string get_sticker_set_name(int64 sticker_set_id) const;
 
   int64 choose_added_member_id(const td_api::messageChatAddMembers *message_add_members) const;

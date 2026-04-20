@@ -17255,28 +17255,6 @@ td::vector<td::int64> Client::get_message_sticker_set_ids(const MessageInfo *mes
   return sticker_set_ids;
 }
 
-td::vector<td::int64> Client::get_message_sticker_set_ids(const object_ptr<td_api::message> &message) {
-  if (message == nullptr) {
-    return {};
-  }
-
-  td::vector<int64> sticker_set_ids;
-  auto content_sticker_set_id = get_sticker_set_id(message->content_);
-  if (content_sticker_set_id != 0) {
-    sticker_set_ids.push_back(content_sticker_set_id);
-  }
-  if (message->reply_to_ != nullptr && message->reply_to_->get_id() == td_api::messageReplyToMessage::ID) {
-    const auto *reply_to_message = static_cast<const td_api::messageReplyToMessage *>(message->reply_to_.get());
-    if (reply_to_message->content_ != nullptr) {
-      auto reply_sticker_set_id = get_sticker_set_id(reply_to_message->content_);
-      if (reply_sticker_set_id != 0) {
-        sticker_set_ids.push_back(reply_sticker_set_id);
-      }
-    }
-  }
-  return sticker_set_ids;
-}
-
 td::string Client::get_sticker_set_name(int64 sticker_set_id) const {
   return sticker_set_names_.get(sticker_set_id);
 }
