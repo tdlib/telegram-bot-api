@@ -17041,21 +17041,6 @@ td::int64 Client::get_same_chat_reply_to_message_id(const MessageInfo *message_i
   return get_implicit_reply_to_message_id(message_info->chat_id, message_info->id, message_info->topic_id);
 }
 
-void Client::drop_internal_reply_to_message_in_another_chat(object_ptr<td_api::message> &message) {
-  CHECK(message != nullptr);
-  if (message->reply_to_ != nullptr && message->reply_to_->get_id() == td_api::messageReplyToMessage::ID) {
-    auto *reply_to = static_cast<td_api::messageReplyToMessage *>(message->reply_to_.get());
-    auto reply_in_chat_id = reply_to->chat_id_;
-    if (reply_in_chat_id != message->chat_id_ && reply_to->origin_ == nullptr) {
-      LOG(ERROR) << "Drop reply to message " << message->id_ << " in chat " << message->chat_id_
-                 << " from another chat " << reply_in_chat_id << " sent at " << message->date_
-                 << " and originally sent at "
-                 << (message->forward_info_ != nullptr ? message->forward_info_->date_ : -1);
-      message->reply_to_ = nullptr;
-    }
-  }
-}
-
 td::Slice Client::get_sticker_type(const object_ptr<td_api::StickerType> &type) {
   CHECK(type != nullptr);
   switch (type->get_id()) {
@@ -17576,13 +17561,17 @@ td::unique_ptr<Client::MessageInfo> Client::create_message(object_ptr<td_api::me
   message_info->is_self_destruct = message->self_destruct_type_ != nullptr;
   message_info->is_imported = message->import_info_ != nullptr;
 
-  drop_internal_reply_to_message_in_another_chat(message);
-
   if (message->reply_to_ != nullptr) {
     switch (message->reply_to_->get_id()) {
-      case td_api::messageReplyToMessage::ID:
+      case td_api::messageReplyToMessage::ID: {
         message_info->reply_to_message = move_object_as<td_api::messageReplyToMessage>(message->reply_to_);
+        auto reply_in_chat_id = message_info->reply_to_message->chat_id_;
+        if (reply_in_chat_id != message_info->chat_id && message_info->reply_to_message->origin_ == nullptr) {
+          LOG(ERROR) << "Drop reply to message " << message_info->id << " in chat " << message_info->chat_id;
+          message_info->reply_to_message = nullptr;
+        }
         break;
+      }
       case td_api::messageReplyToStory::ID:
         message_info->reply_to_story = move_object_as<td_api::messageReplyToStory>(message->reply_to_);
         break;

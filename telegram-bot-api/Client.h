@@ -1164,8 +1164,6 @@ class Client final : public WebhookActor::Callback {
 
   int64 get_same_chat_reply_to_message_id(const MessageInfo *message_info, bool only_explicit) const;
 
-  static void drop_internal_reply_to_message_in_another_chat(object_ptr<td_api::message> &message);
-
   static td::Slice get_sticker_type(const object_ptr<td_api::StickerType> &type);
 
   static td::Result<object_ptr<td_api::StickerType>> get_sticker_type(td::Slice type);
