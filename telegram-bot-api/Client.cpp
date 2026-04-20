@@ -6474,10 +6474,10 @@ class Client::TdOnCheckUserNoFailCallback final : public TdQueryCallback {
 template <class OnSuccess>
 class Client::TdOnCheckChatCallback final : public TdQueryCallback {
  public:
-  TdOnCheckChatCallback(const Client *client, bool only_supergroup, AccessRights access_rights, PromisedQueryPtr query,
+  TdOnCheckChatCallback(const Client *client, bool by_username, AccessRights access_rights, PromisedQueryPtr query,
                         OnSuccess on_success)
       : client_(client)
-      , only_supergroup_(only_supergroup)
+      , by_username_(by_username)
       , access_rights_(access_rights)
       , query_(std::move(query))
       , on_success_(std::move(on_success)) {
@@ -6493,8 +6493,25 @@ class Client::TdOnCheckChatCallback final : public TdQueryCallback {
     auto chat_info = client_->get_chat(chat->id_);
     CHECK(chat_info != nullptr);  // it must have already been received through updates
     CHECK(chat_info->title == chat->title_);
-    if (only_supergroup_ && chat_info->type != ChatInfo::Type::Supergroup) {
-      return fail_query(400, "Bad Request: chat not found", std::move(query_));
+    if (by_username_) {
+      bool is_allowed = false;
+      switch (chat_info->type) {
+        case ChatInfo::Type::Private: {
+          auto user_info = client_->get_user_info(chat_info->user_id);
+          CHECK(user_info != nullptr);
+          is_allowed = (user_info->type == UserInfo::Type::Bot);
+          break;
+        }
+        case ChatInfo::Type::Supergroup:
+          is_allowed = true;
+          break;
+        default:
+          // not allowed
+          break;
+      }
+      if (!is_allowed) {
+        return fail_query(400, "Bad Request: chat not found", std::move(query_));
+      }
     }
 
     client_->check_chat_access(chat->id_, access_rights_, chat_info, std::move(query_), std::move(on_success_));
@@ -6502,7 +6519,7 @@ class Client::TdOnCheckChatCallback final : public TdQueryCallback {
 
  private:
   const Client *client_;
-  bool only_supergroup_;
+  bool by_username_;
   AccessRights access_rights_;
   PromisedQueryPtr query_;
   OnSuccess on_success_;
