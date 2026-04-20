@@ -7324,7 +7324,7 @@ class Client::TdOnGetStarAmountCallback final : public TdQueryCallback {
 
 class Client::TdOnGetReceivedGiftsCallback final : public TdQueryCallback {
  public:
-  TdOnGetReceivedGiftsCallback(const Client *client, bool can_be_managed, PromisedQueryPtr query)
+  TdOnGetReceivedGiftsCallback(Client *client, bool can_be_managed, PromisedQueryPtr query)
       : client_(client), can_be_managed_(can_be_managed), query_(std::move(query)) {
   }
 
@@ -7335,11 +7335,20 @@ class Client::TdOnGetReceivedGiftsCallback final : public TdQueryCallback {
 
     CHECK(result->get_id() == td_api::receivedGifts::ID);
     auto gifts = move_object_as<td_api::receivedGifts>(result);
-    answer_query(JsonReceivedGifts(gifts.get(), can_be_managed_, client_), std::move(query_));
+    td::vector<int64> sticker_set_ids;
+    for (const auto &gift : gifts->gifts_) {
+      td::combine(sticker_set_ids, Client::get_sent_gift_sticker_set_ids(gift->gift_));
+    }
+    client_->get_sticker_set_names(
+        std::move(sticker_set_ids),
+        td::PromiseCreator::lambda([actor_id = client_->actor_id(client_), gifts = std::move(gifts),
+                                    can_be_managed = can_be_managed_, query = std::move(query_)](td::Unit) mutable {
+          send_closure(actor_id, &Client::return_received_gifts, std::move(gifts), can_be_managed, std::move(query));
+        }));
   }
 
  private:
-  const Client *client_;
+  Client *client_;
   bool can_be_managed_;
   PromisedQueryPtr query_;
 };
@@ -15361,6 +15370,11 @@ void Client::return_stickers(object_ptr<td_api::stickers> stickers, PromisedQuer
   answer_query(JsonStickers(stickers->stickers_, this), std::move(query));
 }
 
+void Client::return_received_gifts(object_ptr<td_api::receivedGifts> gifts, bool can_be_managed,
+                                   PromisedQueryPtr query) {
+  answer_query(JsonReceivedGifts(gifts.get(), can_be_managed, this), std::move(query));
+}
+
 void Client::return_chat_full_info(int64 chat_id, int64 pinned_message_id, PromisedQueryPtr query) {
   answer_query(JsonChat(chat_id, this, true, pinned_message_id), std::move(query));
 }
@@ -17240,6 +17254,18 @@ td::vector<td::int64> Client::get_upgraded_gift_sticker_set_ids(const object_ptr
     sticker_set_ids.push_back(gift->symbol_->sticker_->set_id_);
   }
   return sticker_set_ids;
+}
+
+td::vector<td::int64> Client::get_sent_gift_sticker_set_ids(const object_ptr<td_api::SentGift> &gift) {
+  switch (gift->get_id()) {
+    case td_api::sentGiftRegular::ID:
+      return get_gift_sticker_set_ids(static_cast<const td_api::sentGiftRegular *>(gift.get())->gift_);
+    case td_api::sentGiftUpgraded::ID:
+      return get_upgraded_gift_sticker_set_ids(static_cast<const td_api::sentGiftUpgraded *>(gift.get())->gift_);
+    default:
+      UNREACHABLE();
+      return {};
+  }
 }
 
 td::vector<td::int64> Client::get_message_content_sticker_set_ids(const object_ptr<td_api::MessageContent> &content) {

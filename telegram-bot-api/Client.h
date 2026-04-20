@@ -947,6 +947,8 @@ class Client final : public WebhookActor::Callback {
 
   void return_stickers(object_ptr<td_api::stickers> stickers, PromisedQueryPtr query);
 
+  void return_received_gifts(object_ptr<td_api::receivedGifts> gifts, bool can_be_managed, PromisedQueryPtr query);
+
   void return_chat_full_info(int64 chat_id, int64 pinned_message_id, PromisedQueryPtr query);
 
   void fix_reply_markup_bot_user_ids(object_ptr<td_api::ReplyMarkup> &reply_markup) const;
@@ -1187,6 +1189,8 @@ class Client final : public WebhookActor::Callback {
   static td::vector<int64> get_gift_sticker_set_ids(const object_ptr<td_api::gift> &gift);
 
   static td::vector<int64> get_upgraded_gift_sticker_set_ids(const object_ptr<td_api::upgradedGift> &gift);
+
+  static td::vector<int64> get_sent_gift_sticker_set_ids(const object_ptr<td_api::SentGift> &gift);
 
   static td::vector<int64> get_message_content_sticker_set_ids(const object_ptr<td_api::MessageContent> &content);
 
