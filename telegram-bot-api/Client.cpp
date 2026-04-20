@@ -7337,7 +7337,7 @@ class Client::TdOnGetReceivedGiftsCallback final : public TdQueryCallback {
     auto gifts = move_object_as<td_api::receivedGifts>(result);
     td::vector<int64> sticker_set_ids;
     for (const auto &gift : gifts->gifts_) {
-      td::combine(sticker_set_ids, Client::get_sent_gift_sticker_set_ids(gift->gift_));
+      td::combine(sticker_set_ids, get_sent_gift_sticker_set_ids(gift->gift_));
     }
     client_->get_sticker_set_names(
         std::move(sticker_set_ids),
@@ -7495,7 +7495,7 @@ class Client::TdOnGetUserChatBoostsCallback final : public TdQueryCallback {
 
 class Client::TdOnGetGiftsCallback final : public TdQueryCallback {
  public:
-  TdOnGetGiftsCallback(const Client *client, PromisedQueryPtr query) : client_(client), query_(std::move(query)) {
+  TdOnGetGiftsCallback(Client *client, PromisedQueryPtr query) : client_(client), query_(std::move(query)) {
   }
 
   void on_result(object_ptr<td_api::Object> result) final {
@@ -7506,11 +7506,20 @@ class Client::TdOnGetGiftsCallback final : public TdQueryCallback {
     CHECK(result->get_id() == td_api::availableGifts::ID);
     auto available_gifts = move_object_as<td_api::availableGifts>(result);
     auto gifts = td::transform(std::move(available_gifts->gifts_), [](auto &&gift) { return std::move(gift->gift_); });
-    answer_query(JsonGifts(gifts, client_), std::move(query_));
+    td::vector<int64> sticker_set_ids;
+    for (const auto &gift : gifts) {
+      td::combine(sticker_set_ids, get_gift_sticker_set_ids(gift));
+    }
+    client_->get_sticker_set_names(
+        std::move(sticker_set_ids),
+        td::PromiseCreator::lambda([actor_id = client_->actor_id(client_), gifts = std::move(gifts),
+                                    query = std::move(query_)](td::Unit) mutable {
+          send_closure(actor_id, &Client::return_gifts, std::move(gifts), std::move(query));
+        }));
   }
 
  private:
-  const Client *client_;
+  Client *client_;
   PromisedQueryPtr query_;
 };
 
@@ -15368,6 +15377,10 @@ void Client::on_file_download(int32 file_id, td::Result<object_ptr<td_api::file>
 
 void Client::return_stickers(object_ptr<td_api::stickers> stickers, PromisedQueryPtr query) {
   answer_query(JsonStickers(stickers->stickers_, this), std::move(query));
+}
+
+void Client::return_gifts(td::vector<object_ptr<td_api::gift>> gifts, PromisedQueryPtr query) {
+  answer_query(JsonGifts(gifts, this), std::move(query));
 }
 
 void Client::return_received_gifts(object_ptr<td_api::receivedGifts> gifts, bool can_be_managed,

@@ -947,6 +947,8 @@ class Client final : public WebhookActor::Callback {
 
   void return_stickers(object_ptr<td_api::stickers> stickers, PromisedQueryPtr query);
 
+  void return_gifts(td::vector<object_ptr<td_api::gift>> gifts, PromisedQueryPtr query);
+
   void return_received_gifts(object_ptr<td_api::receivedGifts> gifts, bool can_be_managed, PromisedQueryPtr query);
 
   void return_chat_full_info(int64 chat_id, int64 pinned_message_id, PromisedQueryPtr query);
