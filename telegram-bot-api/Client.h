@@ -1162,15 +1162,7 @@ class Client final : public WebhookActor::Callback {
                                                     bool from_update);
   const BusinessConnection *get_business_connection(const td::string &connection_id) const;
 
-  static int64 get_same_chat_reply_to_message_id(const td_api::messageReplyToMessage *reply_to,
-                                                 int64 implicit_reply_to_message_id);
-
-  static int64 get_same_chat_reply_to_message_id(const object_ptr<td_api::MessageReplyTo> &reply_to,
-                                                 int64 implicit_reply_to_message_id);
-
-  int64 get_same_chat_reply_to_message_id(const object_ptr<td_api::message> &message) const;
-
-  int64 get_same_chat_reply_to_message_id(const MessageInfo *message_info) const;
+  int64 get_same_chat_reply_to_message_id(const MessageInfo *message_info, bool only_explicit) const;
 
   static void drop_internal_reply_to_message_in_another_chat(object_ptr<td_api::message> &message);
 

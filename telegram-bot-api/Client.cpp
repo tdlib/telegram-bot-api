@@ -4071,7 +4071,7 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     object("forward_date", message_->initial_send_date);
   }
   if (need_reply_) {
-    auto reply_to_message_id = client_->get_same_chat_reply_to_message_id(message_);
+    auto reply_to_message_id = client_->get_same_chat_reply_to_message_id(message_, true);
     if (reply_to_message_id > 0) {
       // internal reply
       const MessageInfo *reply_to_message = !message_->business_connection_id.empty()
@@ -7808,7 +7808,7 @@ void Client::on_get_reply_message(int64 chat_id, object_ptr<td_api::message> rep
   CHECK(!queue.queue_.empty());
   auto &message_info = queue.queue_.front().message_info_;
   CHECK(chat_id == message_info->chat_id);
-  int64 reply_to_message_id = get_same_chat_reply_to_message_id(message_info.get());
+  int64 reply_to_message_id = get_same_chat_reply_to_message_id(message_info.get(), false);
   CHECK(reply_to_message_id > 0);
   if (reply_to_message == nullptr) {
     LOG(INFO) << "Can't find message " << reply_to_message_id << " in chat " << chat_id
@@ -7852,7 +7852,7 @@ void Client::on_get_callback_query_message(object_ptr<td_api::message> message, 
         process_new_callback_query_queue(user_id, state);
         return;
       }
-      auto reply_to_message_id = get_same_chat_reply_to_message_id(message_info);
+      auto reply_to_message_id = get_same_chat_reply_to_message_id(message_info, false);
       LOG(INFO) << "Can't find callback query reply to message " << reply_to_message_id << " in chat " << chat_id
                 << ". It may be already deleted";
     }
@@ -16560,7 +16560,7 @@ void Client::process_new_callback_query_queue(int64 user_id, int state) {
       state = 1;
     }
     if (state == 1) {
-      auto reply_to_message_id = get_same_chat_reply_to_message_id(message_info);
+      auto reply_to_message_id = get_same_chat_reply_to_message_id(message_info, false);
       if (reply_to_message_id > 0 && get_message(chat_id, reply_to_message_id, false) == nullptr) {
         queue.has_active_request_ = true;
         return send_request(make_object<td_api::getRepliedMessage>(chat_id, message_id),
@@ -16570,7 +16570,7 @@ void Client::process_new_callback_query_queue(int64 user_id, int state) {
     }
     if (state == 2) {
       auto sticker_set_ids = get_message_sticker_set_ids(message_info);
-      auto reply_to_message_id = get_same_chat_reply_to_message_id(message_info);
+      auto reply_to_message_id = get_same_chat_reply_to_message_id(message_info, false);
       td::combine(sticker_set_ids, get_message_sticker_set_ids(get_message(chat_id, reply_to_message_id, true)));
       if (!sticker_set_ids.empty()) {
         queue.has_active_request_ = true;
@@ -16973,103 +16973,72 @@ bool Client::need_skip_update_message(int64 chat_id, const MessageInfo *message_
   return false;
 }
 
-td::int64 Client::get_same_chat_reply_to_message_id(const td_api::messageReplyToMessage *reply_to,
-                                                    int64 implicit_reply_to_message_id) {
-  if (reply_to != nullptr && reply_to->origin_ == nullptr) {
-    CHECK(reply_to->message_id_ > 0);
-    return reply_to->message_id_;
+td::int64 Client::get_same_chat_reply_to_message_id(const MessageInfo *message_info, bool only_explicit) const {
+  if (message_info == nullptr) {
+    return 0;
   }
-  return implicit_reply_to_message_id;
-}
-
-td::int64 Client::get_same_chat_reply_to_message_id(const object_ptr<td_api::MessageReplyTo> &reply_to,
-                                                    int64 implicit_reply_to_message_id) {
-  if (reply_to != nullptr) {
-    switch (reply_to->get_id()) {
-      case td_api::messageReplyToMessage::ID:
-        return get_same_chat_reply_to_message_id(static_cast<const td_api::messageReplyToMessage *>(reply_to.get()),
-                                                 implicit_reply_to_message_id);
-      case td_api::messageReplyToStory::ID:
-        break;
-      default:
-        UNREACHABLE();
-        break;
-    }
-  }
-  return implicit_reply_to_message_id;
-}
-
-td::int64 Client::get_same_chat_reply_to_message_id(const object_ptr<td_api::message> &message) const {
   auto content_message_id = [&] {
-    switch (message->content_->get_id()) {
+    if (only_explicit) {
+      return static_cast<int64>(0);
+    }
+    auto content = message_info->content.get();
+    switch (content->get_id()) {
       case td_api::messagePinMessage::ID:
-        return static_cast<const td_api::messagePinMessage *>(message->content_.get())->message_id_;
+        return static_cast<const td_api::messagePinMessage *>(content)->message_id_;
       case td_api::messageGameScore::ID:
-        return static_cast<const td_api::messageGameScore *>(message->content_.get())->game_message_id_;
+        return static_cast<const td_api::messageGameScore *>(content)->game_message_id_;
       case td_api::messagePaymentSuccessful::ID: {
-        const auto *content = static_cast<const td_api::messagePaymentSuccessful *>(message->content_.get());
-        return content->invoice_chat_id_ == message->chat_id_ ? content->invoice_message_id_ : static_cast<int64>(0);
+        const auto *payment = static_cast<const td_api::messagePaymentSuccessful *>(content);
+        return payment->invoice_chat_id_ == message_info->chat_id ? payment->invoice_message_id_
+                                                                  : static_cast<int64>(0);
       }
       case td_api::messageChatSetBackground::ID:
-        return static_cast<const td_api::messageChatSetBackground *>(message->content_.get())
-            ->old_background_message_id_;
+        return static_cast<const td_api::messageChatSetBackground *>(content)->old_background_message_id_;
       case td_api::messageGiveawayCompleted::ID:
-        return static_cast<const td_api::messageGiveawayCompleted *>(message->content_.get())->giveaway_message_id_;
+        return static_cast<const td_api::messageGiveawayCompleted *>(content)->giveaway_message_id_;
       case td_api::messageChecklistTasksDone::ID:
-        return static_cast<const td_api::messageChecklistTasksDone *>(message->content_.get())->checklist_message_id_;
+        return static_cast<const td_api::messageChecklistTasksDone *>(content)->checklist_message_id_;
       case td_api::messageChecklistTasksAdded::ID:
-        return static_cast<const td_api::messageChecklistTasksAdded *>(message->content_.get())->checklist_message_id_;
+        return static_cast<const td_api::messageChecklistTasksAdded *>(content)->checklist_message_id_;
       case td_api::messageSuggestedPostApprovalFailed::ID:
-        return static_cast<const td_api::messageSuggestedPostApprovalFailed *>(message->content_.get())
-            ->suggested_post_message_id_;
+        return static_cast<const td_api::messageSuggestedPostApprovalFailed *>(content)->suggested_post_message_id_;
       case td_api::messageSuggestedPostApproved::ID:
-        return static_cast<const td_api::messageSuggestedPostApproved *>(message->content_.get())
-            ->suggested_post_message_id_;
+        return static_cast<const td_api::messageSuggestedPostApproved *>(content)->suggested_post_message_id_;
       case td_api::messageSuggestedPostDeclined::ID:
-        return static_cast<const td_api::messageSuggestedPostDeclined *>(message->content_.get())
-            ->suggested_post_message_id_;
+        return static_cast<const td_api::messageSuggestedPostDeclined *>(content)->suggested_post_message_id_;
       case td_api::messageSuggestedPostPaid::ID:
-        return static_cast<const td_api::messageSuggestedPostPaid *>(message->content_.get())
-            ->suggested_post_message_id_;
+        return static_cast<const td_api::messageSuggestedPostPaid *>(content)->suggested_post_message_id_;
       case td_api::messageSuggestedPostRefunded::ID:
-        return static_cast<const td_api::messageSuggestedPostRefunded *>(message->content_.get())
-            ->suggested_post_message_id_;
+        return static_cast<const td_api::messageSuggestedPostRefunded *>(content)->suggested_post_message_id_;
       case td_api::messageUpgradedGift::ID: {
-        auto *origin = static_cast<const td_api::messageUpgradedGift *>(message->content_.get())->origin_.get();
+        auto *origin = static_cast<const td_api::messageUpgradedGift *>(content)->origin_.get();
         if (origin->get_id() == td_api::upgradedGiftOriginUpgrade::ID) {
           return static_cast<const td_api::upgradedGiftOriginUpgrade *>(origin)->gift_message_id_;
         }
         return static_cast<int64>(0);
       }
       case td_api::messageUpgradedGiftPurchaseOfferRejected::ID:
-        return static_cast<const td_api::messageUpgradedGiftPurchaseOfferRejected *>(message->content_.get())
-            ->offer_message_id_;
+        return static_cast<const td_api::messageUpgradedGiftPurchaseOfferRejected *>(content)->offer_message_id_;
       case td_api::messageChatHasProtectedContentToggled::ID:
-        return static_cast<const td_api::messageChatHasProtectedContentToggled *>(message->content_.get())
-            ->request_message_id_;
+        return static_cast<const td_api::messageChatHasProtectedContentToggled *>(content)->request_message_id_;
       case td_api::messagePollOptionAdded::ID:
-        return static_cast<const td_api::messagePollOptionAdded *>(message->content_.get())->poll_message_id_;
+        return static_cast<const td_api::messagePollOptionAdded *>(content)->poll_message_id_;
       case td_api::messagePollOptionDeleted::ID:
-        return static_cast<const td_api::messagePollOptionDeleted *>(message->content_.get())->poll_message_id_;
+        return static_cast<const td_api::messagePollOptionDeleted *>(content)->poll_message_id_;
       default:
         return static_cast<int64>(0);
     }
   }();
   if (content_message_id != 0) {
-    CHECK(message->reply_to_ == nullptr);
+    CHECK(message_info->reply_to_message == nullptr);
+    CHECK(message_info->reply_to_story == nullptr);
     return content_message_id;
   }
-  return get_same_chat_reply_to_message_id(
-      message->reply_to_, get_implicit_reply_to_message_id(message->chat_id_, message->id_, message->topic_id_));
-}
-
-td::int64 Client::get_same_chat_reply_to_message_id(const MessageInfo *message_info) const {
-  if (message_info == nullptr) {
-    return 0;
+  if (message_info->reply_to_message != nullptr && message_info->reply_to_message->origin_ == nullptr) {
+    CHECK(message_info->reply_to_message->message_id_ > 0);
+    return message_info->reply_to_message->message_id_;
   }
-  return get_same_chat_reply_to_message_id(
-      message_info->reply_to_message.get(),
-      get_implicit_reply_to_message_id(message_info->chat_id, message_info->id, message_info->topic_id));
+  return get_implicit_reply_to_message_id(message_info->chat_id, message_info->id, message_info->topic_id);
 }
 
 void Client::drop_internal_reply_to_message_in_another_chat(object_ptr<td_api::message> &message) {
@@ -17347,7 +17316,7 @@ void Client::process_new_message_queue(int64 chat_id, int state) {
     CHECK(chat_id == message_info_ref->chat_id);
     int64 message_id = message_info_ref->id;
 
-    int64 reply_to_message_id = get_same_chat_reply_to_message_id(message_info_ref.get());
+    int64 reply_to_message_id = get_same_chat_reply_to_message_id(message_info_ref.get(), false);
     if (state == 0) {
       if (reply_to_message_id > 0 && get_message(chat_id, reply_to_message_id, false) == nullptr) {
         queue.has_active_request_ = true;
