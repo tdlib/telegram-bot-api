@@ -1384,6 +1384,8 @@ class Client final : public WebhookActor::Callback {
   void add_update_impl(UpdateType update_type, const td::VirtuallyJsonable &update, int32 timeout,
                        int64 webhook_queue_id);
 
+  void add_message_update(UpdateType update_type, const MessageInfo *message_info, int64 webhook_queue_id);
+
   std::size_t get_pending_update_count() const;
 
   void update_last_synchronization_error_date();
