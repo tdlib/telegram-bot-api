@@ -679,7 +679,7 @@ class Client::JsonMaskPosition final : public td::Jsonable {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
-    object("point", Client::MASK_POINTS[Client::mask_point_to_index(mask_position_->point_)]);
+    object("point", MASK_POINTS[mask_point_to_index(mask_position_->point_)]);
     object("x_shift", mask_position_->x_shift_);
     object("y_shift", mask_position_->y_shift_);
     object("scale", mask_position_->scale_);
@@ -712,7 +712,7 @@ class Client::JsonSticker final : public td::Jsonable {
     switch (sticker_->full_type_->get_id()) {
       case td_api::stickerFullTypeRegular::ID: {
         auto full_type = static_cast<const td_api::stickerFullTypeRegular *>(sticker_->full_type_.get());
-        object("type", Client::get_sticker_type(make_object<td_api::stickerTypeRegular>()));
+        object("type", get_sticker_type(make_object<td_api::stickerTypeRegular>()));
         if (full_type->premium_animation_ != nullptr) {
           object("premium_animation", JsonFile(full_type->premium_animation_.get(), client_, false));
         }
@@ -720,7 +720,7 @@ class Client::JsonSticker final : public td::Jsonable {
       }
       case td_api::stickerFullTypeMask::ID: {
         auto full_type = static_cast<const td_api::stickerFullTypeMask *>(sticker_->full_type_.get());
-        object("type", Client::get_sticker_type(make_object<td_api::stickerTypeMask>()));
+        object("type", get_sticker_type(make_object<td_api::stickerTypeMask>()));
         if (full_type->mask_position_ != nullptr) {
           object("mask_position", JsonMaskPosition(full_type->mask_position_.get()));
         }
@@ -728,7 +728,7 @@ class Client::JsonSticker final : public td::Jsonable {
       }
       case td_api::stickerFullTypeCustomEmoji::ID: {
         auto full_type = static_cast<const td_api::stickerFullTypeCustomEmoji *>(sticker_->full_type_.get());
-        object("type", Client::get_sticker_type(make_object<td_api::stickerTypeCustomEmoji>()));
+        object("type", get_sticker_type(make_object<td_api::stickerTypeCustomEmoji>()));
         if (full_type->custom_emoji_id_ != 0) {
           object("custom_emoji_id", td::to_string(full_type->custom_emoji_id_));
         }
@@ -3131,7 +3131,7 @@ class Client::JsonEncryptedPassportElement final : public td::Jsonable {
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     auto id = element_->type_->get_id();
-    object("type", Client::get_passport_element_type(id));
+    object("type", get_passport_element_type(id));
     switch (id) {
       case td_api::passportElementTypePhoneNumber::ID:
         object("phone_number", element_->value_);
@@ -4996,7 +4996,7 @@ class Client::JsonBotInfoShortDescription final : public td::Jsonable {
 
 class Client::JsonChatAdministratorRights final : public td::Jsonable {
  public:
-  JsonChatAdministratorRights(const td_api::chatAdministratorRights *rights, Client::ChatType chat_type)
+  JsonChatAdministratorRights(const td_api::chatAdministratorRights *rights, ChatType chat_type)
       : rights_(rights), chat_type_(chat_type) {
   }
 
@@ -5008,7 +5008,7 @@ class Client::JsonChatAdministratorRights final : public td::Jsonable {
 
  private:
   const td_api::chatAdministratorRights *rights_;
-  Client::ChatType chat_type_;
+  ChatType chat_type_;
 };
 
 class Client::JsonChatPhotos final : public td::Jsonable {
@@ -5029,7 +5029,7 @@ class Client::JsonChatPhotos final : public td::Jsonable {
 
 class Client::JsonChatMember final : public td::Jsonable {
  public:
-  JsonChatMember(const td_api::chatMember *member, Client::ChatType chat_type, const Client *client)
+  JsonChatMember(const td_api::chatMember *member, ChatType chat_type, const Client *client)
       : member_(member), chat_type_(chat_type), client_(client) {
   }
 
@@ -5047,7 +5047,7 @@ class Client::JsonChatMember final : public td::Jsonable {
       default:
         UNREACHABLE();
     }
-    object("status", Client::get_chat_member_status(member_->status_));
+    object("status", get_chat_member_status(member_->status_));
     switch (member_->status_->get_id()) {
       case td_api::chatMemberStatusCreator::ID: {
         auto creator = static_cast<const td_api::chatMemberStatusCreator *>(member_->status_.get());
@@ -5082,7 +5082,7 @@ class Client::JsonChatMember final : public td::Jsonable {
         if (!member_->tag_.empty()) {
           object("tag", member_->tag_);
         }
-        if (chat_type_ == Client::ChatType::Supergroup) {
+        if (chat_type_ == ChatType::Supergroup) {
           auto restricted = static_cast<const td_api::chatMemberStatusRestricted *>(member_->status_.get());
           object("until_date", restricted->restricted_until_date_);
           json_store_permissions(object, restricted->permissions_.get());
@@ -5103,13 +5103,13 @@ class Client::JsonChatMember final : public td::Jsonable {
 
  private:
   const td_api::chatMember *member_;
-  Client::ChatType chat_type_;
+  ChatType chat_type_;
   const Client *client_;
 };
 
 class Client::JsonChatMembers final : public td::Jsonable {
  public:
-  JsonChatMembers(const td::vector<object_ptr<td_api::chatMember>> &members, Client::ChatType chat_type,
+  JsonChatMembers(const td::vector<object_ptr<td_api::chatMember>> &members, ChatType chat_type,
                   bool administrators_only, bool return_bots, const Client *client)
       : members_(members)
       , chat_type_(chat_type)
@@ -5134,7 +5134,7 @@ class Client::JsonChatMembers final : public td::Jsonable {
         }
       }
       if (administrators_only_) {
-        auto status = Client::get_chat_member_status(member->status_);
+        auto status = get_chat_member_status(member->status_);
         if (status != "creator" && status != "administrator") {
           continue;
         }
@@ -5145,7 +5145,7 @@ class Client::JsonChatMembers final : public td::Jsonable {
 
  private:
   const td::vector<object_ptr<td_api::chatMember>> &members_;
-  Client::ChatType chat_type_;
+  ChatType chat_type_;
   bool administrators_only_;
   bool return_bots_;
   const Client *client_;
@@ -5911,7 +5911,7 @@ class Client::JsonStickerSet final : public td::Jsonable {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
-    if (sticker_set_->id_ == Client::GREAT_MINDS_SET_ID) {
+    if (sticker_set_->id_ == GREAT_MINDS_SET_ID) {
       object("name", GREAT_MINDS_SET_NAME);
     } else {
       object("name", sticker_set_->name_);
@@ -5921,7 +5921,7 @@ class Client::JsonStickerSet final : public td::Jsonable {
       client_->json_store_thumbnail(object, sticker_set_->thumbnail_.get());
     }
 
-    auto type = Client::get_sticker_type(sticker_set_->sticker_type_);
+    auto type = get_sticker_type(sticker_set_->sticker_type_);
     object("sticker_type", type);
     object("contains_masks", td::JsonBool(type == "mask"));
 
@@ -7150,7 +7150,7 @@ class Client::TdOnGetGroupMembersCallback final : public TdQueryCallback {
     auto group_full_info = move_object_as<td_api::basicGroupFullInfo>(result);
     auto return_bots = to_bool(query_->arg("return_bots"));
     answer_query(
-        JsonChatMembers(group_full_info->members_, Client::ChatType::Group, administrators_only_, return_bots, client_),
+        JsonChatMembers(group_full_info->members_, ChatType::Group, administrators_only_, return_bots, client_),
         std::move(query_));
   }
 
@@ -7162,7 +7162,7 @@ class Client::TdOnGetGroupMembersCallback final : public TdQueryCallback {
 
 class Client::TdOnGetSupergroupMembersCallback final : public TdQueryCallback {
  public:
-  TdOnGetSupergroupMembersCallback(const Client *client, Client::ChatType chat_type, PromisedQueryPtr query)
+  TdOnGetSupergroupMembersCallback(const Client *client, ChatType chat_type, PromisedQueryPtr query)
       : client_(client), chat_type_(chat_type), query_(std::move(query)) {
   }
 
@@ -7179,7 +7179,7 @@ class Client::TdOnGetSupergroupMembersCallback final : public TdQueryCallback {
 
  private:
   const Client *client_;
-  Client::ChatType chat_type_;
+  ChatType chat_type_;
   PromisedQueryPtr query_;
 };
 
