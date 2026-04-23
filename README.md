@@ -11,8 +11,8 @@ Please note that only global Bot API issues that affect all bots are suitable fo
 - [Dependencies](#dependencies)
 - [Usage](#usage)
 - [Documentation](#documentation)
-- [Moving a bot to a local server](#switching)
-- [Moving a bot from one local server to another](#moving)
+- [Moving a bot to a local server](#moving-a-bot-to-a-local-server)
+- [Moving a bot from one local server to another](#moving-a-bot-from-one-local-server-to-another)
 - [License](#license)
 
 <a name="installation"></a>
