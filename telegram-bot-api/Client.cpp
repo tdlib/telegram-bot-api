@@ -5868,19 +5868,19 @@ class Client::JsonStickerSet final : public td::Jsonable {
   const Client *client_;
 };
 
-class Client::JsonSentWebAppMessage final : public td::Jsonable {
+class Client::JsonInlineMessageId final : public td::Jsonable {
  public:
-  explicit JsonSentWebAppMessage(const td_api::sentWebAppMessage *message) : message_(message) {
+  explicit JsonInlineMessageId(const td_api::inlineMessageId *message) : message_(message) {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
-    if (!message_->inline_message_id_.empty()) {
-      object("inline_message_id", message_->inline_message_id_);
+    if (!message_->id_.empty()) {
+      object("inline_message_id", message_->id_);
     }
   }
 
  private:
-  const td_api::sentWebAppMessage *message_;
+  const td_api::inlineMessageId *message_;
 };
 
 class Client::JsonPreparedInlineMessageId final : public td::Jsonable {
@@ -7390,9 +7390,9 @@ class Client::TdOnAnswerWebAppQueryCallback final : public TdQueryCallback {
       return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
     }
 
-    CHECK(result->get_id() == td_api::sentWebAppMessage::ID);
-    auto message = move_object_as<td_api::sentWebAppMessage>(result);
-    answer_query(JsonSentWebAppMessage(message.get()), std::move(query_));
+    CHECK(result->get_id() == td_api::inlineMessageId::ID);
+    auto message = move_object_as<td_api::inlineMessageId>(result);
+    answer_query(JsonInlineMessageId(message.get()), std::move(query_));
   }
 
  private:
@@ -11355,7 +11355,7 @@ td::Result<td_api::object_ptr<td_api::chatPermissions>> Client::get_chat_permiss
 
   return make_object<td_api::chatPermissions>(
       can_send_messages, can_send_audios, can_send_documents, can_send_photos, can_send_videos, can_send_video_notes,
-      can_send_voice_notes, can_send_polls, can_send_other_messages, can_add_link_previews, can_edit_tag,
+      can_send_voice_notes, can_send_polls, can_send_other_messages, can_add_link_previews, false, can_edit_tag,
       can_change_info, can_invite_users, can_pin_messages, can_manage_topics);
 }
 
@@ -11769,14 +11769,14 @@ td::Result<td::vector<td_api::object_ptr<td_api::inputPollOption>>> Client::get_
         TRY_RESULT(parse_mode, object.get_optional_string_field("text_parse_mode"));
         TRY_RESULT(option_text,
                    get_formatted_text(std::move(text), std::move(parse_mode), object.extract_field("text_entities")));
-        options.push_back(make_object<td_api::inputPollOption>(std::move(option_text)));
+        options.push_back(make_object<td_api::inputPollOption>(std::move(option_text), nullptr));
         continue;
       }
 
       return td::Status::Error(400, "Expected an option to be of type String");
     }
     options.push_back(make_object<td_api::inputPollOption>(
-        make_object<td_api::formattedText>(input_option.get_string().str(), td::Auto())));
+        make_object<td_api::formattedText>(input_option.get_string().str(), td::Auto()), nullptr));
   }
   return std::move(options);
 }
@@ -12781,7 +12781,7 @@ td::Status Client::process_send_poll_query(PromisedQueryPtr &query) {
       correct_option_ids.push_back(get_integer_arg(query.get(), "correct_option_id", -1));
     }
 
-    poll_type = make_object<td_api::inputPollTypeQuiz>(std::move(correct_option_ids), std::move(explanation));
+    poll_type = make_object<td_api::inputPollTypeQuiz>(std::move(correct_option_ids), std::move(explanation), nullptr);
   } else if (type.empty() || type == "regular") {
     poll_type = make_object<td_api::inputPollTypeRegular>(to_bool(query->arg("allow_adding_options")));
   } else {
@@ -12796,10 +12796,10 @@ td::Status Client::process_send_poll_query(PromisedQueryPtr &query) {
   auto is_closed = to_bool(query->arg("is_closed"));
   auto shuffle_options = to_bool(query->arg("shuffle_options"));
   auto hide_results_until_closes = to_bool(query->arg("hide_results_until_closes"));
-  do_send_message(make_object<td_api::inputMessagePoll>(std::move(question), std::move(options), std::move(description),
-                                                        is_anonymous, allows_multiple_answers, allows_revoting,
-                                                        shuffle_options, hide_results_until_closes,
-                                                        std::move(poll_type), open_period, close_date, is_closed),
+  do_send_message(make_object<td_api::inputMessagePoll>(
+                      std::move(question), std::move(options), std::move(description), nullptr, is_anonymous,
+                      allows_multiple_answers, allows_revoting, false, td::vector<td::string>(), shuffle_options,
+                      hide_results_until_closes, std::move(poll_type), open_period, close_date, is_closed),
                   std::move(query));
   return td::Status::OK();
 }
@@ -13614,7 +13614,7 @@ td::Status Client::process_gift_premium_subscription_query(PromisedQueryPtr &que
 td::Status Client::process_get_managed_bot_token_query(PromisedQueryPtr &query) {
   TRY_RESULT(user_id, get_user_id(query.get()));
   check_user(user_id, std::move(query), [this, user_id](PromisedQueryPtr query) {
-    send_request(make_object<td_api::getBotToken>(user_id, false),
+    send_request(make_object<td_api::getManagedBotToken>(user_id, false),
                  td::make_unique<TdOnGetBotTokenCallback>(std::move(query)));
   });
   return td::Status::OK();
@@ -13623,7 +13623,7 @@ td::Status Client::process_get_managed_bot_token_query(PromisedQueryPtr &query) 
 td::Status Client::process_replace_managed_bot_token_query(PromisedQueryPtr &query) {
   TRY_RESULT(user_id, get_user_id(query.get()));
   check_user(user_id, std::move(query), [this, user_id](PromisedQueryPtr query) {
-    send_request(make_object<td_api::getBotToken>(user_id, true),
+    send_request(make_object<td_api::getManagedBotToken>(user_id, true),
                  td::make_unique<TdOnGetBotTokenCallback>(std::move(query)));
   });
   return td::Status::OK();
@@ -17321,7 +17321,9 @@ td::vector<td::int64> Client::get_message_content_sticker_set_ids(const object_p
       const auto *poll = static_cast<const td_api::messagePoll *>(content.get())->poll_.get();
       td::vector<int64> sticker_set_ids;
       for (const auto &option : poll->options_) {
-        td::combine(sticker_set_ids, get_message_content_sticker_set_ids(option->media_));
+        if (option->media_ != nullptr) {
+          td::combine(sticker_set_ids, get_message_content_sticker_set_ids(option->media_));
+        }
       }
       return sticker_set_ids;
     }
@@ -17625,8 +17627,8 @@ td::unique_ptr<Client::MessageInfo> Client::create_message(object_ptr<td_api::me
   }
 
   message_info->content = std::move(message->content_);
-  message_info->suggested_post_info = std::move(message->suggested_post_info_);
-  message_info->reply_markup = std::move(message->reply_markup_);
+  set_message_suggested_post_info(message_info.get(), std::move(message->suggested_post_info_));
+  set_message_reply_markup(message_info.get(), std::move(message->reply_markup_));
 
   auto sticker_set_ids = get_message_sticker_set_ids(message_info.get());
   if (!sticker_set_ids.empty()) {
