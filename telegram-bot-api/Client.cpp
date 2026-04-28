@@ -2244,20 +2244,7 @@ class Client::JsonPollOption final : public td::Jsonable {
     }
     object("voter_count", option_->voter_count_);
     if (option_->author_ != nullptr && option_->addition_date_ > 0) {
-      switch (option_->author_->get_id()) {
-        case td_api::messageSenderUser::ID: {
-          auto user_id = static_cast<const td_api::messageSenderUser *>(option_->author_.get())->user_id_;
-          object("added_by_user", JsonUser(user_id, client_));
-          break;
-        }
-        case td_api::messageSenderChat::ID: {
-          auto chat_id = static_cast<const td_api::messageSenderChat *>(option_->author_.get())->chat_id_;
-          object("added_by_chat", JsonChat(chat_id, client_));
-          break;
-        }
-        default:
-          UNREACHABLE();
-      }
+      client_->json_store_message_sender(object, option_->author_, "added_by_user", "added_by_chat");
       object("addition_date", option_->addition_date_);
     }
   }
@@ -2337,21 +2324,8 @@ class Client::JsonPollAnswer final : public td::Jsonable {
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("poll_id", td::to_string(poll_answer_->poll_id_));
-    switch (poll_answer_->voter_id_->get_id()) {
-      case td_api::messageSenderUser::ID: {
-        auto user_id = static_cast<const td_api::messageSenderUser *>(poll_answer_->voter_id_.get())->user_id_;
-        object("user", JsonUser(user_id, client_));
-        break;
-      }
-      case td_api::messageSenderChat::ID: {
-        auto voter_chat_id = static_cast<const td_api::messageSenderChat *>(poll_answer_->voter_id_.get())->chat_id_;
-        object("user", JsonUser(client_->channel_bot_user_id_, client_));
-        object("voter_chat", JsonChat(voter_chat_id, client_));
-        break;
-      }
-      default:
-        UNREACHABLE();
-    }
+    client_->json_store_message_sender(object, poll_answer_->voter_id_, "user", "voter_chat",
+                                       client_->channel_bot_user_id_);
     object("option_ids", td::json_array(poll_answer_->option_positions_, [](int32 option_id) { return option_id; }));
     object("option_persistent_ids",
            td::json_array(poll_answer_->option_ids_, [](const td::string &option_id) { return option_id; }));
@@ -2430,20 +2404,7 @@ class Client::JsonChecklistTask final : public td::Jsonable {
       object("text_entities", JsonVectorEntities(task_->text_->entities_, client_));
     }
     if (task_->completed_by_ != nullptr && task_->completion_date_ != 0) {
-      switch (task_->completed_by_->get_id()) {
-        case td_api::messageSenderUser::ID: {
-          auto user_id = static_cast<const td_api::messageSenderUser *>(task_->completed_by_.get())->user_id_;
-          object("completed_by_user", JsonUser(user_id, client_));
-          break;
-        }
-        case td_api::messageSenderChat::ID: {
-          auto chat_id = static_cast<const td_api::messageSenderChat *>(task_->completed_by_.get())->chat_id_;
-          object("completed_by_chat", JsonChat(chat_id, client_));
-          break;
-        }
-        default:
-          UNREACHABLE();
-      }
+      client_->json_store_message_sender(object, task_->completed_by_, "completed_by_user", "completed_by_chat");
       object("completion_date", task_->completion_date_);
     }
   }
@@ -5340,20 +5301,7 @@ class Client::JsonMessageReactionUpdated final : public td::Jsonable {
     auto object = scope->enter_object();
     object("chat", JsonChat(update_->chat_id_, client_));
     object("message_id", as_client_message_id(update_->message_id_));
-    switch (update_->actor_id_->get_id()) {
-      case td_api::messageSenderUser::ID: {
-        auto user_id = static_cast<const td_api::messageSenderUser *>(update_->actor_id_.get())->user_id_;
-        object("user", JsonUser(user_id, client_));
-        break;
-      }
-      case td_api::messageSenderChat::ID: {
-        auto actor_chat_id = static_cast<const td_api::messageSenderChat *>(update_->actor_id_.get())->chat_id_;
-        object("actor_chat", JsonChat(actor_chat_id, client_));
-        break;
-      }
-      default:
-        UNREACHABLE();
-    }
+    client_->json_store_message_sender(object, update_->actor_id_, "user", "actor_chat");
     object("date", update_->date_);
     object("old_reaction", td::json_array(update_->old_reaction_types_,
                                           [](const auto &reaction) { return JsonReactionType(reaction.get()); }));
@@ -5508,20 +5456,7 @@ class Client::JsonReceivedGift final : public td::Jsonable {
         UNREACHABLE();
     }
     if (received_gift_->sender_id_ != nullptr) {
-      switch (received_gift_->sender_id_->get_id()) {
-        case td_api::messageSenderUser::ID: {
-          auto sender_id = static_cast<const td_api::messageSenderUser *>(received_gift_->sender_id_.get());
-          object("sender_user", JsonUser(sender_id->user_id_, client_));
-          break;
-        }
-        case td_api::messageSenderChat::ID: {
-          auto sender_id = static_cast<const td_api::messageSenderChat *>(received_gift_->sender_id_.get());
-          object("sender_chat", JsonChat(sender_id->chat_id_, client_));
-          break;
-        }
-        default:
-          UNREACHABLE();
-      }
+      client_->json_store_message_sender(object, received_gift_->sender_id_, "sender_user", "sender_chat");
     }
     object("send_date", received_gift_->date_);
     if (!received_gift_->text_->text_.empty()) {
@@ -16356,6 +16291,29 @@ void Client::json_store_rarity(td::JsonObjectScope &object, const td_api::Upgrad
       UNREACHABLE();
   }
   object("rarity_per_mille", rarity_per_mille);
+}
+
+void Client::json_store_message_sender(td::JsonObjectScope &object, const object_ptr<td_api::MessageSender> &sender,
+                                       td::Slice user_field_name, td::Slice chat_field_name,
+                                       int64 backward_compatibility_user_id) const {
+  CHECK(sender != nullptr);
+  switch (sender->get_id()) {
+    case td_api::messageSenderUser::ID: {
+      auto sender_id = static_cast<const td_api::messageSenderUser *>(sender.get());
+      object(user_field_name, JsonUser(sender_id->user_id_, this));
+      break;
+    }
+    case td_api::messageSenderChat::ID: {
+      auto sender_id = static_cast<const td_api::messageSenderChat *>(sender.get());
+      if (backward_compatibility_user_id > 0) {
+        object(user_field_name, JsonUser(backward_compatibility_user_id, this));
+      }
+      object(chat_field_name, JsonChat(sender_id->chat_id_, this));
+      break;
+    }
+    default:
+      UNREACHABLE();
+  }
 }
 
 td::Slice Client::get_update_type_name(UpdateType update_type) {
