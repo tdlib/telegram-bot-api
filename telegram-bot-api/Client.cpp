@@ -282,6 +282,7 @@ bool Client::init_methods() {
   methods_.emplace("giftpremiumsubscription", &Client::process_gift_premium_subscription_query);
   methods_.emplace("getmanagedbottoken", &Client::process_get_managed_bot_token_query);
   methods_.emplace("getmanagedbotaccesssettings", &Client::process_get_managed_bot_access_settings_query);
+  methods_.emplace("setmanagedbotaccesssettings", &Client::process_set_managed_bot_access_settings_query);
   methods_.emplace("replacemanagedbottoken", &Client::process_replace_managed_bot_token_query);
   methods_.emplace("verifyuser", &Client::process_verify_user_query);
   methods_.emplace("verifychat", &Client::process_verify_chat_query);
@@ -13716,6 +13717,23 @@ td::Status Client::process_get_managed_bot_access_settings_query(PromisedQueryPt
     send_request(make_object<td_api::getManagedBotAccessSettings>(user_id),
                  td::make_unique<TdOnGetBotAccessSettingsCallback>(this, std::move(query)));
   });
+  return td::Status::OK();
+}
+
+td::Status Client::process_set_managed_bot_access_settings_query(PromisedQueryPtr &query) {
+  TRY_RESULT(user_id, get_user_id(query.get()));
+  auto is_restricted = to_bool(query->arg("is_access_restricted"));
+  td::vector<int64> added_user_ids;
+  if (is_restricted && query->has_arg("added_user_ids")) {
+    TRY_RESULT_ASSIGN(added_user_ids, get_user_ids(query.get(), 10u, "added_user_ids"));
+  }
+  check_user(user_id, std::move(query),
+             [this, user_id,
+              access_settings = make_object<td_api::botAccessSettings>(is_restricted, std::move(added_user_ids))](
+                 PromisedQueryPtr query) mutable {
+               send_request(make_object<td_api::setManagedBotAccessSettings>(user_id, std::move(access_settings)),
+                            td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+             });
   return td::Status::OK();
 }
 
