@@ -269,6 +269,7 @@ bool Client::init_methods() {
   methods_.emplace("deletemessage", &Client::process_delete_message_query);
   methods_.emplace("deletemessages", &Client::process_delete_messages_query);
   methods_.emplace("deletemessagereaction", &Client::process_delete_message_reaction_query);
+  methods_.emplace("deleteallmessagereactions", &Client::process_delete_all_message_reactions_query);
   methods_.emplace("poststory", &Client::process_post_story_query);
   methods_.emplace("repoststory", &Client::process_repost_story_query);
   methods_.emplace("editstory", &Client::process_edit_story_query);
@@ -13551,6 +13552,35 @@ td::Status Client::process_delete_message_reaction_query(PromisedQueryPtr &query
                         });
                   }
                 });
+  return td::Status::OK();
+}
+
+td::Status Client::process_delete_all_message_reactions_query(PromisedQueryPtr &query) {
+  auto chat_id = query->arg("chat_id");
+  int64 user_id = -1;
+  td::string actor_chat_id;
+  if (!query->arg("user_id").empty()) {
+    TRY_RESULT_ASSIGN(user_id, get_user_id(query.get()));
+  } else {
+    actor_chat_id = query->arg("actor_chat_id").str();
+  }
+  check_chat(chat_id, AccessRights::Write, std::move(query),
+             [this, user_id, actor_chat_id](int64 chat_id, PromisedQueryPtr query) {
+               if (user_id >= 0) {
+                 check_user_no_fail(user_id, std::move(query), [this, chat_id, user_id](PromisedQueryPtr query) {
+                   send_request(make_object<td_api::deleteAllRecentMessageReactionsFromSender>(
+                                    chat_id, make_object<td_api::messageSenderUser>(user_id)),
+                                td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+                 });
+               } else {
+                 check_chat_no_fail(actor_chat_id, std::move(query),
+                                    [this, chat_id](int64 actor_chat_id, PromisedQueryPtr query) {
+                                      send_request(make_object<td_api::deleteAllRecentMessageReactionsFromSender>(
+                                                       chat_id, make_object<td_api::messageSenderChat>(actor_chat_id)),
+                                                   td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+                                    });
+               }
+             });
   return td::Status::OK();
 }
 
