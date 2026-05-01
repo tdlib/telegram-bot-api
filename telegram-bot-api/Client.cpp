@@ -281,6 +281,7 @@ bool Client::init_methods() {
   methods_.emplace("sendgift", &Client::process_send_gift_query);
   methods_.emplace("giftpremiumsubscription", &Client::process_gift_premium_subscription_query);
   methods_.emplace("getmanagedbottoken", &Client::process_get_managed_bot_token_query);
+  methods_.emplace("getmanagedbotaccesssettings", &Client::process_get_managed_bot_access_settings_query);
   methods_.emplace("replacemanagedbottoken", &Client::process_replace_managed_bot_token_query);
   methods_.emplace("verifyuser", &Client::process_verify_user_query);
   methods_.emplace("verifychat", &Client::process_verify_chat_query);
@@ -872,6 +873,25 @@ class Client::JsonAcceptedGiftTypes final : public td::Jsonable {
   bool upgraded_gifts_;
   bool premium_subscription_;
   bool gifts_from_channels_;
+};
+
+class Client::JsonBotAccessSettings final : public td::Jsonable {
+ public:
+  JsonBotAccessSettings(const td_api::botAccessSettings *bot_access_settings, const Client *client)
+      : bot_access_settings_(bot_access_settings), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("is_access_restricted", td::JsonBool(bot_access_settings_->is_restricted_));
+    if (!bot_access_settings_->added_user_ids_.empty()) {
+      object("added_users", td::json_array(bot_access_settings_->added_user_ids_,
+                                           [client = client_](auto &user_id) { return JsonUser(user_id, client); }));
+    }
+  }
+
+ private:
+  const td_api::botAccessSettings *bot_access_settings_;
+  const Client *client_;
 };
 
 class Client::JsonBirthdate final : public td::Jsonable {
@@ -7170,6 +7190,27 @@ class Client::TdOnGetBotTokenCallback final : public TdQueryCallback {
   }
 
  private:
+  PromisedQueryPtr query_;
+};
+
+class Client::TdOnGetBotAccessSettingsCallback final : public TdQueryCallback {
+ public:
+  TdOnGetBotAccessSettingsCallback(const Client *client, PromisedQueryPtr query)
+      : client_(client), query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::botAccessSettings::ID);
+    auto settings = move_object_as<td_api::botAccessSettings>(result);
+    answer_query(JsonBotAccessSettings(settings.get(), client_), std::move(query_));
+  }
+
+ private:
+  const Client *client_;
   PromisedQueryPtr query_;
 };
 
@@ -13625,6 +13666,15 @@ td::Status Client::process_replace_managed_bot_token_query(PromisedQueryPtr &que
   check_user(user_id, std::move(query), [this, user_id](PromisedQueryPtr query) {
     send_request(make_object<td_api::getManagedBotToken>(user_id, true),
                  td::make_unique<TdOnGetBotTokenCallback>(std::move(query)));
+  });
+  return td::Status::OK();
+}
+
+td::Status Client::process_get_managed_bot_access_settings_query(PromisedQueryPtr &query) {
+  TRY_RESULT(user_id, get_user_id(query.get()));
+  check_user(user_id, std::move(query), [this, user_id](PromisedQueryPtr query) {
+    send_request(make_object<td_api::getManagedBotAccessSettings>(user_id),
+                 td::make_unique<TdOnGetBotAccessSettingsCallback>(this, std::move(query)));
   });
   return td::Status::OK();
 }
