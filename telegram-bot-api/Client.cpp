@@ -2301,6 +2301,7 @@ class Client::JsonPoll final : public td::Jsonable {
     object("is_anonymous", td::JsonBool(poll_->is_anonymous_));
     object("allows_multiple_answers", td::JsonBool(poll_->allows_multiple_answers_));
     object("allows_revoting", td::JsonBool(poll_->allows_revoting_));
+    object("members_only", td::JsonBool(poll_->members_only_));
     switch (poll_->type_->get_id()) {
       case td_api::pollTypeQuiz::ID: {
         object("type", "quiz");
@@ -12888,9 +12889,10 @@ td::Status Client::process_send_poll_query(PromisedQueryPtr &query) {
   auto is_closed = to_bool(query->arg("is_closed"));
   auto shuffle_options = to_bool(query->arg("shuffle_options"));
   auto hide_results_until_closes = to_bool(query->arg("hide_results_until_closes"));
+  auto members_only = to_bool(query->arg("members_only"));
   do_send_message(make_object<td_api::inputMessagePoll>(
                       std::move(question), std::move(options), std::move(description), nullptr, is_anonymous,
-                      allows_multiple_answers, allows_revoting, false, td::vector<td::string>(), shuffle_options,
+                      allows_multiple_answers, allows_revoting, members_only, td::vector<td::string>(), shuffle_options,
                       hide_results_until_closes, std::move(poll_type), open_period, close_date, is_closed),
                   std::move(query));
   return td::Status::OK();
