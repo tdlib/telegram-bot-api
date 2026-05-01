@@ -12171,7 +12171,7 @@ td::Result<td::vector<td::int64>> Client::get_message_ids(const Query *query, si
     }
     auto parsed_message_id = td::to_integer_safe<int32>(number);
     if (parsed_message_id.is_error()) {
-      return td::Status::Error(400, "Can't parse message identifier as Number");
+      return td::Status::Error(400, "Can't parse message identifier as a Number");
     }
     if (parsed_message_id.ok() <= 0) {
       return td::Status::Error(400, "Invalid message identifier specified");
@@ -12195,6 +12195,46 @@ td::Result<td::int64> Client::get_user_id(const Query *query, td::Slice field_na
     return td::Status::Error(400, PSLICE() << "Invalid " << field_name << " specified");
   }
   return user_id;
+}
+
+td::Result<td::vector<td::int64>> Client::get_user_ids(const Query *query, size_t max_count, td::Slice field_name) {
+  auto user_ids_str = query->arg(field_name);
+  if (user_ids_str.empty()) {
+    return td::Status::Error(400, "User identifiers are not specified");
+  }
+
+  auto r_value = json_decode(user_ids_str);
+  if (r_value.is_error()) {
+    return td::Status::Error(400, PSLICE() << "Can't parse " << field_name << " JSON object");
+  }
+  auto value = r_value.move_as_ok();
+  if (value.type() != td::JsonValue::Type::Array) {
+    return td::Status::Error(400, "Expected an Array of user identifiers");
+  }
+  if (value.get_array().size() > max_count) {
+    return td::Status::Error(400, "Too many user identifiers specified");
+  }
+
+  td::vector<int64> user_ids;
+  for (auto &user_id : value.get_array()) {
+    td::Slice number;
+    if (user_id.type() == td::JsonValue::Type::Number) {
+      number = user_id.get_number();
+    } else if (user_id.type() == td::JsonValue::Type::String) {
+      number = user_id.get_string();
+    } else {
+      return td::Status::Error(400, "User identifier must be a Number");
+    }
+    auto parsed_user_id = td::to_integer_safe<int64>(number);
+    if (parsed_user_id.is_error()) {
+      return td::Status::Error(400, "Can't parse user identifier as a Number");
+    }
+    if (parsed_user_id.ok() <= 0) {
+      return td::Status::Error(400, "Invalid user identifier specified");
+    }
+    user_ids.push_back(parsed_user_id.ok());
+  }
+  return std::move(user_ids);
 }
 
 void Client::decrease_yet_unsent_message_count(int64 chat_id, int32 count) {
