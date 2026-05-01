@@ -2302,6 +2302,10 @@ class Client::JsonPoll final : public td::Jsonable {
     object("allows_multiple_answers", td::JsonBool(poll_->allows_multiple_answers_));
     object("allows_revoting", td::JsonBool(poll_->allows_revoting_));
     object("members_only", td::JsonBool(poll_->members_only_));
+    if (!poll_->country_codes_.empty()) {
+      object("country_codes",
+             td::json_array(poll_->country_codes_, [](const td::string &country_code) { return country_code; }));
+    }
     switch (poll_->type_->get_id()) {
       case td_api::pollTypeQuiz::ID: {
         object("type", "quiz");
@@ -12249,6 +12253,34 @@ td::Result<td::vector<td::int64>> Client::get_user_ids(const Query *query, size_
   return std::move(user_ids);
 }
 
+td::Result<td::vector<td::string>> Client::get_strings(const Query *query, size_t max_count, td::Slice field_name) {
+  auto strings_str = query->arg(field_name);
+  if (strings_str.empty()) {
+    return td::vector<td::string>();
+  }
+
+  auto r_value = json_decode(strings_str);
+  if (r_value.is_error()) {
+    return td::Status::Error(400, PSLICE() << "Can't parse " << field_name << " JSON object");
+  }
+  auto value = r_value.move_as_ok();
+  if (value.type() != td::JsonValue::Type::Array) {
+    return td::Status::Error(400, "Expected an Array of String");
+  }
+  if (value.get_array().size() > max_count) {
+    return td::Status::Error(400, "Too many items specified");
+  }
+
+  td::vector<td::string> strings;
+  for (auto &string : value.get_array()) {
+    if (string.type() != td::JsonValue::Type::String) {
+      return td::Status::Error(400, "Expected an Array of String");
+    }
+    strings.push_back(string.get_string().str());
+  }
+  return std::move(strings);
+}
+
 void Client::decrease_yet_unsent_message_count(int64 chat_id, int32 count) {
   auto count_it = yet_unsent_message_count_.find(chat_id);
   CHECK(count_it != yet_unsent_message_count_.end());
@@ -12890,9 +12922,10 @@ td::Status Client::process_send_poll_query(PromisedQueryPtr &query) {
   auto shuffle_options = to_bool(query->arg("shuffle_options"));
   auto hide_results_until_closes = to_bool(query->arg("hide_results_until_closes"));
   auto members_only = to_bool(query->arg("members_only"));
+  TRY_RESULT(country_codes, get_strings(query.get(), 12, "country_codes"));
   do_send_message(make_object<td_api::inputMessagePoll>(
                       std::move(question), std::move(options), std::move(description), nullptr, is_anonymous,
-                      allows_multiple_answers, allows_revoting, members_only, td::vector<td::string>(), shuffle_options,
+                      allows_multiple_answers, allows_revoting, members_only, std::move(country_codes), shuffle_options,
                       hide_results_until_closes, std::move(poll_type), open_period, close_date, is_closed),
                   std::move(query));
   return td::Status::OK();

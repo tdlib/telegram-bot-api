@@ -730,6 +730,8 @@ class Client final : public WebhookActor::Callback {
 
   static td::Result<td::vector<int64>> get_user_ids(const Query *query, size_t max_count, td::Slice field_name);
 
+  static td::Result<td::vector<td::string>> get_strings(const Query *query, size_t max_count, td::Slice field_name);
+
   void decrease_yet_unsent_message_count(int64 chat_id, int32 count);
 
   int64 extract_yet_unsent_message_query_id(int64 chat_id, int64 message_id);
