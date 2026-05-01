@@ -1037,6 +1037,7 @@ class Client final : public WebhookActor::Callback {
     bool has_private_forwards = false;
     bool has_restricted_voice_and_video_messages = false;
     bool is_inline_bot = false;
+    bool supports_guest_queries = false;
     bool is_premium = false;
     bool added_to_attachment_menu = false;
     bool has_topics = false;
