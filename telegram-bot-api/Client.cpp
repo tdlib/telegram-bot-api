@@ -4606,6 +4606,10 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
   if (message_->via_bot_user_id > 0) {
     object("via_bot", JsonUser(message_->via_bot_user_id, client_));
   }
+  if (message_->guest_bot_caller_id != nullptr) {
+    client_->json_store_message_sender(object, message_->guest_bot_caller_id, "guest_bot_caller_user",
+                                       "guest_bot_caller_chat");
+  }
   if (!message_->can_be_saved) {
     object("has_protected_content", td::JsonTrue());
   }
@@ -17768,6 +17772,7 @@ td::unique_ptr<Client::MessageInfo> Client::create_message(object_ptr<td_api::me
   message_info->edit_date = message->edit_date_;
   message_info->media_album_id = message->media_album_id_;
   message_info->via_bot_user_id = message->via_bot_user_id_;
+  message_info->guest_bot_caller_id = std::move(message->guest_bot_caller_id_);
   message_info->sender_business_bot_user_id = message->sender_business_bot_user_id_;
 
   if (message->forward_info_ != nullptr) {

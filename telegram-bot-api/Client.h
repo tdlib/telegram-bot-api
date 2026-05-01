@@ -1149,6 +1149,7 @@ class Client final : public WebhookActor::Callback {
     object_ptr<td_api::MessageTopic> topic_id;
     int64 media_album_id = 0;
     int64 via_bot_user_id = 0;
+    object_ptr<td_api::MessageSender> guest_bot_caller_id;
     object_ptr<td_api::MessageContent> content;
     object_ptr<td_api::suggestedPostInfo> suggested_post_info;
     object_ptr<td_api::ReplyMarkup> reply_markup;
