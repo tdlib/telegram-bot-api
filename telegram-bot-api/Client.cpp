@@ -4094,6 +4094,9 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
   if (message_->media_album_id != 0) {
     object("media_group_id", td::to_string(message_->media_album_id));
   }
+  if (message_->guest_query_id != 0) {
+    object("guest_query_id", td::to_string(message_->guest_query_id));
+  }
   switch (message_->content->get_id()) {
     case td_api::messageText::ID: {
       auto content = static_cast<const td_api::messageText *>(message_->content.get());
@@ -9052,6 +9055,9 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       break;
     case td_api::updateBusinessMessagesDeleted::ID:
       add_update_business_messages_deleted(move_object_as<td_api::updateBusinessMessagesDeleted>(result));
+      break;
+    case td_api::updateNewGuestQuery::ID:
+      add_new_guest_query(move_object_as<td_api::updateNewGuestQuery>(result));
       break;
     case td_api::updateConnectionState::ID: {
       auto update = move_object_as<td_api::updateConnectionState>(result);
@@ -16591,6 +16597,8 @@ td::Slice Client::get_update_type_name(UpdateType update_type) {
       return td::Slice("purchased_paid_media");
     case UpdateType::ManagedBot:
       return td::Slice("managed_bot");
+    case UpdateType::GuestMessage:
+      return td::Slice("guest_message");
     default:
       UNREACHABLE();
       return td::Slice();
@@ -17079,6 +17087,18 @@ void Client::add_business_message_edited(object_ptr<td_api::updateBusinessMessag
   auto message_info = create_business_message(update->connection_id_, std::move(update->message_));
   new_business_message_queues_[update->connection_id_].queue_.emplace(std::move(message_info), true);
   process_new_business_message_queue(update->connection_id_, 0);
+}
+
+void Client::add_new_guest_query(object_ptr<td_api::updateNewGuestQuery> &&update) {
+  CHECK(update != nullptr);
+  auto message_info = create_message(std::move(update->message_));
+  message_info->reference_messages =
+      transform(std::move(update->reference_messages_),
+                [&](object_ptr<td_api::message> &&message) { return create_message(std::move(message)); });
+  message_info->guest_query_id = update->id_;
+  auto chat_id = message_info->chat_id;
+  new_guest_query_queues_[chat_id].queue_.emplace(std::move(message_info));
+  process_new_guest_query_queue(chat_id, 0);
 }
 
 td::int64 Client::choose_added_member_id(const td_api::messageChatAddMembers *message_add_members) const {
@@ -17584,6 +17604,9 @@ td::vector<td::int64> Client::get_message_sticker_set_ids(const MessageInfo *mes
   if (message_info->business_reply_to_message != nullptr) {
     td::combine(sticker_set_ids, get_message_sticker_set_ids(message_info->business_reply_to_message.get()));
   }
+  for (const auto &reference_message : message_info->reference_messages) {
+    td::combine(sticker_set_ids, get_message_sticker_set_ids(reference_message.get()));
+  }
   return sticker_set_ids;
 }
 
@@ -17702,6 +17725,50 @@ void Client::process_new_business_message_queue(const td::string &connection_id,
     add_message_update(update_type, message_info.get(), webhook_queue_id);
   }
   new_business_message_queues_.erase(connection_id);
+}
+
+void Client::process_new_guest_query_queue(int64 chat_id, int state) {
+  auto &queue = new_guest_query_queues_[chat_id];
+  if (queue.has_active_request_) {
+    if (state != 0) {
+      queue.has_active_request_ = false;
+    } else {
+      return;
+    }
+  } else {
+    CHECK(state == 0);
+  }
+  if (logging_out_ || closing_) {
+    new_guest_query_queues_.erase(chat_id);
+    return;
+  }
+  while (!queue.queue_.empty()) {
+    auto &query = queue.queue_.front();
+    if (state == 0) {
+      auto sticker_set_ids = get_message_sticker_set_ids(query.message_info_.get());
+      if (!sticker_set_ids.empty()) {
+        queue.has_active_request_ = true;
+        return get_sticker_set_names(std::move(sticker_set_ids),
+                                     td::PromiseCreator::lambda([actor_id = actor_id(this), chat_id](td::Unit) {
+                                       send_closure(actor_id, &Client::process_new_guest_query_queue, chat_id, 1);
+                                     }));
+      }
+      state = 1;
+    }
+    CHECK(state == 1);
+
+    auto message_info = std::move(query.message_info_);
+    queue.queue_.pop();
+
+    state = 0;
+    if (need_skip_update_message(0, message_info.get(), false)) {
+      continue;
+    }
+
+    auto webhook_queue_id = message_info->chat_id + (static_cast<int64>(12) << 33);
+    add_message_update(UpdateType::GuestMessage, message_info.get(), webhook_queue_id);
+  }
+  new_guest_query_queues_.erase(chat_id);
 }
 
 td::unique_ptr<Client::MessageInfo> Client::delete_message(int64 chat_id, int64 message_id, bool only_from_cache) {

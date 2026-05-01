@@ -1140,10 +1140,12 @@ class Client final : public WebhookActor::Callback {
     int32 initial_send_date = 0;
     int32 sender_boost_count = 0;
     int64 paid_message_star_count = 0;
+    int64 guest_query_id = 0;
     object_ptr<td_api::MessageOrigin> forward_origin;
     td::string author_signature;
     td::string sender_tag;
     td::unique_ptr<MessageInfo> business_reply_to_message;
+    td::vector<td::unique_ptr<MessageInfo>> reference_messages;
     object_ptr<td_api::messageReplyToMessage> reply_to_message;
     object_ptr<td_api::messageReplyToStory> reply_to_story;
     object_ptr<td_api::MessageTopic> topic_id;
@@ -1247,6 +1249,10 @@ class Client final : public WebhookActor::Callback {
   void add_business_message_edited(object_ptr<td_api::updateBusinessMessageEdited> &&update);
 
   void process_new_business_message_queue(const td::string &connection_id, int state);
+
+  void add_new_guest_query(object_ptr<td_api::updateNewGuestQuery> &&update);
+
+  void process_new_guest_query_queue(int64 chat_id, int state);
 
   struct MessageFullId {
     int64 chat_id;
@@ -1385,6 +1391,7 @@ class Client final : public WebhookActor::Callback {
     BusinessMessagesDeleted,
     PurchasedPaidMedia,
     ManagedBot,
+    GuestMessage,
     Size
   };
 
@@ -1512,6 +1519,18 @@ class Client final : public WebhookActor::Callback {
     bool has_active_request_ = false;
   };
   td::FlatHashMap<td::string, NewBusinessMessageQueue> new_business_message_queues_;  // connection_id -> queue
+
+  struct NewGuestQuery {
+    td::unique_ptr<MessageInfo> message_info_;
+
+    explicit NewGuestQuery(td::unique_ptr<MessageInfo> &&message_info) : message_info_(std::move(message_info)) {
+    }
+  };
+  struct NewGuestQueryQueue {
+    std::queue<NewGuestQuery> queue_;
+    bool has_active_request_ = false;
+  };
+  td::FlatHashMap<int64, NewGuestQueryQueue> new_guest_query_queues_;  // chat_id -> queue
 
   struct NewCallbackQueryQueue {
     std::queue<object_ptr<td_api::updateNewCallbackQuery>> queue_;
