@@ -4064,9 +4064,7 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     auto reply_to_message_id = client_->get_same_chat_reply_to_message_id(message_, true);
     if (reply_to_message_id > 0) {
       // internal reply
-      const MessageInfo *reply_to_message = !message_->business_connection_id.empty()
-                                                ? message_->business_reply_to_message.get()
-                                                : client_->get_message(message_->chat_id, reply_to_message_id, true);
+      const auto *reply_to_message = client_->get_reply_to_message_info(message_, reply_to_message_id);
       if (reply_to_message != nullptr) {
         object("reply_to_message", JsonMessage(reply_to_message, false, "reply in " + source_, client_));
       } else {
@@ -4320,9 +4318,7 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       auto content = static_cast<const td_api::messagePinMessage *>(message_->content.get());
       auto message_id = content->message_id_;
       if (message_id > 0) {
-        const MessageInfo *pinned_message = !message_->business_connection_id.empty()
-                                                ? message_->business_reply_to_message.get()
-                                                : client_->get_message(message_->chat_id, message_id, true);
+        const auto *pinned_message = client_->get_reply_to_message_info(message_, message_id);
         if (pinned_message != nullptr) {
           object("pinned_message", JsonMessage(pinned_message, false, "pin in " + source_, client_));
         } else if (need_reply_) {
@@ -17091,6 +17087,7 @@ void Client::add_business_message_edited(object_ptr<td_api::updateBusinessMessag
 
 void Client::add_new_guest_query(object_ptr<td_api::updateNewGuestQuery> &&update) {
   CHECK(update != nullptr);
+  CHECK(update->id_ != 0);
   auto message_info = create_message(std::move(update->message_));
   message_info->reference_messages =
       transform(std::move(update->reference_messages_),
@@ -18129,6 +18126,21 @@ td::int64 Client::get_implicit_reply_to_message_id(int64 chat_id, int64 message_
       return 0;
   }
   return implicit_reply_to_message_id < message_id ? implicit_reply_to_message_id : 0;
+}
+
+const Client::MessageInfo *Client::get_reply_to_message_info(const MessageInfo *message_info, int64 message_id) const {
+  if (!message_info->business_connection_id.empty()) {
+    return message_info->business_reply_to_message.get();
+  }
+  if (message_info->guest_query_id != 0) {
+    for (const auto &reference_message : message_info->reference_messages) {
+      if (reference_message->id == message_id) {
+        return reference_message.get();
+      }
+    }
+    return nullptr;
+  }
+  return get_message(message_info->chat_id, message_id, true);
 }
 
 td::int32 Client::get_forum_topic_id(const object_ptr<td_api::MessageTopic> &topic_id) {
