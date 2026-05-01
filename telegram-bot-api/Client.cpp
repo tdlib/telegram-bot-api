@@ -293,6 +293,7 @@ bool Client::init_methods() {
   methods_.emplace("setgamescore", &Client::process_set_game_score_query);
   methods_.emplace("getgamehighscores", &Client::process_get_game_high_scores_query);
   methods_.emplace("answerwebappquery", &Client::process_answer_web_app_query_query);
+  methods_.emplace("answerguestquery", &Client::process_answer_guest_query_query);
   methods_.emplace("answerinlinequery", &Client::process_answer_inline_query_query);
   methods_.emplace("savepreparedinlinemessage", &Client::process_save_prepared_inline_message_query);
   methods_.emplace("savepreparedkeyboardbutton", &Client::process_save_prepared_keyboard_button_query);
@@ -7452,6 +7453,25 @@ class Client::TdOnAnswerWebAppQueryCallback final : public TdQueryCallback {
   PromisedQueryPtr query_;
 };
 
+class Client::TdOnAnswerGuestQueryCallback final : public TdQueryCallback {
+ public:
+  explicit TdOnAnswerGuestQueryCallback(PromisedQueryPtr query) : query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::inlineMessageId::ID);
+    auto inline_message_id = move_object_as<td_api::inlineMessageId>(result);
+    answer_query(JsonInlineMessageId(inline_message_id.get()), std::move(query_));
+  }
+
+ private:
+  PromisedQueryPtr query_;
+};
+
 class Client::TdOnSavePreparedInlineMessageCallback final : public TdQueryCallback {
  public:
   explicit TdOnSavePreparedInlineMessageCallback(PromisedQueryPtr query) : query_(std::move(query)) {
@@ -13969,6 +13989,22 @@ td::Status Client::process_answer_web_app_query_query(PromisedQueryPtr &query) {
                                                         PromisedQueryPtr query) {
         CHECK(results.size() == 1);
         send_request(make_object<td_api::answerWebAppQuery>(web_app_query_id, std::move(results[0])),
+                     td::make_unique<TdOnAnswerWebAppQueryCallback>(std::move(query)));
+      });
+  return td::Status::OK();
+}
+
+td::Status Client::process_answer_guest_query_query(PromisedQueryPtr &query) {
+  auto guest_query_id = td::to_integer<int64>(query->arg("guest_query_id"));
+  TRY_RESULT(result, get_inline_query_result(query.get(), bot_user_ids_));
+  td::vector<object_ptr<td_api::InputInlineQueryResult>> results;
+  results.push_back(std::move(result));
+
+  resolve_inline_query_results_bot_usernames(
+      std::move(results), std::move(query),
+      [this, guest_query_id](td::vector<object_ptr<td_api::InputInlineQueryResult>> results, PromisedQueryPtr query) {
+        CHECK(results.size() == 1);
+        send_request(make_object<td_api::answerGuestQuery>(guest_query_id, std::move(results[0])),
                      td::make_unique<TdOnAnswerWebAppQueryCallback>(std::move(query)));
       });
   return td::Status::OK();

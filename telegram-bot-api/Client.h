@@ -304,6 +304,7 @@ class Client final : public WebhookActor::Callback {
   class TdOnGetChatInviteLinkCallback;
   class TdOnGetGameHighScoresCallback;
   class TdOnAnswerWebAppQueryCallback;
+  class TdOnAnswerGuestQueryCallback;
   class TdOnSavePreparedInlineMessageCallback;
   class TdOnSavePreparedKeyboardButtonCallback;
   class TdOnReturnFileCallback;
@@ -829,6 +830,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_set_game_score_query(PromisedQueryPtr &query);
   td::Status process_get_game_high_scores_query(PromisedQueryPtr &query);
   td::Status process_answer_web_app_query_query(PromisedQueryPtr &query);
+  td::Status process_answer_guest_query_query(PromisedQueryPtr &query);
   td::Status process_answer_inline_query_query(PromisedQueryPtr &query);
   td::Status process_save_prepared_inline_message_query(PromisedQueryPtr &query);
   td::Status process_save_prepared_keyboard_button_query(PromisedQueryPtr &query);
