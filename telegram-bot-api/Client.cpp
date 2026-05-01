@@ -1273,13 +1273,13 @@ class Client::JsonChat final : public td::Jsonable {
           }
           object("permissions", JsonChatPermissions(permissions));
         }
-        auto everyone_is_administrator = permissions->can_send_basic_messages_ && permissions->can_send_audios_ &&
-                                         permissions->can_send_documents_ && permissions->can_send_photos_ &&
-                                         permissions->can_send_videos_ && permissions->can_send_video_notes_ &&
-                                         permissions->can_send_voice_notes_ && permissions->can_send_polls_ &&
-                                         permissions->can_send_other_messages_ && permissions->can_add_link_previews_ &&
-                                         permissions->can_edit_tag_ && permissions->can_change_info_ &&
-                                         permissions->can_invite_users_ && permissions->can_pin_messages_;
+        auto everyone_is_administrator =
+            permissions->can_send_basic_messages_ && permissions->can_send_audios_ &&
+            permissions->can_send_documents_ && permissions->can_send_photos_ && permissions->can_send_videos_ &&
+            permissions->can_send_video_notes_ && permissions->can_send_voice_notes_ && permissions->can_send_polls_ &&
+            permissions->can_send_other_messages_ && permissions->can_add_link_previews_ &&
+            permissions->can_react_to_messages_ && permissions->can_edit_tag_ && permissions->can_change_info_ &&
+            permissions->can_invite_users_ && permissions->can_pin_messages_;
         object("all_members_are_administrators", td::JsonBool(everyone_is_administrator));
         object("accepted_gift_types", JsonAcceptedGiftTypes(false, false, false, false, false));
         photo = group_info->photo.get();
@@ -11282,6 +11282,7 @@ td::Result<td_api::object_ptr<td_api::chatPermissions>> Client::get_chat_permiss
   auto can_send_polls = false;
   auto can_send_other_messages = false;
   auto can_add_link_previews = false;
+  auto can_react_to_messages = false;
   auto can_edit_tag = false;
   auto can_change_info = false;
   auto can_invite_users = false;
@@ -11342,6 +11343,11 @@ td::Result<td_api::object_ptr<td_api::chatPermissions>> Client::get_chat_permiss
       } else {
         can_edit_tag = can_pin_messages;
       }
+      if (object.has_field("can_react_to_messages")) {
+        TRY_RESULT_ASSIGN(can_react_to_messages, object.get_optional_bool_field("can_react_to_messages"));
+      } else {
+        can_react_to_messages = can_send_messages;
+      }
       return td::Status::OK();
     }();
 
@@ -11393,12 +11399,14 @@ td::Result<td_api::object_ptr<td_api::chatPermissions>> Client::get_chat_permiss
     can_send_videos = can_send_media_messages;
     can_send_video_notes = can_send_media_messages;
     can_send_voice_notes = can_send_media_messages;
+    can_edit_tag = can_pin_messages;
+    can_react_to_messages = can_send_messages;
   }
 
   return make_object<td_api::chatPermissions>(
       can_send_messages, can_send_audios, can_send_documents, can_send_photos, can_send_videos, can_send_video_notes,
-      can_send_voice_notes, can_send_polls, can_send_other_messages, can_add_link_previews, false, can_edit_tag,
-      can_change_info, can_invite_users, can_pin_messages, can_manage_topics);
+      can_send_voice_notes, can_send_polls, can_send_other_messages, can_add_link_previews, can_react_to_messages,
+      can_edit_tag, can_change_info, can_invite_users, can_pin_messages, can_manage_topics);
 }
 
 td::Result<td_api::object_ptr<td_api::inputChecklistTask>> Client::get_input_checklist_task(
@@ -16370,6 +16378,7 @@ void Client::json_store_permissions(td::JsonObjectScope &object, const td_api::c
   object("can_send_polls", td::JsonBool(permissions->can_send_polls_));
   object("can_send_other_messages", td::JsonBool(permissions->can_send_other_messages_));
   object("can_add_web_page_previews", td::JsonBool(permissions->can_add_link_previews_));
+  object("can_react_to_messages", td::JsonBool(permissions->can_react_to_messages_));
   object("can_edit_tag", td::JsonBool(permissions->can_edit_tag_));
   object("can_change_info", td::JsonBool(permissions->can_change_info_));
   object("can_invite_users", td::JsonBool(permissions->can_invite_users_));
