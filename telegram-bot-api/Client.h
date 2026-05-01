@@ -802,6 +802,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_edit_message_reply_markup_query(PromisedQueryPtr &query);
   td::Status process_delete_message_query(PromisedQueryPtr &query);
   td::Status process_delete_messages_query(PromisedQueryPtr &query);
+  td::Status process_delete_message_reaction_query(PromisedQueryPtr &query);
   td::Status process_post_story_query(PromisedQueryPtr &query);
   td::Status process_repost_story_query(PromisedQueryPtr &query);
   td::Status process_edit_story_query(PromisedQueryPtr &query);
