@@ -278,6 +278,7 @@ class Client final : public WebhookActor::Callback {
   class TdOnGetEditedMessageCallback;
   class TdOnGetCallbackQueryMessageCallback;
   class TdOnGetForumTopicInfoCallback;
+  class TdOnGetMessagesCallback;
   class TdOnGetMenuButtonCallback;
   class TdOnGetMyCommandsCallback;
   class TdOnGetMyDefaultAdministratorRightsCallback;
@@ -862,6 +863,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_transfer_gift_query(PromisedQueryPtr &query);
   td::Status process_set_user_emoji_status_query(PromisedQueryPtr &query);
   td::Status process_get_chat_query(PromisedQueryPtr &query);
+  td::Status process_get_user_personal_chat_messages_query(PromisedQueryPtr &query);
   td::Status process_set_chat_photo_query(PromisedQueryPtr &query);
   td::Status process_delete_chat_photo_query(PromisedQueryPtr &query);
   td::Status process_set_chat_title_query(PromisedQueryPtr &query);

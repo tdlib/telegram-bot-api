@@ -325,6 +325,7 @@ bool Client::init_methods() {
   methods_.emplace("transfergift", &Client::process_transfer_gift_query);
   methods_.emplace("setuseremojistatus", &Client::process_set_user_emoji_status_query);
   methods_.emplace("getchat", &Client::process_get_chat_query);
+  methods_.emplace("getuserpersonalchatmessages", &Client::process_get_user_personal_chat_messages_query);
   methods_.emplace("setchatphoto", &Client::process_set_chat_photo_query);
   methods_.emplace("deletechatphoto", &Client::process_delete_chat_photo_query);
   methods_.emplace("setchattitle", &Client::process_set_chat_title_query);
@@ -7075,6 +7076,32 @@ class Client::TdOnGetForumTopicInfoCallback final : public TdQueryCallback {
   }
 
  private:
+  PromisedQueryPtr query_;
+};
+
+class Client::TdOnGetMessagesCallback final : public TdQueryCallback {
+ public:
+  TdOnGetMessagesCallback(Client *client, PromisedQueryPtr query) : client_(client), query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::messages::ID);
+    auto messages = move_object_as<td_api::messages>(result);
+    td::vector<td::string> message_strings;
+    for (auto &message : messages->messages_) {
+      auto message_info = client_->create_message(std::move(message));
+      message_strings.push_back(
+          td::json_encode<td::string>(JsonMessage(message_info.get(), false, "TdOnGetMessagesCallback", client_)));
+    }
+    answer_query(JsonMessages(message_strings), std::move(query_));
+  }
+
+ private:
+  Client *client_;
   PromisedQueryPtr query_;
 };
 
@@ -14494,6 +14521,17 @@ td::Status Client::process_get_chat_query(PromisedQueryPtr &query) {
       default:
         UNREACHABLE();
     }
+  });
+  return td::Status::OK();
+}
+
+td::Status Client::process_get_user_personal_chat_messages_query(PromisedQueryPtr &query) {
+  TRY_RESULT(user_id, get_user_id(query.get()));
+  auto limit = get_integer_arg(query.get(), "limit", 0, 0, 20);
+
+  check_user(user_id, std::move(query), [this, user_id, limit](PromisedQueryPtr query) mutable {
+    send_request(make_object<td_api::getPersonalChatHistory>(user_id, limit),
+                 td::make_unique<TdOnGetMessagesCallback>(this, std::move(query)));
   });
   return td::Status::OK();
 }
