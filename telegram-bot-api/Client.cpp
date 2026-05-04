@@ -13067,6 +13067,7 @@ td::Status Client::process_send_poll_query(PromisedQueryPtr &query) {
     TRY_RESULT(explanation,
                get_formatted_text(query->arg("explanation").str(), query->arg("explanation_parse_mode").str(),
                                   get_input_entities(query.get(), "explanation_entities")));
+    TRY_RESULT(explanation_media, get_input_poll_media(query.get(), "explanation_media"));
     td::vector<int32> correct_option_ids;
     if (query->has_arg("correct_option_ids")) {
       auto r_value = json_decode(query->arg("correct_option_ids"));
@@ -13092,7 +13093,8 @@ td::Status Client::process_send_poll_query(PromisedQueryPtr &query) {
       correct_option_ids.push_back(get_integer_arg(query.get(), "correct_option_id", -1));
     }
 
-    poll_type = make_object<td_api::inputPollTypeQuiz>(std::move(correct_option_ids), std::move(explanation), nullptr);
+    poll_type = make_object<td_api::inputPollTypeQuiz>(std::move(correct_option_ids), std::move(explanation),
+                                                       std::move(explanation_media));
   } else if (type.empty() || type == "regular") {
     poll_type = make_object<td_api::inputPollTypeRegular>(to_bool(query->arg("allow_adding_options")));
   } else {
@@ -13109,8 +13111,9 @@ td::Status Client::process_send_poll_query(PromisedQueryPtr &query) {
   auto hide_results_until_closes = to_bool(query->arg("hide_results_until_closes"));
   auto members_only = to_bool(query->arg("members_only"));
   TRY_RESULT(country_codes, get_strings(query.get(), 12, "country_codes"));
+  TRY_RESULT(media, get_input_poll_media(query.get(), "media"));
   do_send_message(make_object<td_api::inputMessagePoll>(
-                      std::move(question), std::move(options), std::move(description), nullptr, is_anonymous,
+                      std::move(question), std::move(options), std::move(description), std::move(media), is_anonymous,
                       allows_multiple_answers, allows_revoting, members_only, std::move(country_codes), shuffle_options,
                       hide_results_until_closes, std::move(poll_type), open_period, close_date, is_closed),
                   std::move(query));
