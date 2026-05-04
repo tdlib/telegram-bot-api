@@ -11780,8 +11780,8 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_po
 
   auto r_input_message_content = get_input_poll_media(query, r_value.move_as_ok(), false);
   if (r_input_message_content.is_error()) {
-    return td::Status::Error(400, PSLICE()
-                                      << "Can't parse InputPollMedia: " << r_input_message_content.error().message());
+    return td::Status::Error(
+        400, PSLICE() << "Failed to parse InputPollMedia: " << r_input_message_content.error().message());
   }
   return r_input_message_content.move_as_ok();
 }
@@ -11986,7 +11986,8 @@ td::Result<td_api::object_ptr<td_api::inputMessageInvoice>> Client::get_input_me
       std::move(paid_media_caption));
 }
 
-td::Result<td::vector<td_api::object_ptr<td_api::inputPollOption>>> Client::get_input_poll_options(const Query *query) {
+td::Result<td::vector<td_api::object_ptr<td_api::inputPollOption>>> Client::get_input_poll_options(
+    const Query *query) const {
   auto input_options = query->arg("options");
   LOG(INFO) << "Parsing JSON object: " << input_options;
   auto r_value = json_decode(input_options);
@@ -12009,7 +12010,11 @@ td::Result<td::vector<td_api::object_ptr<td_api::inputPollOption>>> Client::get_
         TRY_RESULT(parse_mode, object.get_optional_string_field("text_parse_mode"));
         TRY_RESULT(option_text,
                    get_formatted_text(std::move(text), std::move(parse_mode), object.extract_field("text_entities")));
-        options.push_back(make_object<td_api::inputPollOption>(std::move(option_text), nullptr));
+        auto r_media = get_input_poll_media(query, object.extract_field("media"), true);
+        if (r_media.is_error()) {
+          return td::Status::Error(400, PSLICE() << "Failed to parse poll option media: " << r_media.error().message());
+        }
+        options.push_back(make_object<td_api::inputPollOption>(std::move(option_text), r_media.move_as_ok()));
         continue;
       }
 
