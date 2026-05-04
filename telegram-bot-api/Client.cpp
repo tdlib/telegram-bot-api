@@ -2257,6 +2257,65 @@ class Client::JsonInvoice final : public td::Jsonable {
   const td_api::messageInvoice *invoice_;
 };
 
+class Client::JsonPollMedia final : public td::Jsonable {
+ public:
+  JsonPollMedia(const td_api::MessageContent *content, const Client *client) : content_(content), client_(client) {
+    CHECK(content_ != nullptr);
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    switch (content_->get_id()) {
+      case td_api::messageAnimation::ID: {
+        auto content = static_cast<const td_api::messageAnimation *>(content_);
+        object("animation", JsonAnimation(content->animation_.get(), false, client_));
+        break;
+      }
+      case td_api::messageAudio::ID: {
+        auto content = static_cast<const td_api::messageAudio *>(content_);
+        object("audio", JsonAudio(content->audio_.get(), client_));
+        break;
+      }
+      case td_api::messageDocument::ID: {
+        auto content = static_cast<const td_api::messageDocument *>(content_);
+        object("document", JsonDocument(content->document_.get(), client_));
+        break;
+      }
+      case td_api::messageLocation::ID: {
+        auto content = static_cast<const td_api::messageLocation *>(content_);
+        object("location", JsonLocation(content->location_.get()));
+        break;
+      }
+      case td_api::messagePhoto::ID: {
+        auto content = static_cast<const td_api::messagePhoto *>(content_);
+        object("photo", JsonPhoto(content->photo_.get(), client_));
+        break;
+      }
+      case td_api::messageSticker::ID: {
+        auto content = static_cast<const td_api::messageSticker *>(content_);
+        object("sticker", JsonSticker(content->sticker_.get(), client_));
+        break;
+      }
+      case td_api::messageVenue::ID: {
+        auto content = static_cast<const td_api::messageVenue *>(content_);
+        object("venue", JsonVenue(content->venue_.get()));
+        break;
+      }
+      case td_api::messageVideo::ID: {
+        auto content = static_cast<const td_api::messageVideo *>(content_);
+        object("video", JsonVideo(content->video_.get(), content->cover_.get(), content->start_timestamp_,
+                                  &content->alternative_videos_, client_));
+        break;
+      }
+      default:
+        LOG(ERROR) << "Receive poll with " << to_string(*content_);
+    }
+  }
+
+ private:
+  const td_api::MessageContent *content_;
+  const Client *client_;
+};
+
 class Client::JsonPollOption final : public td::Jsonable {
  public:
   JsonPollOption(const td_api::pollOption *option, const Client *client) : option_(option), client_(client) {
@@ -2267,6 +2326,9 @@ class Client::JsonPollOption final : public td::Jsonable {
     object("text", option_->text_->text_);
     if (!option_->text_->entities_.empty()) {
       object("text_entities", JsonVectorEntities(option_->text_->entities_, client_));
+    }
+    if (option_->media_ != nullptr) {
+      object("media", JsonPollMedia(option_->media_.get(), client_));
     }
     object("voter_count", option_->voter_count_);
     if (option_->author_ != nullptr && option_->addition_date_ > 0) {
@@ -2282,8 +2344,9 @@ class Client::JsonPollOption final : public td::Jsonable {
 
 class Client::JsonPoll final : public td::Jsonable {
  public:
-  JsonPoll(const td_api::poll *poll, const td_api::formattedText *description, const Client *client)
-      : poll_(poll), description_(description), client_(client) {
+  JsonPoll(const td_api::poll *poll, const td_api::formattedText *description, const td_api::MessageContent *media,
+           const Client *client)
+      : poll_(poll), description_(description), media_(media), client_(client) {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
@@ -2325,6 +2388,9 @@ class Client::JsonPoll final : public td::Jsonable {
           object("explanation", explanation->text_);
           object("explanation_entities", JsonVectorEntities(explanation->entities_, client_));
         }
+        if (quiz->explanation_media_ != nullptr) {
+          object("explanation_media", JsonPollMedia(quiz->explanation_media_.get(), client_));
+        }
         break;
       }
       case td_api::pollTypeRegular::ID:
@@ -2339,11 +2405,15 @@ class Client::JsonPoll final : public td::Jsonable {
         object("description_entities", JsonVectorEntities(description_->entities_, client_));
       }
     }
+    if (media_ != nullptr) {
+      object("media", JsonPollMedia(media_, client_));
+    }
   }
 
  private:
   const td_api::poll *poll_;
   const td_api::formattedText *description_;
+  const td_api::MessageContent *media_;
   const Client *client_;
 };
 
@@ -3929,7 +3999,7 @@ class Client::JsonExternalReplyInfo final : public td::Jsonable {
         }
         case td_api::messagePoll::ID: {
           auto content = static_cast<const td_api::messagePoll *>(reply_->content_.get());
-          object("poll", JsonPoll(content->poll_.get(), content->description_.get(), client_));
+          object("poll", JsonPoll(content->poll_.get(), content->description_.get(), content->media_.get(), client_));
           break;
         }
         case td_api::messageUnsupported::ID:
@@ -4206,7 +4276,7 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     }
     case td_api::messagePoll::ID: {
       auto content = static_cast<const td_api::messagePoll *>(message_->content.get());
-      object("poll", JsonPoll(content->poll_.get(), content->description_.get(), client_));
+      object("poll", JsonPoll(content->poll_.get(), content->description_.get(), content->media_.get(), client_));
       break;
     }
     case td_api::messageChatAddMembers::ID: {
@@ -6282,7 +6352,9 @@ class Client::TdOnStopPollCallback final : public TdQueryCallback {
       return fail_query_with_error(std::move(query_), 400, "message poll not found");
     }
     auto message_poll = static_cast<const td_api::messagePoll *>(message_info->content.get());
-    answer_query(JsonPoll(message_poll->poll_.get(), message_poll->description_.get(), client_), std::move(query_));
+    answer_query(
+        JsonPoll(message_poll->poll_.get(), message_poll->description_.get(), message_poll->media_.get(), client_),
+        std::move(query_));
   }
 
  private:
@@ -6311,7 +6383,9 @@ class Client::TdOnStopBusinessPollCallback final : public TdQueryCallback {
       return fail_query_with_error(std::move(query_), 400, "message poll not found");
     }
     auto message_poll = static_cast<const td_api::messagePoll *>(message->content.get());
-    answer_query(JsonPoll(message_poll->poll_.get(), message_poll->description_.get(), client_), std::move(query_));
+    answer_query(
+        JsonPoll(message_poll->poll_.get(), message_poll->description_.get(), message_poll->media_.get(), client_),
+        std::move(query_));
   }
 
  private:
@@ -16848,7 +16922,7 @@ void Client::add_message_update(UpdateType update_type, const MessageInfo *messa
 
 void Client::add_update_poll(object_ptr<td_api::updatePoll> &&update) {
   CHECK(update != nullptr);
-  add_update(UpdateType::Poll, JsonPoll(update->poll_.get(), nullptr, this), 86400, update->poll_->id_);
+  add_update(UpdateType::Poll, JsonPoll(update->poll_.get(), nullptr, nullptr, this), 86400, update->poll_->id_);
 }
 
 void Client::add_update_poll_answer(object_ptr<td_api::updatePollAnswer> &&update) {

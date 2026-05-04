@@ -134,6 +134,7 @@ class Client final : public WebhookActor::Callback {
   class JsonInvoice;
   class JsonLocation;
   class JsonVenue;
+  class JsonPollMedia;
   class JsonPollOption;
   class JsonPoll;
   class JsonPollAnswer;
