@@ -10025,6 +10025,33 @@ td_api::object_ptr<td_api::inputThumbnail> Client::get_input_thumbnail(const Que
   return make_object<td_api::inputThumbnail>(std::move(input_file), 0, 0);
 }
 
+td::Result<td_api::object_ptr<td_api::inputThumbnail>> Client::get_input_thumbnail(const Query *query,
+                                                                                   const td::JsonObject &object,
+                                                                                   bool allow_legacy) const {
+  TRY_RESULT(thumbnail, object.get_optional_string_field("thumbnail"));
+  if (allow_legacy) {
+    if (thumbnail.empty()) {
+      TRY_RESULT_ASSIGN(thumbnail, object.get_optional_string_field("thumb"));
+    }
+    auto thumbnail_input_file = get_input_file(query, td::Slice(), thumbnail, true);
+    if (thumbnail_input_file == nullptr) {
+      thumbnail_input_file = get_input_file(query, "thumbnail", td::Slice(), true);
+      if (thumbnail_input_file == nullptr) {
+        thumbnail_input_file = get_input_file(query, "thumb", td::Slice(), true);
+      }
+    }
+    if (thumbnail_input_file != nullptr) {
+      return make_object<td_api::inputThumbnail>(std::move(thumbnail_input_file), 0, 0);
+    }
+  } else {
+    auto thumbnail_input_file = get_input_file(query, "thumbnail", thumbnail, true);
+    if (thumbnail_input_file != nullptr) {
+      return make_object<td_api::inputThumbnail>(std::move(thumbnail_input_file), 0, 0);
+    }
+  }
+  return nullptr;
+}
+
 td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_message_content(
     td::JsonValue &input_message_content, bool is_input_message_content_required) {
   CHECK(input_message_content.type() == td::JsonValue::Type::Object);
@@ -11636,22 +11663,7 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
   if (input_file == nullptr) {
     return td::Status::Error("media not found");
   }
-
-  TRY_RESULT(thumbnail, object.get_optional_string_field("thumbnail"));
-  if (thumbnail.empty()) {
-    TRY_RESULT_ASSIGN(thumbnail, object.get_optional_string_field("thumb"));
-  }
-  auto thumbnail_input_file = get_input_file(query, td::Slice(), thumbnail, true);
-  if (thumbnail_input_file == nullptr) {
-    thumbnail_input_file = get_input_file(query, "thumbnail", td::Slice(), true);
-    if (thumbnail_input_file == nullptr) {
-      thumbnail_input_file = get_input_file(query, "thumb", td::Slice(), true);
-    }
-  }
-  object_ptr<td_api::inputThumbnail> input_thumbnail;
-  if (thumbnail_input_file != nullptr) {
-    input_thumbnail = make_object<td_api::inputThumbnail>(std::move(thumbnail_input_file), 0, 0);
-  }
+  TRY_RESULT(input_thumbnail, get_input_thumbnail(query, object, true));
 
   TRY_RESULT(type, object.get_required_string_field("type"));
   if (type == "photo") {
@@ -11770,13 +11782,7 @@ td::Result<td_api::object_ptr<td_api::inputPaidMedia>> Client::get_input_paid_me
   if (input_file == nullptr) {
     return td::Status::Error("media not found");
   }
-
-  object_ptr<td_api::inputThumbnail> input_thumbnail;
-  TRY_RESULT(thumbnail, object.get_optional_string_field("thumbnail"));
-  auto thumbnail_input_file = get_input_file(query, "thumbnail", thumbnail, true);
-  if (thumbnail_input_file != nullptr) {
-    input_thumbnail = make_object<td_api::inputThumbnail>(std::move(thumbnail_input_file), 0, 0);
-  }
+  TRY_RESULT(input_thumbnail, get_input_thumbnail(query, object, true));
 
   TRY_RESULT(width, object.get_optional_int_field("width"));
   TRY_RESULT(height, object.get_optional_int_field("height"));

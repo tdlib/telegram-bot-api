@@ -542,6 +542,9 @@ class Client final : public WebhookActor::Callback {
 
   object_ptr<td_api::inputThumbnail> get_input_thumbnail(const Query *query) const;
 
+  td::Result<object_ptr<td_api::inputThumbnail>> get_input_thumbnail(const Query *query, const td::JsonObject &object,
+                                                                     bool allow_legacy = false) const;
+
   static td::Result<object_ptr<td_api::inlineQueryResultsButton>> get_inline_query_results_button(
       td::JsonValue &&value);
 
