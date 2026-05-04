@@ -11727,6 +11727,65 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
   return r_input_message_content.move_as_ok();
 }
 
+td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_poll_media(const Query *query,
+                                                                                         td::JsonValue &&input_media,
+                                                                                         bool for_option) const {
+  if (input_media.type() != td::JsonValue::Type::Object) {
+    if (input_media.type() == td::JsonValue::Type::Null) {
+      return nullptr;
+    }
+    return td::Status::Error("expected an Object");
+  }
+
+  auto &object = input_media.get_object();
+
+  TRY_RESULT(type, object.get_required_string_field("type"));
+  if (type == "location") {
+    TRY_RESULT(location, get_location(object));
+    return make_object<td_api::inputMessageLocation>(std::move(location), 0, 0, 0);
+  }
+  if (type == "venue") {
+    TRY_RESULT(venue, get_venue(object));
+    return make_object<td_api::inputMessageVenue>(std::move(venue));
+  }
+  if (type != "animation" && type != "photo" && type != "video" &&
+      (for_option ? type != "sticker" : type != "audio" && type != "document")) {
+    return td::Status::Error("invalid type specified");
+  }
+  if (type == "sticker") {
+    TRY_RESULT(media, object.get_optional_string_field("media"));
+    auto input_file = get_input_file(query, td::Slice(), media, false);
+    if (input_file == nullptr) {
+      return td::Status::Error("media not found");
+    }
+    return make_object<td_api::inputMessageSticker>(std::move(input_file), nullptr, 0, 0, td::string());
+  }
+
+  return get_input_media(query, object, type, nullptr, false, false, false);
+}
+
+td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_poll_media(const Query *query,
+                                                                                         td::Slice field_name) const {
+  auto media = query->arg(field_name);
+  if (media.empty()) {
+    return nullptr;
+  }
+
+  LOG(INFO) << "Parsing JSON object: " << media;
+  auto r_value = json_decode(media);
+  if (r_value.is_error()) {
+    LOG(INFO) << "Can't parse JSON object: " << r_value.error();
+    return td::Status::Error(400, PSLICE() << "Can't parse InputPollMedia JSON object");
+  }
+
+  auto r_input_message_content = get_input_poll_media(query, r_value.move_as_ok(), false);
+  if (r_input_message_content.is_error()) {
+    return td::Status::Error(400, PSLICE()
+                                      << "Can't parse InputPollMedia: " << r_input_message_content.error().message());
+  }
+  return r_input_message_content.move_as_ok();
+}
+
 td::Result<td::vector<td_api::object_ptr<td_api::InputMessageContent>>> Client::get_input_message_contents(
     const Query *query, td::Slice field_name) const {
   TRY_RESULT(media, get_required_string_arg(query, field_name));
