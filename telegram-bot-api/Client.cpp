@@ -10077,13 +10077,10 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
   }
 
   if (object.has_field("latitude") && object.has_field("longitude")) {
-    TRY_RESULT(latitude, object.get_required_double_field("latitude"));
-    TRY_RESULT(longitude, object.get_required_double_field("longitude"));
-    TRY_RESULT(horizontal_accuracy, object.get_optional_double_field("horizontal_accuracy"));
+    TRY_RESULT(location, get_location(object));
     TRY_RESULT(live_period, object.get_optional_int_field("live_period"));
     TRY_RESULT(heading, object.get_optional_int_field("heading"));
     TRY_RESULT(proximity_alert_radius, object.get_optional_int_field("proximity_alert_radius"));
-    auto location = make_object<td_api::location>(latitude, longitude, horizontal_accuracy);
 
     if (object.has_field("title") && object.has_field("address")) {
       TRY_RESULT(title, object.get_required_string_field("title"));
@@ -10437,22 +10434,21 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
         std::move(reply_markup), std::move(input_message_content));
   }
   if (type == "location") {
-    TRY_RESULT(latitude, object.get_required_double_field("latitude"));
-    TRY_RESULT(longitude, object.get_required_double_field("longitude"));
-    TRY_RESULT(horizontal_accuracy, object.get_optional_double_field("horizontal_accuracy"));
-    TRY_RESULT(live_period, object.get_optional_int_field("live_period"));
-    TRY_RESULT(heading, object.get_optional_int_field("heading"));
-    TRY_RESULT(proximity_alert_radius, object.get_optional_int_field("proximity_alert_radius"));
-    TRY_RESULT(title, object.get_required_string_field("title"));
-
     if (input_message_content == nullptr) {
-      auto location = make_object<td_api::location>(latitude, longitude, horizontal_accuracy);
+      TRY_RESULT(location, get_location(object));
+      TRY_RESULT(live_period, object.get_optional_int_field("live_period"));
+      TRY_RESULT(heading, object.get_optional_int_field("heading"));
+      TRY_RESULT(proximity_alert_radius, object.get_optional_int_field("proximity_alert_radius"));
       input_message_content =
           make_object<td_api::inputMessageLocation>(std::move(location), live_period, heading, proximity_alert_radius);
     }
+
+    TRY_RESULT(location, get_location(object));
+    TRY_RESULT(live_period, object.get_optional_int_field("live_period"));
+    TRY_RESULT(title, object.get_required_string_field("title"));
     return make_object<td_api::inputInlineQueryResultLocation>(
-        id, make_object<td_api::location>(latitude, longitude, horizontal_accuracy), live_period, title, thumbnail_url,
-        thumbnail_width, thumbnail_height, std::move(reply_markup), std::move(input_message_content));
+        id, std::move(location), live_period, title, thumbnail_url, thumbnail_width, thumbnail_height,
+        std::move(reply_markup), std::move(input_message_content));
   }
   if (type == "mpeg4_gif") {
     TRY_RESULT(title, object.get_optional_string_field("title"));
@@ -10507,9 +10503,7 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
                                                               std::move(input_message_content));
   }
   if (type == "venue") {
-    TRY_RESULT(latitude, object.get_required_double_field("latitude"));
-    TRY_RESULT(longitude, object.get_required_double_field("longitude"));
-    TRY_RESULT(horizontal_accuracy, object.get_optional_double_field("horizontal_accuracy"));
+    TRY_RESULT(location, get_location(object));
     TRY_RESULT(title, object.get_required_string_field("title"));
     TRY_RESULT(address, object.get_required_string_field("address"));
     TRY_RESULT(foursquare_id, object.get_optional_string_field("foursquare_id"));
@@ -10533,13 +10527,11 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
 
     if (input_message_content == nullptr) {
       input_message_content = make_object<td_api::inputMessageVenue>(
-          make_object<td_api::venue>(make_object<td_api::location>(latitude, longitude, horizontal_accuracy), title,
-                                     address, provider, venue_id, venue_type));
+          make_object<td_api::venue>(std::move(location), title, address, provider, venue_id, venue_type));
+      TRY_RESULT_ASSIGN(location, get_location(object));
     }
     return make_object<td_api::inputInlineQueryResultVenue>(
-        id,
-        make_object<td_api::venue>(make_object<td_api::location>(latitude, longitude, horizontal_accuracy), title,
-                                   address, provider, venue_id, venue_type),
+        id, make_object<td_api::venue>(std::move(location), title, address, provider, venue_id, venue_type),
         thumbnail_url, thumbnail_width, thumbnail_height, std::move(reply_markup), std::move(input_message_content));
   }
   if (type == "video") {
@@ -11432,6 +11424,13 @@ td::Result<td_api::object_ptr<td_api::location>> Client::get_location(const Quer
                                        td::to_double(horizontal_accuracy));
 }
 
+td::Result<td_api::object_ptr<td_api::location>> Client::get_location(const td::JsonObject &object) {
+  TRY_RESULT(latitude, object.get_required_double_field("latitude"));
+  TRY_RESULT(longitude, object.get_required_double_field("longitude"));
+  TRY_RESULT(horizontal_accuracy, object.get_optional_double_field("horizontal_accuracy"));
+  return make_object<td_api::location>(latitude, longitude, horizontal_accuracy);
+}
+
 td::Result<td_api::object_ptr<td_api::chatPermissions>> Client::get_chat_permissions(
     const Query *query, bool &allow_legacy, bool use_independent_chat_permissions) {
   auto can_send_messages = false;
@@ -12025,8 +12024,7 @@ td::Result<td_api::object_ptr<td_api::InputStoryAreaType>> Client::get_input_sto
 
   TRY_RESULT(type, object.get_required_string_field("type"));
   if (type == "location") {
-    TRY_RESULT(latitude, object.get_required_double_field("latitude"));
-    TRY_RESULT(longitude, object.get_required_double_field("longitude"));
+    TRY_RESULT(location, get_location(object));
     object_ptr<td_api::locationAddress> location_address;
     TRY_RESULT(address, object.extract_optional_field("address", td::JsonValue::Type::Object));
     if (address.type() == td::JsonValue::Type::Object) {
@@ -12037,8 +12035,7 @@ td::Result<td_api::object_ptr<td_api::InputStoryAreaType>> Client::get_input_sto
       TRY_RESULT(street, address_object.get_optional_string_field("street"));
       location_address = make_object<td_api::locationAddress>(country_code, state, city, street);
     }
-    return make_object<td_api::inputStoryAreaTypeLocation>(make_object<td_api::location>(latitude, longitude, 0.0),
-                                                           std::move(location_address));
+    return make_object<td_api::inputStoryAreaTypeLocation>(std::move(location), std::move(location_address));
   }
   if (type == "suggested_reaction") {
     TRY_RESULT(reaction_type, object.extract_required_field("reaction_type", td::JsonValue::Type::Object));
