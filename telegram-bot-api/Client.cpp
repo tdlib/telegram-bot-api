@@ -10077,37 +10077,15 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
   }
 
   if (object.has_field("latitude") && object.has_field("longitude")) {
+    if (object.has_field("title") && object.has_field("address")) {
+      TRY_RESULT(venue, get_venue(object));
+      return make_object<td_api::inputMessageVenue>(std::move(venue));
+    }
+
     TRY_RESULT(location, get_location(object));
     TRY_RESULT(live_period, object.get_optional_int_field("live_period"));
     TRY_RESULT(heading, object.get_optional_int_field("heading"));
     TRY_RESULT(proximity_alert_radius, object.get_optional_int_field("proximity_alert_radius"));
-
-    if (object.has_field("title") && object.has_field("address")) {
-      TRY_RESULT(title, object.get_required_string_field("title"));
-      TRY_RESULT(address, object.get_required_string_field("address"));
-      td::string provider;
-      td::string venue_id;
-      td::string venue_type;
-
-      TRY_RESULT(google_place_id, object.get_optional_string_field("google_place_id"));
-      TRY_RESULT(google_place_type, object.get_optional_string_field("google_place_type"));
-      if (!google_place_id.empty() || !google_place_type.empty()) {
-        provider = "gplaces";
-        venue_id = std::move(google_place_id);
-        venue_type = std::move(google_place_type);
-      }
-      TRY_RESULT(foursquare_id, object.get_optional_string_field("foursquare_id"));
-      TRY_RESULT(foursquare_type, object.get_optional_string_field("foursquare_type"));
-      if (!foursquare_id.empty() || !foursquare_type.empty()) {
-        provider = "foursquare";
-        venue_id = std::move(foursquare_id);
-        venue_type = std::move(foursquare_type);
-      }
-
-      return make_object<td_api::inputMessageVenue>(
-          make_object<td_api::venue>(std::move(location), title, address, provider, venue_id, venue_type));
-    }
-
     return make_object<td_api::inputMessageLocation>(std::move(location), live_period, heading, proximity_alert_radius);
   }
 
@@ -10503,36 +10481,15 @@ td::Result<td_api::object_ptr<td_api::InputInlineQueryResult>> Client::get_inlin
                                                               std::move(input_message_content));
   }
   if (type == "venue") {
-    TRY_RESULT(location, get_location(object));
-    TRY_RESULT(title, object.get_required_string_field("title"));
-    TRY_RESULT(address, object.get_required_string_field("address"));
-    TRY_RESULT(foursquare_id, object.get_optional_string_field("foursquare_id"));
-    TRY_RESULT(foursquare_type, object.get_optional_string_field("foursquare_type"));
-    TRY_RESULT(google_place_id, object.get_optional_string_field("google_place_id"));
-    TRY_RESULT(google_place_type, object.get_optional_string_field("google_place_type"));
-
-    td::string provider;
-    td::string venue_id;
-    td::string venue_type;
-    if (!google_place_id.empty() || !google_place_type.empty()) {
-      provider = "gplaces";
-      venue_id = std::move(google_place_id);
-      venue_type = std::move(google_place_type);
-    }
-    if (!foursquare_id.empty() || !foursquare_type.empty()) {
-      provider = "foursquare";
-      venue_id = std::move(foursquare_id);
-      venue_type = std::move(foursquare_type);
-    }
-
     if (input_message_content == nullptr) {
-      input_message_content = make_object<td_api::inputMessageVenue>(
-          make_object<td_api::venue>(std::move(location), title, address, provider, venue_id, venue_type));
-      TRY_RESULT_ASSIGN(location, get_location(object));
+      TRY_RESULT(venue, get_venue(object));
+      input_message_content = make_object<td_api::inputMessageVenue>(std::move(venue));
     }
-    return make_object<td_api::inputInlineQueryResultVenue>(
-        id, make_object<td_api::venue>(std::move(location), title, address, provider, venue_id, venue_type),
-        thumbnail_url, thumbnail_width, thumbnail_height, std::move(reply_markup), std::move(input_message_content));
+
+    TRY_RESULT(venue, get_venue(object));
+    return make_object<td_api::inputInlineQueryResultVenue>(id, std::move(venue), thumbnail_url, thumbnail_width,
+                                                            thumbnail_height, std::move(reply_markup),
+                                                            std::move(input_message_content));
   }
   if (type == "video") {
     TRY_RESULT(title, object.get_required_string_field("title"));
@@ -11429,6 +11386,32 @@ td::Result<td_api::object_ptr<td_api::location>> Client::get_location(const td::
   TRY_RESULT(longitude, object.get_required_double_field("longitude"));
   TRY_RESULT(horizontal_accuracy, object.get_optional_double_field("horizontal_accuracy"));
   return make_object<td_api::location>(latitude, longitude, horizontal_accuracy);
+}
+
+td::Result<td_api::object_ptr<td_api::venue>> Client::get_venue(const td::JsonObject &object) {
+  TRY_RESULT(location, get_location(object));
+  TRY_RESULT(title, object.get_required_string_field("title"));
+  TRY_RESULT(address, object.get_required_string_field("address"));
+  TRY_RESULT(foursquare_id, object.get_optional_string_field("foursquare_id"));
+  TRY_RESULT(foursquare_type, object.get_optional_string_field("foursquare_type"));
+  TRY_RESULT(google_place_id, object.get_optional_string_field("google_place_id"));
+  TRY_RESULT(google_place_type, object.get_optional_string_field("google_place_type"));
+
+  td::string provider;
+  td::string venue_id;
+  td::string venue_type;
+  if (!google_place_id.empty() || !google_place_type.empty()) {
+    provider = "gplaces";
+    venue_id = std::move(google_place_id);
+    venue_type = std::move(google_place_type);
+  }
+  if (!foursquare_id.empty() || !foursquare_type.empty()) {
+    provider = "foursquare";
+    venue_id = std::move(foursquare_id);
+    venue_type = std::move(foursquare_type);
+  }
+
+  return make_object<td_api::venue>(std::move(location), title, address, provider, venue_id, venue_type);
 }
 
 td::Result<td_api::object_ptr<td_api::chatPermissions>> Client::get_chat_permissions(
