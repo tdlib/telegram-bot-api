@@ -670,6 +670,12 @@ class Client final : public WebhookActor::Callback {
   td::Result<object_ptr<td_api::InputMessageContent>> get_input_media(const Query *query, td::JsonValue &&input_media,
                                                                       bool for_album) const;
 
+  td::Result<object_ptr<td_api::InputMessageContent>> get_input_media(const Query *query, const td::JsonObject &object,
+                                                                      const td::string &type,
+                                                                      object_ptr<td_api::formattedText> &&caption,
+                                                                      bool show_caption_above_media, bool has_spoiler,
+                                                                      bool for_album) const;
+
   td::Result<object_ptr<td_api::InputMessageContent>> get_input_media(const Query *query, td::Slice field_name) const;
 
   td::Result<td::vector<object_ptr<td_api::InputMessageContent>>> get_input_message_contents(

@@ -11639,6 +11639,15 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
   TRY_RESULT(caption, get_formatted_text(std::move(input_caption), std::move(parse_mode), std::move(entities)));
   TRY_RESULT(show_caption_above_media, object.get_optional_bool_field("show_caption_above_media"));
   TRY_RESULT(has_spoiler, object.get_optional_bool_field("has_spoiler"));
+  TRY_RESULT(type, object.get_required_string_field("type"));
+
+  return get_input_media(query, object, type, std::move(caption), show_caption_above_media, has_spoiler, for_album);
+}
+
+td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_media(
+    const Query *query, const td::JsonObject &object, const td::string &type,
+    object_ptr<td_api::formattedText> &&caption, bool show_caption_above_media, bool has_spoiler,
+    bool for_album) const {
   TRY_RESULT(media, object.get_optional_string_field("media"));
 
   auto input_file = get_input_file(query, td::Slice(), media, false);
@@ -11647,7 +11656,6 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
   }
   TRY_RESULT(input_thumbnail, get_input_thumbnail(query, object, true));
 
-  TRY_RESULT(type, object.get_required_string_field("type"));
   if (type == "photo") {
     return make_object<td_api::inputMessagePhoto>(std::move(input_file), nullptr, nullptr, td::vector<int32>(), 0, 0,
                                                   std::move(caption), show_caption_above_media, nullptr, has_spoiler);
