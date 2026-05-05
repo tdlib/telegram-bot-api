@@ -237,6 +237,7 @@ bool Client::init_methods() {
   methods_.emplace("sendaudio", &Client::process_send_audio_query);
   methods_.emplace("senddice", &Client::process_send_dice_query);
   methods_.emplace("senddocument", &Client::process_send_document_query);
+  methods_.emplace("sendlivephoto", &Client::process_send_live_photo_query);
   methods_.emplace("sendphoto", &Client::process_send_photo_query);
   methods_.emplace("sendsticker", &Client::process_send_sticker_query);
   methods_.emplace("sendvideo", &Client::process_send_video_query);
@@ -12962,6 +12963,25 @@ td::Status Client::process_send_photo_query(PromisedQueryPtr &query) {
   do_send_message(
       make_object<td_api::inputMessagePhoto>(std::move(photo), nullptr, nullptr, td::vector<int32>(), 0, 0,
                                              std::move(caption), show_caption_above_media, nullptr, has_spoiler),
+      std::move(query));
+  return td::Status::OK();
+}
+
+td::Status Client::process_send_live_photo_query(PromisedQueryPtr &query) {
+  auto live_photo = get_input_file(query.get(), "live_photo");
+  if (live_photo == nullptr) {
+    return td::Status::Error(400, "There is no live photo in the request");
+  }
+  auto photo = get_input_file(query.get(), "photo");
+  if (photo == nullptr) {
+    return td::Status::Error(400, "There is no photo in the request");
+  }
+  TRY_RESULT(caption, get_caption(query.get()));
+  auto show_caption_above_media = to_bool(query->arg("show_caption_above_media"));
+  auto has_spoiler = to_bool(query->arg("has_spoiler"));
+  do_send_message(
+      make_object<td_api::inputMessagePhoto>(std::move(photo), nullptr, std::move(live_photo), td::vector<int32>(), 0,
+                                             0, std::move(caption), show_caption_above_media, nullptr, has_spoiler),
       std::move(query));
   return td::Status::OK();
 }
