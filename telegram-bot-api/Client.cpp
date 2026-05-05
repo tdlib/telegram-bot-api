@@ -11881,6 +11881,13 @@ td::Result<td_api::object_ptr<td_api::inputPaidMedia>> Client::get_input_paid_me
   TRY_RESULT(type, object.get_required_string_field("type"));
   if (type == "photo") {
     media_type = make_object<td_api::inputPaidMediaTypePhoto>(nullptr);
+  } else if (type == "live_photo") {
+    TRY_RESULT(photo, object.get_optional_string_field("photo"));
+    media_type = make_object<td_api::inputPaidMediaTypePhoto>(std::move(input_file));
+    input_file = get_input_file(query, "photo", photo, false);
+    if (input_file == nullptr) {
+      return td::Status::Error("photo not found");
+    }
   } else if (type == "video") {
     TRY_RESULT(duration, object.get_optional_int_field("duration"));
     TRY_RESULT(supports_streaming, object.get_optional_bool_field("supports_streaming"));
