@@ -3967,7 +3967,11 @@ class Client::JsonExternalReplyInfo final : public td::Jsonable {
         case td_api::messagePhoto::ID: {
           auto content = static_cast<const td_api::messagePhoto *>(reply_->content_.get());
           CHECK(content->photo_ != nullptr);
-          object("photo", JsonPhoto(content->photo_.get(), client_));
+          if (content->video_ != nullptr) {
+            object("live_photo", JsonLivePhoto(content->photo_.get(), content->video_.get(), client_));
+          } else {
+            object("photo", JsonPhoto(content->photo_.get(), client_));
+          }
           add_media_spoiler(object, content->has_spoiler_);
           break;
         }
@@ -4240,6 +4244,9 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     case td_api::messagePhoto::ID: {
       auto content = static_cast<const td_api::messagePhoto *>(message_->content.get());
       CHECK(content->photo_ != nullptr);
+      if (content->video_ != nullptr) {
+        object("live_photo", JsonLivePhoto(content->photo_.get(), content->video_.get(), client_));
+      }
       object("photo", JsonPhoto(content->photo_.get(), client_));
       add_caption(object, content->caption_, content->show_caption_above_media_);
       add_media_spoiler(object, content->has_spoiler_);
