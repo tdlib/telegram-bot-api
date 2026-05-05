@@ -2315,7 +2315,11 @@ class Client::JsonPollMedia final : public td::Jsonable {
       }
       case td_api::messagePhoto::ID: {
         auto content = static_cast<const td_api::messagePhoto *>(content_);
-        object("photo", JsonPhoto(content->photo_.get(), client_));
+        if (content->video_ != nullptr) {
+          object("live_photo", JsonLivePhoto(content->photo_.get(), content->video_.get(), client_));
+        } else {
+          object("photo", JsonPhoto(content->photo_.get(), client_));
+        }
         break;
       }
       case td_api::messageSticker::ID: {
