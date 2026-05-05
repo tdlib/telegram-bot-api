@@ -117,6 +117,7 @@ class Client final : public WebhookActor::Callback {
   class JsonDocument;
   class JsonPhotoSize;
   class JsonPhoto;
+  class JsonLivePhoto;
   class JsonChatPhoto;
   class JsonThumbnail;
   class JsonMaskPosition;

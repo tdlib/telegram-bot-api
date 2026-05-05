@@ -1960,6 +1960,29 @@ class Client::JsonPhoto final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonLivePhoto final : public td::Jsonable {
+ public:
+  JsonLivePhoto(const td_api::photo *photo, const td_api::video *video, const Client *client)
+      : photo_(photo), video_(video), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("photo", JsonPhoto(photo_, client_));
+    object("duration", video_->duration_);
+    object("width", video_->width_);
+    object("height", video_->height_);
+    if (!video_->mime_type_.empty()) {
+      object("mime_type", video_->mime_type_);
+    }
+    client_->json_store_file(object, video_->video_.get());
+  }
+
+ private:
+  const td_api::photo *photo_;
+  const td_api::video *video_;
+  const Client *client_;
+};
+
 class Client::JsonChatPhoto final : public td::Jsonable {
  public:
   JsonChatPhoto(const td_api::chatPhoto *photo, const Client *client) : photo_(photo), client_(client) {
@@ -2100,8 +2123,13 @@ class Client::JsonPaidMedia final : public td::Jsonable {
       }
       case td_api::paidMediaPhoto::ID: {
         auto media = static_cast<const td_api::paidMediaPhoto *>(paid_media_);
-        object("type", "photo");
-        object("photo", JsonPhoto(media->photo_.get(), client_));
+        if (media->video_ != nullptr) {
+          object("type", "live_photo");
+          object("live_photo", JsonLivePhoto(media->photo_.get(), media->video_.get(), client_));
+        } else {
+          object("type", "photo");
+          object("photo", JsonPhoto(media->photo_.get(), client_));
+        }
         break;
       }
       case td_api::paidMediaVideo::ID: {
