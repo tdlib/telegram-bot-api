@@ -11699,6 +11699,16 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
     return make_object<td_api::inputMessagePhoto>(std::move(input_file), nullptr, nullptr, td::vector<int32>(), 0, 0,
                                                   std::move(caption), show_caption_above_media, nullptr, has_spoiler);
   }
+  if (type == "live_photo") {
+    TRY_RESULT(photo, object.get_optional_string_field("photo"));
+    auto input_photo = get_input_file(query, td::Slice(), photo, false);
+    if (input_photo == nullptr) {
+      return td::Status::Error("photo not found");
+    }
+    return make_object<td_api::inputMessagePhoto>(std::move(input_photo), nullptr, std::move(input_file),
+                                                  td::vector<int32>(), 0, 0, std::move(caption),
+                                                  show_caption_above_media, nullptr, has_spoiler);
+  }
   if (type == "video") {
     TRY_RESULT(width, object.get_optional_int_field("width"));
     TRY_RESULT(height, object.get_optional_int_field("height"));
@@ -11787,7 +11797,7 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_po
     TRY_RESULT(venue, get_venue(object));
     return make_object<td_api::inputMessageVenue>(std::move(venue));
   }
-  if (type != "animation" && type != "photo" && type != "video" &&
+  if (type != "animation" && type != "photo" && type != "live_photo" && type != "video" &&
       (for_option ? type != "sticker" : type != "audio" && type != "document")) {
     return td::Status::Error("invalid type specified");
   }
