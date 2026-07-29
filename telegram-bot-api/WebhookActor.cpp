@@ -698,9 +698,13 @@ void WebhookActor::start_up() {
     next_ip_address_resolve_time_ = last_success_time_;
   }
 
-  active_new_connection_flood_.add_limit(0.5, 10);
-
-  pending_new_connection_flood_.add_limit(2, 1);
+  if (parameters_->local_mode_) {
+    active_new_connection_flood_.add_limit(0.01, 100);
+    pending_new_connection_flood_.add_limit(0.05, 20);
+  } else {
+    active_new_connection_flood_.add_limit(0.5, 10);
+    pending_new_connection_flood_.add_limit(2, 1);
+  }
 
   if (!parameters_->local_mode_) {
     if (url_.protocol_ == td::HttpUrl::Protocol::Https) {
