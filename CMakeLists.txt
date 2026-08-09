@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
 
-project(TelegramBotApi VERSION 10.1 LANGUAGES CXX)
+project(TelegramBotApi VERSION 10.2 LANGUAGES CXX)
 
 add_subdirectory(td EXCLUDE_FROM_ALL)
 
