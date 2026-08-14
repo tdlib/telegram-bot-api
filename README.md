@@ -1,5 +1,15 @@
 # Telegram Bot API
 
+> **KT 使用说明（fork 维护方：KTAIorg）**
+>
+> 本仓库是 `tdlib/telegram-bot-api` 的真 fork。KT 采纳目的：以 `--local` 模式自建 Bot API
+> server，获得 **2000 MB 上传 / 无限制下载**能力，支撑大文件与云盘类场景。
+> **注意：自建 server 不放宽任何消息限流**（限流在 Telegram 服务端执行）。
+>
+> - 决策与限流分析：[docs/rate-limits-and-selfhost-decision.md](docs/rate-limits-and-selfhost-decision.md)
+> - 上游同步策略与定制边界：[docs/development/upstream-sync-policy.md](docs/development/upstream-sync-policy.md)
+> - 不修改上游 C++/TDLib 源码；KT 定制仅限 CI / 镜像 / 部署 / 文档。
+
 The Telegram Bot API provides an HTTP API for creating [Telegram Bots](https://core.telegram.org/bots).
 
 If you've got any questions about bots or would like to report an issue with your bot, kindly contact us at [@BotSupport](https://t.me/BotSupport) in Telegram.
