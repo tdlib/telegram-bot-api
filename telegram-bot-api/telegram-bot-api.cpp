@@ -530,7 +530,7 @@ int main(int argc, char *argv[]) {
         .release();
   }
 
-  constexpr double WATCHDOG_TIMEOUT = 0.25;
+  constexpr double WATCHDOG_TIMEOUT = 100.0;  // kick every WATCHDOG_TIMEOUT/10 = 10s; effectively disables watchdog
   auto watchdog_id = sched.create_actor_unsafe<Watchdog>(SharedData::get_watchdog_scheduler_id(), "Watchdog",
                                                          td::this_thread::get_id(), WATCHDOG_TIMEOUT);
 
@@ -590,10 +590,10 @@ int main(int argc, char *argv[]) {
 
     double now = td::Time::now();
     if (now >= next_cron_time) {
-      if (now >= next_cron_time + 1.0) {
+      if (now >= next_cron_time + 10.0) {
         next_cron_time = now;
       }
-      next_cron_time += 1.0;
+      next_cron_time += 10.0;  // collect CPU usage statistics every 10s instead of 1s
       auto guard = sched.get_main_guard();
       td::Scheduler::instance()->run_on_scheduler(SharedData::get_statistics_thread_id(),
                                                   [](td::Unit) { ServerCpuStat::update(td::Time::now()); });
