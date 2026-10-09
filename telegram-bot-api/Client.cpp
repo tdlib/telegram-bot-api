@@ -12177,6 +12177,10 @@ td::Result<td_api::object_ptr<td_api::RichText>> Client::get_rich_text(td::JsonV
         TRY_RESULT(text, get_rich_text(object.extract_field("text")));
         return make_object<td_api::richTextCashtag>(std::move(text), td::string());
       }
+      if (type == "ton_address") {
+        TRY_RESULT(text, get_rich_text(object.extract_field("text")));
+        return make_object<td_api::richTextTonAddress>(std::move(text), td::string());
+      }
       if (type == "bot_command") {
         TRY_RESULT(text, get_rich_text(object.extract_field("text")));
         return make_object<td_api::richTextBotCommand>(std::move(text), td::string());
