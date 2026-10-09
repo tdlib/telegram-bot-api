@@ -580,6 +580,9 @@ class Client::JsonEntity final : public td::Jsonable {
       case td_api::textEntityTypeBankCardNumber::ID:
         object("type", "bank_card_number");
         break;
+      case td_api::textEntityTypeTonAddress::ID:
+        object("type", "ton_address");
+        break;
       case td_api::textEntityTypeBold::ID:
         object("type", "bold");
         break;
@@ -657,8 +660,7 @@ class Client::JsonVectorEntities final : public td::Jsonable {
     auto array = scope->enter_array();
     for (auto &entity : entities_) {
       auto entity_type = entity->type_->get_id();
-      if (entity_type != td_api::textEntityTypeMediaTimestamp::ID &&
-          entity_type != td_api::textEntityTypeTonAddress::ID) {
+      if (entity_type != td_api::textEntityTypeMediaTimestamp::ID) {
         array << JsonEntity(entity.get(), client_);
       }
     }
