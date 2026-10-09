@@ -657,8 +657,7 @@ class Client::JsonVectorEntities final : public td::Jsonable {
     auto array = scope->enter_array();
     for (auto &entity : entities_) {
       auto entity_type = entity->type_->get_id();
-      if (entity_type != td_api::textEntityTypeBankCardNumber::ID &&
-          entity_type != td_api::textEntityTypeMediaTimestamp::ID &&
+      if (entity_type != td_api::textEntityTypeMediaTimestamp::ID &&
           entity_type != td_api::textEntityTypeTonAddress::ID) {
         array << JsonEntity(entity.get(), client_);
       }
