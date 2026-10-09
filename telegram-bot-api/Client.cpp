@@ -15381,12 +15381,13 @@ td::Status Client::process_set_managed_bot_access_settings_query(PromisedQueryPt
 
 td::Status Client::process_verify_user_query(PromisedQueryPtr &query) {
   TRY_RESULT(user_id, get_user_id(query.get()));
-  auto custom_description = query->arg("custom_description");
+  TRY_RESULT(custom_description, get_formatted_text(query->arg("custom_description").str(),
+                                                    query->arg("custom_description_parse_mode").str(),
+                                                    get_input_entities(query.get(), "custom_description_entities")));
   check_user(user_id, std::move(query),
-             [this, user_id, custom_description = custom_description.str()](PromisedQueryPtr query) {
+             [this, user_id, custom_description = std::move(custom_description)](PromisedQueryPtr query) mutable {
                send_request(make_object<td_api::setMessageSenderBotVerification>(
-                                0, make_object<td_api::messageSenderUser>(user_id),
-                                make_object<td_api::formattedText>(custom_description, td::Auto())),
+                                0, make_object<td_api::messageSenderUser>(user_id), std::move(custom_description)),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
   return td::Status::OK();
@@ -15394,12 +15395,13 @@ td::Status Client::process_verify_user_query(PromisedQueryPtr &query) {
 
 td::Status Client::process_verify_chat_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
-  auto custom_description = query->arg("custom_description");
+  TRY_RESULT(custom_description, get_formatted_text(query->arg("custom_description").str(),
+                                                    query->arg("custom_description_parse_mode").str(),
+                                                    get_input_entities(query.get(), "custom_description_entities")));
   check_chat(chat_id, AccessRights::Read, std::move(query),
-             [this, custom_description = custom_description.str()](int64 chat_id, PromisedQueryPtr query) {
+             [this, custom_description = std::move(custom_description)](int64 chat_id, PromisedQueryPtr query) mutable {
                send_request(make_object<td_api::setMessageSenderBotVerification>(
-                                0, make_object<td_api::messageSenderChat>(chat_id),
-                                make_object<td_api::formattedText>(custom_description, td::Auto())),
+                                0, make_object<td_api::messageSenderChat>(chat_id), std::move(custom_description)),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
   return td::Status::OK();
