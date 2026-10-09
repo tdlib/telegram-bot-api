@@ -658,7 +658,8 @@ class Client::JsonVectorEntities final : public td::Jsonable {
     for (auto &entity : entities_) {
       auto entity_type = entity->type_->get_id();
       if (entity_type != td_api::textEntityTypeBankCardNumber::ID &&
-          entity_type != td_api::textEntityTypeMediaTimestamp::ID) {
+          entity_type != td_api::textEntityTypeMediaTimestamp::ID &&
+          entity_type != td_api::textEntityTypeTonAddress::ID) {
         array << JsonEntity(entity.get(), client_);
       }
     }
@@ -790,6 +791,13 @@ class Client::JsonRichText final : public td::Jsonable {
         object("type", "cashtag");
         object("text", JsonRichText(text->text_.get(), client_));
         object("cashtag", text->cashtag_);
+        break;
+      }
+      case td_api::richTextTonAddress::ID: {
+        const auto *text = static_cast<const td_api::richTextTonAddress *>(text_);
+        object("type", "ton_address");
+        object("text", JsonRichText(text->text_.get(), client_));
+        object("address", text->address_);
         break;
       }
       case td_api::richTextBotCommand::ID: {
@@ -5372,6 +5380,10 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("community_chat_joined", JsonCommunityChatJoined(content, client_));
       break;
     }
+    case td_api::messageTonWalletTransfer::ID:
+      break;
+    case td_api::messageTonConnectRequest::ID:
+      break;
     default:
       UNREACHABLE();
   }
@@ -15312,7 +15324,8 @@ td::Status Client::process_verify_user_query(PromisedQueryPtr &query) {
   check_user(user_id, std::move(query),
              [this, user_id, custom_description = custom_description.str()](PromisedQueryPtr query) {
                send_request(make_object<td_api::setMessageSenderBotVerification>(
-                                0, make_object<td_api::messageSenderUser>(user_id), custom_description),
+                                0, make_object<td_api::messageSenderUser>(user_id),
+                                make_object<td_api::formattedText>(custom_description, td::Auto())),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
   return td::Status::OK();
@@ -15324,7 +15337,8 @@ td::Status Client::process_verify_chat_query(PromisedQueryPtr &query) {
   check_chat(chat_id, AccessRights::Read, std::move(query),
              [this, custom_description = custom_description.str()](int64 chat_id, PromisedQueryPtr query) {
                send_request(make_object<td_api::setMessageSenderBotVerification>(
-                                0, make_object<td_api::messageSenderChat>(chat_id), custom_description),
+                                0, make_object<td_api::messageSenderChat>(chat_id),
+                                make_object<td_api::formattedText>(custom_description, td::Auto())),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
   return td::Status::OK();
@@ -18973,6 +18987,8 @@ bool Client::need_skip_update_message(int64 chat_id, const MessageInfo *message_
     case td_api::messageUpgradedGiftPurchaseOfferRejected::ID:
     case td_api::messageChatHasProtectedContentToggled::ID:
     case td_api::messageChatHasProtectedContentDisableRequested::ID:
+    case td_api::messageTonWalletTransfer::ID:
+    case td_api::messageTonConnectRequest::ID:
       return true;
     default:
       break;
