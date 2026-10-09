@@ -4035,6 +4035,26 @@ class Client::JsonCommunityChatJoined final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonTonWalletTransfer final : public td::Jsonable {
+ public:
+  JsonTonWalletTransfer(const td_api::messageTonWalletTransfer *ton_wallet_transfer, const Client *client)
+      : ton_wallet_transfer_(ton_wallet_transfer), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("transaction_id", ton_wallet_transfer_->transaction_id_);
+    object("peer_address", ton_wallet_transfer_->peer_address_);
+    object("amount", ton_wallet_transfer_->amount_);
+    if (!ton_wallet_transfer_->is_comment_encrypted_) {
+      object("comment", ton_wallet_transfer_->comment_);
+    }
+  }
+
+ private:
+  const td_api::messageTonWalletTransfer *ton_wallet_transfer_;
+  const Client *client_;
+};
+
 class Client::JsonGiveawayCreated final : public td::Jsonable {
  public:
   explicit JsonGiveawayCreated(const td_api::messageGiveawayCreated *giveaway_created)
@@ -5381,8 +5401,11 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("community_chat_joined", JsonCommunityChatJoined(content, client_));
       break;
     }
-    case td_api::messageTonWalletTransfer::ID:
+    case td_api::messageTonWalletTransfer::ID: {
+      auto content = static_cast<const td_api::messageTonWalletTransfer *>(message_->content.get());
+      object("ton_wallet_transfer", JsonTonWalletTransfer(content, client_));
       break;
+    }
     case td_api::messageTonConnectRequest::ID:
       break;
     default:
@@ -18992,7 +19015,6 @@ bool Client::need_skip_update_message(int64 chat_id, const MessageInfo *message_
     case td_api::messageUpgradedGiftPurchaseOfferRejected::ID:
     case td_api::messageChatHasProtectedContentToggled::ID:
     case td_api::messageChatHasProtectedContentDisableRequested::ID:
-    case td_api::messageTonWalletTransfer::ID:
     case td_api::messageTonConnectRequest::ID:
       return true;
     default:
