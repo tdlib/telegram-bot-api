@@ -313,6 +313,7 @@ class Client final : public WebhookActor::Callback {
   class TdOnGetSupergroupMemberCountCallback;
   class TdOnGetUserChatBoostsCallback;
   class TdOnGetGiftsCallback;
+  class TdOnGetUniqueGiftCallback;
   class TdOnCreateInvoiceLinkCallback;
   class TdOnGetBotTokenCallback;
   class TdOnGetBotAccessSettingsCallback;
@@ -923,6 +924,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_refund_star_payment_query(PromisedQueryPtr &query);
   td::Status process_edit_user_star_subscription_query(PromisedQueryPtr &query);
   td::Status process_get_available_gifts_query(PromisedQueryPtr &query);
+  td::Status process_get_unique_gift_query(PromisedQueryPtr &query);
   td::Status process_send_gift_query(PromisedQueryPtr &query);
   td::Status process_gift_premium_subscription_query(PromisedQueryPtr &query);
   td::Status process_get_managed_bot_token_query(PromisedQueryPtr &query);
@@ -1072,6 +1074,8 @@ class Client final : public WebhookActor::Callback {
   void return_stickers(object_ptr<td_api::stickers> stickers, PromisedQueryPtr query);
 
   void return_gifts(td::vector<object_ptr<td_api::gift>> gifts, PromisedQueryPtr query);
+
+  void return_unique_gift(object_ptr<td_api::upgradedGift> gift, PromisedQueryPtr query);
 
   void return_received_gifts(object_ptr<td_api::receivedGifts> gifts, bool can_be_managed, PromisedQueryPtr query);
 

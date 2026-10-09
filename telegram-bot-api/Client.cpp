@@ -290,6 +290,7 @@ bool Client::init_methods() {
   methods_.emplace("refundstarpayment", &Client::process_refund_star_payment_query);
   methods_.emplace("edituserstarsubscription", &Client::process_edit_user_star_subscription_query);
   methods_.emplace("getavailablegifts", &Client::process_get_available_gifts_query);
+  methods_.emplace("getuniquegift", &Client::process_get_unique_gift_query);
   methods_.emplace("sendgift", &Client::process_send_gift_query);
   methods_.emplace("giftpremiumsubscription", &Client::process_gift_premium_subscription_query);
   methods_.emplace("getmanagedbottoken", &Client::process_get_managed_bot_token_query);
@@ -8407,6 +8408,32 @@ class Client::TdOnGetGiftsCallback final : public TdQueryCallback {
   PromisedQueryPtr query_;
 };
 
+class Client::TdOnGetUniqueGiftCallback final : public TdQueryCallback {
+ public:
+  TdOnGetUniqueGiftCallback(Client *client, PromisedQueryPtr query) : client_(client), query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::upgradedGift::ID);
+    auto gift = move_object_as<td_api::upgradedGift>(result);
+    auto sticker_set_ids = get_upgraded_gift_sticker_set_ids(gift);
+    client_->get_sticker_set_names(
+        std::move(sticker_set_ids),
+        td::PromiseCreator::lambda([actor_id = client_->actor_id(client_), gift = std::move(gift),
+                                    query = std::move(query_)](td::Unit) mutable {
+          send_closure(actor_id, &Client::return_unique_gift, std::move(gift), std::move(query));
+        }));
+  }
+
+ private:
+  Client *client_;
+  PromisedQueryPtr query_;
+};
+
 class Client::TdOnReturnFileCallback final : public TdQueryCallback {
  public:
   TdOnReturnFileCallback(const Client *client, PromisedQueryPtr query) : client_(client), query_(std::move(query)) {
@@ -15262,6 +15289,12 @@ td::Status Client::process_get_available_gifts_query(PromisedQueryPtr &query) {
   return td::Status::OK();
 }
 
+td::Status Client::process_get_unique_gift_query(PromisedQueryPtr &query) {
+  send_request(make_object<td_api::getUpgradedGift>(query->arg("name").str()),
+               td::make_unique<TdOnGetUniqueGiftCallback>(this, std::move(query)));
+  return td::Status::OK();
+}
+
 td::Status Client::process_send_gift_query(PromisedQueryPtr &query) {
   auto gift_id = td::to_integer<int64>(query->arg("gift_id"));
   auto pay_for_upgrade = to_bool(query->arg("pay_for_upgrade"));
@@ -17119,6 +17152,10 @@ void Client::return_stickers(object_ptr<td_api::stickers> stickers, PromisedQuer
 
 void Client::return_gifts(td::vector<object_ptr<td_api::gift>> gifts, PromisedQueryPtr query) {
   answer_query(JsonGifts(gifts, this), std::move(query));
+}
+
+void Client::return_unique_gift(object_ptr<td_api::upgradedGift> gift, PromisedQueryPtr query) {
+  answer_query(JsonUniqueGift(gift.get(), this), std::move(query));
 }
 
 void Client::return_received_gifts(object_ptr<td_api::receivedGifts> gifts, bool can_be_managed,
