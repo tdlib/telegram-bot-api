@@ -97,11 +97,10 @@ void ClientManager::send(PromisedQueryPtr query) {
 
     td::string ip_address = query->get_peer_ip_address();
     if (!ip_address.empty()) {
-      td::IPAddress tmp;
-      tmp.init_host_port(ip_address, 0).ignore();
-      tmp.clear_ipv6_interface();
-      if (tmp.is_valid()) {
-        ip_address = tmp.get_ip_str().str();
+      auto r_ip_address = td::IPAddress::get_ip_address(ip_address);
+      if (r_ip_address.is_ok()) {
+        r_ip_address.ok_ref().clear_ipv6_interface();
+        ip_address = r_ip_address.ok_ref().get_ip_str().str();
       }
     }
     LOG(DEBUG) << "Receive incoming query for new bot " << token << " from " << ip_address;
