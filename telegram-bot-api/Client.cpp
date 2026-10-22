@@ -335,6 +335,7 @@ bool Client::init_methods() {
   methods_.emplace("getusergifts", &Client::process_get_user_gifts_query);
   methods_.emplace("getchatgifts", &Client::process_get_chat_gifts_query);
   methods_.emplace("convertgifttostars", &Client::process_convert_gift_to_stars_query);
+  methods_.emplace("deletebusinessaccountgift", &Client::process_delete_business_account_gift_query);
   methods_.emplace("upgradegift", &Client::process_upgrade_gift_query);
   methods_.emplace("transfergift", &Client::process_transfer_gift_query);
   methods_.emplace("setuseremojistatus", &Client::process_set_user_emoji_status_query);
@@ -16212,6 +16213,18 @@ td::Status Client::process_convert_gift_to_stars_query(PromisedQueryPtr &query) 
       business_connection_id, std::move(query),
       [this, owned_gift_id](const BusinessConnection *business_connection, PromisedQueryPtr query) {
         send_request(make_object<td_api::sellGift>(business_connection->id_, owned_gift_id.str()),
+                     td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+      });
+  return td::Status::OK();
+}
+
+td::Status Client::process_delete_business_account_gift_query(PromisedQueryPtr &query) {
+  auto business_connection_id = query->arg("business_connection_id").str();
+  auto owned_gift_id = query->arg("owned_gift_id");
+  check_business_connection(
+      business_connection_id, std::move(query),
+      [this, owned_gift_id](const BusinessConnection *business_connection, PromisedQueryPtr query) {
+        send_request(make_object<td_api::deleteGift>(business_connection->id_, owned_gift_id.str()),
                      td::make_unique<TdOnOkQueryCallback>(std::move(query)));
       });
   return td::Status::OK();
