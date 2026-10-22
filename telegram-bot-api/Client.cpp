@@ -4715,6 +4715,11 @@ class Client::JsonTextQuote final : public td::Jsonable {
     if (!quote_->text_->entities_.empty()) {
       object("entities", JsonVectorEntities(quote_->text_->entities_, client_));
     }
+    if (!quote_->rich_texts_.empty()) {
+      object("rich_texts", td::json_array(quote_->rich_texts_, [client = client_](const auto &rich_text) {
+               return JsonRichText(rich_text.get(), client);
+             }));
+    }
     object("position", quote_->position_);
     if (quote_->is_manual_) {
       object("is_manual", td::JsonTrue());
