@@ -5409,6 +5409,8 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     }
     case td_api::messageTonConnectRequest::ID:
       break;
+    case td_api::messageUnpaidMessagesAllowedByLink::ID:
+      break;
     default:
       UNREACHABLE();
   }
@@ -10238,7 +10240,7 @@ td::Result<Client::InputReplyParameters> Client::get_reply_parameters(td::JsonVa
   result.reply_to_message_id = as_tdlib_message_id(td::max(message_id, 0));
   result.reply_to_ephemeral_message_id = td::max(ephemeral_message_id, 0);
   result.allow_sending_without_reply = allow_sending_without_reply;
-  result.quote = make_object<td_api::inputTextQuote>(std::move(quote), quote_position);
+  result.quote = make_object<td_api::inputTextQuote>(std::move(quote), td::Auto(), quote_position);
   result.checklist_task_id = checklist_task_id;
   result.poll_option_id = std::move(poll_option_id);
   return std::move(result);
@@ -13375,8 +13377,8 @@ td::Result<td_api::object_ptr<td_api::inputStoryArea>> Client::get_input_story_a
   TRY_RESULT(input_type, get_input_story_area_type(std::move(type)));
 
   return make_object<td_api::inputStoryArea>(
-      make_object<td_api::storyAreaPosition>(x_percentage, y_percentage, width_percentage, height_percentage,
-                                             rotation_angle, corner_radius_percentage),
+      make_object<td_api::areaPosition>(x_percentage, y_percentage, width_percentage, height_percentage, rotation_angle,
+                                        corner_radius_percentage),
       std::move(input_type));
 }
 
@@ -19055,6 +19057,7 @@ bool Client::need_skip_update_message(int64 chat_id, const MessageInfo *message_
     case td_api::messageChatHasProtectedContentToggled::ID:
     case td_api::messageChatHasProtectedContentDisableRequested::ID:
     case td_api::messageTonConnectRequest::ID:
+    case td_api::messageUnpaidMessagesAllowedByLink::ID:
       return true;
     default:
       break;
