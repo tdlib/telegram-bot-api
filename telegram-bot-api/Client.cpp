@@ -10460,6 +10460,20 @@ td::Result<Client::InputReplyParameters> Client::get_reply_parameters(td::JsonVa
   TRY_RESULT(parse_mode, object.get_optional_string_field("quote_parse_mode"));
   TRY_RESULT(quote,
              get_formatted_text(std::move(input_quote), std::move(parse_mode), object.extract_field("quote_entities")));
+  td::vector<object_ptr<td_api::RichText>> quote_rich_texts;
+  auto input_quote_rich_texts = object.extract_field("quote_rich_texts");
+  if (input_quote_rich_texts.type() != td::JsonValue::Type::Null) {
+    if (input_quote_rich_texts.type() != td::JsonValue::Type::Array) {
+      return td::Status::Error(400, "Field \"quote_rich_texts\" must be an Array");
+    }
+    for (auto &input_rich_text : input_quote_rich_texts.get_array()) {
+      if (input_rich_text.type() == td::JsonValue::Type::Null) {
+        return td::Status::Error(400, "Field \"quote_rich_texts\" must not contain null");
+      }
+      TRY_RESULT(rich_text, get_rich_text(std::move(input_rich_text)));
+      quote_rich_texts.push_back(std::move(rich_text));
+    }
+  }
   TRY_RESULT(quote_position, object.get_optional_int_field("quote_position"));
   TRY_RESULT(checklist_task_id, object.get_optional_int_field("checklist_task_id"));
   TRY_RESULT(poll_option_id, object.get_optional_string_field("poll_option_id"));
@@ -10470,7 +10484,7 @@ td::Result<Client::InputReplyParameters> Client::get_reply_parameters(td::JsonVa
   result.reply_to_message_id = as_tdlib_message_id(td::max(message_id, 0));
   result.reply_to_ephemeral_message_id = td::max(ephemeral_message_id, 0);
   result.allow_sending_without_reply = allow_sending_without_reply;
-  result.quote = make_object<td_api::inputTextQuote>(std::move(quote), td::Auto(), quote_position);
+  result.quote = make_object<td_api::inputTextQuote>(std::move(quote), std::move(quote_rich_texts), quote_position);
   result.checklist_task_id = checklist_task_id;
   result.poll_option_id = std::move(poll_option_id);
   return std::move(result);
