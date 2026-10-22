@@ -1461,6 +1461,86 @@ class Client::JsonUserRating final : public td::Jsonable {
   const td_api::userRating *user_rating_;
 };
 
+class Client::JsonAreaPosition final : public td::Jsonable {
+ public:
+  explicit JsonAreaPosition(const td_api::areaPosition *position) : position_(position) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("x_percentage", position_->x_percentage_);
+    object("y_percentage", position_->y_percentage_);
+    object("width_percentage", position_->width_percentage_);
+    object("height_percentage", position_->height_percentage_);
+    object("rotation_angle", position_->rotation_angle_);
+    object("corner_radius_percentage", position_->corner_radius_percentage_);
+  }
+
+ private:
+  const td_api::areaPosition *position_;
+};
+
+class Client::JsonTonNftAttribute final : public td::Jsonable {
+ public:
+  explicit JsonTonNftAttribute(const td_api::tonNftAttribute *attribute) : attribute_(attribute) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("trait_type", attribute_->trait_type_);
+    object("value", attribute_->value_);
+  }
+
+ private:
+  const td_api::tonNftAttribute *attribute_;
+};
+
+class Client::JsonTonNft final : public td::Jsonable {
+ public:
+  JsonTonNft(const td_api::tonNft *nft, const Client *client) : nft_(nft), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const;
+
+ private:
+  const td_api::tonNft *nft_;
+  const Client *client_;
+};
+
+class Client::JsonTonWalletCardSticker final : public td::Jsonable {
+ public:
+  JsonTonWalletCardSticker(const td_api::tonWalletCardSticker *sticker, const Client *client)
+      : sticker_(sticker), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("position", JsonAreaPosition(sticker_->position_.get()));
+    object("nft", JsonTonNft(sticker_->nft_.get(), client_));
+  }
+
+ private:
+  const td_api::tonWalletCardSticker *sticker_;
+  const Client *client_;
+};
+
+class Client::JsonTonWalletCard final : public td::Jsonable {
+ public:
+  JsonTonWalletCard(const td_api::tonWalletCard *card, const Client *client) : card_(card), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("address", card_->address_);
+    object("amount", card_->gram_amount_);
+    object("stickers", td::json_array(card_->stickers_, [client = client_](const auto &sticker) {
+             return JsonTonWalletCardSticker(sticker.get(), client);
+           }));
+    if (!card_->background_nft_address_.empty()) {
+      object("background_nft_address", card_->background_nft_address_);
+    }
+  }
+
+ private:
+  const td_api::tonWalletCard *card_;
+  const Client *client_;
+};
+
 class Client::JsonUniqueGiftColors final : public td::Jsonable {
  public:
   explicit JsonUniqueGiftColors(const td_api::upgradedGiftColors *gift_colors) : gift_colors_(gift_colors) {
@@ -1633,6 +1713,9 @@ class Client::JsonChat final : public td::Jsonable {
           }
           if (user_info->first_profile_audio != nullptr) {
             object("first_profile_audio", JsonAudio(user_info->first_profile_audio.get(), client_));
+          }
+          if (user_info->ton_wallet_card != nullptr) {
+            object("ton_wallet_card", JsonTonWalletCard(user_info->ton_wallet_card.get(), client_));
           }
           if (user_info->paid_message_star_count > 0) {
             object("paid_message_star_count", user_info->paid_message_star_count);
@@ -2321,6 +2404,25 @@ class Client::JsonPhotoSize final : public td::Jsonable {
   const td_api::photoSize *photo_size_;
   const Client *client_;
 };
+
+void Client::JsonTonNft::store(td::JsonValueScope *scope) const {
+  auto object = scope->enter_object();
+  object("address", nft_->address_);
+  if (!nft_->collection_address_.empty()) {
+    object("collection_address", nft_->collection_address_);
+  }
+  object("index", nft_->index_);
+  object("name", nft_->name_);
+  object("description", nft_->description_);
+  if (!nft_->attributes_.empty()) {
+    object("attributes", td::json_array(nft_->attributes_, [](const auto &attribute) {
+             return JsonTonNftAttribute(attribute.get());
+           }));
+  }
+  if (nft_->gift_ != nullptr) {
+    object("gift", JsonUniqueGift(nft_->gift_.get(), client_));
+  }
+}
 
 class Client::JsonThumbnail final : public td::Jsonable {
  public:
@@ -9782,6 +9884,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       user_info->accepted_gift_types = std::move(full_info->gift_settings_->accepted_gift_types_);
       user_info->rating = std::move(full_info->rating_);
       user_info->first_profile_audio = std::move(full_info->first_profile_audio_);
+      user_info->ton_wallet_card = std::move(full_info->ton_wallet_card_);
       user_info->personal_chat_id = full_info->personal_chat_id_;
       user_info->has_private_forwards = full_info->has_private_forwards_;
       user_info->has_restricted_voice_and_video_messages = full_info->has_restricted_voice_and_video_note_messages_;
