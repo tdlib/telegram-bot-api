@@ -291,6 +291,7 @@ bool Client::init_methods() {
   methods_.emplace("edituserstarsubscription", &Client::process_edit_user_star_subscription_query);
   methods_.emplace("getavailablegifts", &Client::process_get_available_gifts_query);
   methods_.emplace("getuniquegift", &Client::process_get_unique_gift_query);
+  methods_.emplace("getchatsharethemebackdrops", &Client::process_get_chat_share_theme_backdrops_query);
   methods_.emplace("sendgift", &Client::process_send_gift_query);
   methods_.emplace("giftpremiumsubscription", &Client::process_gift_premium_subscription_query);
   methods_.emplace("getmanagedbottoken", &Client::process_get_managed_bot_token_query);
@@ -2116,6 +2117,36 @@ class Client::JsonUniqueGiftBackdrop final : public td::Jsonable {
 
  private:
   const td_api::upgradedGiftBackdrop *backdrop_;
+};
+
+class Client::JsonChatShareThemeBackdrop final : public td::Jsonable {
+ public:
+  explicit JsonChatShareThemeBackdrop(const td_api::profileShareThemeBackdrop *backdrop) : backdrop_(backdrop) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("id", backdrop_->id_);
+    object("name", backdrop_->name_);
+    object("colors", JsonUniqueGiftBackdropColors(backdrop_->colors_.get()));
+  }
+
+ private:
+  const td_api::profileShareThemeBackdrop *backdrop_;
+};
+
+class Client::JsonChatShareThemeBackdrops final : public td::Jsonable {
+ public:
+  explicit JsonChatShareThemeBackdrops(const td_api::profileShareThemeBackdrops *backdrops) : backdrops_(backdrops) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("backdrops", td::json_array(backdrops_->backdrops_, [](auto &backdrop) {
+             return JsonChatShareThemeBackdrop(backdrop.get());
+           }));
+  }
+
+ private:
+  const td_api::profileShareThemeBackdrops *backdrops_;
 };
 
 class Client::JsonUniqueGift final : public td::Jsonable {
@@ -8246,6 +8277,25 @@ class Client::TdOnGetBotAccessSettingsCallback final : public TdQueryCallback {
 
  private:
   const Client *client_;
+  PromisedQueryPtr query_;
+};
+
+class Client::TdOnGetChatShareThemeBackdropsCallback final : public TdQueryCallback {
+ public:
+  explicit TdOnGetChatShareThemeBackdropsCallback(PromisedQueryPtr query) : query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::profileShareThemeBackdrops::ID);
+    auto backdrops = move_object_as<td_api::profileShareThemeBackdrops>(result);
+    answer_query(JsonChatShareThemeBackdrops(backdrops.get()), std::move(query_));
+  }
+
+ private:
   PromisedQueryPtr query_;
 };
 
@@ -15469,6 +15519,12 @@ td::Status Client::process_get_available_gifts_query(PromisedQueryPtr &query) {
 td::Status Client::process_get_unique_gift_query(PromisedQueryPtr &query) {
   send_request(make_object<td_api::getUpgradedGift>(query->arg("name").str()),
                td::make_unique<TdOnGetUniqueGiftCallback>(this, std::move(query)));
+  return td::Status::OK();
+}
+
+td::Status Client::process_get_chat_share_theme_backdrops_query(PromisedQueryPtr &query) {
+  send_request(make_object<td_api::getProfileShareThemeBackdrops>(),
+               td::make_unique<TdOnGetChatShareThemeBackdropsCallback>(std::move(query)));
   return td::Status::OK();
 }
 

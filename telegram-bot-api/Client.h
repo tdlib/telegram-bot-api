@@ -220,6 +220,8 @@ class Client final : public WebhookActor::Callback {
   class JsonUniqueGiftSymbol;
   class JsonUniqueGiftBackdropColors;
   class JsonUniqueGiftBackdrop;
+  class JsonChatShareThemeBackdrop;
+  class JsonChatShareThemeBackdrops;
   class JsonUniqueGift;
   class JsonUniqueGiftColors;
   class JsonMessageReactionUpdated;
@@ -321,6 +323,7 @@ class Client final : public WebhookActor::Callback {
   class TdOnGetUserChatBoostsCallback;
   class TdOnGetGiftsCallback;
   class TdOnGetUniqueGiftCallback;
+  class TdOnGetChatShareThemeBackdropsCallback;
   class TdOnCreateInvoiceLinkCallback;
   class TdOnGetBotTokenCallback;
   class TdOnGetBotAccessSettingsCallback;
@@ -932,6 +935,7 @@ class Client final : public WebhookActor::Callback {
   td::Status process_edit_user_star_subscription_query(PromisedQueryPtr &query);
   td::Status process_get_available_gifts_query(PromisedQueryPtr &query);
   td::Status process_get_unique_gift_query(PromisedQueryPtr &query);
+  td::Status process_get_chat_share_theme_backdrops_query(PromisedQueryPtr &query);
   td::Status process_send_gift_query(PromisedQueryPtr &query);
   td::Status process_gift_premium_subscription_query(PromisedQueryPtr &query);
   td::Status process_get_managed_bot_token_query(PromisedQueryPtr &query);
