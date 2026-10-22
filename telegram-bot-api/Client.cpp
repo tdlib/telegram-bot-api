@@ -5618,6 +5618,7 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     case td_api::messageTonConnectRequest::ID:
       break;
     case td_api::messageUnpaidMessagesAllowedByLink::ID:
+      object("paid_messages_waived", JsonEmptyObject());
       break;
     default:
       UNREACHABLE();
@@ -19307,7 +19308,6 @@ bool Client::need_skip_update_message(int64 chat_id, const MessageInfo *message_
     case td_api::messageChatHasProtectedContentToggled::ID:
     case td_api::messageChatHasProtectedContentDisableRequested::ID:
     case td_api::messageTonConnectRequest::ID:
-    case td_api::messageUnpaidMessagesAllowedByLink::ID:
       return true;
     default:
       break;
