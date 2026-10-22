@@ -113,6 +113,8 @@ class Client final : public WebhookActor::Callback {
   class JsonTonNft;
   class JsonTonWalletCardSticker;
   class JsonTonWalletCard;
+  class JsonEmojiType;
+  class JsonProfileShareTheme;
   class JsonMessageSender;
   class JsonMessageOrigin;
   class JsonExternalReplyInfo;
@@ -1150,6 +1152,7 @@ class Client final : public WebhookActor::Callback {
     object_ptr<td_api::userRating> rating;
     object_ptr<td_api::audio> first_profile_audio;
     object_ptr<td_api::tonWalletCard> ton_wallet_card;
+    object_ptr<td_api::ProfileShareTheme> share_theme;
     int64 personal_chat_id = 0;
     int64 paid_message_star_count = 0;
     int64 community_id = 0;
@@ -1205,6 +1208,7 @@ class Client final : public WebhookActor::Callback {
     int64 guard_bot_user_id = 0;
     int64 community_id = 0;
     object_ptr<td_api::chatLocation> location;
+    object_ptr<td_api::ProfileShareTheme> share_theme;
     object_ptr<td_api::ChatMemberStatus> status;
     bool is_supergroup = false;
     bool is_forum = false;

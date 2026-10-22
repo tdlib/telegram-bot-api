@@ -1541,6 +1541,44 @@ class Client::JsonTonWalletCard final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonEmojiType final : public td::Jsonable {
+ public:
+  explicit JsonEmojiType(const td_api::EmojiType *emoji_type) : emoji_type_(emoji_type) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    CHECK(emoji_type_ != nullptr);
+    switch (emoji_type_->get_id()) {
+      case td_api::emojiTypeRegular::ID:
+        object("type", "emoji");
+        object("emoji", static_cast<const td_api::emojiTypeRegular *>(emoji_type_)->emoji_);
+        break;
+      case td_api::emojiTypeCustomEmoji::ID:
+        object("type", "custom_emoji");
+        object("custom_emoji_id",
+               td::to_string(static_cast<const td_api::emojiTypeCustomEmoji *>(emoji_type_)->custom_emoji_id_));
+        break;
+      default:
+        UNREACHABLE();
+    }
+  }
+
+ private:
+  const td_api::EmojiType *emoji_type_;
+};
+
+class Client::JsonProfileShareTheme final : public td::Jsonable {
+ public:
+  JsonProfileShareTheme(const td_api::ProfileShareTheme *share_theme, const Client *client)
+      : share_theme_(share_theme), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const;
+
+ private:
+  const td_api::ProfileShareTheme *share_theme_;
+  const Client *client_;
+};
+
 class Client::JsonUniqueGiftColors final : public td::Jsonable {
  public:
   explicit JsonUniqueGiftColors(const td_api::upgradedGiftColors *gift_colors) : gift_colors_(gift_colors) {
@@ -1717,6 +1755,9 @@ class Client::JsonChat final : public td::Jsonable {
           if (user_info->ton_wallet_card != nullptr) {
             object("ton_wallet_card", JsonTonWalletCard(user_info->ton_wallet_card.get(), client_));
           }
+          if (user_info->share_theme != nullptr) {
+            object("share_theme", JsonProfileShareTheme(user_info->share_theme.get(), client_));
+          }
           if (user_info->paid_message_star_count > 0) {
             object("paid_message_star_count", user_info->paid_message_star_count);
           }
@@ -1840,6 +1881,9 @@ class Client::JsonChat final : public td::Jsonable {
           }
           if (supergroup_info->location != nullptr) {
             object("location", JsonChatLocation(supergroup_info->location.get()));
+          }
+          if (supergroup_info->share_theme != nullptr) {
+            object("share_theme", JsonProfileShareTheme(supergroup_info->share_theme.get(), client_));
           }
           if (supergroup_info->has_paid_media_allowed && !supergroup_info->is_supergroup) {
             object("can_send_paid_media", td::JsonTrue());
@@ -2108,6 +2152,32 @@ class Client::JsonUniqueGift final : public td::Jsonable {
   const td_api::upgradedGift *gift_;
   const Client *client_;
 };
+
+void Client::JsonProfileShareTheme::store(td::JsonValueScope *scope) const {
+  auto object = scope->enter_object();
+  CHECK(share_theme_ != nullptr);
+  switch (share_theme_->get_id()) {
+    case td_api::profileShareThemeEmoji::ID: {
+      auto theme = static_cast<const td_api::profileShareThemeEmoji *>(share_theme_);
+      object("type", "emoji");
+      object("emojis", td::json_array(theme->emojis_, [](const auto &emoji_type) {
+               return JsonEmojiType(emoji_type.get());
+             }));
+      if (!theme->use_default_background_) {
+        object("background_backdrop_id", theme->background_backdrop_id_);
+      }
+      break;
+    }
+    case td_api::profileShareThemeUpgradedGift::ID: {
+      auto theme = static_cast<const td_api::profileShareThemeUpgradedGift *>(share_theme_);
+      object("type", "unique_gift");
+      object("gift", JsonUniqueGift(theme->gift_.get(), client_));
+      break;
+    }
+    default:
+      UNREACHABLE();
+  }
+}
 
 class Client::JsonStarAmount final : public td::Jsonable {
  public:
@@ -9885,6 +9955,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       user_info->rating = std::move(full_info->rating_);
       user_info->first_profile_audio = std::move(full_info->first_profile_audio_);
       user_info->ton_wallet_card = std::move(full_info->ton_wallet_card_);
+      user_info->share_theme = std::move(full_info->share_theme_);
       user_info->personal_chat_id = full_info->personal_chat_id_;
       user_info->has_private_forwards = full_info->has_private_forwards_;
       user_info->has_restricted_voice_and_video_messages = full_info->has_restricted_voice_and_video_note_messages_;
@@ -9941,6 +10012,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       supergroup_info->guard_bot_user_id = full_info->guard_bot_user_id_;
       supergroup_info->community_id = full_info->community_id_;
       supergroup_info->location = std::move(full_info->location_);
+      supergroup_info->share_theme = std::move(full_info->share_theme_);
       supergroup_info->has_hidden_members = full_info->has_hidden_members_;
       supergroup_info->has_aggressive_anti_spam_enabled = full_info->has_aggressive_anti_spam_enabled_;
       supergroup_info->has_paid_media_allowed = full_info->has_paid_media_allowed_;
