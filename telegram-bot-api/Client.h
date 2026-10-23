@@ -1362,6 +1362,11 @@ class Client final : public WebhookActor::Callback {
 
   static td::vector<int64> get_sent_gift_sticker_set_ids(const object_ptr<td_api::SentGift> &gift);
 
+  static td::vector<int64> get_ton_wallet_card_sticker_set_ids(const object_ptr<td_api::tonWalletCard> &card);
+
+  static td::vector<int64> get_profile_share_theme_sticker_set_ids(
+      const object_ptr<td_api::ProfileShareTheme> &share_theme);
+
   static td::vector<int64> get_message_content_sticker_set_ids(const object_ptr<td_api::MessageContent> &content);
 
   static td::vector<int64> get_poll_media_sticker_set_ids(const object_ptr<td_api::PollMedia> &media);

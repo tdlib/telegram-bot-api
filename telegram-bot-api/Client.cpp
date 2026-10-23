@@ -2141,9 +2141,8 @@ class Client::JsonChatShareThemeBackdrops final : public td::Jsonable {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
-    object("backdrops", td::json_array(backdrops_->backdrops_, [](auto &backdrop) {
-             return JsonChatShareThemeBackdrop(backdrop.get());
-           }));
+    object("backdrops", td::json_array(backdrops_->backdrops_,
+                                       [](auto &backdrop) { return JsonChatShareThemeBackdrop(backdrop.get()); }));
   }
 
  private:
@@ -2192,9 +2191,8 @@ void Client::JsonProfileShareTheme::store(td::JsonValueScope *scope) const {
     case td_api::profileShareThemeEmoji::ID: {
       auto theme = static_cast<const td_api::profileShareThemeEmoji *>(share_theme_);
       object("type", "emoji");
-      object("emojis", td::json_array(theme->emojis_, [](const auto &emoji_type) {
-               return JsonEmojiType(emoji_type.get());
-             }));
+      object("emojis",
+             td::json_array(theme->emojis_, [](const auto &emoji_type) { return JsonEmojiType(emoji_type.get()); }));
       if (!theme->use_default_background_) {
         object("background_backdrop_id", theme->background_backdrop_id_);
       }
@@ -2517,9 +2515,8 @@ void Client::JsonTonNft::store(td::JsonValueScope *scope) const {
   object("name", nft_->name_);
   object("description", nft_->description_);
   if (!nft_->attributes_.empty()) {
-    object("attributes", td::json_array(nft_->attributes_, [](const auto &attribute) {
-             return JsonTonNftAttribute(attribute.get());
-           }));
+    object("attributes", td::json_array(nft_->attributes_,
+                                        [](const auto &attribute) { return JsonTonNftAttribute(attribute.get()); }));
   }
   if (nft_->gift_ != nullptr) {
     object("gift", JsonUniqueGift(nft_->gift_.get(), client_));
@@ -7936,6 +7933,7 @@ class Client::TdOnGetChatPinnedMessageCallback final : public TdQueryCallback {
       CHECK(supergroup_info != nullptr);
       sticker_set_ids.push_back(supergroup_info->sticker_set_id);
       sticker_set_ids.push_back(supergroup_info->custom_emoji_sticker_set_id);
+      td::append(sticker_set_ids, get_profile_share_theme_sticker_set_ids(supergroup_info->share_theme));
     } else if (chat_info->type == ChatInfo::Type::Private) {
       auto user_info = client_->get_user_info(chat_info->user_id);
       CHECK(user_info != nullptr);
@@ -7943,6 +7941,8 @@ class Client::TdOnGetChatPinnedMessageCallback final : public TdQueryCallback {
           user_info->business_info->start_page_->sticker_ != nullptr) {
         sticker_set_ids.push_back(user_info->business_info->start_page_->sticker_->set_id_);
       }
+      td::append(sticker_set_ids, get_ton_wallet_card_sticker_set_ids(user_info->ton_wallet_card));
+      td::append(sticker_set_ids, get_profile_share_theme_sticker_set_ids(user_info->share_theme));
     }
     client_->get_sticker_set_names(
         std::move(sticker_set_ids),
@@ -17790,17 +17790,17 @@ void Client::do_reply_to_callback_query_with_ephemeral_message(
                                  "Business messages can't be sent as ephemeral replies to callback queries");
   }
 
-  resolve_reply_markup_bot_usernames(
-      std::move(reply_markup), std::move(query),
-      [this, callback_query_id = parameters.callback_query_id,
-       replace_callback_query_message = parameters.replace_callback_query_message, protect_content,
-       input_message_content = std::move(input_message_content)](object_ptr<td_api::ReplyMarkup> reply_markup,
-                                                                 PromisedQueryPtr query) mutable {
-        send_request(make_object<td_api::replyToCallbackQueryWithEphemeralMessage>(
-                         callback_query_id, replace_callback_query_message, protect_content,
-                         std::move(reply_markup), std::move(input_message_content)),
-                     td::make_unique<TdOnOkQueryCallback>(std::move(query)));
-      });
+  resolve_reply_markup_bot_usernames(std::move(reply_markup), std::move(query),
+                                     [this, callback_query_id = parameters.callback_query_id,
+                                      replace_callback_query_message = parameters.replace_callback_query_message,
+                                      protect_content, input_message_content = std::move(input_message_content)](
+                                         object_ptr<td_api::ReplyMarkup> reply_markup, PromisedQueryPtr query) mutable {
+                                       send_request(
+                                           make_object<td_api::replyToCallbackQueryWithEphemeralMessage>(
+                                               callback_query_id, replace_callback_query_message, protect_content,
+                                               std::move(reply_markup), std::move(input_message_content)),
+                                           td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+                                     });
 }
 
 td::int64 Client::get_send_message_query_id(PromisedQueryPtr query, bool is_multisend) {
@@ -19646,6 +19646,29 @@ td::vector<td::int64> Client::get_sent_gift_sticker_set_ids(const object_ptr<td_
       UNREACHABLE();
       return {};
   }
+}
+
+td::vector<td::int64> Client::get_ton_wallet_card_sticker_set_ids(const object_ptr<td_api::tonWalletCard> &card) {
+  td::vector<int64> sticker_set_ids;
+  if (card == nullptr) {
+    return sticker_set_ids;
+  }
+  for (const auto &sticker : card->stickers_) {
+    const auto &nft = sticker->nft_;
+    if (nft->gift_ != nullptr) {
+      td::append(sticker_set_ids, get_upgraded_gift_sticker_set_ids(nft->gift_));
+    }
+  }
+  return sticker_set_ids;
+}
+
+td::vector<td::int64> Client::get_profile_share_theme_sticker_set_ids(
+    const object_ptr<td_api::ProfileShareTheme> &share_theme) {
+  if (share_theme == nullptr || share_theme->get_id() != td_api::profileShareThemeUpgradedGift::ID) {
+    return {};
+  }
+  return get_upgraded_gift_sticker_set_ids(
+      static_cast<const td_api::profileShareThemeUpgradedGift *>(share_theme.get())->gift_);
 }
 
 td::vector<td::int64> Client::get_message_content_sticker_set_ids(const object_ptr<td_api::MessageContent> &content) {
