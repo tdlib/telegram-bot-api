@@ -1569,9 +1569,9 @@ class Client::JsonEmojiType final : public td::Jsonable {
   const td_api::EmojiType *emoji_type_;
 };
 
-class Client::JsonProfileShareTheme final : public td::Jsonable {
+class Client::JsonChatShareTheme final : public td::Jsonable {
  public:
-  JsonProfileShareTheme(const td_api::ProfileShareTheme *share_theme, const Client *client)
+  JsonChatShareTheme(const td_api::ProfileShareTheme *share_theme, const Client *client)
       : share_theme_(share_theme), client_(client) {
   }
   void store(td::JsonValueScope *scope) const;
@@ -1758,7 +1758,7 @@ class Client::JsonChat final : public td::Jsonable {
             object("ton_wallet_card", JsonTonWalletCard(user_info->ton_wallet_card.get(), client_));
           }
           if (user_info->share_theme != nullptr) {
-            object("share_theme", JsonProfileShareTheme(user_info->share_theme.get(), client_));
+            object("share_theme", JsonChatShareTheme(user_info->share_theme.get(), client_));
           }
           if (user_info->paid_message_star_count > 0) {
             object("paid_message_star_count", user_info->paid_message_star_count);
@@ -1885,7 +1885,7 @@ class Client::JsonChat final : public td::Jsonable {
             object("location", JsonChatLocation(supergroup_info->location.get()));
           }
           if (supergroup_info->share_theme != nullptr) {
-            object("share_theme", JsonProfileShareTheme(supergroup_info->share_theme.get(), client_));
+            object("share_theme", JsonChatShareTheme(supergroup_info->share_theme.get(), client_));
           }
           if (supergroup_info->has_paid_media_allowed && !supergroup_info->is_supergroup) {
             object("can_send_paid_media", td::JsonTrue());
@@ -2184,7 +2184,7 @@ class Client::JsonUniqueGift final : public td::Jsonable {
   const Client *client_;
 };
 
-void Client::JsonProfileShareTheme::store(td::JsonValueScope *scope) const {
+void Client::JsonChatShareTheme::store(td::JsonValueScope *scope) const {
   auto object = scope->enter_object();
   CHECK(share_theme_ != nullptr);
   switch (share_theme_->get_id()) {
@@ -4239,8 +4239,8 @@ class Client::JsonCommunityChatJoined final : public td::Jsonable {
 
 class Client::JsonTonWalletTransfer final : public td::Jsonable {
  public:
-  JsonTonWalletTransfer(const td_api::messageTonWalletTransfer *ton_wallet_transfer, const Client *client)
-      : ton_wallet_transfer_(ton_wallet_transfer), client_(client) {
+  explicit JsonTonWalletTransfer(const td_api::messageTonWalletTransfer *ton_wallet_transfer)
+      : ton_wallet_transfer_(ton_wallet_transfer) {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
@@ -4254,7 +4254,6 @@ class Client::JsonTonWalletTransfer final : public td::Jsonable {
 
  private:
   const td_api::messageTonWalletTransfer *ton_wallet_transfer_;
-  const Client *client_;
 };
 
 class Client::JsonGiveawayCreated final : public td::Jsonable {
@@ -5610,7 +5609,7 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     }
     case td_api::messageTonWalletTransfer::ID: {
       auto content = static_cast<const td_api::messageTonWalletTransfer *>(message_->content.get());
-      object("ton_wallet_transfer", JsonTonWalletTransfer(content, client_));
+      object("ton_wallet_transfer", JsonTonWalletTransfer(content));
       break;
     }
     case td_api::messageTonConnectRequest::ID:

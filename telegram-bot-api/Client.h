@@ -114,7 +114,7 @@ class Client final : public WebhookActor::Callback {
   class JsonTonWalletCardSticker;
   class JsonTonWalletCard;
   class JsonEmojiType;
-  class JsonProfileShareTheme;
+  class JsonChatShareTheme;
   class JsonMessageSender;
   class JsonMessageOrigin;
   class JsonExternalReplyInfo;
