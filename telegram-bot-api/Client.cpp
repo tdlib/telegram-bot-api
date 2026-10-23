@@ -12242,7 +12242,7 @@ td::Result<td_api::object_ptr<td_api::TextEntityType>> Client::get_text_entity_t
     return make_object<td_api::textEntityTypeDateTime>(unix_time, std::move(formatting_type));
   }
   if (type == "mention" || type == "hashtag" || type == "cashtag" || type == "bot_command" || type == "url" ||
-      type == "email" || type == "phone_number" || type == "bank_card_number") {
+      type == "email" || type == "phone_number" || type == "bank_card_number" || type == "ton_address") {
     return nullptr;
   }
 
