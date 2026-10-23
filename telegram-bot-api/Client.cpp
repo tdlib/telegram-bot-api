@@ -10527,10 +10527,13 @@ td::Result<Client::EphemeralMessageParameters> Client::get_ephemeral_message_par
     return EphemeralMessageParameters();
   }
   EphemeralMessageParameters result;
-  TRY_RESULT_ASSIGN(result.receiver_user_id, object.get_required_long_field("receiver_user_id"));
+  TRY_RESULT_ASSIGN(result.receiver_user_id, object.get_optional_long_field("receiver_user_id"));
   TRY_RESULT_ASSIGN(result.callback_query_id, object.get_optional_long_field("callback_query_id"));
   TRY_RESULT_ASSIGN(result.replace_callback_query_message,
                     object.get_optional_bool_field("replace_callback_query_message"));
+  if (result.receiver_user_id == 0 && result.callback_query_id == 0) {
+    return td::Status::Error(400, "Field \"receiver_user_id\" or \"callback_query_id\" must be specified");
+  }
   return std::move(result);
 }
 
@@ -17696,13 +17699,24 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
   if (r_ephemeral_message_parameters.is_error()) {
     return fail_query_with_error(std::move(query), 400, r_ephemeral_message_parameters.error().message());
   }
+  auto ephemeral_message_parameters = r_ephemeral_message_parameters.move_as_ok();
+  auto protect_content = to_bool(query->arg("protect_content"));
+  auto r_reply_markup = get_reply_markup(query.get(), bot_user_ids_);
+  if (r_reply_markup.is_error()) {
+    return fail_query_with_error(std::move(query), 400, r_reply_markup.error().message());
+  }
+  auto reply_markup = r_reply_markup.move_as_ok();
+  if (ephemeral_message_parameters.receiver_user_id == 0 && ephemeral_message_parameters.callback_query_id != 0) {
+    return do_reply_to_callback_query_with_ephemeral_message(ephemeral_message_parameters, protect_content,
+                                                             std::move(reply_markup), std::move(input_message_content),
+                                                             std::move(query));
+  }
   auto r_reply_parameters = get_reply_parameters(query.get());
   if (r_reply_parameters.is_error()) {
     return fail_query_with_error(std::move(query), 400, r_reply_parameters.error().message());
   }
   auto reply_parameters = r_reply_parameters.move_as_ok();
   auto disable_notification = to_bool(query->arg("disable_notification"));
-  auto protect_content = to_bool(query->arg("protect_content"));
   auto allow_paid_broadcast = to_bool(query->arg("allow_paid_broadcast"));
   auto effect_id = td::to_integer<int64>(query->arg("message_effect_id"));
   auto direct_messages_topic_id = td::to_integer<int64>(query->arg("direct_messages_topic_id"));
@@ -17710,19 +17724,13 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
   if (r_input_suggested_post_info.is_error()) {
     return fail_query_with_error(std::move(query), 400, r_input_suggested_post_info.error().message());
   }
-  auto r_reply_markup = get_reply_markup(query.get(), bot_user_ids_);
-  if (r_reply_markup.is_error()) {
-    return fail_query_with_error(std::move(query), 400, r_reply_markup.error().message());
-  }
-  auto reply_markup = r_reply_markup.move_as_ok();
 
   auto send_options = get_message_send_options(disable_notification, protect_content, allow_paid_broadcast, effect_id,
                                                r_input_suggested_post_info.move_as_ok());
   resolve_reply_markup_bot_usernames(
       std::move(reply_markup), std::move(query),
       [this, chat_id_str = chat_id.str(), forum_topic_id, direct_messages_topic_id,
-       business_connection_id = business_connection_id.str(),
-       ephemeral_message_parameters = r_ephemeral_message_parameters.move_as_ok(),
+       business_connection_id = business_connection_id.str(), ephemeral_message_parameters,
        reply_parameters = std::move(reply_parameters), disable_notification, protect_content, allow_paid_broadcast,
        effect_id, send_options = std::move(send_options), input_message_content = std::move(input_message_content)](
           object_ptr<td_api::ReplyMarkup> reply_markup, PromisedQueryPtr query) mutable {
@@ -17771,6 +17779,27 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
         };
         check_reply_parameters(chat_id_str, std::move(reply_parameters), forum_topic_id, direct_messages_topic_id,
                                std::move(query), std::move(on_success), allow_paid_broadcast);
+      });
+}
+
+void Client::do_reply_to_callback_query_with_ephemeral_message(
+    const EphemeralMessageParameters &parameters, bool protect_content, object_ptr<td_api::ReplyMarkup> reply_markup,
+    object_ptr<td_api::InputMessageContent> input_message_content, PromisedQueryPtr query) {
+  if (!query->arg("business_connection_id").empty()) {
+    return fail_query_with_error(std::move(query), 400,
+                                 "Business messages can't be sent as ephemeral replies to callback queries");
+  }
+
+  resolve_reply_markup_bot_usernames(
+      std::move(reply_markup), std::move(query),
+      [this, callback_query_id = parameters.callback_query_id,
+       replace_callback_query_message = parameters.replace_callback_query_message, protect_content,
+       input_message_content = std::move(input_message_content)](object_ptr<td_api::ReplyMarkup> reply_markup,
+                                                                 PromisedQueryPtr query) mutable {
+        send_request(make_object<td_api::replyToCallbackQueryWithEphemeralMessage>(
+                         callback_query_id, replace_callback_query_message, protect_content,
+                         std::move(reply_markup), std::move(input_message_content)),
+                     td::make_unique<TdOnOkQueryCallback>(std::move(query)));
       });
 }
 

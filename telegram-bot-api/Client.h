@@ -1078,6 +1078,12 @@ class Client final : public WebhookActor::Callback {
   td::Status do_edit_ephemeral_message(object_ptr<td_api::InputMessageContent> input_message_content,
                                        PromisedQueryPtr &query);
 
+  void do_reply_to_callback_query_with_ephemeral_message(const EphemeralMessageParameters &parameters,
+                                                         bool protect_content,
+                                                         object_ptr<td_api::ReplyMarkup> reply_markup,
+                                                         object_ptr<td_api::InputMessageContent> input_message_content,
+                                                         PromisedQueryPtr query);
+
   void do_get_file(object_ptr<td_api::file> file, PromisedQueryPtr query);
 
   bool is_file_being_downloaded(int32 file_id) const;
