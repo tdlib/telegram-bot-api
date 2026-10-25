@@ -1532,7 +1532,7 @@ class Client::JsonTonWalletCard final : public td::Jsonable {
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     object("address", card_->address_);
-    object("amount", card_->gram_amount_);
+    object("amount", td::to_string(card_->gram_amount_));
     object("stickers", td::json_array(card_->stickers_, [client = client_](const auto &sticker) {
              return JsonTonWalletCardSticker(sticker.get(), client);
            }));
@@ -4249,7 +4249,7 @@ class Client::JsonTonWalletTransfer final : public td::Jsonable {
     auto object = scope->enter_object();
     object("transaction_id", ton_wallet_transfer_->transaction_id_);
     object("peer_address", ton_wallet_transfer_->peer_address_);
-    object("amount", ton_wallet_transfer_->amount_);
+    object("amount", td::to_string(ton_wallet_transfer_->amount_));
     if (!ton_wallet_transfer_->is_comment_encrypted_) {
       object("comment", ton_wallet_transfer_->comment_);
     }
