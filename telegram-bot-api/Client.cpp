@@ -160,6 +160,9 @@ void Client::fail_query_with_error(PromisedQueryPtr query, int32 error_code, td:
         error_buf = PSTRING() << "CUSTOM_TITLE" << error_message.substr(4);
       }
       error_message = error_buf;
+    } else if (error_message == "STARGIFT_SLUG_INVALID") {
+      error_code = 400;
+      error_message = "gift not found";
     }
   }
   td::Slice prefix;
@@ -15540,7 +15543,8 @@ td::Status Client::process_get_available_gifts_query(PromisedQueryPtr &query) {
 }
 
 td::Status Client::process_get_unique_gift_query(PromisedQueryPtr &query) {
-  send_request(make_object<td_api::getUpgradedGift>(query->arg("name").str()),
+  auto name = query->arg("name").str();
+  send_request(make_object<td_api::getUpgradedGift>(name),
                td::make_unique<TdOnGetUniqueGiftCallback>(this, std::move(query)));
   return td::Status::OK();
 }
