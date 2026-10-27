@@ -317,6 +317,7 @@ bool Client::init_methods() {
   methods_.emplace("savepreparedinlinemessage", &Client::process_save_prepared_inline_message_query);
   methods_.emplace("savepreparedkeyboardbutton", &Client::process_save_prepared_keyboard_button_query);
   methods_.emplace("answercallbackquery", &Client::process_answer_callback_query_query);
+  methods_.emplace("answerwidgetquery", &Client::process_answer_widget_query_query);
   methods_.emplace("answershippingquery", &Client::process_answer_shipping_query_query);
   methods_.emplace("answerprecheckoutquery", &Client::process_answer_pre_checkout_query_query);
   methods_.emplace("exportchatinvitelink", &Client::process_export_chat_invite_link_query);
@@ -16089,6 +16090,15 @@ td::Status Client::process_answer_callback_query_query(PromisedQueryPtr &query) 
   int32 cache_time = get_integer_arg(query.get(), "cache_time", 0, 0, 24 * 30 * 60 * 60);
 
   send_request(make_object<td_api::answerCallbackQuery>(callback_query_id, text, show_alert, url, cache_time),
+               td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+  return td::Status::OK();
+}
+
+td::Status Client::process_answer_widget_query_query(PromisedQueryPtr &query) {
+  auto widget_query_id = td::to_integer<int64>(query->arg("widget_query_id"));
+  auto data = query->arg("data").str();
+
+  send_request(make_object<td_api::answerWidgetQuery>(widget_query_id, data),
                td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   return td::Status::OK();
 }
