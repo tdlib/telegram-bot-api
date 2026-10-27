@@ -189,6 +189,7 @@ class Client final : public WebhookActor::Callback {
   class JsonCallbackQuery;
   class JsonInlineCallbackQuery;
   class JsonWidgetQuery;
+  class JsonInlineWidgetQuery;
   class JsonShippingQuery;
   class JsonPreCheckoutQuery;
   class JsonPaidMediaPurchased;
@@ -1391,6 +1392,8 @@ class Client final : public WebhookActor::Callback {
   static void json_store_callback_query_payload(td::JsonObjectScope &object,
                                                 const td_api::CallbackQueryPayload *payload);
 
+  static void json_store_widget_query_data(td::JsonObjectScope &object, const td::string &data);
+
   static void json_store_administrator_rights(td::JsonObjectScope &object,
                                               const td_api::chatAdministratorRights *rights, ChatType chat_type);
 
@@ -1513,6 +1516,8 @@ class Client final : public WebhookActor::Callback {
   void add_new_inline_callback_query(object_ptr<td_api::updateNewInlineCallbackQuery> &&query);
 
   void add_new_widget_query(object_ptr<td_api::updateNewWidgetQuery> &&query);
+
+  void add_new_inline_widget_query(object_ptr<td_api::updateNewInlineWidgetQuery> &&query);
 
   void add_new_shipping_query(object_ptr<td_api::updateNewShippingQuery> &&query);
 

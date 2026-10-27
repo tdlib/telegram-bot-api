@@ -5910,12 +5910,7 @@ class Client::JsonWidgetQuery final : public td::Jsonable {
     object("chat", JsonChat(query_->chat_id_, client_));
     object("message_id", as_client_message_id(query_->message_id_));
     object("chat_instance", td::to_string(query_->chat_instance_));
-    if (!td::check_utf8(query_->data_)) {
-      LOG(WARNING) << "Receive non-UTF-8 widget query data";
-      object("data", td::JsonRawString(query_->data_));
-    } else {
-      object("data", query_->data_);
-    }
+    client_->json_store_widget_query_data(object, query_->data_);
     if (query_->widget_id_ != 0) {
       object("widget_id", td::to_string(query_->widget_id_));
     }
@@ -5923,6 +5918,32 @@ class Client::JsonWidgetQuery final : public td::Jsonable {
 
  private:
   const td_api::updateNewWidgetQuery *query_;
+  const Client *client_;
+};
+
+class Client::JsonInlineWidgetQuery final : public td::Jsonable {
+ public:
+  JsonInlineWidgetQuery(const td_api::updateNewInlineWidgetQuery *query, const Client *client)
+      : query_(query), client_(client) {
+  }
+
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("id", td::to_string(query_->id_));
+    object("from", JsonUser(query_->sender_user_id_, client_));
+    object("inline_message_id", query_->inline_message_id_);
+    object("chat_instance", td::to_string(query_->chat_instance_));
+    if (!query_->chat_type_.empty()) {
+      object("chat_type", query_->chat_type_);
+    }
+    client_->json_store_widget_query_data(object, query_->data_);
+    if (query_->widget_id_ != 0) {
+      object("widget_id", td::to_string(query_->widget_id_));
+    }
+  }
+
+ private:
+  const td_api::updateNewInlineWidgetQuery *query_;
   const Client *client_;
 };
 
@@ -10249,6 +10270,9 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       break;
     case td_api::updateNewWidgetQuery::ID:
       add_new_widget_query(move_object_as<td_api::updateNewWidgetQuery>(result));
+      break;
+    case td_api::updateNewInlineWidgetQuery::ID:
+      add_new_inline_widget_query(move_object_as<td_api::updateNewInlineWidgetQuery>(result));
       break;
     case td_api::updateNewShippingQuery::ID:
       add_new_shipping_query(move_object_as<td_api::updateNewShippingQuery>(result));
@@ -18543,6 +18567,15 @@ void Client::json_store_callback_query_payload(td::JsonObjectScope &object,
   }
 }
 
+void Client::json_store_widget_query_data(td::JsonObjectScope &object, const td::string &data) {
+  if (!td::check_utf8(data)) {
+    LOG(WARNING) << "Receive non-UTF-8 widget query data";
+    object("data", td::JsonRawString(data));
+  } else {
+    object("data", data);
+  }
+}
+
 void Client::json_store_administrator_rights(td::JsonObjectScope &object, const td_api::chatAdministratorRights *rights,
                                              ChatType chat_type) {
   object("can_manage_chat", td::JsonBool(rights->can_manage_chat_));
@@ -19193,6 +19226,12 @@ void Client::add_new_inline_callback_query(object_ptr<td_api::updateNewInlineCal
 void Client::add_new_widget_query(object_ptr<td_api::updateNewWidgetQuery> &&query) {
   CHECK(query != nullptr);
   add_update(UpdateType::WidgetQuery, JsonWidgetQuery(query.get(), this), 150,
+             query->sender_user_id_ + (static_cast<int64>(16) << 33));
+}
+
+void Client::add_new_inline_widget_query(object_ptr<td_api::updateNewInlineWidgetQuery> &&query) {
+  CHECK(query != nullptr);
+  add_update(UpdateType::WidgetQuery, JsonInlineWidgetQuery(query.get(), this), 150,
              query->sender_user_id_ + (static_cast<int64>(16) << 33));
 }
 
