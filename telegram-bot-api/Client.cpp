@@ -5947,6 +5947,25 @@ class Client::JsonInlineWidgetQuery final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonSharedWidgetQuery final : public td::Jsonable {
+ public:
+  JsonSharedWidgetQuery(const td_api::updateNewWidgetCopyQuery *query, const Client *client)
+      : query_(query), client_(client) {
+  }
+
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("id", td::to_string(query_->id_));
+    object("from", JsonUser(query_->sender_user_id_, client_));
+    client_->json_store_widget_query_data(object, query_->data_);
+    object("widget_id", td::to_string(query_->widget_id_));
+  }
+
+ private:
+  const td_api::updateNewWidgetCopyQuery *query_;
+  const Client *client_;
+};
+
 class Client::JsonShippingQuery final : public td::Jsonable {
  public:
   JsonShippingQuery(const td_api::updateNewShippingQuery *query, const Client *client)
@@ -10273,6 +10292,9 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       break;
     case td_api::updateNewInlineWidgetQuery::ID:
       add_new_inline_widget_query(move_object_as<td_api::updateNewInlineWidgetQuery>(result));
+      break;
+    case td_api::updateNewWidgetCopyQuery::ID:
+      add_new_shared_widget_query(move_object_as<td_api::updateNewWidgetCopyQuery>(result));
       break;
     case td_api::updateNewShippingQuery::ID:
       add_new_shipping_query(move_object_as<td_api::updateNewShippingQuery>(result));
@@ -18872,6 +18894,8 @@ td::Slice Client::get_update_type_name(UpdateType update_type) {
       return td::Slice("stopped_message_generation");
     case UpdateType::WidgetQuery:
       return td::Slice("widget_query");
+    case UpdateType::SharedWidgetQuery:
+      return td::Slice("shared_widget_query");
     default:
       UNREACHABLE();
       return td::Slice();
@@ -19232,6 +19256,12 @@ void Client::add_new_widget_query(object_ptr<td_api::updateNewWidgetQuery> &&que
 void Client::add_new_inline_widget_query(object_ptr<td_api::updateNewInlineWidgetQuery> &&query) {
   CHECK(query != nullptr);
   add_update(UpdateType::WidgetQuery, JsonInlineWidgetQuery(query.get(), this), 150,
+             query->sender_user_id_ + (static_cast<int64>(16) << 33));
+}
+
+void Client::add_new_shared_widget_query(object_ptr<td_api::updateNewWidgetCopyQuery> &&query) {
+  CHECK(query != nullptr);
+  add_update(UpdateType::SharedWidgetQuery, JsonSharedWidgetQuery(query.get(), this), 150,
              query->sender_user_id_ + (static_cast<int64>(16) << 33));
 }
 
