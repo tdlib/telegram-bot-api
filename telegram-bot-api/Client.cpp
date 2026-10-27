@@ -276,6 +276,7 @@ bool Client::init_methods() {
   methods_.emplace("editmessagecaption", &Client::process_edit_message_caption_query);
   methods_.emplace("editmessagechecklist", &Client::process_edit_message_checklist_query);
   methods_.emplace("editmessagereplymarkup", &Client::process_edit_message_reply_markup_query);
+  methods_.emplace("editmessagewidgetdata", &Client::process_edit_message_widget_data_query);
   methods_.emplace("editephemeralmessagetext", &Client::process_edit_ephemeral_message_text_query);
   methods_.emplace("editephemeralmessagemedia", &Client::process_edit_ephemeral_message_media_query);
   methods_.emplace("editephemeralmessagecaption", &Client::process_edit_ephemeral_message_caption_query);
@@ -15418,6 +15419,24 @@ td::Status Client::process_edit_message_checklist_query(PromisedQueryPtr &query)
                                      td::make_unique<TdOnEditMessageCallback>(this, std::move(query)));
                       });
       });
+  return td::Status::OK();
+}
+
+td::Status Client::process_edit_message_widget_data_query(PromisedQueryPtr &query) {
+  auto chat_id = query->arg("chat_id");
+  auto message_id = get_message_id(query.get());
+  auto edit_public_data = query->has_arg("public_data");
+  auto public_data = query->arg("public_data").str();
+  auto edit_chat_data = query->has_arg("chat_data");
+  auto chat_data = query->arg("chat_data").str();
+
+  check_message(chat_id, message_id, false, AccessRights::Read, "message with widget to edit", std::move(query),
+                [this, edit_public_data, public_data = std::move(public_data), edit_chat_data,
+                 chat_data = std::move(chat_data)](int64 chat_id, int64 message_id, PromisedQueryPtr query) {
+                  send_request(make_object<td_api::editMessageWidgetData>(chat_id, message_id, edit_public_data,
+                                                                          public_data, edit_chat_data, chat_data),
+                               td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+                });
   return td::Status::OK();
 }
 
