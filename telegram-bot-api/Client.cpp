@@ -5617,6 +5617,8 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     }
     case td_api::messageTonConnectRequest::ID:
       break;
+    case td_api::messageWidget::ID:
+      break;
     case td_api::messageUnpaidMessagesAllowedByLink::ID:
       object("paid_messages_waived", JsonEmptyObject());
       break;
@@ -7109,6 +7111,28 @@ class Client::TdOnReturnBusinessMessageCallback final : public TdQueryCallback {
  private:
   Client *client_;
   td::string business_connection_id_;
+  PromisedQueryPtr query_;
+};
+
+class Client::TdOnReplyToCallbackQueryCallback final : public TdQueryCallback {
+ public:
+  TdOnReplyToCallbackQueryCallback(Client *client, PromisedQueryPtr query)
+      : client_(client), query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::message::ID);
+    const auto *message_info = client_->add_message(move_object_as<td_api::message>(result), true);
+    message_info->is_content_changed = false;
+    answer_query(JsonMessage(message_info, true, "sent ephemeral message", client_), std::move(query_));
+  }
+
+ private:
+  Client *client_;
   PromisedQueryPtr query_;
 };
 
@@ -15416,8 +15440,8 @@ td::Status Client::process_post_story_query(PromisedQueryPtr &query) {
         auto protect_content = to_bool(query->arg("protect_content"));
         send_request(make_object<td_api::postStory>(
                          business_connection->user_chat_id_, std::move(content), std::move(areas), std::move(caption),
-                         make_object<td_api::storyPrivacySettingsEveryone>(), td::vector<int32>(), active_period,
-                         nullptr, is_posted_to_chat_page, protect_content),
+                         nullptr, make_object<td_api::storyPrivacySettingsEveryone>(), td::vector<int32>(),
+                         active_period, nullptr, is_posted_to_chat_page, protect_content),
                      td::make_unique<TdOnPostStoryCallback>(this, std::move(query)));
       });
   return td::Status::OK();
@@ -15438,7 +15462,7 @@ td::Status Client::process_repost_story_query(PromisedQueryPtr &query) {
                      auto is_posted_to_chat_page = to_bool(query->arg("post_to_chat_page"));
                      auto protect_content = to_bool(query->arg("protect_content"));
                      send_request(make_object<td_api::postStory>(
-                                      chat_id, nullptr, nullptr, nullptr,
+                                      chat_id, nullptr, nullptr, nullptr, nullptr,
                                       make_object<td_api::storyPrivacySettingsEveryone>(), td::vector<int32>(),
                                       active_period, make_object<td_api::storyFullId>(from_chat_id, from_story_id),
                                       is_posted_to_chat_page, protect_content),
@@ -17802,7 +17826,7 @@ void Client::do_reply_to_callback_query_with_ephemeral_message(
                                            make_object<td_api::replyToCallbackQueryWithEphemeralMessage>(
                                                callback_query_id, replace_callback_query_message, protect_content,
                                                std::move(reply_markup), std::move(input_message_content)),
-                                           td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+                                           td::make_unique<TdOnReplyToCallbackQueryCallback>(this, std::move(query)));
                                      });
 }
 
@@ -19353,6 +19377,7 @@ bool Client::need_skip_update_message(int64 chat_id, const MessageInfo *message_
     case td_api::messageChatHasProtectedContentToggled::ID:
     case td_api::messageChatHasProtectedContentDisableRequested::ID:
     case td_api::messageTonConnectRequest::ID:
+    case td_api::messageWidget::ID:
       return true;
     default:
       break;

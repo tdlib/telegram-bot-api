@@ -291,6 +291,7 @@ class Client final : public WebhookActor::Callback {
   class TdOnGetUserProfileAudiosCallback;
   class TdOnSendMessageCallback;
   class TdOnReturnBusinessMessageCallback;
+  class TdOnReplyToCallbackQueryCallback;
   class TdOnSendMessageAlbumCallback;
   class TdOnSendBusinessMessageAlbumCallback;
   class TdOnForwardMessagesCallback;
