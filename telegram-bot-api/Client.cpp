@@ -11229,6 +11229,26 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
     return make_object<td_api::inputMessageRichMessage>(std::move(input_rich_message), false);
   }
 
+  if (object.has_field("html")) {
+    TRY_RESULT(html, object.get_required_string_field("html"));
+    TRY_RESULT(width, object.get_optional_int_field("width"));
+    TRY_RESULT(height, object.get_optional_int_field("height"));
+    TRY_RESULT(public_data, object.get_optional_string_field("public_data"));
+    TRY_RESULT(chat_data, object.get_optional_string_field("chat_data"));
+    TRY_RESULT(input_caption, object.get_optional_string_field("caption"));
+    TRY_RESULT(parse_mode, object.get_optional_string_field("parse_mode"));
+    auto entities = object.extract_field("caption_entities");
+    TRY_RESULT(caption, get_formatted_text(std::move(input_caption), std::move(parse_mode), std::move(entities)));
+    TRY_RESULT(show_caption_above_media, object.get_optional_bool_field("show_caption_above_media"));
+    TRY_RESULT(allow_queries, object.get_optional_bool_field("allow_queries"));
+    TRY_RESULT(is_shared, object.get_optional_bool_field("is_shared"));
+    width = td::clamp(width, 0, MAX_LENGTH);
+    height = td::clamp(height, 0, MAX_LENGTH);
+    return make_object<td_api::inputMessageWidget>(width, height, std::move(html), std::move(public_data),
+                                                   std::move(chat_data), std::move(caption), show_caption_above_media,
+                                                   allow_queries, is_shared);
+  }
+
   TRY_RESULT(message_text, object.get_optional_string_field("message_text"));
 
   if (!message_text.empty()) {
