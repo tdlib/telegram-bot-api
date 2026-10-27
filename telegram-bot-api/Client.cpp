@@ -258,6 +258,7 @@ bool Client::init_methods() {
   methods_.emplace("sendpoll", &Client::process_send_poll_query);
   methods_.emplace("stoppoll", &Client::process_stop_poll_query);
   methods_.emplace("sendchecklist", &Client::process_send_checklist_query);
+  methods_.emplace("sendwidget", &Client::process_send_widget_query);
   methods_.emplace("copymessage", &Client::process_copy_message_query);
   methods_.emplace("copymessages", &Client::process_copy_messages_query);
   methods_.emplace("forwardmessage", &Client::process_forward_message_query);
@@ -14737,6 +14738,23 @@ td::Status Client::process_stop_poll_query(PromisedQueryPtr &query) {
                             td::make_unique<TdOnStopPollCallback>(this, chat_id, message_id, std::move(query)));
                       });
       });
+  return td::Status::OK();
+}
+
+td::Status Client::process_send_widget_query(PromisedQueryPtr &query) {
+  TRY_RESULT(html, get_required_string_arg(query.get(), "html"));
+  int32 width = get_integer_arg(query.get(), "width", 0, 0, MAX_LENGTH);
+  int32 height = get_integer_arg(query.get(), "height", 0, 0, MAX_LENGTH);
+  auto public_data = query->arg("public_data").str();
+  auto chat_data = query->arg("chat_data").str();
+  TRY_RESULT(caption, get_caption(query.get()));
+  auto show_caption_above_media = to_bool(query->arg("show_caption_above_media"));
+  auto allow_queries = to_bool(query->arg("allow_queries"));
+  auto is_shared = to_bool(query->arg("is_shared"));
+  do_send_message(make_object<td_api::inputMessageWidget>(width, height, html.str(), std::move(public_data),
+                                                          std::move(chat_data), std::move(caption),
+                                                          show_caption_above_media, allow_queries, is_shared),
+                  std::move(query));
   return td::Status::OK();
 }
 
