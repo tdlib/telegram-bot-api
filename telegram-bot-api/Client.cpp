@@ -277,6 +277,7 @@ bool Client::init_methods() {
   methods_.emplace("editmessagechecklist", &Client::process_edit_message_checklist_query);
   methods_.emplace("editmessagereplymarkup", &Client::process_edit_message_reply_markup_query);
   methods_.emplace("editmessagewidgetdata", &Client::process_edit_message_widget_data_query);
+  methods_.emplace("editsharedwidgetdata", &Client::process_edit_shared_widget_data_query);
   methods_.emplace("editephemeralmessagetext", &Client::process_edit_ephemeral_message_text_query);
   methods_.emplace("editephemeralmessagemedia", &Client::process_edit_ephemeral_message_media_query);
   methods_.emplace("editephemeralmessagecaption", &Client::process_edit_ephemeral_message_caption_query);
@@ -15445,6 +15446,16 @@ td::Status Client::process_edit_message_widget_data_query(PromisedQueryPtr &quer
                                                                           public_data, edit_chat_data, chat_data),
                                td::make_unique<TdOnOkQueryCallback>(std::move(query)));
                 });
+  return td::Status::OK();
+}
+
+td::Status Client::process_edit_shared_widget_data_query(PromisedQueryPtr &query) {
+  auto widget_id = td::to_integer<int64>(query->arg("widget_id"));
+  auto public_data = query->arg("public_data").str();
+  int32 cache_time = get_integer_arg(query.get(), "cache_time", 0, -1, 3601);
+
+  send_request(make_object<td_api::editWidgetData>(widget_id, public_data, cache_time),
+               td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   return td::Status::OK();
 }
 
