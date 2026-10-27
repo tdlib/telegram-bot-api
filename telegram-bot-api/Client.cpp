@@ -5898,6 +5898,34 @@ class Client::JsonInlineCallbackQuery final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonWidgetQuery final : public td::Jsonable {
+ public:
+  JsonWidgetQuery(const td_api::updateNewWidgetQuery *query, const Client *client) : query_(query), client_(client) {
+  }
+
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("id", td::to_string(query_->id_));
+    object("from", JsonUser(query_->sender_user_id_, client_));
+    object("chat", JsonChat(query_->chat_id_, client_));
+    object("message_id", as_client_message_id(query_->message_id_));
+    object("chat_instance", td::to_string(query_->chat_instance_));
+    if (!td::check_utf8(query_->data_)) {
+      LOG(WARNING) << "Receive non-UTF-8 widget query data";
+      object("data", td::JsonRawString(query_->data_));
+    } else {
+      object("data", query_->data_);
+    }
+    if (query_->widget_id_ != 0) {
+      object("widget_id", td::to_string(query_->widget_id_));
+    }
+  }
+
+ private:
+  const td_api::updateNewWidgetQuery *query_;
+  const Client *client_;
+};
+
 class Client::JsonShippingQuery final : public td::Jsonable {
  public:
   JsonShippingQuery(const td_api::updateNewShippingQuery *query, const Client *client)
@@ -10218,6 +10246,9 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       break;
     case td_api::updateNewInlineCallbackQuery::ID:
       add_new_inline_callback_query(move_object_as<td_api::updateNewInlineCallbackQuery>(result));
+      break;
+    case td_api::updateNewWidgetQuery::ID:
+      add_new_widget_query(move_object_as<td_api::updateNewWidgetQuery>(result));
       break;
     case td_api::updateNewShippingQuery::ID:
       add_new_shipping_query(move_object_as<td_api::updateNewShippingQuery>(result));
@@ -18806,6 +18837,8 @@ td::Slice Client::get_update_type_name(UpdateType update_type) {
       return td::Slice("subscription");
     case UpdateType::StopMessageDraft:
       return td::Slice("stopped_message_generation");
+    case UpdateType::WidgetQuery:
+      return td::Slice("widget_query");
     default:
       UNREACHABLE();
       return td::Slice();
@@ -19155,6 +19188,12 @@ void Client::add_new_inline_callback_query(object_ptr<td_api::updateNewInlineCal
              JsonInlineCallbackQuery(query->id_, query->sender_user_id_, query->inline_message_id_,
                                      query->chat_instance_, query->payload_.get(), this),
              150, query->sender_user_id_ + (static_cast<int64>(3) << 33));
+}
+
+void Client::add_new_widget_query(object_ptr<td_api::updateNewWidgetQuery> &&query) {
+  CHECK(query != nullptr);
+  add_update(UpdateType::WidgetQuery, JsonWidgetQuery(query.get(), this), 150,
+             query->sender_user_id_ + (static_cast<int64>(16) << 33));
 }
 
 void Client::add_new_shipping_query(object_ptr<td_api::updateNewShippingQuery> &&query) {

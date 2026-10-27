@@ -188,6 +188,7 @@ class Client final : public WebhookActor::Callback {
   class JsonChosenInlineResult;
   class JsonCallbackQuery;
   class JsonInlineCallbackQuery;
+  class JsonWidgetQuery;
   class JsonShippingQuery;
   class JsonPreCheckoutQuery;
   class JsonPaidMediaPurchased;
@@ -1511,6 +1512,8 @@ class Client final : public WebhookActor::Callback {
 
   void add_new_inline_callback_query(object_ptr<td_api::updateNewInlineCallbackQuery> &&query);
 
+  void add_new_widget_query(object_ptr<td_api::updateNewWidgetQuery> &&query);
+
   void add_new_shipping_query(object_ptr<td_api::updateNewShippingQuery> &&query);
 
   void add_new_pre_checkout_query(object_ptr<td_api::updateNewPreCheckoutQuery> &&query);
@@ -1572,6 +1575,7 @@ class Client final : public WebhookActor::Callback {
     GuestMessage,
     Subscription,
     StopMessageDraft,
+    WidgetQuery,
     Size
   };
 
