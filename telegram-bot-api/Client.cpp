@@ -15430,6 +15430,14 @@ td::Status Client::process_edit_message_widget_data_query(PromisedQueryPtr &quer
   auto edit_chat_data = query->has_arg("chat_data");
   auto chat_data = query->arg("chat_data").str();
 
+  if (chat_id.empty() && message_id == 0) {
+    TRY_RESULT(inline_message_id, get_inline_message_id(query.get()));
+    auto request = make_object<td_api::editInlineMessageWidgetData>(
+        inline_message_id.str(), edit_public_data, std::move(public_data), edit_chat_data, std::move(chat_data));
+    send_request(std::move(request), td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+    return td::Status::OK();
+  }
+
   check_message(chat_id, message_id, false, AccessRights::Read, "message with widget to edit", std::move(query),
                 [this, edit_public_data, public_data = std::move(public_data), edit_chat_data,
                  chat_data = std::move(chat_data)](int64 chat_id, int64 message_id, PromisedQueryPtr query) {
