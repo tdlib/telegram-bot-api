@@ -259,6 +259,7 @@ class Client final : public WebhookActor::Callback {
   class JsonCommunityChatAdded;
   class JsonCommunityChatJoined;
   class JsonTonWalletTransfer;
+  class JsonWidget;
   class JsonBotSubscriptionUpdated;
   class JsonMessageGenerationStopped;
   class JsonGiveawayCreated;

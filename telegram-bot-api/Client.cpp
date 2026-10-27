@@ -4259,6 +4259,37 @@ class Client::JsonTonWalletTransfer final : public td::Jsonable {
   const td_api::messageTonWalletTransfer *ton_wallet_transfer_;
 };
 
+class Client::JsonWidget final : public td::Jsonable {
+ public:
+  explicit JsonWidget(const td_api::messageWidget *widget) : widget_(widget) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    if (widget_->widget_id_ != 0) {
+      object("id", td::to_string(widget_->widget_id_));
+    }
+    if (widget_->width_ != 0) {
+      object("width", widget_->width_);
+    }
+    if (widget_->height_ != 0) {
+      object("height", widget_->height_);
+    }
+    object("html", widget_->html_);
+    if (!widget_->public_data_.empty()) {
+      object("public_data", widget_->public_data_);
+    }
+    if (!widget_->chat_data_.empty()) {
+      object("chat_data", widget_->chat_data_);
+    }
+    if (widget_->is_copy_) {
+      object("is_copy", td::JsonTrue());
+    }
+  }
+
+ private:
+  const td_api::messageWidget *widget_;
+};
+
 class Client::JsonGiveawayCreated final : public td::Jsonable {
  public:
   explicit JsonGiveawayCreated(const td_api::messageGiveawayCreated *giveaway_created)
@@ -4686,6 +4717,11 @@ class Client::JsonExternalReplyInfo final : public td::Jsonable {
         case td_api::messageChecklist::ID: {
           auto content = static_cast<const td_api::messageChecklist *>(reply_->content_.get());
           object("checklist", JsonChecklist(content->list_.get(), client_));
+          break;
+        }
+        case td_api::messageWidget::ID: {
+          auto content = static_cast<const td_api::messageWidget *>(reply_->content_.get());
+          object("widget", JsonWidget(content));
           break;
         }
         default:
@@ -5617,8 +5653,12 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     }
     case td_api::messageTonConnectRequest::ID:
       break;
-    case td_api::messageWidget::ID:
+    case td_api::messageWidget::ID: {
+      auto content = static_cast<const td_api::messageWidget *>(message_->content.get());
+      object("widget", JsonWidget(content));
+      add_caption(object, content->caption_, content->show_caption_above_media_);
       break;
+    }
     case td_api::messageUnpaidMessagesAllowedByLink::ID:
       object("paid_messages_waived", JsonEmptyObject());
       break;
@@ -19377,7 +19417,6 @@ bool Client::need_skip_update_message(int64 chat_id, const MessageInfo *message_
     case td_api::messageChatHasProtectedContentToggled::ID:
     case td_api::messageChatHasProtectedContentDisableRequested::ID:
     case td_api::messageTonConnectRequest::ID:
-    case td_api::messageWidget::ID:
       return true;
     default:
       break;
