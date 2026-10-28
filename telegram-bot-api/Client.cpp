@@ -3648,12 +3648,7 @@ class Client::JsonSuccessfulPaymentBot final : public td::Jsonable {
     auto object = scope->enter_object();
     object("currency", successful_payment_->currency_);
     object("total_amount", successful_payment_->total_amount_);
-    if (!td::check_utf8(successful_payment_->invoice_payload_)) {
-      LOG(WARNING) << "Receive non-UTF-8 invoice payload";
-      object("invoice_payload", td::JsonRawString(successful_payment_->invoice_payload_));
-    } else {
-      object("invoice_payload", successful_payment_->invoice_payload_);
-    }
+    json_store_bytes(object, "invoice_payload", successful_payment_->invoice_payload_, "invoice payload");
     if (!successful_payment_->shipping_option_id_.empty()) {
       object("shipping_option_id", successful_payment_->shipping_option_id_);
     }
@@ -3686,12 +3681,7 @@ class Client::JsonRefundedPayment final : public td::Jsonable {
     auto object = scope->enter_object();
     object("currency", refunded_payment_->currency_);
     object("total_amount", refunded_payment_->total_amount_);
-    if (!td::check_utf8(refunded_payment_->invoice_payload_)) {
-      LOG(WARNING) << "Receive non-UTF-8 invoice payload";
-      object("invoice_payload", td::JsonRawString(refunded_payment_->invoice_payload_));
-    } else {
-      object("invoice_payload", refunded_payment_->invoice_payload_);
-    }
+    json_store_bytes(object, "invoice_payload", refunded_payment_->invoice_payload_, "invoice payload");
     object("telegram_payment_charge_id", refunded_payment_->telegram_payment_charge_id_);
     if (!refunded_payment_->provider_payment_charge_id_.empty()) {
       object("provider_payment_charge_id", refunded_payment_->provider_payment_charge_id_);
@@ -5913,7 +5903,7 @@ class Client::JsonWidgetQuery final : public td::Jsonable {
     object("chat", JsonChat(query_->chat_id_, client_));
     object("message_id", as_client_message_id(query_->message_id_));
     object("chat_instance", td::to_string(query_->chat_instance_));
-    client_->json_store_widget_query_data(object, query_->data_);
+    json_store_bytes(object, "data", query_->data_, "widget query data");
     if (query_->widget_id_ != 0) {
       object("widget_id", td::to_string(query_->widget_id_));
     }
@@ -5939,7 +5929,7 @@ class Client::JsonInlineWidgetQuery final : public td::Jsonable {
     if (!query_->chat_type_.empty()) {
       object("chat_type", query_->chat_type_);
     }
-    client_->json_store_widget_query_data(object, query_->data_);
+    json_store_bytes(object, "data", query_->data_, "widget query data");
     if (query_->widget_id_ != 0) {
       object("widget_id", td::to_string(query_->widget_id_));
     }
@@ -5960,7 +5950,7 @@ class Client::JsonSharedWidgetQuery final : public td::Jsonable {
     auto object = scope->enter_object();
     object("id", td::to_string(query_->id_));
     object("from", JsonUser(query_->sender_user_id_, client_));
-    client_->json_store_widget_query_data(object, query_->data_);
+    json_store_bytes(object, "data", query_->data_, "widget query data");
     object("widget_id", td::to_string(query_->widget_id_));
   }
 
@@ -5979,12 +5969,7 @@ class Client::JsonShippingQuery final : public td::Jsonable {
     auto object = scope->enter_object();
     object("id", td::to_string(query_->id_));
     object("from", JsonUser(query_->sender_user_id_, client_));
-    if (!td::check_utf8(query_->invoice_payload_)) {
-      LOG(WARNING) << "Receive non-UTF-8 invoice payload";
-      object("invoice_payload", td::JsonRawString(query_->invoice_payload_));
-    } else {
-      object("invoice_payload", query_->invoice_payload_);
-    }
+    json_store_bytes(object, "invoice_payload", query_->invoice_payload_, "invoice payload");
     object("shipping_address", JsonAddress(query_->shipping_address_.get()));
   }
 
@@ -6005,12 +5990,7 @@ class Client::JsonPreCheckoutQuery final : public td::Jsonable {
     object("from", JsonUser(query_->sender_user_id_, client_));
     object("currency", query_->currency_);
     object("total_amount", query_->total_amount_);
-    if (!td::check_utf8(query_->invoice_payload_)) {
-      LOG(WARNING) << "Receive non-UTF-8 invoice payload";
-      object("invoice_payload", td::JsonRawString(query_->invoice_payload_));
-    } else {
-      object("invoice_payload", query_->invoice_payload_);
-    }
+    json_store_bytes(object, "invoice_payload", query_->invoice_payload_, "invoice payload");
     if (!query_->shipping_option_id_.empty()) {
       object("shipping_option_id", query_->shipping_option_id_);
     }
@@ -6803,12 +6783,7 @@ class Client::JsonStarTransactionType final : public td::Jsonable {
         object("type", "user");
         object("user", JsonUser(type->user_id_, client_));
         if (!type->invoice_payload_.empty()) {
-          if (!td::check_utf8(type->invoice_payload_)) {
-            LOG(WARNING) << "Receive non-UTF-8 invoice payload";
-            object("invoice_payload", td::JsonRawString(type->invoice_payload_));
-          } else {
-            object("invoice_payload", type->invoice_payload_);
-          }
+          json_store_bytes(object, "invoice_payload", type->invoice_payload_, "invoice payload");
         }
         if (type->affiliate_ != nullptr) {
           object("affiliate", JsonAffiliateInfo(type->affiliate_.get(), client_));
@@ -6821,12 +6796,7 @@ class Client::JsonStarTransactionType final : public td::Jsonable {
         object("type", "user");
         object("user", JsonUser(type->user_id_, client_));
         if (!type->invoice_payload_.empty()) {
-          if (!td::check_utf8(type->invoice_payload_)) {
-            LOG(WARNING) << "Receive non-UTF-8 invoice payload";
-            object("invoice_payload", td::JsonRawString(type->invoice_payload_));
-          } else {
-            object("invoice_payload", type->invoice_payload_);
-          }
+          json_store_bytes(object, "invoice_payload", type->invoice_payload_, "invoice payload");
         }
         if (type->subscription_period_ > 0) {
           object("subscription_period", type->subscription_period_);
@@ -18618,12 +18588,7 @@ void Client::json_store_callback_query_payload(td::JsonObjectScope &object,
   switch (payload->get_id()) {
     case td_api::callbackQueryPayloadData::ID: {
       auto data = static_cast<const td_api::callbackQueryPayloadData *>(payload);
-      if (!td::check_utf8(data->data_)) {
-        LOG(WARNING) << "Receive non-UTF-8 callback query data";
-        object("data", td::JsonRawString(data->data_));
-      } else {
-        object("data", data->data_);
-      }
+      json_store_bytes(object, "data", data->data_, "callback query data");
       break;
     }
     case td_api::callbackQueryPayloadGame::ID:
@@ -18637,12 +18602,13 @@ void Client::json_store_callback_query_payload(td::JsonObjectScope &object,
   }
 }
 
-void Client::json_store_widget_query_data(td::JsonObjectScope &object, const td::string &data) {
-  if (!td::check_utf8(data)) {
-    LOG(WARNING) << "Receive non-UTF-8 widget query data";
-    object("data", td::JsonRawString(data));
+void Client::json_store_bytes(td::JsonObjectScope &object, td::Slice field_name, const td::string &bytes,
+                              td::Slice source) {
+  if (!td::check_utf8(bytes)) {
+    LOG(WARNING) << "Receive non-UTF-8 " << source;
+    object(field_name, td::JsonRawString(bytes));
   } else {
-    object("data", data);
+    object(field_name, bytes);
   }
 }
 
