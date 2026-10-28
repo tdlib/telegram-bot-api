@@ -1396,8 +1396,7 @@ class Client final : public WebhookActor::Callback {
   static void json_store_callback_query_payload(td::JsonObjectScope &object,
                                                 const td_api::CallbackQueryPayload *payload);
 
-  static void json_store_bytes(td::JsonObjectScope &object, td::Slice field_name, const td::string &bytes,
-                               td::Slice source);
+  static void json_store_bytes(td::JsonObjectScope &object, td::Slice field_name, td::CSlice bytes, td::Slice source);
 
   static void json_store_administrator_rights(td::JsonObjectScope &object,
                                               const td_api::chatAdministratorRights *rights, ChatType chat_type);

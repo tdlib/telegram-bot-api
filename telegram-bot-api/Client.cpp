@@ -6952,21 +6952,13 @@ class Client::JsonWebhookInfo final : public td::Jsonable {
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     td::CSlice url = client_->webhook_url_;
-    if (td::check_utf8(url)) {
-      object("url", url);
-    } else {
-      object("url", td::JsonRawString(url));
-    }
+    json_store_bytes(object, "url", url, td::Slice());
     object("has_custom_certificate", td::JsonBool(client_->has_webhook_certificate_));
     object("pending_update_count", td::narrow_cast<int32>(client_->get_pending_update_count()));
     if (client_->last_webhook_error_date_ > 0) {
       object("last_error_date", client_->last_webhook_error_date_);
       td::CSlice error_message = client_->last_webhook_error_.message();
-      if (td::check_utf8(error_message)) {
-        object("last_error_message", error_message);
-      } else {
-        object("last_error_message", td::JsonRawString(error_message));
-      }
+      json_store_bytes(object, "last_error_message", error_message, td::Slice());
     }
     if (client_->webhook_max_connections_ > 0) {
       object("max_connections", client_->webhook_max_connections_);
@@ -18558,11 +18550,7 @@ void Client::json_store_file(td::JsonObjectScope &object, const td_api::file *fi
   }
   if (with_path && file->local_->is_downloading_completed_) {
     if (parameters_->local_mode_) {
-      if (td::check_utf8(file->local_->path_)) {
-        object("file_path", file->local_->path_);
-      } else {
-        object("file_path", td::JsonRawString(file->local_->path_));
-      }
+      json_store_bytes(object, "file_path", file->local_->path_, td::Slice());
     } else {
       td::Slice relative_path = td::PathView::relative(file->local_->path_, files_dir_, true);
       if (!relative_path.empty() && file->local_->downloaded_size_ <= MAX_DOWNLOAD_FILE_SIZE) {
@@ -18602,10 +18590,11 @@ void Client::json_store_callback_query_payload(td::JsonObjectScope &object,
   }
 }
 
-void Client::json_store_bytes(td::JsonObjectScope &object, td::Slice field_name, const td::string &bytes,
-                              td::Slice source) {
+void Client::json_store_bytes(td::JsonObjectScope &object, td::Slice field_name, td::CSlice bytes, td::Slice source) {
   if (!td::check_utf8(bytes)) {
-    LOG(WARNING) << "Receive non-UTF-8 " << source;
+    if (!source.empty()) {
+      LOG(WARNING) << "Receive non-UTF-8 " << source;
+    }
     object(field_name, td::JsonRawString(bytes));
   } else {
     object(field_name, bytes);
