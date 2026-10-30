@@ -191,6 +191,8 @@ class Client final : public WebhookActor::Callback {
   class JsonWidgetQuery;
   class JsonInlineWidgetQuery;
   class JsonSharedWidgetQuery;
+  class JsonWidgetQueryType;
+  class JsonWidgetQueryWallet;
   class JsonShippingQuery;
   class JsonPreCheckoutQuery;
   class JsonPaidMediaPurchased;
@@ -1372,6 +1374,9 @@ class Client final : public WebhookActor::Callback {
 
   static td::vector<int64> get_sent_gift_sticker_set_ids(const object_ptr<td_api::SentGift> &gift);
 
+  static td::vector<int64> get_widget_query_sticker_set_ids(const object_ptr<td_api::WidgetQueryType> &query_type,
+                                                            const object_ptr<td_api::tonWalletCard> &wallet_card);
+
   static td::vector<int64> get_ton_wallet_card_sticker_set_ids(const object_ptr<td_api::tonWalletCard> &card);
 
   static td::vector<int64> get_profile_share_theme_sticker_set_ids(
@@ -1519,11 +1524,9 @@ class Client final : public WebhookActor::Callback {
 
   void add_new_inline_callback_query(object_ptr<td_api::updateNewInlineCallbackQuery> &&query);
 
-  void add_new_widget_query(object_ptr<td_api::updateNewWidgetQuery> &&query);
+  void add_new_widget_query(object_ptr<td_api::Object> &&update);
 
-  void add_new_inline_widget_query(object_ptr<td_api::updateNewInlineWidgetQuery> &&query);
-
-  void add_new_shared_widget_query(object_ptr<td_api::updateNewWidgetCopyQuery> &&query);
+  void do_add_new_widget_query(object_ptr<td_api::Object> &&update);
 
   void add_new_shipping_query(object_ptr<td_api::updateNewShippingQuery> &&query);
 

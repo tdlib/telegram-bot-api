@@ -5891,6 +5891,67 @@ class Client::JsonInlineCallbackQuery final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonWidgetQueryWallet final : public td::Jsonable {
+ public:
+  explicit JsonWidgetQueryWallet(const td_api::widgetQueryWallet *wallet) : wallet_(wallet) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("address", wallet_->address_);
+    object("amount", td::to_string(wallet_->gram_amount_));
+    if (!wallet_->public_key_.empty() && !wallet_->state_init_.empty()) {
+      object("public_key", td::hex_encode(wallet_->public_key_));
+      object("state_init", td::base64_encode(wallet_->state_init_));
+    }
+  }
+
+ private:
+  const td_api::widgetQueryWallet *wallet_;
+};
+
+class Client::JsonWidgetQueryType final : public td::Jsonable {
+ public:
+  JsonWidgetQueryType(const td_api::WidgetQueryType *query_type, const td_api::tonWalletCard *wallet_card,
+                      const Client *client)
+      : query_type_(query_type), wallet_card_(wallet_card), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    CHECK(query_type_ != nullptr);
+    auto object = scope->enter_object();
+    switch (query_type_->get_id()) {
+      case td_api::widgetQueryTypeData::ID: {
+        auto query_type = static_cast<const td_api::widgetQueryTypeData *>(query_type_);
+        object("type", "data");
+        if (query_type->with_wallet_ && wallet_card_ != nullptr) {
+          object("wallet_card", JsonTonWalletCard(wallet_card_, client_));
+        }
+        break;
+      }
+      case td_api::widgetQueryTypeSignData::ID: {
+        auto query_type = static_cast<const td_api::widgetQueryTypeSignData *>(query_type_);
+        object("type", "sign_data");
+        object("wallet", JsonWidgetQueryWallet(query_type->wallet_.get()));
+        object("sign_data", query_type->sign_data_);
+        break;
+      }
+      case td_api::widgetQueryTypeSentTransaction::ID: {
+        auto query_type = static_cast<const td_api::widgetQueryTypeSentTransaction *>(query_type_);
+        object("type", "sent_transaction");
+        object("wallet", JsonWidgetQueryWallet(query_type->wallet_.get()));
+        object("msg_hash", query_type->msg_hash_);
+        break;
+      }
+      default:
+        UNREACHABLE();
+    }
+  }
+
+ private:
+  const td_api::WidgetQueryType *query_type_;
+  const td_api::tonWalletCard *wallet_card_;
+  const Client *client_;
+};
+
 class Client::JsonWidgetQuery final : public td::Jsonable {
  public:
   JsonWidgetQuery(const td_api::updateNewWidgetQuery *query, const Client *client) : query_(query), client_(client) {
@@ -5903,6 +5964,7 @@ class Client::JsonWidgetQuery final : public td::Jsonable {
     object("chat", JsonChat(query_->chat_id_, client_));
     object("message_id", as_client_message_id(query_->message_id_));
     object("chat_instance", td::to_string(query_->chat_instance_));
+    object("type", JsonWidgetQueryType(query_->query_type_.get(), query_->wallet_card_.get(), client_));
     json_store_bytes(object, "data", query_->data_, "widget query data");
     if (query_->widget_id_ != 0) {
       object("widget_id", td::to_string(query_->widget_id_));
@@ -5929,6 +5991,7 @@ class Client::JsonInlineWidgetQuery final : public td::Jsonable {
     if (!query_->chat_type_.empty()) {
       object("chat_type", query_->chat_type_);
     }
+    object("type", JsonWidgetQueryType(query_->query_type_.get(), query_->wallet_card_.get(), client_));
     json_store_bytes(object, "data", query_->data_, "widget query data");
     if (query_->widget_id_ != 0) {
       object("widget_id", td::to_string(query_->widget_id_));
@@ -5950,6 +6013,7 @@ class Client::JsonSharedWidgetQuery final : public td::Jsonable {
     auto object = scope->enter_object();
     object("id", td::to_string(query_->id_));
     object("from", JsonUser(query_->sender_user_id_, client_));
+    object("type", JsonWidgetQueryType(query_->query_type_.get(), query_->wallet_card_.get(), client_));
     json_store_bytes(object, "data", query_->data_, "widget query data");
     object("widget_id", td::to_string(query_->widget_id_));
   }
@@ -10253,13 +10317,9 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       add_new_inline_callback_query(move_object_as<td_api::updateNewInlineCallbackQuery>(result));
       break;
     case td_api::updateNewWidgetQuery::ID:
-      add_new_widget_query(move_object_as<td_api::updateNewWidgetQuery>(result));
-      break;
     case td_api::updateNewInlineWidgetQuery::ID:
-      add_new_inline_widget_query(move_object_as<td_api::updateNewInlineWidgetQuery>(result));
-      break;
     case td_api::updateNewWidgetCopyQuery::ID:
-      add_new_shared_widget_query(move_object_as<td_api::updateNewWidgetCopyQuery>(result));
+      add_new_widget_query(std::move(result));
       break;
     case td_api::updateNewShippingQuery::ID:
       add_new_shipping_query(move_object_as<td_api::updateNewShippingQuery>(result));
@@ -19250,22 +19310,59 @@ void Client::add_new_inline_callback_query(object_ptr<td_api::updateNewInlineCal
              150, query->sender_user_id_ + (static_cast<int64>(3) << 33));
 }
 
-void Client::add_new_widget_query(object_ptr<td_api::updateNewWidgetQuery> &&query) {
-  CHECK(query != nullptr);
-  add_update(UpdateType::WidgetQuery, JsonWidgetQuery(query.get(), this), 150,
-             query->sender_user_id_ + (static_cast<int64>(16) << 33));
+void Client::add_new_widget_query(object_ptr<td_api::Object> &&update) {
+  CHECK(update != nullptr);
+  td::vector<int64> sticker_set_ids;
+  switch (update->get_id()) {
+    case td_api::updateNewWidgetQuery::ID: {
+      auto query = static_cast<const td_api::updateNewWidgetQuery *>(update.get());
+      sticker_set_ids = get_widget_query_sticker_set_ids(query->query_type_, query->wallet_card_);
+      break;
+    }
+    case td_api::updateNewInlineWidgetQuery::ID: {
+      auto query = static_cast<const td_api::updateNewInlineWidgetQuery *>(update.get());
+      sticker_set_ids = get_widget_query_sticker_set_ids(query->query_type_, query->wallet_card_);
+      break;
+    }
+    case td_api::updateNewWidgetCopyQuery::ID: {
+      auto query = static_cast<const td_api::updateNewWidgetCopyQuery *>(update.get());
+      sticker_set_ids = get_widget_query_sticker_set_ids(query->query_type_, query->wallet_card_);
+      break;
+    }
+    default:
+      UNREACHABLE();
+  }
+  get_sticker_set_names(
+      std::move(sticker_set_ids),
+      td::PromiseCreator::lambda([actor_id = actor_id(this), update = std::move(update)](td::Unit) mutable {
+        send_closure(actor_id, &Client::do_add_new_widget_query, std::move(update));
+      }));
 }
 
-void Client::add_new_inline_widget_query(object_ptr<td_api::updateNewInlineWidgetQuery> &&query) {
-  CHECK(query != nullptr);
-  add_update(UpdateType::WidgetQuery, JsonInlineWidgetQuery(query.get(), this), 150,
-             query->sender_user_id_ + (static_cast<int64>(16) << 33));
-}
-
-void Client::add_new_shared_widget_query(object_ptr<td_api::updateNewWidgetCopyQuery> &&query) {
-  CHECK(query != nullptr);
-  add_update(UpdateType::SharedWidgetQuery, JsonSharedWidgetQuery(query.get(), this), 150,
-             query->sender_user_id_ + (static_cast<int64>(16) << 33));
+void Client::do_add_new_widget_query(object_ptr<td_api::Object> &&update) {
+  CHECK(update != nullptr);
+  switch (update->get_id()) {
+    case td_api::updateNewWidgetQuery::ID: {
+      auto query = static_cast<const td_api::updateNewWidgetQuery *>(update.get());
+      add_update(UpdateType::WidgetQuery, JsonWidgetQuery(query, this), 150,
+                 query->sender_user_id_ + (static_cast<int64>(16) << 33));
+      break;
+    }
+    case td_api::updateNewInlineWidgetQuery::ID: {
+      auto query = static_cast<const td_api::updateNewInlineWidgetQuery *>(update.get());
+      add_update(UpdateType::WidgetQuery, JsonInlineWidgetQuery(query, this), 150,
+                 query->sender_user_id_ + (static_cast<int64>(16) << 33));
+      break;
+    }
+    case td_api::updateNewWidgetCopyQuery::ID: {
+      auto query = static_cast<const td_api::updateNewWidgetCopyQuery *>(update.get());
+      add_update(UpdateType::SharedWidgetQuery, JsonSharedWidgetQuery(query, this), 150,
+                 query->sender_user_id_ + (static_cast<int64>(16) << 33));
+      break;
+    }
+    default:
+      UNREACHABLE();
+  }
 }
 
 void Client::add_new_shipping_query(object_ptr<td_api::updateNewShippingQuery> &&query) {
@@ -19886,6 +19983,16 @@ td::vector<td::int64> Client::get_sent_gift_sticker_set_ids(const object_ptr<td_
       UNREACHABLE();
       return {};
   }
+}
+
+td::vector<td::int64> Client::get_widget_query_sticker_set_ids(const object_ptr<td_api::WidgetQueryType> &query_type,
+                                                               const object_ptr<td_api::tonWalletCard> &wallet_card) {
+  CHECK(query_type != nullptr);
+  if (query_type->get_id() != td_api::widgetQueryTypeData::ID ||
+      !static_cast<const td_api::widgetQueryTypeData *>(query_type.get())->with_wallet_) {
+    return {};
+  }
+  return get_ton_wallet_card_sticker_set_ids(wallet_card);
 }
 
 td::vector<td::int64> Client::get_ton_wallet_card_sticker_set_ids(const object_ptr<td_api::tonWalletCard> &card) {
