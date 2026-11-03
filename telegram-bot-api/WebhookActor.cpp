@@ -554,6 +554,7 @@ td::Status WebhookActor::send_update() {
   td::HttpHeaderCreator hc;
   hc.init_post(url_.query_);
   hc.add_header("Host", host_header_);
+  hc.add_header("User-Agent", "WebhookDelivery/1.0");
   if (!url_.userinfo_.empty()) {
     hc.add_header("Authorization", PSLICE() << "Basic " << td::base64_encode(url_.userinfo_));
   }
