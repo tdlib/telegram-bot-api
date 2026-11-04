@@ -9255,8 +9255,10 @@ template <class OnSuccess>
 void Client::check_chat_access(int64 chat_id, AccessRights access_rights, const ChatInfo *chat_info,
                                PromisedQueryPtr query, OnSuccess on_success) const {
   CHECK(chat_info != nullptr);
+  bool is_ephemeral = access_rights == AccessRights::ReadEphemeral || access_rights == AccessRights::EditEphemeral;
   bool need_write_access = access_rights == AccessRights::Write;
-  bool need_edit_access = access_rights == AccessRights::Edit || need_write_access;
+  bool need_edit_access =
+      access_rights == AccessRights::Edit || access_rights == AccessRights::EditEphemeral || need_write_access;
   bool need_read_access = true;
   switch (chat_info->type) {
     case ChatInfo::Type::Private: {
@@ -9308,7 +9310,7 @@ void Client::check_chat_access(int64 chat_id, AccessRights access_rights, const 
       }
       bool is_public = !supergroup_info->active_usernames.empty() || supergroup_info->has_location;
       bool need_more_access_rights = is_public ? need_edit_access : need_read_access;
-      if (!is_chat_member(supergroup_info->status) && need_more_access_rights) {
+      if (!is_chat_member(supergroup_info->status) && need_more_access_rights && !is_ephemeral) {
         if (supergroup_info->is_supergroup) {
           return fail_query(403, "Forbidden: bot is not a member of the supergroup chat", std::move(query));
         } else {
@@ -15554,7 +15556,7 @@ td::Status Client::process_edit_ephemeral_message_caption_query(PromisedQueryPtr
       [this, chat_id_str = chat_id.str(), receiver_user_id, ephemeral_message_id, caption = std::move(caption),
        show_caption_above_media](object_ptr<td_api::ReplyMarkup> reply_markup, PromisedQueryPtr query) mutable {
         check_chat(
-            chat_id_str, AccessRights::Edit, std::move(query),
+            chat_id_str, AccessRights::EditEphemeral, std::move(query),
             [this, receiver_user_id, ephemeral_message_id, caption = std::move(caption), show_caption_above_media,
              reply_markup = std::move(reply_markup)](int64 chat_id, PromisedQueryPtr query) mutable {
               send_request(make_object<td_api::editEphemeralMessageCaption>(
@@ -15596,7 +15598,7 @@ td::Status Client::process_delete_ephemeral_message_query(PromisedQueryPtr &quer
   auto chat_id = query->arg("chat_id");
   TRY_RESULT(receiver_user_id, get_user_id(query.get(), "receiver_user_id"));
   auto ephemeral_message_id = get_integer_arg(query.get(), "ephemeral_message_id", 0);
-  check_chat(chat_id, AccessRights::Read, std::move(query),
+  check_chat(chat_id, AccessRights::ReadEphemeral, std::move(query),
              [this, receiver_user_id, ephemeral_message_id](int64 chat_id, PromisedQueryPtr query) {
                send_request(
                    make_object<td_api::deleteEphemeralMessage>(chat_id, receiver_user_id, ephemeral_message_id),
@@ -18130,7 +18132,7 @@ td::Status Client::do_edit_ephemeral_message(object_ptr<td_api::InputMessageCont
        input_message_content = std::move(input_message_content)](object_ptr<td_api::ReplyMarkup> reply_markup,
                                                                  PromisedQueryPtr query) mutable {
         check_chat(
-            chat_id_str, AccessRights::Edit, std::move(query),
+            chat_id_str, AccessRights::EditEphemeral, std::move(query),
             [this, receiver_user_id, ephemeral_message_id, input_message_content = std::move(input_message_content),
              reply_markup = std::move(reply_markup)](int64 chat_id, PromisedQueryPtr query) mutable {
               send_request(

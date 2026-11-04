@@ -405,7 +405,7 @@ class Client final : public WebhookActor::Callback {
   struct BotCommandScope;
   struct BotUserIds;
 
-  enum class AccessRights { Read, ReadMembers, Edit, Write };
+  enum class AccessRights { Read, ReadMembers, Edit, Write, ReadEphemeral, EditEphemeral };
 
   template <class OnSuccess>
   class TdOnCheckUserCallback;
