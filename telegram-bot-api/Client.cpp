@@ -19604,9 +19604,11 @@ bool Client::need_skip_update_message(int64 chat_id, const MessageInfo *message_
   if (chat_type == ChatInfo::Type::Supergroup) {
     CHECK(chat != nullptr);
     auto supergroup_info = get_supergroup_info(chat->supergroup_id);
-    if (supergroup_info->status->get_id() == td_api::chatMemberStatusLeft::ID ||
-        supergroup_info->status->get_id() == td_api::chatMemberStatusBanned::ID) {
+    if ((supergroup_info->status->get_id() == td_api::chatMemberStatusLeft::ID ||
+         supergroup_info->status->get_id() == td_api::chatMemberStatusBanned::ID) &&
+        message_info->ephemeral_message_id == 0) {
       // if we have left the chat, send only update about leaving the supergroup
+      // ephemeral messages are received without chat membership, for example, in placeholder chats
       if (message_content_id == td_api::messageChatDeleteMember::ID) {
         auto user_id = static_cast<const td_api::messageChatDeleteMember *>(message_info->content.get())->user_id_;
         return user_id != my_id_;
