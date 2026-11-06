@@ -405,7 +405,7 @@ class Client final : public WebhookActor::Callback {
   struct BotCommandScope;
   struct BotUserIds;
 
-  enum class AccessRights { Read, ReadMembers, Edit, Write, ReadEphemeral, EditEphemeral };
+  enum class AccessRights { Read, ReadMembers, Edit, Write, ReadEphemeral, EditEphemeral, WriteEphemeral };
 
   template <class OnSuccess>
   class TdOnCheckUserCallback;
@@ -454,8 +454,9 @@ class Client final : public WebhookActor::Callback {
   void check_chat_no_fail(td::Slice chat_id_str, PromisedQueryPtr query, OnSuccess on_success);
 
   template <class OnSuccess>
-  void check_message_topic(td::Slice chat_id_str, int32 forum_topic_id, int64 direct_messages_topic_id,
-                           PromisedQueryPtr query, OnSuccess on_success, bool allow_unknown_user = false);
+  void check_message_topic(td::Slice chat_id_str, AccessRights access_rights, int32 forum_topic_id,
+                           int64 direct_messages_topic_id, PromisedQueryPtr query, OnSuccess on_success,
+                           bool allow_unknown_user = false);
 
   static td::Result<int64> get_business_connection_chat_id(td::Slice chat_id_str);
 

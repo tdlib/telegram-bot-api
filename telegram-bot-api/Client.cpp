@@ -9255,8 +9255,9 @@ template <class OnSuccess>
 void Client::check_chat_access(int64 chat_id, AccessRights access_rights, const ChatInfo *chat_info,
                                PromisedQueryPtr query, OnSuccess on_success) const {
   CHECK(chat_info != nullptr);
-  bool is_ephemeral = access_rights == AccessRights::ReadEphemeral || access_rights == AccessRights::EditEphemeral;
-  bool need_write_access = access_rights == AccessRights::Write;
+  bool is_ephemeral = access_rights == AccessRights::ReadEphemeral || access_rights == AccessRights::EditEphemeral ||
+                      access_rights == AccessRights::WriteEphemeral;
+  bool need_write_access = access_rights == AccessRights::Write || access_rights == AccessRights::WriteEphemeral;
   bool need_edit_access =
       access_rights == AccessRights::Edit || access_rights == AccessRights::EditEphemeral || need_write_access;
   bool need_read_access = true;
@@ -9385,10 +9386,11 @@ void Client::check_chat_no_fail(td::Slice chat_id_str, PromisedQueryPtr query, O
 }
 
 template <class OnSuccess>
-void Client::check_message_topic(td::Slice chat_id_str, int32 forum_topic_id, int64 direct_messages_topic_id,
-                                 PromisedQueryPtr query, OnSuccess on_success, bool allow_unknown_user) {
+void Client::check_message_topic(td::Slice chat_id_str, AccessRights access_rights, int32 forum_topic_id,
+                                 int64 direct_messages_topic_id, PromisedQueryPtr query, OnSuccess on_success,
+                                 bool allow_unknown_user) {
   check_chat(
-      chat_id_str, AccessRights::Write, std::move(query),
+      chat_id_str, access_rights, std::move(query),
       [this, forum_topic_id, direct_messages_topic_id, allow_unknown_user, on_success = std::move(on_success)](
           int64 chat_id, PromisedQueryPtr query) mutable {
         if (forum_topic_id == 0 && direct_messages_topic_id == 0) {
@@ -9608,8 +9610,11 @@ void Client::check_reply_parameters(td::Slice chat_id_str, InputReplyParameters 
   if (chat_id_str == reply_parameters.reply_in_chat_id) {
     reply_parameters.reply_in_chat_id.clear();
   }
+  // replies to ephemeral messages can be sent without chat membership, for example, in placeholder chats
+  auto access_rights =
+      reply_parameters.reply_to_ephemeral_message_id > 0 ? AccessRights::WriteEphemeral : AccessRights::Write;
   check_message_topic(
-      chat_id_str, forum_topic_id, direct_messages_topic_id, std::move(query),
+      chat_id_str, access_rights, forum_topic_id, direct_messages_topic_id, std::move(query),
       [this, reply_parameters = std::move(reply_parameters), on_success = std::move(on_success)](
           int64 chat_id, object_ptr<td_api::MessageTopic> &&topic_id, PromisedQueryPtr query) mutable {
         if (reply_parameters.reply_to_ephemeral_message_id > 0) {
