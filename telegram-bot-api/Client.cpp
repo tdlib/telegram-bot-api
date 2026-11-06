@@ -20158,7 +20158,9 @@ void Client::process_new_message_queue(int64 chat_id, int state) {
     UpdateType update_type;
     auto chat = get_chat(chat_id);
     CHECK(chat != nullptr);
-    if (chat->type == ChatInfo::Type::Supergroup && !get_supergroup_info(chat->supergroup_id)->is_supergroup) {
+    // ephemeral messages are sent by users even in channels
+    if (chat->type == ChatInfo::Type::Supergroup && !get_supergroup_info(chat->supergroup_id)->is_supergroup &&
+        message_info->ephemeral_message_id == 0) {
       update_type = is_edited ? UpdateType::EditedChannelPost : UpdateType::ChannelPost;
     } else {
       update_type = is_edited ? UpdateType::EditedMessage : UpdateType::Message;
