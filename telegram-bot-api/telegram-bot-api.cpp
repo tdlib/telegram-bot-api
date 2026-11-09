@@ -530,13 +530,14 @@ int main(int argc, char *argv[]) {
         .release();
   }
 
-  constexpr double WATCHDOG_TIMEOUT = 0.25;
+  constexpr double WATCHDOG_TIMEOUT = 30.0;
+  constexpr double WATCHDOG_KICK_INTERVAL = 10.0;
   auto watchdog_id = sched.create_actor_unsafe<Watchdog>(SharedData::get_watchdog_scheduler_id(), "Watchdog",
                                                          td::this_thread::get_id(), WATCHDOG_TIMEOUT);
 
   sched.start();
 
-  double next_watchdog_kick_time = start_time;
+  double next_watchdog_kick_time = start_time + 600.0;
   double next_cron_time = start_time;
   double last_dump_time = start_time - 1000.0;
   bool close_flag = false;
@@ -599,10 +600,10 @@ int main(int argc, char *argv[]) {
                                                   [](td::Unit) { ServerCpuStat::update(td::Time::now()); });
     }
 
-    if (now >= start_time + 600) {
+    if (now >= next_watchdog_kick_time) {
       auto guard = sched.get_main_guard();
       send_closure(watchdog_id, &Watchdog::kick);
-      next_watchdog_kick_time = now + WATCHDOG_TIMEOUT / 10;
+      next_watchdog_kick_time = now + WATCHDOG_KICK_INTERVAL;
     }
 
     if (!need_dump_statistics.test_and_set() || now > last_dump_time + 300.0) {
