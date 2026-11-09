@@ -97,29 +97,31 @@ void ClientManager::send(PromisedQueryPtr query) {
 
     td::string ip_address = query->get_peer_ip_address();
     if (!ip_address.empty()) {
-      td::IPAddress tmp;
-      tmp.init_host_port(ip_address, 0).ignore();
-      tmp.clear_ipv6_interface();
-      if (tmp.is_valid()) {
-        ip_address = tmp.get_ip_str().str();
+      auto r_ip_address = td::IPAddress::get_ip_address(ip_address);
+      if (r_ip_address.is_ok()) {
+        r_ip_address.ok_ref().clear_ipv6_interface();
+        ip_address = r_ip_address.ok_ref().get_ip_str().str();
       }
     }
     LOG(DEBUG) << "Receive incoming query for new bot " << token << " from " << ip_address;
     if (!ip_address.empty()) {
       LOG(DEBUG) << "Check Client creation flood control for IP address " << ip_address;
-      auto res = flood_controls_.emplace(std::move(ip_address), td::FloodControlFast());
-      auto &flood_control = res.first->second;
-      if (res.second) {
-        flood_control.add_limit(60, 20);        // 20 in a minute
-        flood_control.add_limit(60 * 60, 600);  // 600 in an hour
+      auto *flood_control = flood_controls_.access(ip_address);
+      if (flood_control == nullptr) {
+        td::FloodControlFast new_flood_control;
+        new_flood_control.add_limit(60, 20);        // 20 in a minute
+        new_flood_control.add_limit(60 * 60, 600);  // 600 in an hour
+        flood_controls_.set(ip_address, std::move(new_flood_control));
+        flood_control = flood_controls_.access(ip_address);
+        CHECK(flood_control != nullptr);
       }
       auto now = td::Time::now();
-      auto wakeup_at = flood_control.get_wakeup_at();
+      auto wakeup_at = flood_control->get_wakeup_at();
       if (wakeup_at > now) {
         LOG(INFO) << "Failed to create Client from IP address " << ip_address << " with token";
         return query->set_retry_after_error(static_cast<int>(wakeup_at - now) + 1);
       }
-      flood_control.add_event(now);
+      flood_control->add_event(now);
     }
     if (is_global_flood_control_enabled_) {
       auto now = td::Time::now();
