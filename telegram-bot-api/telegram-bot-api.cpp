@@ -530,13 +530,14 @@ int main(int argc, char *argv[]) {
         .release();
   }
 
-  constexpr double WATCHDOG_TIMEOUT = 100.0;  // kick every WATCHDOG_TIMEOUT/10 = 10s; effectively disables watchdog
+  constexpr double WATCHDOG_TIMEOUT = 30.0;
+  constexpr double WATCHDOG_KICK_INTERVAL = 10.0;
   auto watchdog_id = sched.create_actor_unsafe<Watchdog>(SharedData::get_watchdog_scheduler_id(), "Watchdog",
                                                          td::this_thread::get_id(), WATCHDOG_TIMEOUT);
 
   sched.start();
 
-  double next_watchdog_kick_time = start_time;
+  double next_watchdog_kick_time = start_time + 600.0;
   double next_cron_time = start_time;
   double last_dump_time = start_time - 1000.0;
   bool close_flag = false;
@@ -590,19 +591,19 @@ int main(int argc, char *argv[]) {
 
     double now = td::Time::now();
     if (now >= next_cron_time) {
-      if (now >= next_cron_time + 10.0) {
+      if (now >= next_cron_time + 1.0) {
         next_cron_time = now;
       }
-      next_cron_time += 10.0;  // collect CPU usage statistics every 10s instead of 1s
+      next_cron_time += 1.0;
       auto guard = sched.get_main_guard();
       td::Scheduler::instance()->run_on_scheduler(SharedData::get_statistics_thread_id(),
                                                   [](td::Unit) { ServerCpuStat::update(td::Time::now()); });
     }
 
-    if (now >= start_time + 600) {
+    if (now >= next_watchdog_kick_time) {
       auto guard = sched.get_main_guard();
       send_closure(watchdog_id, &Watchdog::kick);
-      next_watchdog_kick_time = now + WATCHDOG_TIMEOUT / 10;
+      next_watchdog_kick_time = now + WATCHDOG_KICK_INTERVAL;
     }
 
     if (!need_dump_statistics.test_and_set() || now > last_dump_time + 300.0) {
