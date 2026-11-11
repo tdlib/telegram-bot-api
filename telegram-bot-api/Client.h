@@ -411,6 +411,7 @@ class Client final : public WebhookActor::Callback {
   class TdOnCheckUserCallback;
   template <class OnSuccess>
   class TdOnCheckUserNoFailCallback;
+  class TdOnCheckUsersCallback;
   template <class OnSuccess>
   class TdOnCheckChatCallback;
   template <class OnSuccess>
@@ -438,6 +439,9 @@ class Client final : public WebhookActor::Callback {
 
   template <class OnSuccess>
   void check_user_no_fail(int64 user_id, PromisedQueryPtr query, OnSuccess on_success);
+
+  template <class OnSuccess>
+  void check_users(td::vector<int64> user_ids, PromisedQueryPtr query, OnSuccess on_success);
 
   template <class OnSuccess>
   static void check_user_read_access(const UserInfo *user_info, PromisedQueryPtr query, OnSuccess on_success);

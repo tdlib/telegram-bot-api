@@ -7619,6 +7619,25 @@ class Client::TdOnCheckUserCallback final : public TdQueryCallback {
   OnSuccess on_success_;
 };
 
+class Client::TdOnCheckUsersCallback final : public TdQueryCallback {
+ public:
+  explicit TdOnCheckUsersCallback(td::Promise<td::Unit> &&promise) : promise_(std::move(promise)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      auto error = move_object_as<td_api::error>(result);
+      return promise_.set_error(td::Status::Error(error->code_, error->message_));
+    }
+
+    CHECK(result->get_id() == td_api::user::ID);
+    promise_.set_value(td::Unit());
+  }
+
+ private:
+  td::Promise<td::Unit> promise_;
+};
+
 template <class OnSuccess>
 class Client::TdOnCheckUserNoFailCallback final : public TdQueryCallback {
  public:
@@ -9249,6 +9268,38 @@ void Client::check_user_no_fail(int64 user_id, PromisedQueryPtr query, OnSuccess
   }
   send_request(make_object<td_api::getUser>(user_id),
                td::make_unique<TdOnCheckUserNoFailCallback<OnSuccess>>(std::move(query), std::move(on_success)));
+}
+
+template <class OnSuccess>
+void Client::check_users(td::vector<int64> user_ids, PromisedQueryPtr query, OnSuccess on_success) {
+  td::unique(user_ids);
+  td::remove_if(user_ids, [this](int64 user_id) {
+    const UserInfo *user_info = get_user_info(user_id);
+    return user_info != nullptr && user_info->have_access;
+  });
+  if (user_ids.empty()) {
+    return on_success(std::move(query));
+  }
+
+  td::MultiPromiseActorSafe mpas("CheckUsersMultiPromiseActor");
+  mpas.add_promise(td::PromiseCreator::lambda(
+      [actor_id = actor_id(this), query = std::move(query), on_success = std::move(on_success)](
+          td::Result<td::Unit> result) mutable {
+        td::send_lambda(actor_id, [query = std::move(query), on_success = std::move(on_success),
+                                   result = std::move(result)]() mutable {
+          if (result.is_error()) {
+            return fail_query_with_error(std::move(query), result.error().code(), result.error().message(),
+                                         "user not found");
+          }
+          on_success(std::move(query));
+        });
+      }));
+
+  auto lock = mpas.get_promise();
+  for (auto user_id : user_ids) {
+    send_request(make_object<td_api::getUser>(user_id), td::make_unique<TdOnCheckUsersCallback>(mpas.get_promise()));
+  }
+  lock.set_value(td::Unit());
 }
 
 template <class OnSuccess>
@@ -15900,13 +15951,15 @@ td::Status Client::process_set_managed_bot_access_settings_query(PromisedQueryPt
   if (is_restricted && query->has_arg("added_user_ids")) {
     TRY_RESULT_ASSIGN(added_user_ids, get_user_ids(query.get(), 10u, "added_user_ids"));
   }
-  check_user(user_id, std::move(query),
-             [this, user_id,
-              access_settings = make_object<td_api::botAccessSettings>(is_restricted, std::move(added_user_ids))](
-                 PromisedQueryPtr query) mutable {
-               send_request(make_object<td_api::setManagedBotAccessSettings>(user_id, std::move(access_settings)),
-                            td::make_unique<TdOnOkQueryCallback>(std::move(query)));
-             });
+  auto user_ids = added_user_ids;
+  user_ids.push_back(user_id);
+  check_users(std::move(user_ids), std::move(query),
+              [this, user_id,
+               access_settings = make_object<td_api::botAccessSettings>(is_restricted, std::move(added_user_ids))](
+                  PromisedQueryPtr query) mutable {
+                send_request(make_object<td_api::setManagedBotAccessSettings>(user_id, std::move(access_settings)),
+                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+              });
   return td::Status::OK();
 }
 
