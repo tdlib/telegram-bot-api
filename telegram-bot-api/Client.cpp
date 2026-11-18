@@ -3797,6 +3797,8 @@ class Client::JsonUniqueGiftMessage final : public td::Jsonable {
         object("origin", "gifted_upgrade");
         break;
       case td_api::upgradedGiftOriginBlockchain::ID:
+      case td_api::upgradedGiftOriginOnChainResale::ID:
+      case td_api::upgradedGiftOriginOnChainOffer::ID:
         LOG(ERROR) << "Receive a gift assigned from blockchain";
         object("origin", "blockchain");
         break;
@@ -4827,8 +4829,14 @@ void Client::JsonRichBlock::store(td::JsonValueScope *scope) const {
     }
     case td_api::pageBlockExpandableBlockQuote::ID: {
       const auto *block = static_cast<const td_api::pageBlockExpandableBlockQuote *>(block_);
-      object("type", "expandable_blockquote");
-      object("text", JsonRichText(block->text_.get(), client_));
+      if (block->blocks_.size() == 1 && block->blocks_[0]->get_id() == td_api::pageBlockParagraph::ID) {
+        const auto *paragraph = static_cast<const td_api::pageBlockParagraph *>(block->blocks_[0].get());
+        object("type", "expandable_blockquote");
+        object("text", JsonRichText(paragraph->text_.get(), client_));
+      } else {
+        object("type", "blockquote");
+        object("blocks", JsonRichBlocks(block->blocks_, client_));
+      }
       if (block->credit_ != nullptr) {
         object("credit", JsonRichText(block->credit_.get(), client_));
       }
@@ -5656,6 +5664,10 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     }
     case td_api::messageUnpaidMessagesAllowedByLink::ID:
       object("paid_messages_waived", JsonEmptyObject());
+      break;
+    case td_api::messageBotInvite::ID:
+      break;
+    case td_api::messageUpgradedGiftOnChainPurchaseOffer::ID:
       break;
     default:
       UNREACHABLE();
@@ -7255,8 +7267,7 @@ class Client::TdOnReturnBusinessMessageCallback final : public TdQueryCallback {
 
 class Client::TdOnReplyToCallbackQueryCallback final : public TdQueryCallback {
  public:
-  TdOnReplyToCallbackQueryCallback(Client *client, PromisedQueryPtr query)
-      : client_(client), query_(std::move(query)) {
+  TdOnReplyToCallbackQueryCallback(Client *client, PromisedQueryPtr query) : client_(client), query_(std::move(query)) {
   }
 
   void on_result(object_ptr<td_api::Object> result) final {
@@ -9282,9 +9293,9 @@ void Client::check_users(td::vector<int64> user_ids, PromisedQueryPtr query, OnS
   }
 
   td::MultiPromiseActorSafe mpas("CheckUsersMultiPromiseActor");
-  mpas.add_promise(td::PromiseCreator::lambda(
-      [actor_id = actor_id(this), query = std::move(query), on_success = std::move(on_success)](
-          td::Result<td::Unit> result) mutable {
+  mpas.add_promise(
+      td::PromiseCreator::lambda([actor_id = actor_id(this), query = std::move(query),
+                                  on_success = std::move(on_success)](td::Result<td::Unit> result) mutable {
         td::send_lambda(actor_id, [query = std::move(query), on_success = std::move(on_success),
                                    result = std::move(result)]() mutable {
           if (result.is_error()) {
@@ -10527,15 +10538,14 @@ void Client::on_closed() {
   if (logging_out_) {
     parameters_->shared_data_->webhook_db_->erase(bot_token_with_dc_);
 
-    td::Scheduler::instance()->run_on_scheduler(
-        SharedData::get_file_gc_scheduler_id(),
-        [actor_id = actor_id(this), dir = dir_, files_dir = files_dir_](td::Unit) {
-          CHECK(dir.size() >= 24);
-          CHECK(dir.back() == TD_DIR_SLASH);
-          td::rmrf(dir).ignore();
-          td::rmrf(files_dir).ignore();
-          send_closure(actor_id, &Client::finish_closing);
-        });
+    td::Scheduler::instance()->run_on_scheduler(SharedData::get_file_gc_scheduler_id(),
+                                                [actor_id = actor_id(this), dir = dir_, files_dir = files_dir_]() {
+                                                  CHECK(dir.size() >= 24);
+                                                  CHECK(dir.back() == TD_DIR_SLASH);
+                                                  td::rmrf(dir).ignore();
+                                                  td::rmrf(files_dir).ignore();
+                                                  send_closure(actor_id, &Client::finish_closing);
+                                                });
     return;
   }
 
@@ -12897,7 +12907,9 @@ td::Result<td_api::object_ptr<td_api::InputPageBlock>> Client::get_input_page_bl
   if (type == "expandable_blockquote") {
     TRY_RESULT(text, get_rich_text(object.extract_field("text")));
     TRY_RESULT(credit, get_rich_text(object.extract_field("credit")));
-    return make_object<td_api::inputPageBlockExpandableBlockQuote>(std::move(text), std::move(credit));
+    td::vector<object_ptr<td_api::InputPageBlock>> blocks;
+    blocks.push_back(make_object<td_api::inputPageBlockParagraph>(std::move(text)));
+    return make_object<td_api::inputPageBlockExpandableBlockQuote>(std::move(blocks), std::move(credit));
   }
   if (type == "pullquote") {
     TRY_RESULT(text, get_rich_text(object.extract_field("text")));
@@ -14356,19 +14368,16 @@ void Client::on_cmd(PromisedQueryPtr query, bool force) {
 
       td::create_actor<td::SleepActor>(
           "DeleteLastSendMessageTimeSleepActor", last_send_message_time + min_delay - (now - max_bucket_volume),
-          td::PromiseCreator::lambda([actor_id = actor_id(this), file_size,
-                                      max_delay = max_bucket_volume + min_delay](td::Result<td::Unit>) mutable {
+          [actor_id = actor_id(this), file_size, max_delay = max_bucket_volume + min_delay] {
             send_closure(actor_id, &Client::delete_last_send_message_time, file_size, max_delay);
-          }))
+          })
           .release();
 
       if (last_send_message_time > now) {
-        td::create_actor<td::SleepActor>(
-            "DoSendMessageSleepActor", last_send_message_time - now,
-            td::PromiseCreator::lambda(
-                [actor_id = actor_id(this), query = std::move(query)](td::Result<td::Unit>) mutable {
-                  send_closure(actor_id, &Client::on_cmd, std::move(query), true);
-                }))
+        td::create_actor<td::SleepActor>("DoSendMessageSleepActor", last_send_message_time - now,
+                                         [actor_id = actor_id(this), query = std::move(query)]() mutable {
+                                           send_closure(actor_id, &Client::on_cmd, std::move(query), true);
+                                         })
             .release();
         return;
       }
@@ -14944,10 +14953,10 @@ td::Status Client::process_send_widget_query(PromisedQueryPtr &query) {
   auto show_caption_above_media = to_bool(query->arg("show_caption_above_media"));
   auto allow_queries = to_bool(query->arg("allow_queries"));
   auto is_shared = to_bool(query->arg("is_shared"));
-  do_send_message(make_object<td_api::inputMessageWidget>(width, height, html.str(), std::move(public_data),
-                                                          std::move(chat_data), std::move(caption),
-                                                          show_caption_above_media, allow_queries, is_shared),
-                  std::move(query));
+  do_send_message(
+      make_object<td_api::inputMessageWidget>(width, height, html.str(), std::move(public_data), std::move(chat_data),
+                                              std::move(caption), show_caption_above_media, allow_queries, is_shared),
+      std::move(query));
   return td::Status::OK();
 }
 
@@ -17841,13 +17850,13 @@ void Client::webhook_error(td::Status status) {
 
 void Client::webhook_closed(td::Status status) {
   if (has_webhook_certificate_) {
-    td::Scheduler::instance()->run_on_scheduler(SharedData::get_webhook_certificate_scheduler_id(),
-                                                [actor_id = actor_id(this), path = get_webhook_certificate_path(),
-                                                 status = std::move(status)](td::Unit) mutable {
-                                                  LOG(INFO) << "Unlink certificate " << path;
-                                                  td::unlink(path).ignore();
-                                                  send_closure(actor_id, &Client::on_webhook_closed, std::move(status));
-                                                });
+    td::Scheduler::instance()->run_on_scheduler(
+        SharedData::get_webhook_certificate_scheduler_id(),
+        [actor_id = actor_id(this), path = get_webhook_certificate_path(), status = std::move(status)]() mutable {
+          LOG(INFO) << "Unlink certificate " << path;
+          td::unlink(path).ignore();
+          send_closure(actor_id, &Client::on_webhook_closed, std::move(status));
+        });
     return;
   }
   on_webhook_closed(std::move(status));
@@ -17956,7 +17965,7 @@ void Client::do_set_webhook(PromisedQueryPtr query, bool was_deleted) {
         td::Scheduler::instance()->run_on_scheduler(
             SharedData::get_webhook_certificate_scheduler_id(),
             [actor_id = actor_id(this), from_path = cert_file_ptr->temp_file_name,
-             to_path = get_webhook_certificate_path(), size](td::Unit) {
+             to_path = get_webhook_certificate_path(), size]() {
               LOG(INFO) << "Copy certificate to " << to_path;
               auto status = td::copy_file(from_path, to_path, size);
               send_closure(actor_id, &Client::on_webhook_certificate_copied, std::move(status));
@@ -18222,9 +18231,7 @@ void Client::fail_query_conflict(td::CSlice message, PromisedQueryPtr &&query) {
   } else {
     td::create_actor<td::SleepActor>(
         "FailQueryConflictSleepActor", 3.0,
-        td::PromiseCreator::lambda([message = message.str(), query = std::move(query)](td::Result<> result) mutable {
-          fail_query(409, message, std::move(query));
-        }))
+        [message = message.str(), query = std::move(query)]() mutable { fail_query(409, message, std::move(query)); })
         .release();
   }
 }
@@ -18240,11 +18247,9 @@ void Client::fail_query_closing(PromisedQueryPtr &&query) {
 
 void Client::fail_query_flood_limit_exceeded(PromisedQueryPtr &&query) {
   flood_limited_query_count_++;
-  td::create_actor<td::SleepActor>(
-      "FailQueryFloodLimitExceededActor", 3.0,
-      td::PromiseCreator::lambda(
-          [query = std::move(query)](td::Result<td::Unit> result) mutable { query->set_retry_after_error(60); }))
-      .release();
+  td::create_actor<td::SleepActor>("FailQueryFloodLimitExceededActor", 3.0, [query = std::move(query)] {
+    query->set_retry_after_error(60);
+  }).release();
 }
 
 Client::ClosingError Client::get_closing_error() {
@@ -19749,6 +19754,8 @@ bool Client::need_skip_update_message(int64 chat_id, const MessageInfo *message_
     case td_api::messageChatHasProtectedContentToggled::ID:
     case td_api::messageChatHasProtectedContentDisableRequested::ID:
     case td_api::messageTonConnectRequest::ID:
+    case td_api::messageBotInvite::ID:
+    case td_api::messageUpgradedGiftOnChainPurchaseOffer::ID:
       return true;
     default:
       break;
@@ -19810,6 +19817,8 @@ td::int64 Client::get_same_chat_reply_to_message_id(const MessageInfo *message_i
       }
       case td_api::messageUpgradedGiftPurchaseOfferRejected::ID:
         return static_cast<const td_api::messageUpgradedGiftPurchaseOfferRejected *>(content)->offer_message_id_;
+      case td_api::messageUpgradedGiftOnChainPurchaseOffer::ID:
+        return static_cast<const td_api::messageUpgradedGiftOnChainPurchaseOffer *>(content)->offer_message_id_;
       case td_api::messageChatHasProtectedContentToggled::ID:
         return static_cast<const td_api::messageChatHasProtectedContentToggled *>(content)->request_message_id_;
       case td_api::messagePollOptionAdded::ID:
@@ -20112,6 +20121,9 @@ td::vector<td::int64> Client::get_message_content_sticker_set_ids(const object_p
     case td_api::messageUpgradedGiftPurchaseOfferRejected::ID:
       return get_upgraded_gift_sticker_set_ids(
           static_cast<const td_api::messageUpgradedGiftPurchaseOfferRejected *>(content.get())->gift_);
+    case td_api::messageUpgradedGiftOnChainPurchaseOffer::ID:
+      return get_upgraded_gift_sticker_set_ids(
+          static_cast<const td_api::messageUpgradedGiftOnChainPurchaseOffer *>(content.get())->gift_);
     default:
       break;
   }
