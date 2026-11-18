@@ -18,6 +18,7 @@
 #include "td/actor/actor.h"
 #include "td/actor/SignalSlot.h"
 
+#include "td/utils/Action.h"
 #include "td/utils/common.h"
 #include "td/utils/Container.h"
 #include "td/utils/FlatHashMap.h"
@@ -404,106 +405,95 @@ class Client final : public WebhookActor::Callback {
   struct ChatInfo;
   struct BotCommandScope;
   struct BotUserIds;
+  struct BusinessConnection;
 
   enum class AccessRights { Read, ReadMembers, Edit, Write, ReadEphemeral, EditEphemeral, WriteEphemeral };
 
-  template <class OnSuccess>
+  using OnUserChecked = td::Action<void(PromisedQueryPtr)>;
+  using OnChatChecked = td::Action<void(int64, PromisedQueryPtr)>;
+  using OnMessageTopicChecked = td::Action<void(int64, object_ptr<td_api::MessageTopic>, PromisedQueryPtr)>;
+  using OnBusinessConnectionChecked = td::Action<void(const BusinessConnection *, PromisedQueryPtr)>;
+  using OnBusinessConnectionChatChecked = td::Action<void(const BusinessConnection *, int64, PromisedQueryPtr)>;
+  using OnBotCommandScopeChecked = td::Action<void(object_ptr<td_api::BotCommandScope>, PromisedQueryPtr)>;
+  using OnRemoteFileIdChecked = td::Action<void(object_ptr<td_api::file>, PromisedQueryPtr)>;
+  using OnMessageChecked = td::Action<void(int64, int64, PromisedQueryPtr)>;
+  using OnMessagesChecked = td::Action<void(int64, td::vector<int64>, PromisedQueryPtr)>;
+  using OnReplyParametersChecked =
+      td::Action<void(int64, object_ptr<td_api::MessageTopic>, CheckedReplyParameters, PromisedQueryPtr)>;
+  using OnStickerSetResolved = td::Action<void(int64, PromisedQueryPtr)>;
+  using OnReplyMarkupResolved = td::Action<void(object_ptr<td_api::ReplyMarkup>, PromisedQueryPtr)>;
+  using OnInlineQueryResultsResolved =
+      td::Action<void(td::vector<object_ptr<td_api::InputInlineQueryResult>>, PromisedQueryPtr)>;
+  using OnChatMemberReceived = td::Action<void(object_ptr<td_api::chatMember>, PromisedQueryPtr)>;
+
   class TdOnCheckUserCallback;
-  template <class OnSuccess>
   class TdOnCheckUserNoFailCallback;
   class TdOnCheckUsersCallback;
-  template <class OnSuccess>
   class TdOnCheckChatCallback;
-  template <class OnSuccess>
   class TdOnCheckChatNoFailCallback;
-  template <class OnSuccess>
   class TdOnCheckMessageCallback;
-  template <class OnSuccess>
   class TdOnCheckMessagesCallback;
-  template <class OnSuccess>
   class TdOnCheckForumTopicCallback;
-  template <class OnSuccess>
   class TdOnCheckBusinessConnectionCallback;
-  template <class OnSuccess>
   class TdOnCheckRemoteFileIdCallback;
-  template <class OnSuccess>
   class TdOnGetChatMemberCallback;
 
-  template <class OnSuccess>
   class TdOnSearchStickerSetCallback;
 
   class TdOnResolveBotUsernameCallback;
 
-  template <class OnSuccess>
-  void check_user(int64 user_id, PromisedQueryPtr query, OnSuccess on_success);
+  void check_user(int64 user_id, PromisedQueryPtr query, OnUserChecked on_success);
 
-  template <class OnSuccess>
-  void check_user_no_fail(int64 user_id, PromisedQueryPtr query, OnSuccess on_success);
+  void check_user_no_fail(int64 user_id, PromisedQueryPtr query, OnUserChecked on_success);
 
-  template <class OnSuccess>
-  void check_users(td::vector<int64> user_ids, PromisedQueryPtr query, OnSuccess on_success);
+  void check_users(td::vector<int64> user_ids, PromisedQueryPtr query, OnUserChecked on_success);
 
-  template <class OnSuccess>
-  static void check_user_read_access(const UserInfo *user_info, PromisedQueryPtr query, OnSuccess on_success);
+  static void check_user_read_access(const UserInfo *user_info, PromisedQueryPtr query, OnUserChecked on_success);
 
-  template <class OnSuccess>
   void check_chat_access(int64 chat_id, AccessRights access_rights, const ChatInfo *chat_info, PromisedQueryPtr query,
-                         OnSuccess on_success) const;
+                         OnChatChecked on_success) const;
 
-  template <class OnSuccess>
-  void check_chat(td::Slice chat_id_str, AccessRights access_rights, PromisedQueryPtr query, OnSuccess on_success,
+  void check_chat(td::Slice chat_id_str, AccessRights access_rights, PromisedQueryPtr query, OnChatChecked on_success,
                   bool allow_unknown_user = false);
 
-  template <class OnSuccess>
-  void check_chat_no_fail(td::Slice chat_id_str, PromisedQueryPtr query, OnSuccess on_success);
+  void check_chat_no_fail(td::Slice chat_id_str, PromisedQueryPtr query, OnChatChecked on_success);
 
-  template <class OnSuccess>
   void check_message_topic(td::Slice chat_id_str, AccessRights access_rights, int32 forum_topic_id,
-                           int64 direct_messages_topic_id, PromisedQueryPtr query, OnSuccess on_success,
+                           int64 direct_messages_topic_id, PromisedQueryPtr query, OnMessageTopicChecked on_success,
                            bool allow_unknown_user = false);
 
   static td::Result<int64> get_business_connection_chat_id(td::Slice chat_id_str);
 
-  template <class OnSuccess>
   void check_business_connection(const td::string &business_connection_id, PromisedQueryPtr query,
-                                 OnSuccess on_success);
+                                 OnBusinessConnectionChecked on_success);
 
-  template <class OnSuccess>
   void check_business_connection_chat_id(const td::string &business_connection_id, const td::string &chat_id_str,
-                                         PromisedQueryPtr query, OnSuccess on_success);
+                                         PromisedQueryPtr query, OnBusinessConnectionChatChecked on_success);
 
-  template <class OnSuccess>
-  void check_bot_command_scope(BotCommandScope &&scope, PromisedQueryPtr query, OnSuccess on_success);
+  void check_bot_command_scope(BotCommandScope &&scope, PromisedQueryPtr query, OnBotCommandScopeChecked on_success);
 
-  template <class OnSuccess>
-  void check_remote_file_id(td::string file_id, PromisedQueryPtr query, OnSuccess on_success);
+  void check_remote_file_id(td::string file_id, PromisedQueryPtr query, OnRemoteFileIdChecked on_success);
 
-  template <class OnSuccess>
   void check_message(td::Slice chat_id_str, int64 message_id, bool allow_empty, AccessRights access_rights,
-                     td::Slice message_type, PromisedQueryPtr query, OnSuccess on_success);
+                     td::Slice message_type, PromisedQueryPtr query, OnMessageChecked on_success);
 
-  template <class OnSuccess>
   void check_messages(td::Slice chat_id_str, td::vector<int64> message_ids, bool allow_empty,
-                      AccessRights access_rights, td::Slice message_type, PromisedQueryPtr query, OnSuccess on_success);
+                      AccessRights access_rights, td::Slice message_type, PromisedQueryPtr query,
+                      OnMessagesChecked on_success);
 
-  template <class OnSuccess>
   void check_reply_parameters(td::Slice chat_id_str, InputReplyParameters &&reply_parameters, int32 forum_topic_id,
-                              int64 direct_messages_topic_id, PromisedQueryPtr query, OnSuccess on_success,
-                              bool allow_unknown_user = false);
+                              int64 direct_messages_topic_id, PromisedQueryPtr query,
+                              OnReplyParametersChecked on_success, bool allow_unknown_user = false);
 
-  template <class OnSuccess>
-  void resolve_sticker_set(const td::string &sticker_set_name, PromisedQueryPtr query, OnSuccess on_success);
+  void resolve_sticker_set(const td::string &sticker_set_name, PromisedQueryPtr query, OnStickerSetResolved on_success);
 
-  template <class OnSuccess>
   void resolve_reply_markup_bot_usernames(object_ptr<td_api::ReplyMarkup> reply_markup, PromisedQueryPtr query,
-                                          OnSuccess on_success);
+                                          OnReplyMarkupResolved on_success);
 
-  template <class OnSuccess>
   void resolve_inline_query_results_bot_usernames(td::vector<object_ptr<td_api::InputInlineQueryResult>> results,
-                                                  PromisedQueryPtr query, OnSuccess on_success);
+                                                  PromisedQueryPtr query, OnInlineQueryResultsResolved on_success);
 
-  template <class OnSuccess>
-  void get_chat_member(int64 chat_id, int64 user_id, PromisedQueryPtr query, OnSuccess on_success);
+  void get_chat_member(int64 chat_id, int64 user_id, PromisedQueryPtr query, OnChatMemberReceived on_success);
 
   void send_request(object_ptr<td_api::Function> &&f, td::unique_ptr<TdQueryCallback> handler);
 

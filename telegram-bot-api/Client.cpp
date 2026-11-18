@@ -7604,10 +7604,9 @@ class Client::TdOnOkQueryCallback final : public TdQueryCallback {
   PromisedQueryPtr query_;
 };
 
-template <class OnSuccess>
 class Client::TdOnCheckUserCallback final : public TdQueryCallback {
  public:
-  TdOnCheckUserCallback(const Client *client, PromisedQueryPtr query, OnSuccess on_success)
+  TdOnCheckUserCallback(const Client *client, PromisedQueryPtr query, OnUserChecked on_success)
       : client_(client), query_(std::move(query)), on_success_(std::move(on_success)) {
   }
 
@@ -7627,7 +7626,7 @@ class Client::TdOnCheckUserCallback final : public TdQueryCallback {
  private:
   const Client *client_;
   PromisedQueryPtr query_;
-  OnSuccess on_success_;
+  OnUserChecked on_success_;
 };
 
 class Client::TdOnCheckUsersCallback final : public TdQueryCallback {
@@ -7649,10 +7648,9 @@ class Client::TdOnCheckUsersCallback final : public TdQueryCallback {
   td::Promise<td::Unit> promise_;
 };
 
-template <class OnSuccess>
 class Client::TdOnCheckUserNoFailCallback final : public TdQueryCallback {
  public:
-  TdOnCheckUserNoFailCallback(PromisedQueryPtr query, OnSuccess on_success)
+  TdOnCheckUserNoFailCallback(PromisedQueryPtr query, OnUserChecked on_success)
       : query_(std::move(query)), on_success_(std::move(on_success)) {
   }
 
@@ -7662,14 +7660,13 @@ class Client::TdOnCheckUserNoFailCallback final : public TdQueryCallback {
 
  private:
   PromisedQueryPtr query_;
-  OnSuccess on_success_;
+  OnUserChecked on_success_;
 };
 
-template <class OnSuccess>
 class Client::TdOnCheckChatCallback final : public TdQueryCallback {
  public:
   TdOnCheckChatCallback(const Client *client, bool by_username, AccessRights access_rights, PromisedQueryPtr query,
-                        OnSuccess on_success)
+                        OnChatChecked on_success)
       : client_(client)
       , by_username_(by_username)
       , access_rights_(access_rights)
@@ -7716,13 +7713,12 @@ class Client::TdOnCheckChatCallback final : public TdQueryCallback {
   bool by_username_;
   AccessRights access_rights_;
   PromisedQueryPtr query_;
-  OnSuccess on_success_;
+  OnChatChecked on_success_;
 };
 
-template <class OnSuccess>
 class Client::TdOnCheckChatNoFailCallback final : public TdQueryCallback {
  public:
-  TdOnCheckChatNoFailCallback(int64 chat_id, PromisedQueryPtr query, OnSuccess on_success)
+  TdOnCheckChatNoFailCallback(int64 chat_id, PromisedQueryPtr query, OnChatChecked on_success)
       : chat_id_(chat_id), query_(std::move(query)), on_success_(std::move(on_success)) {
   }
 
@@ -7733,13 +7729,12 @@ class Client::TdOnCheckChatNoFailCallback final : public TdQueryCallback {
  private:
   int64 chat_id_;
   PromisedQueryPtr query_;
-  OnSuccess on_success_;
+  OnChatChecked on_success_;
 };
 
-template <class OnSuccess>
 class Client::TdOnCheckBusinessConnectionCallback final : public TdQueryCallback {
  public:
-  TdOnCheckBusinessConnectionCallback(Client *client, PromisedQueryPtr query, OnSuccess on_success)
+  TdOnCheckBusinessConnectionCallback(Client *client, PromisedQueryPtr query, OnBusinessConnectionChecked on_success)
       : client_(client), query_(std::move(query)), on_success_(std::move(on_success)) {
   }
 
@@ -7757,13 +7752,12 @@ class Client::TdOnCheckBusinessConnectionCallback final : public TdQueryCallback
  private:
   Client *client_;
   PromisedQueryPtr query_;
-  OnSuccess on_success_;
+  OnBusinessConnectionChecked on_success_;
 };
 
-template <class OnSuccess>
 class Client::TdOnSearchStickerSetCallback final : public TdQueryCallback {
  public:
-  TdOnSearchStickerSetCallback(PromisedQueryPtr query, OnSuccess on_success)
+  TdOnSearchStickerSetCallback(PromisedQueryPtr query, OnStickerSetResolved on_success)
       : query_(std::move(query)), on_success_(std::move(on_success)) {
   }
 
@@ -7779,7 +7773,7 @@ class Client::TdOnSearchStickerSetCallback final : public TdQueryCallback {
 
  private:
   PromisedQueryPtr query_;
-  OnSuccess on_success_;
+  OnStickerSetResolved on_success_;
 };
 
 class Client::TdOnResolveBotUsernameCallback final : public TdQueryCallback {
@@ -7814,11 +7808,10 @@ class Client::TdOnResolveBotUsernameCallback final : public TdQueryCallback {
   td::string username_;
 };
 
-template <class OnSuccess>
 class Client::TdOnCheckMessageCallback final : public TdQueryCallback {
  public:
   TdOnCheckMessageCallback(Client *client, int64 chat_id, int64 message_id, bool allow_empty, td::Slice message_type,
-                           PromisedQueryPtr query, OnSuccess on_success)
+                           PromisedQueryPtr query, OnMessageChecked on_success)
       : client_(client)
       , chat_id_(chat_id)
       , message_id_(message_id)
@@ -7854,14 +7847,13 @@ class Client::TdOnCheckMessageCallback final : public TdQueryCallback {
   bool allow_empty_;
   td::Slice message_type_;
   PromisedQueryPtr query_;
-  OnSuccess on_success_;
+  OnMessageChecked on_success_;
 };
 
-template <class OnSuccess>
 class Client::TdOnCheckMessagesCallback final : public TdQueryCallback {
  public:
   TdOnCheckMessagesCallback(Client *client, int64 chat_id, bool allow_empty, td::Slice message_type,
-                            PromisedQueryPtr query, OnSuccess on_success)
+                            PromisedQueryPtr query, OnMessagesChecked on_success)
       : client_(client)
       , chat_id_(chat_id)
       , allow_empty_(allow_empty)
@@ -7905,14 +7897,13 @@ class Client::TdOnCheckMessagesCallback final : public TdQueryCallback {
   bool allow_empty_;
   td::Slice message_type_;
   PromisedQueryPtr query_;
-  OnSuccess on_success_;
+  OnMessagesChecked on_success_;
 };
 
-template <class OnSuccess>
 class Client::TdOnCheckForumTopicCallback final : public TdQueryCallback {
  public:
   TdOnCheckForumTopicCallback(Client *client, int64 chat_id, int32 forum_topic_id, PromisedQueryPtr query,
-                              OnSuccess on_success)
+                              OnMessageTopicChecked on_success)
       : client_(client)
       , chat_id_(chat_id)
       , forum_topic_id_(forum_topic_id)
@@ -7940,10 +7931,10 @@ class Client::TdOnCheckForumTopicCallback final : public TdQueryCallback {
                                   int64 chat_id, int64 message_id, PromisedQueryPtr query) mutable {
         on_success(chat_id, make_object<td_api::messageTopicForum>(forum_topic_id), std::move(query));
       };
-      return client_->send_request(make_object<td_api::getMessage>(chat_id_, message_id),
-                                   td::make_unique<TdOnCheckMessageCallback<decltype(on_check_message)>>(
-                                       client_, chat_id_, message_id, true, "top forum topic message",
-                                       std::move(query_), std::move(on_check_message)));
+      return client_->send_request(
+          make_object<td_api::getMessage>(chat_id_, message_id),
+          td::make_unique<TdOnCheckMessageCallback>(client_, chat_id_, message_id, true, "top forum topic message",
+                                                    std::move(query_), std::move(on_check_message)));
     }
     on_success_(chat_id_, make_object<td_api::messageTopicForum>(forum_topic_id_), std::move(query_));
   }
@@ -7953,13 +7944,12 @@ class Client::TdOnCheckForumTopicCallback final : public TdQueryCallback {
   int64 chat_id_;
   int32 forum_topic_id_;
   PromisedQueryPtr query_;
-  OnSuccess on_success_;
+  OnMessageTopicChecked on_success_;
 };
 
-template <class OnSuccess>
 class Client::TdOnCheckRemoteFileIdCallback final : public TdQueryCallback {
  public:
-  TdOnCheckRemoteFileIdCallback(PromisedQueryPtr query, OnSuccess on_success)
+  TdOnCheckRemoteFileIdCallback(PromisedQueryPtr query, OnRemoteFileIdChecked on_success)
       : query_(std::move(query)), on_success_(std::move(on_success)) {
   }
 
@@ -7974,13 +7964,12 @@ class Client::TdOnCheckRemoteFileIdCallback final : public TdQueryCallback {
 
  private:
   PromisedQueryPtr query_;
-  OnSuccess on_success_;
+  OnRemoteFileIdChecked on_success_;
 };
 
-template <class OnSuccess>
 class Client::TdOnGetChatMemberCallback final : public TdQueryCallback {
  public:
-  TdOnGetChatMemberCallback(PromisedQueryPtr query, OnSuccess on_success)
+  TdOnGetChatMemberCallback(PromisedQueryPtr query, OnChatMemberReceived on_success)
       : query_(std::move(query)), on_success_(std::move(on_success)) {
   }
 
@@ -7995,7 +7984,7 @@ class Client::TdOnGetChatMemberCallback final : public TdQueryCallback {
 
  private:
   PromisedQueryPtr query_;
-  OnSuccess on_success_;
+  OnChatMemberReceived on_success_;
 };
 
 class Client::TdOnDownloadFileCallback final : public TdQueryCallback {
@@ -9251,8 +9240,7 @@ void Client::on_get_sticker_set_name(int64 set_id, const td::string &name) {
   }
 }
 
-template <class OnSuccess>
-void Client::check_user_read_access(const UserInfo *user_info, PromisedQueryPtr query, OnSuccess on_success) {
+void Client::check_user_read_access(const UserInfo *user_info, PromisedQueryPtr query, OnUserChecked on_success) {
   CHECK(user_info != nullptr);
   if (!user_info->have_access) {
     // return fail_query(400, "Bad Request: have no access to the user", std::move(query));
@@ -9260,29 +9248,26 @@ void Client::check_user_read_access(const UserInfo *user_info, PromisedQueryPtr 
   on_success(std::move(query));
 }
 
-template <class OnSuccess>
-void Client::check_user(int64 user_id, PromisedQueryPtr query, OnSuccess on_success) {
+void Client::check_user(int64 user_id, PromisedQueryPtr query, OnUserChecked on_success) {
   const UserInfo *user_info = get_user_info(user_id);
   if (user_info != nullptr && user_info->have_access) {
     return check_user_read_access(user_info, std::move(query), std::move(on_success));
   }
   send_request(make_object<td_api::getUser>(user_id),
-               td::make_unique<TdOnCheckUserCallback<OnSuccess>>(this, std::move(query), std::move(on_success)));
+               td::make_unique<TdOnCheckUserCallback>(this, std::move(query), std::move(on_success)));
 }
 
-template <class OnSuccess>
-void Client::check_user_no_fail(int64 user_id, PromisedQueryPtr query, OnSuccess on_success) {
+void Client::check_user_no_fail(int64 user_id, PromisedQueryPtr query, OnUserChecked on_success) {
   const UserInfo *user_info = get_user_info(user_id);
   if (user_info != nullptr && user_info->have_access) {
     on_success(std::move(query));
     return;
   }
   send_request(make_object<td_api::getUser>(user_id),
-               td::make_unique<TdOnCheckUserNoFailCallback<OnSuccess>>(std::move(query), std::move(on_success)));
+               td::make_unique<TdOnCheckUserNoFailCallback>(std::move(query), std::move(on_success)));
 }
 
-template <class OnSuccess>
-void Client::check_users(td::vector<int64> user_ids, PromisedQueryPtr query, OnSuccess on_success) {
+void Client::check_users(td::vector<int64> user_ids, PromisedQueryPtr query, OnUserChecked on_success) {
   td::unique(user_ids);
   td::remove_if(user_ids, [this](int64 user_id) {
     const UserInfo *user_info = get_user_info(user_id);
@@ -9313,9 +9298,8 @@ void Client::check_users(td::vector<int64> user_ids, PromisedQueryPtr query, OnS
   lock.set_value(td::Unit());
 }
 
-template <class OnSuccess>
 void Client::check_chat_access(int64 chat_id, AccessRights access_rights, const ChatInfo *chat_info,
-                               PromisedQueryPtr query, OnSuccess on_success) const {
+                               PromisedQueryPtr query, OnChatChecked on_success) const {
   CHECK(chat_info != nullptr);
   bool is_ephemeral = access_rights == AccessRights::ReadEphemeral || access_rights == AccessRights::EditEphemeral ||
                       access_rights == AccessRights::WriteEphemeral;
@@ -9389,17 +9373,16 @@ void Client::check_chat_access(int64 chat_id, AccessRights access_rights, const 
   on_success(chat_id, std::move(query));
 }
 
-template <class OnSuccess>
-void Client::check_chat(td::Slice chat_id_str, AccessRights access_rights, PromisedQueryPtr query, OnSuccess on_success,
-                        bool allow_unknown_user) {
+void Client::check_chat(td::Slice chat_id_str, AccessRights access_rights, PromisedQueryPtr query,
+                        OnChatChecked on_success, bool allow_unknown_user) {
   if (chat_id_str.empty()) {
     return fail_query(400, "Bad Request: chat_id is empty", std::move(query));
   }
 
   if (chat_id_str[0] == '@') {
-    return send_request(make_object<td_api::searchPublicChat>(chat_id_str.str()),
-                        td::make_unique<TdOnCheckChatCallback<OnSuccess>>(this, true, access_rights, std::move(query),
-                                                                          std::move(on_success)));
+    return send_request(
+        make_object<td_api::searchPublicChat>(chat_id_str.str()),
+        td::make_unique<TdOnCheckChatCallback>(this, true, access_rights, std::move(query), std::move(on_success)));
   }
 
   auto chat_id = td::to_integer<int64>(chat_id_str);
@@ -9416,13 +9399,12 @@ void Client::check_chat(td::Slice chat_id_str, AccessRights access_rights, Promi
   if (chat_info != nullptr) {
     return check_chat_access(chat_id, access_rights, chat_info, std::move(query), std::move(on_success));
   }
-  send_request(make_object<td_api::getChat>(chat_id),
-               td::make_unique<TdOnCheckChatCallback<OnSuccess>>(this, false, access_rights, std::move(query),
-                                                                 std::move(on_success)));
+  send_request(
+      make_object<td_api::getChat>(chat_id),
+      td::make_unique<TdOnCheckChatCallback>(this, false, access_rights, std::move(query), std::move(on_success)));
 }
 
-template <class OnSuccess>
-void Client::check_chat_no_fail(td::Slice chat_id_str, PromisedQueryPtr query, OnSuccess on_success) {
+void Client::check_chat_no_fail(td::Slice chat_id_str, PromisedQueryPtr query, OnChatChecked on_success) {
   if (chat_id_str.empty()) {
     return fail_query(400, "Bad Request: sender_chat_id is empty", std::move(query));
   }
@@ -9443,14 +9425,13 @@ void Client::check_chat_no_fail(td::Slice chat_id_str, PromisedQueryPtr query, O
   if (chat_info != nullptr) {
     return on_success(chat_id, std::move(query));
   }
-  send_request(make_object<td_api::getChat>(chat_id), td::make_unique<TdOnCheckChatNoFailCallback<OnSuccess>>(
-                                                          chat_id, std::move(query), std::move(on_success)));
+  send_request(make_object<td_api::getChat>(chat_id),
+               td::make_unique<TdOnCheckChatNoFailCallback>(chat_id, std::move(query), std::move(on_success)));
 }
 
-template <class OnSuccess>
 void Client::check_message_topic(td::Slice chat_id_str, AccessRights access_rights, int32 forum_topic_id,
-                                 int64 direct_messages_topic_id, PromisedQueryPtr query, OnSuccess on_success,
-                                 bool allow_unknown_user) {
+                                 int64 direct_messages_topic_id, PromisedQueryPtr query,
+                                 OnMessageTopicChecked on_success, bool allow_unknown_user) {
   check_chat(
       chat_id_str, access_rights, std::move(query),
       [this, forum_topic_id, direct_messages_topic_id, allow_unknown_user, on_success = std::move(on_success)](
@@ -9479,8 +9460,8 @@ void Client::check_message_topic(td::Slice chat_id_str, AccessRights access_righ
         }
         if (can_be_forum && forum_topic_id != 0) {
           return send_request(make_object<td_api::getForumTopic>(chat_id, forum_topic_id),
-                              td::make_unique<TdOnCheckForumTopicCallback<OnSuccess>>(
-                                  this, chat_id, forum_topic_id, std::move(query), std::move(on_success)));
+                              td::make_unique<TdOnCheckForumTopicCallback>(this, chat_id, forum_topic_id,
+                                                                           std::move(query), std::move(on_success)));
         }
         return on_success(chat_id, nullptr, std::move(query));
       },
@@ -9499,21 +9480,18 @@ td::Result<td::int64> Client::get_business_connection_chat_id(td::Slice chat_id_
   return r_chat_id.move_as_ok();
 }
 
-template <class OnSuccess>
 void Client::check_business_connection(const td::string &business_connection_id, PromisedQueryPtr query,
-                                       OnSuccess on_success) {
+                                       OnBusinessConnectionChecked on_success) {
   auto business_connection = get_business_connection(business_connection_id);
   if (business_connection != nullptr) {
     return on_success(business_connection, std::move(query));
   }
-  send_request(
-      make_object<td_api::getBusinessConnection>(business_connection_id),
-      td::make_unique<TdOnCheckBusinessConnectionCallback<OnSuccess>>(this, std::move(query), std::move(on_success)));
+  send_request(make_object<td_api::getBusinessConnection>(business_connection_id),
+               td::make_unique<TdOnCheckBusinessConnectionCallback>(this, std::move(query), std::move(on_success)));
 }
 
-template <class OnSuccess>
 void Client::check_business_connection_chat_id(const td::string &business_connection_id, const td::string &chat_id_str,
-                                               PromisedQueryPtr query, OnSuccess on_success) {
+                                               PromisedQueryPtr query, OnBusinessConnectionChatChecked on_success) {
   auto r_chat_id = get_business_connection_chat_id(chat_id_str);
   if (r_chat_id.is_error()) {
     return fail_query_with_error(std::move(query), 400, r_chat_id.error().message());
@@ -9526,8 +9504,8 @@ void Client::check_business_connection_chat_id(const td::string &business_connec
                             });
 }
 
-template <class OnSuccess>
-void Client::check_bot_command_scope(BotCommandScope &&scope, PromisedQueryPtr query, OnSuccess on_success) {
+void Client::check_bot_command_scope(BotCommandScope &&scope, PromisedQueryPtr query,
+                                     OnBotCommandScopeChecked on_success) {
   CHECK(scope.scope_ != nullptr);
   if (scope.chat_id_.empty()) {
     on_success(std::move(scope.scope_), std::move(query));
@@ -9556,14 +9534,13 @@ void Client::check_bot_command_scope(BotCommandScope &&scope, PromisedQueryPtr q
              });
 }
 
-template <class OnSuccess>
-void Client::check_remote_file_id(td::string file_id, PromisedQueryPtr query, OnSuccess on_success) {
+void Client::check_remote_file_id(td::string file_id, PromisedQueryPtr query, OnRemoteFileIdChecked on_success) {
   if (file_id.empty()) {
     return fail_query(400, "Bad Request: file_id not specified", std::move(query));
   }
 
   send_request(make_object<td_api::getRemoteFile>(std::move(file_id), nullptr),
-               td::make_unique<TdOnCheckRemoteFileIdCallback<OnSuccess>>(std::move(query), std::move(on_success)));
+               td::make_unique<TdOnCheckRemoteFileIdCallback>(std::move(query), std::move(on_success)));
 }
 
 bool Client::is_chat_member(const object_ptr<td_api::ChatMemberStatus> &status) {
@@ -9605,9 +9582,8 @@ bool Client::have_message_access(int64 chat_id) const {
   }
 }
 
-template <class OnSuccess>
 void Client::check_message(td::Slice chat_id_str, int64 message_id, bool allow_empty, AccessRights access_rights,
-                           td::Slice message_type, PromisedQueryPtr query, OnSuccess on_success) {
+                           td::Slice message_type, PromisedQueryPtr query, OnMessageChecked on_success) {
   check_chat(chat_id_str, access_rights, std::move(query),
              [this, message_id, allow_empty, message_type, on_success = std::move(on_success)](
                  int64 chat_id, PromisedQueryPtr query) mutable {
@@ -9623,15 +9599,14 @@ void Client::check_message(td::Slice chat_id_str, int64 message_id, bool allow_e
 
                send_request(
                    make_object<td_api::getMessage>(chat_id, message_id),
-                   td::make_unique<TdOnCheckMessageCallback<OnSuccess>>(
-                       this, chat_id, message_id, allow_empty, message_type, std::move(query), std::move(on_success)));
+                   td::make_unique<TdOnCheckMessageCallback>(this, chat_id, message_id, allow_empty, message_type,
+                                                             std::move(query), std::move(on_success)));
              });
 }
 
-template <class OnSuccess>
 void Client::check_messages(td::Slice chat_id_str, td::vector<int64> message_ids, bool allow_empty,
                             AccessRights access_rights, td::Slice message_type, PromisedQueryPtr query,
-                            OnSuccess on_success) {
+                            OnMessagesChecked on_success) {
   check_chat(chat_id_str, access_rights, std::move(query),
              [this, message_ids = std::move(message_ids), allow_empty, message_type,
               on_success = std::move(on_success)](int64 chat_id, PromisedQueryPtr query) mutable {
@@ -9641,8 +9616,8 @@ void Client::check_messages(td::Slice chat_id_str, td::vector<int64> message_ids
                }
 
                send_request(make_object<td_api::getMessages>(chat_id, std::move(message_ids)),
-                            td::make_unique<TdOnCheckMessagesCallback<OnSuccess>>(
-                                this, chat_id, allow_empty, message_type, std::move(query), std::move(on_success)));
+                            td::make_unique<TdOnCheckMessagesCallback>(this, chat_id, allow_empty, message_type,
+                                                                       std::move(query), std::move(on_success)));
              });
 }
 
@@ -9665,10 +9640,9 @@ bool Client::is_reply_in_same_topic(const object_ptr<td_api::MessageTopic> &repl
   }
 }
 
-template <class OnSuccess>
 void Client::check_reply_parameters(td::Slice chat_id_str, InputReplyParameters &&reply_parameters,
                                     int32 forum_topic_id, int64 direct_messages_topic_id, PromisedQueryPtr query,
-                                    OnSuccess on_success, bool allow_unknown_user) {
+                                    OnReplyParametersChecked on_success, bool allow_unknown_user) {
   if (chat_id_str == reply_parameters.reply_in_chat_id) {
     reply_parameters.reply_in_chat_id.clear();
   }
@@ -9721,9 +9695,9 @@ void Client::check_reply_parameters(td::Slice chat_id_str, InputReplyParameters 
           }
 
           send_request(make_object<td_api::getMessage>(reply_in_chat_id, reply_to_message_id),
-                       td::make_unique<TdOnCheckMessageCallback<decltype(on_success)>>(
-                           this, reply_in_chat_id, reply_to_message_id, allow_sending_without_reply,
-                           "message to be replied", std::move(query), std::move(on_success)));
+                       td::make_unique<TdOnCheckMessageCallback>(this, reply_in_chat_id, reply_to_message_id,
+                                                                 allow_sending_without_reply, "message to be replied",
+                                                                 std::move(query), std::move(on_success)));
         };
         if (reply_parameters.reply_in_chat_id.empty()) {
           return on_reply_chat_resolved(chat_id, std::move(query));
@@ -9734,14 +9708,14 @@ void Client::check_reply_parameters(td::Slice chat_id_str, InputReplyParameters 
       allow_unknown_user);
 }
 
-template <class OnSuccess>
-void Client::resolve_sticker_set(const td::string &sticker_set_name, PromisedQueryPtr query, OnSuccess on_success) {
+void Client::resolve_sticker_set(const td::string &sticker_set_name, PromisedQueryPtr query,
+                                 OnStickerSetResolved on_success) {
   if (sticker_set_name.empty()) {
     return fail_query(400, "Bad Request: sticker_set_name is empty", std::move(query));
   }
 
   send_request(make_object<td_api::searchStickerSet>(sticker_set_name, false),
-               td::make_unique<TdOnSearchStickerSetCallback<OnSuccess>>(std::move(query), std::move(on_success)));
+               td::make_unique<TdOnSearchStickerSetCallback>(std::move(query), std::move(on_success)));
 }
 
 void Client::fix_reply_markup_bot_user_ids(object_ptr<td_api::ReplyMarkup> &reply_markup) const {
@@ -9799,9 +9773,8 @@ void Client::resolve_bot_usernames(PromisedQueryPtr query, td::Promise<PromisedQ
   bot_user_ids_.unresolved_bot_usernames_.clear();
 }
 
-template <class OnSuccess>
 void Client::resolve_reply_markup_bot_usernames(object_ptr<td_api::ReplyMarkup> reply_markup, PromisedQueryPtr query,
-                                                OnSuccess on_success) {
+                                                OnReplyMarkupResolved on_success) {
   if (!bot_user_ids_.unresolved_bot_usernames_.empty()) {
     CHECK(reply_markup != nullptr);
     CHECK(reply_markup->get_id() == td_api::replyMarkupInlineKeyboard::ID);
@@ -9818,9 +9791,9 @@ void Client::resolve_reply_markup_bot_usernames(object_ptr<td_api::ReplyMarkup> 
   on_success(std::move(reply_markup), std::move(query));
 }
 
-template <class OnSuccess>
 void Client::resolve_inline_query_results_bot_usernames(td::vector<object_ptr<td_api::InputInlineQueryResult>> results,
-                                                        PromisedQueryPtr query, OnSuccess on_success) {
+                                                        PromisedQueryPtr query,
+                                                        OnInlineQueryResultsResolved on_success) {
   if (!bot_user_ids_.unresolved_bot_usernames_.empty()) {
     return resolve_bot_usernames(
         std::move(query),
@@ -9869,14 +9842,13 @@ void Client::on_resolve_bot_username(const td::string &username, int64 user_id) 
   }
 }
 
-template <class OnSuccess>
-void Client::get_chat_member(int64 chat_id, int64 user_id, PromisedQueryPtr query, OnSuccess on_success) {
-  check_user_no_fail(
-      user_id, std::move(query),
-      [this, chat_id, user_id, on_success = std::move(on_success)](PromisedQueryPtr query) mutable {
-        send_request(make_object<td_api::getChatMember>(chat_id, make_object<td_api::messageSenderUser>(user_id)),
-                     td::make_unique<TdOnGetChatMemberCallback<OnSuccess>>(std::move(query), std::move(on_success)));
-      });
+void Client::get_chat_member(int64 chat_id, int64 user_id, PromisedQueryPtr query, OnChatMemberReceived on_success) {
+  check_user_no_fail(user_id, std::move(query),
+                     [this, chat_id, user_id, on_success = std::move(on_success)](PromisedQueryPtr query) mutable {
+                       send_request(
+                           make_object<td_api::getChatMember>(chat_id, make_object<td_api::messageSenderUser>(user_id)),
+                           td::make_unique<TdOnGetChatMemberCallback>(std::move(query), std::move(on_success)));
+                     });
 }
 
 void Client::send_request(object_ptr<td_api::Function> &&f, td::unique_ptr<TdQueryCallback> handler) {
