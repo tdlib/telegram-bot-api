@@ -3797,8 +3797,6 @@ class Client::JsonUniqueGiftMessage final : public td::Jsonable {
         object("origin", "gifted_upgrade");
         break;
       case td_api::upgradedGiftOriginBlockchain::ID:
-      case td_api::upgradedGiftOriginOnChainResale::ID:
-      case td_api::upgradedGiftOriginOnChainOffer::ID:
         LOG(ERROR) << "Receive a gift assigned from blockchain";
         object("origin", "blockchain");
         break;
@@ -3808,6 +3806,16 @@ class Client::JsonUniqueGiftMessage final : public td::Jsonable {
       case td_api::upgradedGiftOriginCraft::ID:
         LOG(ERROR) << "Receive a crafted gift";
         object("origin", "craft");
+        break;
+      case td_api::upgradedGiftOriginOnChainResale::ID: {
+        auto origin = static_cast<const td_api::upgradedGiftOriginOnChainResale *>(gift_->origin_.get());
+        object("origin", "resale");
+        object("last_resale_currency", "TON");
+        object("last_resale_amount", origin->gram_amount_);
+        break;
+      }
+      case td_api::upgradedGiftOriginOnChainOffer::ID:
+        object("origin", "offer");
         break;
       default:
         UNREACHABLE();
