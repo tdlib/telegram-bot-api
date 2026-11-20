@@ -233,6 +233,7 @@ bool Client::init_methods() {
   methods_.emplace("setmydescription", &Client::process_set_my_description_query);
   methods_.emplace("getmyshortdescription", &Client::process_get_my_short_description_query);
   methods_.emplace("setmyshortdescription", &Client::process_set_my_short_description_query);
+  methods_.emplace("setmysettings", &Client::process_set_my_settings_query);
   methods_.emplace("getchatmenubutton", &Client::process_get_chat_menu_button_query);
   methods_.emplace("setchatmenubutton", &Client::process_set_chat_menu_button_query);
   methods_.emplace("getuserprofilephotos", &Client::process_get_user_profile_photos_query);
@@ -14508,6 +14509,76 @@ td::Status Client::process_set_my_short_description_query(PromisedQueryPtr &quer
   auto language_code = query->arg("language_code");
   auto short_description = query->arg("short_description");
   send_request(make_object<td_api::setBotInfoShortDescription>(my_id_, language_code.str(), short_description.str()),
+               td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+  return td::Status::OK();
+}
+
+td::Status Client::process_set_my_settings_query(PromisedQueryPtr &query) {
+  td::vector<object_ptr<td_api::BotSetting>> settings;
+  if (query->has_arg("supports_inline_queries")) {
+    settings.push_back(make_object<td_api::botSettingIsInline>(to_bool(query->arg("supports_inline_queries"))));
+  }
+  if (query->has_arg("inline_query_placeholder")) {
+    settings.push_back(
+        make_object<td_api::botSettingInlineQueryPlaceholder>(query->arg("inline_query_placeholder").str()));
+  }
+  if (query->has_arg("needs_inline_query_location")) {
+    settings.push_back(make_object<td_api::botSettingNeedLocation>(to_bool(query->arg("needs_inline_query_location"))));
+  }
+  if (query->has_arg("inline_feedback_share_denominator")) {
+    settings.push_back(make_object<td_api::botSettingInlineFeedback>(
+        td::to_integer<int32>(query->arg("inline_feedback_share_denominator"))));
+  }
+  if (query->has_arg("can_join_groups")) {
+    settings.push_back(make_object<td_api::botSettingCanJoinGroups>(to_bool(query->arg("can_join_groups"))));
+  }
+  if (query->has_arg("can_read_all_group_messages")) {
+    settings.push_back(
+        make_object<td_api::botSettingCanReadAllGroupMessages>(to_bool(query->arg("can_read_all_group_messages"))));
+  }
+  if (query->has_arg("can_connect_to_business")) {
+    settings.push_back(
+        make_object<td_api::botSettingCanConnectToBusiness>(to_bool(query->arg("can_connect_to_business"))));
+  }
+  if (query->has_arg("can_manage_bots")) {
+    settings.push_back(make_object<td_api::botSettingCanManageBots>(to_bool(query->arg("can_manage_bots"))));
+  }
+  if (query->has_arg("supports_guest_queries")) {
+    settings.push_back(
+        make_object<td_api::botSettingSupportsGuestQueries>(to_bool(query->arg("supports_guest_queries"))));
+  }
+  if (query->has_arg("supports_join_request_queries")) {
+    settings.push_back(make_object<td_api::botSettingIsGuard>(to_bool(query->arg("supports_join_request_queries"))));
+  }
+  if (query->has_arg("has_topics_enabled")) {
+    settings.push_back(make_object<td_api::botSettingHasTopics>(to_bool(query->arg("has_topics_enabled"))));
+  }
+  if (query->has_arg("allows_users_to_create_topics")) {
+    settings.push_back(
+        make_object<td_api::botSettingAllowsUsersToCreateTopics>(to_bool(query->arg("allows_users_to_create_topics"))));
+  }
+  if (query->has_arg("has_topic_sidebar")) {
+    settings.push_back(make_object<td_api::botSettingHasTopicSidebar>(to_bool(query->arg("has_topic_sidebar"))));
+  }
+  if (query->has_arg("can_communicate_with_bots")) {
+    settings.push_back(
+        make_object<td_api::botSettingCanCommunicateWithBots>(to_bool(query->arg("can_communicate_with_bots"))));
+  }
+  if (query->has_arg("callback_query_mode")) {
+    auto mode = query->arg("callback_query_mode");
+    object_ptr<td_api::BotCallbackQueryMode> callback_query_mode;
+    if (mode == "default") {
+      callback_query_mode = make_object<td_api::botCallbackQueryModeDefault>();
+    } else if (mode == "auto") {
+      callback_query_mode = make_object<td_api::botCallbackQueryModeAuto>();
+    } else if (mode == "inline") {
+      callback_query_mode = make_object<td_api::botCallbackQueryModeInline>();
+    } else {
+      return td::Status::Error(400, "Unsupported callback query mode specified");
+    }
+    settings.push_back(make_object<td_api::botSettingCallbackQueryMode>(std::move(callback_query_mode)));
+  }
+  send_request(make_object<td_api::setBotSettings>(my_id_, std::move(settings)),
                td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   return td::Status::OK();
 }
