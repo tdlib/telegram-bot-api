@@ -527,10 +527,15 @@ class Client::JsonUser final : public td::Jsonable {
       object("can_join_groups", td::JsonBool(user_info->can_join_groups));
       object("can_read_all_group_messages", td::JsonBool(user_info->can_read_all_group_messages));
       object("supports_inline_queries", td::JsonBool(user_info->is_inline_bot));
+      if (!user_info->inline_query_placeholder.empty()) {
+        object("inline_query_placeholder", user_info->inline_query_placeholder);
+      }
+      object("needs_inline_query_location", td::JsonBool(user_info->need_location));
       object("supports_guest_queries", td::JsonBool(user_info->supports_guest_queries));
       object("can_connect_to_business", td::JsonBool(user_info->can_connect_to_business));
       object("has_main_web_app", td::JsonBool(user_info->has_main_web_app));
       object("has_topics_enabled", td::JsonBool(user_info->has_topics));
+      object("has_topic_sidebar", td::JsonBool(user_info->has_topic_sidebar));
       object("allows_users_to_create_topics", td::JsonBool(user_info->allows_users_to_create_topics));
       object("can_manage_bots", td::JsonBool(user_info->can_manage_bots));
       object("supports_join_request_queries", td::JsonBool(user_info->is_guard));
@@ -18511,10 +18516,13 @@ void Client::add_user(UserInfo *user_info, object_ptr<td_api::user> &&user) {
       user_info->can_join_groups = bot->can_join_groups_;
       user_info->can_read_all_group_messages = bot->can_read_all_group_messages_;
       user_info->is_inline_bot = bot->is_inline_;
+      user_info->inline_query_placeholder = bot->inline_query_placeholder_;
+      user_info->need_location = bot->need_location_;
       user_info->supports_guest_queries = bot->supports_guest_queries_;
       user_info->can_connect_to_business = bot->can_connect_to_business_;
       user_info->has_main_web_app = bot->has_main_web_app_;
       user_info->has_topics = bot->has_topics_;
+      user_info->has_topic_sidebar = bot->has_topic_sidebar_;
       user_info->allows_users_to_create_topics = bot->allows_users_to_create_topics_;
       user_info->can_manage_bots = bot->can_manage_bots_;
       user_info->is_guard = bot->is_guard_;

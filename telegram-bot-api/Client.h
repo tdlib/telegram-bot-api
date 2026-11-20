@@ -1163,6 +1163,7 @@ class Client final : public WebhookActor::Callback {
     td::vector<td::string> active_usernames;
     td::string editable_username;
     td::string language_code;
+    td::string inline_query_placeholder;
 
     object_ptr<td_api::chatPhoto> photo;
     td::string bio;
@@ -1185,10 +1186,12 @@ class Client final : public WebhookActor::Callback {
     bool has_private_forwards = false;
     bool has_restricted_voice_and_video_messages = false;
     bool is_inline_bot = false;
+    bool need_location = false;
     bool supports_guest_queries = false;
     bool is_premium = false;
     bool added_to_attachment_menu = false;
     bool has_topics = false;
+    bool has_topic_sidebar = false;
     bool allows_users_to_create_topics = false;
     bool can_manage_bots = false;
     bool is_guard = false;
