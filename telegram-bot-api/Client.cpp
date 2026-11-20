@@ -505,7 +505,7 @@ class Client::JsonUser final : public td::Jsonable {
     auto object = scope->enter_object();
     auto user_info = client_->get_user_info(user_id_);
     object("id", user_id_);
-    bool is_bot = user_info != nullptr && user_info->type == UserInfo::Type::Bot;
+    bool is_bot = (user_info != nullptr && user_info->type == UserInfo::Type::Bot) || full_bot_info_;
     object("is_bot", td::JsonBool(is_bot));
     object("first_name", user_info == nullptr ? "" : user_info->first_name);
     if (user_info != nullptr && !user_info->last_name.empty()) {
@@ -523,22 +523,25 @@ class Client::JsonUser final : public td::Jsonable {
     if (user_info != nullptr && user_info->added_to_attachment_menu) {
       object("added_to_attachment_menu", td::JsonTrue());
     }
-    if (is_bot && full_bot_info_) {
-      object("can_join_groups", td::JsonBool(user_info->can_join_groups));
-      object("can_read_all_group_messages", td::JsonBool(user_info->can_read_all_group_messages));
-      object("supports_inline_queries", td::JsonBool(user_info->is_inline_bot));
-      if (!user_info->inline_query_placeholder.empty()) {
-        object("inline_query_placeholder", user_info->inline_query_placeholder);
+    if (full_bot_info_) {
+      CHECK(user_id_ == client_->my_id_);
+      const auto *bot = client_->my_bot_type_.get();
+      CHECK(bot != nullptr);
+      object("can_join_groups", td::JsonBool(bot->can_join_groups_));
+      object("can_read_all_group_messages", td::JsonBool(bot->can_read_all_group_messages_));
+      object("supports_inline_queries", td::JsonBool(bot->is_inline_));
+      if (!bot->inline_query_placeholder_.empty()) {
+        object("inline_query_placeholder", bot->inline_query_placeholder_);
       }
-      object("needs_inline_query_location", td::JsonBool(user_info->need_location));
-      object("supports_guest_queries", td::JsonBool(user_info->supports_guest_queries));
-      object("can_connect_to_business", td::JsonBool(user_info->can_connect_to_business));
-      object("has_main_web_app", td::JsonBool(user_info->has_main_web_app));
-      object("has_topics_enabled", td::JsonBool(user_info->has_topics));
-      object("has_topic_sidebar", td::JsonBool(user_info->has_topic_sidebar));
-      object("allows_users_to_create_topics", td::JsonBool(user_info->allows_users_to_create_topics));
-      object("can_manage_bots", td::JsonBool(user_info->can_manage_bots));
-      object("supports_join_request_queries", td::JsonBool(user_info->is_guard));
+      object("needs_inline_query_location", td::JsonBool(bot->need_location_));
+      object("supports_guest_queries", td::JsonBool(bot->supports_guest_queries_));
+      object("can_connect_to_business", td::JsonBool(bot->can_connect_to_business_));
+      object("has_main_web_app", td::JsonBool(bot->has_main_web_app_));
+      object("has_topics_enabled", td::JsonBool(bot->has_topics_));
+      object("has_topic_sidebar", td::JsonBool(bot->has_topic_sidebar_));
+      object("allows_users_to_create_topics", td::JsonBool(bot->allows_users_to_create_topics_));
+      object("can_manage_bots", td::JsonBool(bot->can_manage_bots_));
+      object("supports_join_request_queries", td::JsonBool(bot->is_guard_));
     }
   }
 
@@ -14397,6 +14400,10 @@ void Client::on_cmd(PromisedQueryPtr query, bool force) {
 }
 
 td::Status Client::process_get_me_query(PromisedQueryPtr &query) {
+  if (my_bot_type_ == nullptr) {
+    LOG(ERROR) << "User isn't a bot";
+    return td::Status::Error(500, "Failed to get information about the bot");
+  }
   answer_query(JsonUser(my_id_, this, true), std::move(query));
   return td::Status::OK();
 }
@@ -18510,24 +18517,12 @@ void Client::add_user(UserInfo *user_info, object_ptr<td_api::user> &&user) {
     case td_api::userTypeRegular::ID:
       user_info->type = UserInfo::Type::Regular;
       break;
-    case td_api::userTypeBot::ID: {
+    case td_api::userTypeBot::ID:
       user_info->type = UserInfo::Type::Bot;
-      auto *bot = static_cast<const td_api::userTypeBot *>(user->type_.get());
-      user_info->can_join_groups = bot->can_join_groups_;
-      user_info->can_read_all_group_messages = bot->can_read_all_group_messages_;
-      user_info->is_inline_bot = bot->is_inline_;
-      user_info->inline_query_placeholder = bot->inline_query_placeholder_;
-      user_info->need_location = bot->need_location_;
-      user_info->supports_guest_queries = bot->supports_guest_queries_;
-      user_info->can_connect_to_business = bot->can_connect_to_business_;
-      user_info->has_main_web_app = bot->has_main_web_app_;
-      user_info->has_topics = bot->has_topics_;
-      user_info->has_topic_sidebar = bot->has_topic_sidebar_;
-      user_info->allows_users_to_create_topics = bot->allows_users_to_create_topics_;
-      user_info->can_manage_bots = bot->can_manage_bots_;
-      user_info->is_guard = bot->is_guard_;
+      if (user->id_ == my_id_) {
+        my_bot_type_ = move_object_as<td_api::userTypeBot>(user->type_);
+      }
       break;
-    }
     case td_api::userTypeDeleted::ID:
       user_info->type = UserInfo::Type::Deleted;
       break;

@@ -1163,7 +1163,6 @@ class Client final : public WebhookActor::Callback {
     td::vector<td::string> active_usernames;
     td::string editable_username;
     td::string language_code;
-    td::string inline_query_placeholder;
 
     object_ptr<td_api::chatPhoto> photo;
     td::string bio;
@@ -1179,24 +1178,12 @@ class Client final : public WebhookActor::Callback {
     int64 community_id = 0;
 
     bool have_access = false;
-    bool can_join_groups = false;
-    bool can_read_all_group_messages = false;
-    bool can_connect_to_business = false;
-    bool has_main_web_app = false;
     bool has_private_forwards = false;
     bool has_restricted_voice_and_video_messages = false;
-    bool is_inline_bot = false;
-    bool need_location = false;
-    bool supports_guest_queries = false;
     bool is_premium = false;
     bool added_to_attachment_menu = false;
-    bool has_topics = false;
-    bool has_topic_sidebar = false;
-    bool allows_users_to_create_topics = false;
-    bool can_manage_bots = false;
-    bool is_guard = false;
   };
-  static void add_user(UserInfo *user_info, object_ptr<td_api::user> &&user);
+  void add_user(UserInfo *user_info, object_ptr<td_api::user> &&user);
   UserInfo *add_user_info(int64 user_id);
   const UserInfo *get_user_info(int64 user_id) const;
 
@@ -1650,6 +1637,7 @@ class Client final : public WebhookActor::Callback {
   double start_time_ = 0;
 
   int64 my_id_ = -1;
+  object_ptr<td_api::userTypeBot> my_bot_type_;
   int32 authorization_date_ = -1;
   double next_authorization_time_ = 0;
 
