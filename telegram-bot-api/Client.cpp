@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2025
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2026
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -22,6 +22,7 @@
 #include "td/utils/logging.h"
 #include "td/utils/misc.h"
 #include "td/utils/PathView.h"
+#include "td/utils/port/config.h"
 #include "td/utils/port/path.h"
 #include "td/utils/Slice.h"
 #include "td/utils/SliceBuilder.h"
@@ -33,6 +34,7 @@
 #include "td/utils/utf8.h"
 
 #include <cstdlib>
+#include <utility>
 
 namespace telegram_bot_api {
 
@@ -68,8 +70,8 @@ int Client::get_retry_after_time(td::Slice error_message) {
   return 0;
 }
 
-void Client::fail_query_with_error(PromisedQueryPtr query, int32 error_code, td::Slice error_message,
-                                   td::Slice default_message) {
+void Client::fail_query_with_error(PromisedQueryPtr query, int32 error_code, td::CSlice error_message,
+                                   td::CSlice default_message) {
   if (error_code == 429) {
     auto retry_after_time = get_retry_after_time(error_message);
     if (retry_after_time > 0) {
@@ -106,9 +108,9 @@ void Client::fail_query_with_error(PromisedQueryPtr query, int32 error_code, td:
       error_message = default_message;
     }
     if (error_message == "MESSAGE_NOT_MODIFIED") {
-      error_message = td::Slice(
+      error_message =
           "message is not modified: specified new message content and reply markup are exactly the same as a current "
-          "content and reply markup of the message");
+          "content and reply markup of the message";
     } else if (error_message == "WC_CONVERT_URL_INVALID" || error_message == "EXTERNAL_URL_INVALID") {
       error_message = "Wrong HTTP URL specified";
     } else if (error_message == "WEBPAGE_CURL_FAILED") {
@@ -118,37 +120,37 @@ void Client::fail_query_with_error(PromisedQueryPtr query, int32 error_code, td:
     } else if (error_message == "MEDIA_GROUPED_INVALID") {
       error_message = "Can't use the media of the specified type in the album";
     } else if (error_message == "REPLY_MARKUP_TOO_LONG") {
-      error_message = td::Slice("reply markup is too long");
+      error_message = "reply markup is too long";
     } else if (error_message == "INPUT_USER_DEACTIVATED") {
       error_code = 403;
-      error_message = td::Slice("Forbidden: user is deactivated");
+      error_message = "Forbidden: user is deactivated";
     } else if (error_message == "USER_IS_BLOCKED") {
       error_code = 403;
-      error_message = td::Slice("bot was blocked by the user");
+      error_message = "bot was blocked by the user";
     } else if (error_message == "USER_ADMIN_INVALID") {
       error_code = 400;
-      error_message = td::Slice("user is an administrator of the chat");
+      error_message = "user is an administrator of the chat";
     } else if (error_message == "File generation failed") {
       error_code = 400;
-      error_message = td::Slice("can't upload file by URL");
+      error_message = "can't upload file by URL";
     } else if (error_message == "CHAT_ABOUT_NOT_MODIFIED") {
       error_code = 400;
-      error_message = td::Slice("chat description is not modified");
+      error_message = "chat description is not modified";
     } else if (error_message == "PACK_SHORT_NAME_INVALID") {
       error_code = 400;
-      error_message = td::Slice("invalid sticker set name is specified");
+      error_message = "invalid sticker set name is specified";
     } else if (error_message == "PACK_SHORT_NAME_OCCUPIED") {
       error_code = 400;
-      error_message = td::Slice("sticker set name is already occupied");
+      error_message = "sticker set name is already occupied";
     } else if (error_message == "STICKER_EMOJI_INVALID") {
       error_code = 400;
-      error_message = td::Slice("invalid sticker emojis");
+      error_message = "invalid sticker emojis";
     } else if (error_message == "QUERY_ID_INVALID") {
       error_code = 400;
-      error_message = td::Slice("query is too old and response timeout expired or query ID is invalid");
+      error_message = "query is too old and response timeout expired or query ID is invalid";
     } else if (error_message == "MESSAGE_DELETE_FORBIDDEN") {
       error_code = 400;
-      error_message = td::Slice("message can't be deleted");
+      error_message = "message can't be deleted";
     } else if (error_message == "RANK_CHANGE_FORBIDDEN" || error_message == "RANK_EMOJI_NOT_ALLOWED" ||
                error_message == "RANK_INVALID") {
       error_code = 400;
@@ -158,22 +160,25 @@ void Client::fail_query_with_error(PromisedQueryPtr query, int32 error_code, td:
         error_buf = PSTRING() << "CUSTOM_TITLE" << error_message.substr(4);
       }
       error_message = error_buf;
+    } else if (error_message == "STARGIFT_SLUG_INVALID") {
+      error_code = 400;
+      error_message = "gift not found";
     }
   }
   td::Slice prefix;
   switch (error_code) {
     case 400:
-      prefix = td::Slice("Bad Request");
+      prefix = "Bad Request";
       break;
     case 401:
-      prefix = td::Slice("Unauthorized");
+      prefix = "Unauthorized";
       break;
     case 403:
-      prefix = td::Slice("Forbidden");
+      prefix = "Forbidden";
       break;
     case 500:
-      prefix = td::Slice("Internal Server Error");
-      if (real_error_message != td::Slice("Request aborted")) {
+      prefix = "Internal Server Error";
+      if (real_error_message != "Request aborted") {
         LOG(ERROR) << "Receive Internal Server Error \"" << real_error_message << "\" from " << *query;
       }
       break;
@@ -205,7 +210,7 @@ void Client::fail_query_with_error(PromisedQueryPtr query, int32 error_code, td:
 }
 
 void Client::fail_query_with_error(PromisedQueryPtr &&query, object_ptr<td_api::error> error,
-                                   td::Slice default_message) {
+                                   td::CSlice default_message) {
   fail_query_with_error(std::move(query), error->code_, error->message_, default_message);
 }
 
@@ -253,6 +258,8 @@ bool Client::init_methods() {
   methods_.emplace("sendpoll", &Client::process_send_poll_query);
   methods_.emplace("stoppoll", &Client::process_stop_poll_query);
   methods_.emplace("sendchecklist", &Client::process_send_checklist_query);
+  methods_.emplace("sendwidget", &Client::process_send_widget_query);
+  methods_.emplace("sendsharedwidget", &Client::process_send_shared_widget_query);
   methods_.emplace("copymessage", &Client::process_copy_message_query);
   methods_.emplace("copymessages", &Client::process_copy_messages_query);
   methods_.emplace("forwardmessage", &Client::process_forward_message_query);
@@ -269,6 +276,8 @@ bool Client::init_methods() {
   methods_.emplace("editmessagecaption", &Client::process_edit_message_caption_query);
   methods_.emplace("editmessagechecklist", &Client::process_edit_message_checklist_query);
   methods_.emplace("editmessagereplymarkup", &Client::process_edit_message_reply_markup_query);
+  methods_.emplace("editmessagewidgetdata", &Client::process_edit_message_widget_data_query);
+  methods_.emplace("editsharedwidgetdata", &Client::process_edit_shared_widget_data_query);
   methods_.emplace("editephemeralmessagetext", &Client::process_edit_ephemeral_message_text_query);
   methods_.emplace("editephemeralmessagemedia", &Client::process_edit_ephemeral_message_media_query);
   methods_.emplace("editephemeralmessagecaption", &Client::process_edit_ephemeral_message_caption_query);
@@ -288,6 +297,8 @@ bool Client::init_methods() {
   methods_.emplace("refundstarpayment", &Client::process_refund_star_payment_query);
   methods_.emplace("edituserstarsubscription", &Client::process_edit_user_star_subscription_query);
   methods_.emplace("getavailablegifts", &Client::process_get_available_gifts_query);
+  methods_.emplace("getuniquegift", &Client::process_get_unique_gift_query);
+  methods_.emplace("getchatsharethemebackdrops", &Client::process_get_chat_share_theme_backdrops_query);
   methods_.emplace("sendgift", &Client::process_send_gift_query);
   methods_.emplace("giftpremiumsubscription", &Client::process_gift_premium_subscription_query);
   methods_.emplace("getmanagedbottoken", &Client::process_get_managed_bot_token_query);
@@ -308,6 +319,7 @@ bool Client::init_methods() {
   methods_.emplace("savepreparedinlinemessage", &Client::process_save_prepared_inline_message_query);
   methods_.emplace("savepreparedkeyboardbutton", &Client::process_save_prepared_keyboard_button_query);
   methods_.emplace("answercallbackquery", &Client::process_answer_callback_query_query);
+  methods_.emplace("answerwidgetquery", &Client::process_answer_widget_query_query);
   methods_.emplace("answershippingquery", &Client::process_answer_shipping_query_query);
   methods_.emplace("answerprecheckoutquery", &Client::process_answer_pre_checkout_query_query);
   methods_.emplace("exportchatinvitelink", &Client::process_export_chat_invite_link_query);
@@ -331,6 +343,7 @@ bool Client::init_methods() {
   methods_.emplace("getusergifts", &Client::process_get_user_gifts_query);
   methods_.emplace("getchatgifts", &Client::process_get_chat_gifts_query);
   methods_.emplace("convertgifttostars", &Client::process_convert_gift_to_stars_query);
+  methods_.emplace("deletebusinessaccountgift", &Client::process_delete_business_account_gift_query);
   methods_.emplace("upgradegift", &Client::process_upgrade_gift_query);
   methods_.emplace("transfergift", &Client::process_transfer_gift_query);
   methods_.emplace("setuseremojistatus", &Client::process_set_user_emoji_status_query);
@@ -578,6 +591,9 @@ class Client::JsonEntity final : public td::Jsonable {
       case td_api::textEntityTypeBankCardNumber::ID:
         object("type", "bank_card_number");
         break;
+      case td_api::textEntityTypeTonAddress::ID:
+        object("type", "ton_address");
+        break;
       case td_api::textEntityTypeBold::ID:
         object("type", "bold");
         break;
@@ -655,8 +671,7 @@ class Client::JsonVectorEntities final : public td::Jsonable {
     auto array = scope->enter_array();
     for (auto &entity : entities_) {
       auto entity_type = entity->type_->get_id();
-      if (entity_type != td_api::textEntityTypeBankCardNumber::ID &&
-          entity_type != td_api::textEntityTypeMediaTimestamp::ID) {
+      if (entity_type != td_api::textEntityTypeMediaTimestamp::ID) {
         array << JsonEntity(entity.get(), client_);
       }
     }
@@ -664,6 +679,17 @@ class Client::JsonVectorEntities final : public td::Jsonable {
 
  private:
   const td::vector<object_ptr<td_api::textEntity>> &entities_;
+  const Client *client_;
+};
+
+class Client::JsonRichMessageButton final : public td::Jsonable {
+ public:
+  JsonRichMessageButton(const td_api::inlineButton *button, const Client *client) : button_(button), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const;
+
+ private:
+  const td_api::inlineButton *button_;
   const Client *client_;
 };
 
@@ -779,6 +805,13 @@ class Client::JsonRichText final : public td::Jsonable {
         object("cashtag", text->cashtag_);
         break;
       }
+      case td_api::richTextTonAddress::ID: {
+        const auto *text = static_cast<const td_api::richTextTonAddress *>(text_);
+        object("type", "ton_address");
+        object("text", JsonRichText(text->text_.get(), client_));
+        object("address", text->address_);
+        break;
+      }
       case td_api::richTextBotCommand::ID: {
         const auto *text = static_cast<const td_api::richTextBotCommand *>(text_);
         object("type", "bot_command");
@@ -885,6 +918,12 @@ class Client::JsonRichText final : public td::Jsonable {
         object("anchor_name", text->anchor_name_);
         break;
       }
+      case td_api::richTextButton::ID: {
+        const auto *text = static_cast<const td_api::richTextButton *>(text_);
+        object("type", "button");
+        object("button", JsonRichMessageButton(text->button_.get(), client_));
+        break;
+      }
       default:
         UNREACHABLE();
     }
@@ -894,6 +933,13 @@ class Client::JsonRichText final : public td::Jsonable {
   const td_api::RichText *text_;
   const Client *client_;
 };
+
+void Client::JsonRichMessageButton::store(td::JsonValueScope *scope) const {
+  auto object = scope->enter_object();
+  object("text", JsonRichText(button_->text_.get(), client_));
+  json_store_style(object, button_->style_.get(), true);
+  json_store_inline_keyboard_button_type(object, button_->type_.get(), true);
+}
 
 class Client::JsonRichTableCell final : public td::Jsonable {
  public:
@@ -913,19 +959,7 @@ class Client::JsonRichTableCell final : public td::Jsonable {
     if (cell_->rowspan_ > 1) {
       object("rowspan", cell_->rowspan_);
     }
-    switch (cell_->align_->get_id()) {
-      case td_api::pageBlockHorizontalAlignmentLeft::ID:
-        object("align", "left");
-        break;
-      case td_api::pageBlockHorizontalAlignmentCenter::ID:
-        object("align", "center");
-        break;
-      case td_api::pageBlockHorizontalAlignmentRight::ID:
-        object("align", "right");
-        break;
-      default:
-        UNREACHABLE();
-    }
+    json_store_horizontal_alignment(object, cell_->align_.get());
     switch (cell_->valign_->get_id()) {
       case td_api::pageBlockVerticalAlignmentTop::ID:
         object("valign", "top");
@@ -1149,7 +1183,7 @@ class Client::JsonLiveLocation final : public td::Jsonable {
 
 class Client::JsonLocation final : public td::Jsonable {
  public:
-  JsonLocation(const td_api::location *location) : location_(location) {
+  explicit JsonLocation(const td_api::location *location) : location_(location) {
   }
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
@@ -1437,6 +1471,124 @@ class Client::JsonUserRating final : public td::Jsonable {
   const td_api::userRating *user_rating_;
 };
 
+class Client::JsonAreaPosition final : public td::Jsonable {
+ public:
+  explicit JsonAreaPosition(const td_api::areaPosition *position) : position_(position) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("x_percentage", position_->x_percentage_);
+    object("y_percentage", position_->y_percentage_);
+    object("width_percentage", position_->width_percentage_);
+    object("height_percentage", position_->height_percentage_);
+    object("rotation_angle", position_->rotation_angle_);
+    object("corner_radius_percentage", position_->corner_radius_percentage_);
+  }
+
+ private:
+  const td_api::areaPosition *position_;
+};
+
+class Client::JsonTonNftAttribute final : public td::Jsonable {
+ public:
+  explicit JsonTonNftAttribute(const td_api::tonNftAttribute *attribute) : attribute_(attribute) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("trait_type", attribute_->trait_type_);
+    object("value", attribute_->value_);
+  }
+
+ private:
+  const td_api::tonNftAttribute *attribute_;
+};
+
+class Client::JsonTonNft final : public td::Jsonable {
+ public:
+  JsonTonNft(const td_api::tonNft *nft, const Client *client) : nft_(nft), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const;
+
+ private:
+  const td_api::tonNft *nft_;
+  const Client *client_;
+};
+
+class Client::JsonTonWalletCardSticker final : public td::Jsonable {
+ public:
+  JsonTonWalletCardSticker(const td_api::tonWalletCardSticker *sticker, const Client *client)
+      : sticker_(sticker), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("position", JsonAreaPosition(sticker_->position_.get()));
+    object("nft", JsonTonNft(sticker_->nft_.get(), client_));
+  }
+
+ private:
+  const td_api::tonWalletCardSticker *sticker_;
+  const Client *client_;
+};
+
+class Client::JsonTonWalletCard final : public td::Jsonable {
+ public:
+  JsonTonWalletCard(const td_api::tonWalletCard *card, const Client *client) : card_(card), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("address", card_->address_);
+    object("amount", td::to_string(card_->gram_amount_));
+    object("stickers", td::json_array(card_->stickers_, [client = client_](const auto &sticker) {
+             return JsonTonWalletCardSticker(sticker.get(), client);
+           }));
+    if (!card_->background_nft_address_.empty()) {
+      object("background_nft_address", card_->background_nft_address_);
+    }
+  }
+
+ private:
+  const td_api::tonWalletCard *card_;
+  const Client *client_;
+};
+
+class Client::JsonEmojiType final : public td::Jsonable {
+ public:
+  explicit JsonEmojiType(const td_api::EmojiType *emoji_type) : emoji_type_(emoji_type) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    CHECK(emoji_type_ != nullptr);
+    switch (emoji_type_->get_id()) {
+      case td_api::emojiTypeRegular::ID:
+        object("type", "emoji");
+        object("emoji", static_cast<const td_api::emojiTypeRegular *>(emoji_type_)->emoji_);
+        break;
+      case td_api::emojiTypeCustomEmoji::ID:
+        object("type", "custom_emoji");
+        object("custom_emoji_id",
+               td::to_string(static_cast<const td_api::emojiTypeCustomEmoji *>(emoji_type_)->custom_emoji_id_));
+        break;
+      default:
+        UNREACHABLE();
+    }
+  }
+
+ private:
+  const td_api::EmojiType *emoji_type_;
+};
+
+class Client::JsonChatShareTheme final : public td::Jsonable {
+ public:
+  JsonChatShareTheme(const td_api::ProfileShareTheme *share_theme, const Client *client)
+      : share_theme_(share_theme), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const;
+
+ private:
+  const td_api::ProfileShareTheme *share_theme_;
+  const Client *client_;
+};
+
 class Client::JsonUniqueGiftColors final : public td::Jsonable {
  public:
   explicit JsonUniqueGiftColors(const td_api::upgradedGiftColors *gift_colors) : gift_colors_(gift_colors) {
@@ -1610,6 +1762,12 @@ class Client::JsonChat final : public td::Jsonable {
           if (user_info->first_profile_audio != nullptr) {
             object("first_profile_audio", JsonAudio(user_info->first_profile_audio.get(), client_));
           }
+          if (user_info->ton_wallet_card != nullptr) {
+            object("ton_wallet_card", JsonTonWalletCard(user_info->ton_wallet_card.get(), client_));
+          }
+          if (user_info->share_theme != nullptr) {
+            object("share_theme", JsonChatShareTheme(user_info->share_theme.get(), client_));
+          }
           if (user_info->paid_message_star_count > 0) {
             object("paid_message_star_count", user_info->paid_message_star_count);
           }
@@ -1733,6 +1891,9 @@ class Client::JsonChat final : public td::Jsonable {
           }
           if (supergroup_info->location != nullptr) {
             object("location", JsonChatLocation(supergroup_info->location.get()));
+          }
+          if (supergroup_info->share_theme != nullptr) {
+            object("share_theme", JsonChatShareTheme(supergroup_info->share_theme.get(), client_));
           }
           if (supergroup_info->has_paid_media_allowed && !supergroup_info->is_supergroup) {
             object("can_send_paid_media", td::JsonTrue());
@@ -1967,6 +2128,35 @@ class Client::JsonUniqueGiftBackdrop final : public td::Jsonable {
   const td_api::upgradedGiftBackdrop *backdrop_;
 };
 
+class Client::JsonChatShareThemeBackdrop final : public td::Jsonable {
+ public:
+  explicit JsonChatShareThemeBackdrop(const td_api::profileShareThemeBackdrop *backdrop) : backdrop_(backdrop) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("id", backdrop_->id_);
+    object("name", backdrop_->name_);
+    object("colors", JsonUniqueGiftBackdropColors(backdrop_->colors_.get()));
+  }
+
+ private:
+  const td_api::profileShareThemeBackdrop *backdrop_;
+};
+
+class Client::JsonChatShareThemeBackdrops final : public td::Jsonable {
+ public:
+  explicit JsonChatShareThemeBackdrops(const td_api::profileShareThemeBackdrops *backdrops) : backdrops_(backdrops) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("backdrops", td::json_array(backdrops_->backdrops_,
+                                       [](auto &backdrop) { return JsonChatShareThemeBackdrop(backdrop.get()); }));
+  }
+
+ private:
+  const td_api::profileShareThemeBackdrops *backdrops_;
+};
+
 class Client::JsonUniqueGift final : public td::Jsonable {
  public:
   JsonUniqueGift(const td_api::upgradedGift *gift, const Client *client) : gift_(gift), client_(client) {
@@ -2001,6 +2191,31 @@ class Client::JsonUniqueGift final : public td::Jsonable {
   const td_api::upgradedGift *gift_;
   const Client *client_;
 };
+
+void Client::JsonChatShareTheme::store(td::JsonValueScope *scope) const {
+  auto object = scope->enter_object();
+  CHECK(share_theme_ != nullptr);
+  switch (share_theme_->get_id()) {
+    case td_api::profileShareThemeEmoji::ID: {
+      auto theme = static_cast<const td_api::profileShareThemeEmoji *>(share_theme_);
+      object("type", "emoji");
+      object("emojis",
+             td::json_array(theme->emojis_, [](const auto &emoji_type) { return JsonEmojiType(emoji_type.get()); }));
+      if (!theme->use_default_background_) {
+        object("background_backdrop_id", theme->background_backdrop_id_);
+      }
+      break;
+    }
+    case td_api::profileShareThemeUpgradedGift::ID: {
+      auto theme = static_cast<const td_api::profileShareThemeUpgradedGift *>(share_theme_);
+      object("type", "unique_gift");
+      object("gift", JsonUniqueGift(theme->gift_.get(), client_));
+      break;
+    }
+    default:
+      UNREACHABLE();
+  }
+}
 
 class Client::JsonStarAmount final : public td::Jsonable {
  public:
@@ -2297,6 +2512,24 @@ class Client::JsonPhotoSize final : public td::Jsonable {
   const td_api::photoSize *photo_size_;
   const Client *client_;
 };
+
+void Client::JsonTonNft::store(td::JsonValueScope *scope) const {
+  auto object = scope->enter_object();
+  object("address", nft_->address_);
+  if (!nft_->collection_address_.empty()) {
+    object("collection_address", nft_->collection_address_);
+  }
+  object("index", nft_->index_);
+  object("name", nft_->name_);
+  object("description", nft_->description_);
+  if (!nft_->attributes_.empty()) {
+    object("attributes", td::json_array(nft_->attributes_,
+                                        [](const auto &attribute) { return JsonTonNftAttribute(attribute.get()); }));
+  }
+  if (nft_->gift_ != nullptr) {
+    object("gift", JsonUniqueGift(nft_->gift_.get(), client_));
+  }
+}
 
 class Client::JsonThumbnail final : public td::Jsonable {
  public:
@@ -3415,12 +3648,7 @@ class Client::JsonSuccessfulPaymentBot final : public td::Jsonable {
     auto object = scope->enter_object();
     object("currency", successful_payment_->currency_);
     object("total_amount", successful_payment_->total_amount_);
-    if (!td::check_utf8(successful_payment_->invoice_payload_)) {
-      LOG(WARNING) << "Receive non-UTF-8 invoice payload";
-      object("invoice_payload", td::JsonRawString(successful_payment_->invoice_payload_));
-    } else {
-      object("invoice_payload", successful_payment_->invoice_payload_);
-    }
+    json_store_bytes(object, "invoice_payload", successful_payment_->invoice_payload_, "invoice payload");
     if (!successful_payment_->shipping_option_id_.empty()) {
       object("shipping_option_id", successful_payment_->shipping_option_id_);
     }
@@ -3453,12 +3681,7 @@ class Client::JsonRefundedPayment final : public td::Jsonable {
     auto object = scope->enter_object();
     object("currency", refunded_payment_->currency_);
     object("total_amount", refunded_payment_->total_amount_);
-    if (!td::check_utf8(refunded_payment_->invoice_payload_)) {
-      LOG(WARNING) << "Receive non-UTF-8 invoice payload";
-      object("invoice_payload", td::JsonRawString(refunded_payment_->invoice_payload_));
-    } else {
-      object("invoice_payload", refunded_payment_->invoice_payload_);
-    }
+    json_store_bytes(object, "invoice_payload", refunded_payment_->invoice_payload_, "invoice payload");
     object("telegram_payment_charge_id", refunded_payment_->telegram_payment_charge_id_);
     if (!refunded_payment_->provider_payment_charge_id_.empty()) {
       object("provider_payment_charge_id", refunded_payment_->provider_payment_charge_id_);
@@ -3586,6 +3809,15 @@ class Client::JsonUniqueGiftMessage final : public td::Jsonable {
         break;
       default:
         UNREACHABLE();
+    }
+    if (!gift_->text_->text_.empty()) {
+      object("text", gift_->text_->text_);
+      if (!gift_->text_->entities_.empty()) {
+        object("entities", JsonVectorEntities(gift_->text_->entities_, client_));
+      }
+    }
+    if (gift_->is_private_) {
+      object("is_private", td::JsonTrue());
     }
   }
 
@@ -3954,6 +4186,25 @@ class Client::JsonBotSubscriptionUpdated final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonMessageGenerationStopped final : public td::Jsonable {
+ public:
+  JsonMessageGenerationStopped(const td_api::updateStopMessageDraft *update_stop_message_draft, const Client *client)
+      : update_stop_message_draft_(update_stop_message_draft), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("chat", JsonChat(update_stop_message_draft_->chat_id_, client_));
+    if (update_stop_message_draft_->forum_topic_id_ != 0) {
+      object("message_thread_id", update_stop_message_draft_->forum_topic_id_);
+    }
+    object("draft_id", td::to_string(update_stop_message_draft_->draft_id_));
+  }
+
+ private:
+  const td_api::updateStopMessageDraft *update_stop_message_draft_;
+  const Client *client_;
+};
+
 class Client::JsonCommunityChatAdded final : public td::Jsonable {
  public:
   JsonCommunityChatAdded(const td_api::messageChatAddedToCommunity *chat_added_to_community, const Client *client)
@@ -3967,6 +4218,71 @@ class Client::JsonCommunityChatAdded final : public td::Jsonable {
  private:
   const td_api::messageChatAddedToCommunity *chat_added_to_community_;
   const Client *client_;
+};
+
+class Client::JsonCommunityChatJoined final : public td::Jsonable {
+ public:
+  JsonCommunityChatJoined(const td_api::messageChatJoinFromCommunity *chat_join_from_community, const Client *client)
+      : chat_join_from_community_(chat_join_from_community), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("community", JsonCommunity(chat_join_from_community_->community_id_, client_));
+  }
+
+ private:
+  const td_api::messageChatJoinFromCommunity *chat_join_from_community_;
+  const Client *client_;
+};
+
+class Client::JsonTonWalletTransfer final : public td::Jsonable {
+ public:
+  explicit JsonTonWalletTransfer(const td_api::messageTonWalletTransfer *ton_wallet_transfer)
+      : ton_wallet_transfer_(ton_wallet_transfer) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("transaction_id", ton_wallet_transfer_->transaction_id_);
+    object("peer_address", ton_wallet_transfer_->peer_address_);
+    object("amount", td::to_string(ton_wallet_transfer_->amount_));
+    if (!ton_wallet_transfer_->is_comment_encrypted_) {
+      object("comment", ton_wallet_transfer_->comment_);
+    }
+  }
+
+ private:
+  const td_api::messageTonWalletTransfer *ton_wallet_transfer_;
+};
+
+class Client::JsonWidget final : public td::Jsonable {
+ public:
+  explicit JsonWidget(const td_api::messageWidget *widget) : widget_(widget) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    if (widget_->widget_id_ != 0) {
+      object("id", td::to_string(widget_->widget_id_));
+    }
+    if (widget_->width_ != 0) {
+      object("width", widget_->width_);
+    }
+    if (widget_->height_ != 0) {
+      object("height", widget_->height_);
+    }
+    object("html", widget_->html_);
+    if (!widget_->public_data_.empty()) {
+      object("public_data", widget_->public_data_);
+    }
+    if (!widget_->chat_data_.empty()) {
+      object("chat_data", widget_->chat_data_);
+    }
+    if (widget_->is_copy_) {
+      object("is_copy", td::JsonTrue());
+    }
+  }
+
+ private:
+  const td_api::messageWidget *widget_;
 };
 
 class Client::JsonGiveawayCreated final : public td::Jsonable {
@@ -4197,94 +4513,8 @@ class Client::JsonInlineKeyboardButton final : public td::Jsonable {
     if (button_->icon_custom_emoji_id_ != 0) {
       object("icon_custom_emoji_id", td::to_string(button_->icon_custom_emoji_id_));
     }
-    switch (button_->style_->get_id()) {
-      case td_api::buttonStyleDefault::ID:
-        break;
-      case td_api::buttonStylePrimary::ID:
-        object("style", "primary");
-        break;
-      case td_api::buttonStyleDanger::ID:
-        object("style", "danger");
-        break;
-      case td_api::buttonStyleSuccess::ID:
-        object("style", "success");
-        break;
-      default:
-        UNREACHABLE();
-    }
-    switch (button_->type_->get_id()) {
-      case td_api::inlineKeyboardButtonTypeUrl::ID: {
-        auto type = static_cast<const td_api::inlineKeyboardButtonTypeUrl *>(button_->type_.get());
-        object("url", type->url_);
-        break;
-      }
-      case td_api::inlineKeyboardButtonTypeLoginUrl::ID: {
-        auto type = static_cast<const td_api::inlineKeyboardButtonTypeLoginUrl *>(button_->type_.get());
-        object("url", type->url_);
-        break;
-      }
-      case td_api::inlineKeyboardButtonTypeCallback::ID:
-      case td_api::inlineKeyboardButtonTypeCallbackWithPassword::ID: {
-        auto data = get_callback_data(button_->type_);
-        if (!td::check_utf8(data)) {
-          object("callback_data", "INVALID");
-        } else {
-          object("callback_data", data);
-        }
-        break;
-      }
-      case td_api::inlineKeyboardButtonTypeCallbackGame::ID:
-        object("callback_game", JsonEmptyObject());
-        break;
-      case td_api::inlineKeyboardButtonTypeSwitchInline::ID: {
-        auto type = static_cast<const td_api::inlineKeyboardButtonTypeSwitchInline *>(button_->type_.get());
-        switch (type->target_chat_->get_id()) {
-          case td_api::targetChatCurrent::ID:
-            object("switch_inline_query_current_chat", type->query_);
-            break;
-          case td_api::targetChatChosen::ID: {
-            auto types = static_cast<const td_api::targetChatChosen *>(type->target_chat_.get())->types_.get();
-            if (types->allow_user_chats_ && types->allow_bot_chats_ && types->allow_group_chats_ &&
-                types->allow_channel_chats_) {
-              object("switch_inline_query", type->query_);
-            } else {
-              object("switch_inline_query_chosen_chat", td::json_object([&](auto &o) {
-                       o("query", type->query_);
-                       o("allow_user_chats", td::JsonBool(types->allow_user_chats_));
-                       o("allow_bot_chats", td::JsonBool(types->allow_bot_chats_));
-                       o("allow_group_chats", td::JsonBool(types->allow_group_chats_));
-                       o("allow_channel_chats", td::JsonBool(types->allow_channel_chats_));
-                     }));
-            }
-            break;
-          }
-          default:
-            UNREACHABLE();
-        }
-        break;
-      }
-      case td_api::inlineKeyboardButtonTypeBuy::ID:
-        object("pay", td::JsonTrue());
-        break;
-      case td_api::inlineKeyboardButtonTypeUser::ID: {
-        auto type = static_cast<const td_api::inlineKeyboardButtonTypeUser *>(button_->type_.get());
-        object("url", PSLICE() << "tg://user?id=" << type->user_id_);
-        break;
-      }
-      case td_api::inlineKeyboardButtonTypeWebApp::ID: {
-        auto type = static_cast<const td_api::inlineKeyboardButtonTypeWebApp *>(button_->type_.get());
-        object("web_app", JsonWebAppInfo(type->url_));
-        break;
-      }
-      case td_api::inlineKeyboardButtonTypeCopyText::ID: {
-        auto type = static_cast<const td_api::inlineKeyboardButtonTypeCopyText *>(button_->type_.get());
-        object("copy_text", JsonCopyTextButton(type->text_));
-        break;
-      }
-      default:
-        UNREACHABLE();
-        break;
-    }
+    json_store_style(object, button_->style_.get(), false);
+    json_store_inline_keyboard_button_type(object, button_->type_.get(), false);
   }
 
  private:
@@ -4313,9 +4543,12 @@ class Client::JsonReplyMarkup final : public td::Jsonable {
   }
   void store(td::JsonValueScope *scope) const {
     CHECK(reply_markup_->get_id() == td_api::replyMarkupInlineKeyboard::ID);
+    auto inline_reply_markup = static_cast<const td_api::replyMarkupInlineKeyboard *>(reply_markup_);
     auto object = scope->enter_object();
-    object("inline_keyboard",
-           JsonInlineKeyboard(static_cast<const td_api::replyMarkupInlineKeyboard *>(reply_markup_)));
+    object("inline_keyboard", JsonInlineKeyboard(inline_reply_markup));
+    if (inline_reply_markup->force_reply_) {
+      object("force_reply", td::JsonTrue());
+    }
   }
 
  private:
@@ -4481,6 +4714,11 @@ class Client::JsonExternalReplyInfo final : public td::Jsonable {
           object("checklist", JsonChecklist(content->list_.get(), client_));
           break;
         }
+        case td_api::messageWidget::ID: {
+          auto content = static_cast<const td_api::messageWidget *>(reply_->content_.get());
+          object("widget", JsonWidget(content));
+          break;
+        }
         default:
           LOG(ERROR) << "Receive external reply with " << to_string(reply_->content_);
       }
@@ -4507,6 +4745,11 @@ class Client::JsonTextQuote final : public td::Jsonable {
     object("text", quote_->text_->text_);
     if (!quote_->text_->entities_.empty()) {
       object("entities", JsonVectorEntities(quote_->text_->entities_, client_));
+    }
+    if (!quote_->rich_texts_.empty()) {
+      object("rich_texts", td::json_array(quote_->rich_texts_, [client = client_](const auto &rich_text) {
+               return JsonRichText(rich_text.get(), client);
+             }));
     }
     object("position", quote_->position_);
     if (quote_->is_manual_) {
@@ -4582,6 +4825,15 @@ void Client::JsonRichBlock::store(td::JsonValueScope *scope) const {
       }
       return;
     }
+    case td_api::pageBlockExpandableBlockQuote::ID: {
+      const auto *block = static_cast<const td_api::pageBlockExpandableBlockQuote *>(block_);
+      object("type", "expandable_blockquote");
+      object("text", JsonRichText(block->text_.get(), client_));
+      if (block->credit_ != nullptr) {
+        object("credit", JsonRichText(block->credit_.get(), client_));
+      }
+      return;
+    }
     case td_api::pageBlockPullQuote::ID: {
       const auto *block = static_cast<const td_api::pageBlockPullQuote *>(block_);
       object("type", "pullquote");
@@ -4623,6 +4875,9 @@ void Client::JsonRichBlock::store(td::JsonValueScope *scope) const {
       if (block->is_striped_) {
         object("is_striped", td::JsonTrue());
       }
+      if (block->is_compact_) {
+        object("is_compact", td::JsonTrue());
+      }
       return;
     }
     case td_api::pageBlockDetails::ID: {
@@ -4647,6 +4902,17 @@ void Client::JsonRichBlock::store(td::JsonValueScope *scope) const {
       }
       return;
     }
+    case td_api::pageBlockButtonRow::ID: {
+      const auto *block = static_cast<const td_api::pageBlockButtonRow *>(block_);
+      object("type", "buttons");
+      object("buttons", td::json_array(block->buttons_, [client = client_](auto &button) {
+               return JsonRichMessageButton(button.get(), client);
+             }));
+      if (block->align_ != nullptr) {
+        json_store_horizontal_alignment(object, block->align_.get());
+      }
+      return;
+    }
     case td_api::pageBlockAnimation::ID: {
       const auto *block = static_cast<const td_api::pageBlockAnimation *>(block_);
       if (block->animation_ == nullptr) {
@@ -4667,11 +4933,17 @@ void Client::JsonRichBlock::store(td::JsonValueScope *scope) const {
     }
     case td_api::pageBlockAudio::ID: {
       const auto *block = static_cast<const td_api::pageBlockAudio *>(block_);
-      if (block->audio_ == nullptr) {
-        break;
-      }
       object("type", "audio");
       object("audio", JsonAudio(block->audio_.get(), client_));
+      if (block->caption_ != nullptr) {
+        object("caption", JsonRichBlockCaption(block->caption_.get(), client_));
+      }
+      return;
+    }
+    case td_api::pageBlockDocument::ID: {
+      const auto *block = static_cast<const td_api::pageBlockDocument *>(block_);
+      object("type", "document");
+      object("document", JsonDocument(block->document_.get(), client_));
       if (block->caption_ != nullptr) {
         object("caption", JsonRichBlockCaption(block->caption_.get(), client_));
       }
@@ -4715,9 +4987,6 @@ void Client::JsonRichBlock::store(td::JsonValueScope *scope) const {
     }
     case td_api::pageBlockVoiceNote::ID: {
       const auto *block = static_cast<const td_api::pageBlockVoiceNote *>(block_);
-      if (block->voice_note_ == nullptr) {
-        break;
-      }
       object("type", "voice_note");
       object("voice_note", JsonVoiceNote(block->voice_note_.get(), client_));
       if (block->caption_ != nullptr) {
@@ -4725,6 +4994,9 @@ void Client::JsonRichBlock::store(td::JsonValueScope *scope) const {
       }
       return;
     }
+    case td_api::pageBlockUnsupported::ID:
+      object("type", "unsupported");
+      return;
     default:
       break;
   }
@@ -5289,7 +5561,7 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
       object("checklist_tasks_added", JsonChecklistTasksAdded(content, message_->chat_id, client_));
       break;
     }
-    case td_api::messageGiftedTon::ID:
+    case td_api::messageGiftedGrams::ID:
       break;
     case td_api::messageSuggestedPostApprovalFailed::ID: {
       auto content = static_cast<const td_api::messageSuggestedPostApprovalFailed *>(message_->content.get());
@@ -5363,6 +5635,27 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     }
     case td_api::messageChatRemovedFromCommunity::ID:
       object("community_chat_removed", JsonEmptyObject());
+      break;
+    case td_api::messageChatJoinFromCommunity::ID: {
+      auto content = static_cast<const td_api::messageChatJoinFromCommunity *>(message_->content.get());
+      object("community_chat_joined", JsonCommunityChatJoined(content, client_));
+      break;
+    }
+    case td_api::messageTonWalletTransfer::ID: {
+      auto content = static_cast<const td_api::messageTonWalletTransfer *>(message_->content.get());
+      object("ton_wallet_transfer", JsonTonWalletTransfer(content));
+      break;
+    }
+    case td_api::messageTonConnectRequest::ID:
+      break;
+    case td_api::messageWidget::ID: {
+      auto content = static_cast<const td_api::messageWidget *>(message_->content.get());
+      object("widget", JsonWidget(content));
+      add_caption(object, content->caption_, content->show_caption_above_media_);
+      break;
+    }
+    case td_api::messageUnpaidMessagesAllowedByLink::ID:
+      object("paid_messages_waived", JsonEmptyObject());
       break;
     default:
       UNREACHABLE();
@@ -5598,6 +5891,138 @@ class Client::JsonInlineCallbackQuery final : public td::Jsonable {
   const Client *client_;
 };
 
+class Client::JsonWidgetQueryWallet final : public td::Jsonable {
+ public:
+  explicit JsonWidgetQueryWallet(const td_api::widgetQueryWallet *wallet) : wallet_(wallet) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("address", wallet_->address_);
+    object("amount", td::to_string(wallet_->gram_amount_));
+    if (!wallet_->public_key_.empty() && !wallet_->state_init_.empty()) {
+      object("public_key", td::hex_encode(wallet_->public_key_));
+      object("state_init", td::base64_encode(wallet_->state_init_));
+    }
+  }
+
+ private:
+  const td_api::widgetQueryWallet *wallet_;
+};
+
+class Client::JsonWidgetQueryType final : public td::Jsonable {
+ public:
+  JsonWidgetQueryType(const td_api::WidgetQueryType *query_type, const td_api::tonWalletCard *wallet_card,
+                      const Client *client)
+      : query_type_(query_type), wallet_card_(wallet_card), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    CHECK(query_type_ != nullptr);
+    auto object = scope->enter_object();
+    switch (query_type_->get_id()) {
+      case td_api::widgetQueryTypeData::ID: {
+        auto query_type = static_cast<const td_api::widgetQueryTypeData *>(query_type_);
+        object("type", "data");
+        if (query_type->with_wallet_ && wallet_card_ != nullptr) {
+          object("wallet_card", JsonTonWalletCard(wallet_card_, client_));
+        }
+        break;
+      }
+      case td_api::widgetQueryTypeSignData::ID: {
+        auto query_type = static_cast<const td_api::widgetQueryTypeSignData *>(query_type_);
+        object("type", "sign_data");
+        object("wallet", JsonWidgetQueryWallet(query_type->wallet_.get()));
+        object("sign_data", query_type->sign_data_);
+        break;
+      }
+      case td_api::widgetQueryTypeSentTransaction::ID: {
+        auto query_type = static_cast<const td_api::widgetQueryTypeSentTransaction *>(query_type_);
+        object("type", "sent_transaction");
+        object("wallet", JsonWidgetQueryWallet(query_type->wallet_.get()));
+        object("msg_hash", query_type->msg_hash_);
+        break;
+      }
+      default:
+        UNREACHABLE();
+    }
+  }
+
+ private:
+  const td_api::WidgetQueryType *query_type_;
+  const td_api::tonWalletCard *wallet_card_;
+  const Client *client_;
+};
+
+class Client::JsonWidgetQuery final : public td::Jsonable {
+ public:
+  JsonWidgetQuery(const td_api::updateNewWidgetQuery *query, const Client *client) : query_(query), client_(client) {
+  }
+
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("id", td::to_string(query_->id_));
+    object("from", JsonUser(query_->sender_user_id_, client_));
+    object("chat", JsonChat(query_->chat_id_, client_));
+    object("message_id", as_client_message_id(query_->message_id_));
+    object("chat_instance", td::to_string(query_->chat_instance_));
+    object("type", JsonWidgetQueryType(query_->query_type_.get(), query_->wallet_card_.get(), client_));
+    json_store_bytes(object, "data", query_->data_, "widget query data");
+    if (query_->widget_id_ != 0) {
+      object("widget_id", td::to_string(query_->widget_id_));
+    }
+  }
+
+ private:
+  const td_api::updateNewWidgetQuery *query_;
+  const Client *client_;
+};
+
+class Client::JsonInlineWidgetQuery final : public td::Jsonable {
+ public:
+  JsonInlineWidgetQuery(const td_api::updateNewInlineWidgetQuery *query, const Client *client)
+      : query_(query), client_(client) {
+  }
+
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("id", td::to_string(query_->id_));
+    object("from", JsonUser(query_->sender_user_id_, client_));
+    object("inline_message_id", query_->inline_message_id_);
+    object("chat_instance", td::to_string(query_->chat_instance_));
+    if (!query_->chat_type_.empty()) {
+      object("chat_type", query_->chat_type_);
+    }
+    object("type", JsonWidgetQueryType(query_->query_type_.get(), query_->wallet_card_.get(), client_));
+    json_store_bytes(object, "data", query_->data_, "widget query data");
+    if (query_->widget_id_ != 0) {
+      object("widget_id", td::to_string(query_->widget_id_));
+    }
+  }
+
+ private:
+  const td_api::updateNewInlineWidgetQuery *query_;
+  const Client *client_;
+};
+
+class Client::JsonSharedWidgetQuery final : public td::Jsonable {
+ public:
+  JsonSharedWidgetQuery(const td_api::updateNewWidgetCopyQuery *query, const Client *client)
+      : query_(query), client_(client) {
+  }
+
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("id", td::to_string(query_->id_));
+    object("from", JsonUser(query_->sender_user_id_, client_));
+    object("type", JsonWidgetQueryType(query_->query_type_.get(), query_->wallet_card_.get(), client_));
+    json_store_bytes(object, "data", query_->data_, "widget query data");
+    object("widget_id", td::to_string(query_->widget_id_));
+  }
+
+ private:
+  const td_api::updateNewWidgetCopyQuery *query_;
+  const Client *client_;
+};
+
 class Client::JsonShippingQuery final : public td::Jsonable {
  public:
   JsonShippingQuery(const td_api::updateNewShippingQuery *query, const Client *client)
@@ -5608,12 +6033,7 @@ class Client::JsonShippingQuery final : public td::Jsonable {
     auto object = scope->enter_object();
     object("id", td::to_string(query_->id_));
     object("from", JsonUser(query_->sender_user_id_, client_));
-    if (!td::check_utf8(query_->invoice_payload_)) {
-      LOG(WARNING) << "Receive non-UTF-8 invoice payload";
-      object("invoice_payload", td::JsonRawString(query_->invoice_payload_));
-    } else {
-      object("invoice_payload", query_->invoice_payload_);
-    }
+    json_store_bytes(object, "invoice_payload", query_->invoice_payload_, "invoice payload");
     object("shipping_address", JsonAddress(query_->shipping_address_.get()));
   }
 
@@ -5634,12 +6054,7 @@ class Client::JsonPreCheckoutQuery final : public td::Jsonable {
     object("from", JsonUser(query_->sender_user_id_, client_));
     object("currency", query_->currency_);
     object("total_amount", query_->total_amount_);
-    if (!td::check_utf8(query_->invoice_payload_)) {
-      LOG(WARNING) << "Receive non-UTF-8 invoice payload";
-      object("invoice_payload", td::JsonRawString(query_->invoice_payload_));
-    } else {
-      object("invoice_payload", query_->invoice_payload_);
-    }
+    json_store_bytes(object, "invoice_payload", query_->invoice_payload_, "invoice payload");
     if (!query_->shipping_option_id_.empty()) {
       object("shipping_option_id", query_->shipping_option_id_);
     }
@@ -6432,12 +6847,7 @@ class Client::JsonStarTransactionType final : public td::Jsonable {
         object("type", "user");
         object("user", JsonUser(type->user_id_, client_));
         if (!type->invoice_payload_.empty()) {
-          if (!td::check_utf8(type->invoice_payload_)) {
-            LOG(WARNING) << "Receive non-UTF-8 invoice payload";
-            object("invoice_payload", td::JsonRawString(type->invoice_payload_));
-          } else {
-            object("invoice_payload", type->invoice_payload_);
-          }
+          json_store_bytes(object, "invoice_payload", type->invoice_payload_, "invoice payload");
         }
         if (type->affiliate_ != nullptr) {
           object("affiliate", JsonAffiliateInfo(type->affiliate_.get(), client_));
@@ -6450,12 +6860,7 @@ class Client::JsonStarTransactionType final : public td::Jsonable {
         object("type", "user");
         object("user", JsonUser(type->user_id_, client_));
         if (!type->invoice_payload_.empty()) {
-          if (!td::check_utf8(type->invoice_payload_)) {
-            LOG(WARNING) << "Receive non-UTF-8 invoice payload";
-            object("invoice_payload", td::JsonRawString(type->invoice_payload_));
-          } else {
-            object("invoice_payload", type->invoice_payload_);
-          }
+          json_store_bytes(object, "invoice_payload", type->invoice_payload_, "invoice payload");
         }
         if (type->subscription_period_ > 0) {
           object("subscription_period", type->subscription_period_);
@@ -6611,21 +7016,13 @@ class Client::JsonWebhookInfo final : public td::Jsonable {
   void store(td::JsonValueScope *scope) const {
     auto object = scope->enter_object();
     td::CSlice url = client_->webhook_url_;
-    if (td::check_utf8(url)) {
-      object("url", url);
-    } else {
-      object("url", td::JsonRawString(url));
-    }
+    json_store_bytes(object, "url", url, td::Slice());
     object("has_custom_certificate", td::JsonBool(client_->has_webhook_certificate_));
     object("pending_update_count", td::narrow_cast<int32>(client_->get_pending_update_count()));
     if (client_->last_webhook_error_date_ > 0) {
       object("last_error_date", client_->last_webhook_error_date_);
       td::CSlice error_message = client_->last_webhook_error_.message();
-      if (td::check_utf8(error_message)) {
-        object("last_error_message", error_message);
-      } else {
-        object("last_error_message", td::JsonRawString(error_message));
-      }
+      json_store_bytes(object, "last_error_message", error_message, td::Slice());
     }
     if (client_->webhook_max_connections_ > 0) {
       object("max_connections", client_->webhook_max_connections_);
@@ -6853,6 +7250,28 @@ class Client::TdOnReturnBusinessMessageCallback final : public TdQueryCallback {
  private:
   Client *client_;
   td::string business_connection_id_;
+  PromisedQueryPtr query_;
+};
+
+class Client::TdOnReplyToCallbackQueryCallback final : public TdQueryCallback {
+ public:
+  TdOnReplyToCallbackQueryCallback(Client *client, PromisedQueryPtr query)
+      : client_(client), query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::message::ID);
+    const auto *message_info = client_->add_message(move_object_as<td_api::message>(result), true);
+    message_info->is_content_changed = false;
+    answer_query(JsonMessage(message_info, true, "sent ephemeral message", client_), std::move(query_));
+  }
+
+ private:
+  Client *client_;
   PromisedQueryPtr query_;
 };
 
@@ -7679,6 +8098,7 @@ class Client::TdOnGetChatPinnedMessageCallback final : public TdQueryCallback {
       CHECK(supergroup_info != nullptr);
       sticker_set_ids.push_back(supergroup_info->sticker_set_id);
       sticker_set_ids.push_back(supergroup_info->custom_emoji_sticker_set_id);
+      td::append(sticker_set_ids, get_profile_share_theme_sticker_set_ids(supergroup_info->share_theme));
     } else if (chat_info->type == ChatInfo::Type::Private) {
       auto user_info = client_->get_user_info(chat_info->user_id);
       CHECK(user_info != nullptr);
@@ -7686,6 +8106,8 @@ class Client::TdOnGetChatPinnedMessageCallback final : public TdQueryCallback {
           user_info->business_info->start_page_->sticker_ != nullptr) {
         sticker_set_ids.push_back(user_info->business_info->start_page_->sticker_->set_id_);
       }
+      td::append(sticker_set_ids, get_ton_wallet_card_sticker_set_ids(user_info->ton_wallet_card));
+      td::append(sticker_set_ids, get_profile_share_theme_sticker_set_ids(user_info->share_theme));
     }
     client_->get_sticker_set_names(
         std::move(sticker_set_ids),
@@ -8030,6 +8452,25 @@ class Client::TdOnGetBotAccessSettingsCallback final : public TdQueryCallback {
   PromisedQueryPtr query_;
 };
 
+class Client::TdOnGetChatShareThemeBackdropsCallback final : public TdQueryCallback {
+ public:
+  explicit TdOnGetChatShareThemeBackdropsCallback(PromisedQueryPtr query) : query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::profileShareThemeBackdrops::ID);
+    auto backdrops = move_object_as<td_api::profileShareThemeBackdrops>(result);
+    answer_query(JsonChatShareThemeBackdrops(backdrops.get()), std::move(query_));
+  }
+
+ private:
+  PromisedQueryPtr query_;
+};
+
 class Client::TdOnCreateInvoiceLinkCallback final : public TdQueryCallback {
  public:
   explicit TdOnCreateInvoiceLinkCallback(PromisedQueryPtr query) : query_(std::move(query)) {
@@ -8363,6 +8804,32 @@ class Client::TdOnGetGiftsCallback final : public TdQueryCallback {
   PromisedQueryPtr query_;
 };
 
+class Client::TdOnGetUniqueGiftCallback final : public TdQueryCallback {
+ public:
+  TdOnGetUniqueGiftCallback(Client *client, PromisedQueryPtr query) : client_(client), query_(std::move(query)) {
+  }
+
+  void on_result(object_ptr<td_api::Object> result) final {
+    if (result->get_id() == td_api::error::ID) {
+      return fail_query_with_error(std::move(query_), move_object_as<td_api::error>(result));
+    }
+
+    CHECK(result->get_id() == td_api::upgradedGift::ID);
+    auto gift = move_object_as<td_api::upgradedGift>(result);
+    auto sticker_set_ids = get_upgraded_gift_sticker_set_ids(gift);
+    client_->get_sticker_set_names(
+        std::move(sticker_set_ids),
+        td::PromiseCreator::lambda([actor_id = client_->actor_id(client_), gift = std::move(gift),
+                                    query = std::move(query_)](td::Unit) mutable {
+          send_closure(actor_id, &Client::return_unique_gift, std::move(gift), std::move(query));
+        }));
+  }
+
+ private:
+  Client *client_;
+  PromisedQueryPtr query_;
+};
+
 class Client::TdOnReturnFileCallback final : public TdQueryCallback {
  public:
   TdOnReturnFileCallback(const Client *client, PromisedQueryPtr query) : client_(client), query_(std::move(query)) {
@@ -8601,6 +9068,7 @@ void Client::start_up() {
     }
   }
   dir_ = parameters_->working_directory_ + suff;
+  files_dir_ = parameters_->files_directory_ + suff;
 
   class TdCallback final : public td::TdCallback {
    public:
@@ -8787,8 +9255,11 @@ template <class OnSuccess>
 void Client::check_chat_access(int64 chat_id, AccessRights access_rights, const ChatInfo *chat_info,
                                PromisedQueryPtr query, OnSuccess on_success) const {
   CHECK(chat_info != nullptr);
-  bool need_write_access = access_rights == AccessRights::Write;
-  bool need_edit_access = access_rights == AccessRights::Edit || need_write_access;
+  bool is_ephemeral = access_rights == AccessRights::ReadEphemeral || access_rights == AccessRights::EditEphemeral ||
+                      access_rights == AccessRights::WriteEphemeral;
+  bool need_write_access = access_rights == AccessRights::Write || access_rights == AccessRights::WriteEphemeral;
+  bool need_edit_access =
+      access_rights == AccessRights::Edit || access_rights == AccessRights::EditEphemeral || need_write_access;
   bool need_read_access = true;
   switch (chat_info->type) {
     case ChatInfo::Type::Private: {
@@ -8840,7 +9311,7 @@ void Client::check_chat_access(int64 chat_id, AccessRights access_rights, const 
       }
       bool is_public = !supergroup_info->active_usernames.empty() || supergroup_info->has_location;
       bool need_more_access_rights = is_public ? need_edit_access : need_read_access;
-      if (!is_chat_member(supergroup_info->status) && need_more_access_rights) {
+      if (!is_chat_member(supergroup_info->status) && need_more_access_rights && !is_ephemeral) {
         if (supergroup_info->is_supergroup) {
           return fail_query(403, "Forbidden: bot is not a member of the supergroup chat", std::move(query));
         } else {
@@ -8915,10 +9386,11 @@ void Client::check_chat_no_fail(td::Slice chat_id_str, PromisedQueryPtr query, O
 }
 
 template <class OnSuccess>
-void Client::check_message_topic(td::Slice chat_id_str, int32 forum_topic_id, int64 direct_messages_topic_id,
-                                 PromisedQueryPtr query, OnSuccess on_success, bool allow_unknown_user) {
+void Client::check_message_topic(td::Slice chat_id_str, AccessRights access_rights, int32 forum_topic_id,
+                                 int64 direct_messages_topic_id, PromisedQueryPtr query, OnSuccess on_success,
+                                 bool allow_unknown_user) {
   check_chat(
-      chat_id_str, AccessRights::Write, std::move(query),
+      chat_id_str, access_rights, std::move(query),
       [this, forum_topic_id, direct_messages_topic_id, allow_unknown_user, on_success = std::move(on_success)](
           int64 chat_id, PromisedQueryPtr query) mutable {
         if (forum_topic_id == 0 && direct_messages_topic_id == 0) {
@@ -9138,8 +9610,11 @@ void Client::check_reply_parameters(td::Slice chat_id_str, InputReplyParameters 
   if (chat_id_str == reply_parameters.reply_in_chat_id) {
     reply_parameters.reply_in_chat_id.clear();
   }
+  // replies to ephemeral messages can be sent without chat membership, for example, in placeholder chats
+  auto access_rights =
+      reply_parameters.reply_to_ephemeral_message_id > 0 ? AccessRights::WriteEphemeral : AccessRights::Write;
   check_message_topic(
-      chat_id_str, forum_topic_id, direct_messages_topic_id, std::move(query),
+      chat_id_str, access_rights, forum_topic_id, direct_messages_topic_id, std::move(query),
       [this, reply_parameters = std::move(reply_parameters), on_success = std::move(on_success)](
           int64 chat_id, object_ptr<td_api::MessageTopic> &&topic_id, PromisedQueryPtr query) mutable {
         if (reply_parameters.reply_to_ephemeral_message_id > 0) {
@@ -9220,7 +9695,7 @@ void Client::fix_reply_markup_bot_user_ids(object_ptr<td_api::ReplyMarkup> &repl
         continue;
       }
       auto login_url_button = static_cast<td_api::inlineKeyboardButtonTypeLoginUrl *>(button->type_.get());
-      if (login_url_button->id_ % 1000 != 0) {
+      if (login_url_button->id_ % 1000 != 0 || login_url_button->id_ == 0) {
         continue;
       }
       auto it = temp_to_real_bot_user_id_.find(std::abs(login_url_button->id_));
@@ -9228,7 +9703,7 @@ void Client::fix_reply_markup_bot_user_ids(object_ptr<td_api::ReplyMarkup> &repl
       auto bot_user_id = it->second;
       CHECK(bot_user_id != 0);
       if (login_url_button->id_ < 0) {
-        login_url_button->id_ = -bot_user_id;
+        login_url_button->id_ = -bot_user_id - 1;
       } else {
         login_url_button->id_ = bot_user_id;
       }
@@ -9393,7 +9868,8 @@ void Client::on_update_authorization_state() {
   switch (authorization_state_->get_id()) {
     case td_api::authorizationStateWaitTdlibParameters::ID: {
       for (td::string option : {"disable_network_statistics", "disable_time_adjustment_protection", "ignore_file_names",
-                                "ignore_inline_thumbnails", "reuse_uploaded_photos_by_hash", "use_storage_optimizer"}) {
+                                "ignore_inline_thumbnails", "reuse_uploaded_photos_by_hash",
+                                "store_all_files_in_files_directory", "use_storage_optimizer"}) {
         send_request(make_object<td_api::setOption>(option, make_object<td_api::optionValueBoolean>(true)),
                      td::make_unique<TdOnOkCallback>());
       }
@@ -9401,6 +9877,7 @@ void Client::on_update_authorization_state() {
       auto request = make_object<td_api::setTdlibParameters>();
       request->use_test_dc_ = is_test_dc_;
       request->database_directory_ = dir_;
+      request->files_directory_ = files_dir_;
       //request->use_file_database_ = false;
       //request->use_chat_info_database_ = false;
       //request->use_secret_chats_ = false;
@@ -9706,6 +10183,8 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       user_info->accepted_gift_types = std::move(full_info->gift_settings_->accepted_gift_types_);
       user_info->rating = std::move(full_info->rating_);
       user_info->first_profile_audio = std::move(full_info->first_profile_audio_);
+      user_info->ton_wallet_card = std::move(full_info->ton_wallet_card_);
+      user_info->share_theme = std::move(full_info->share_theme_);
       user_info->personal_chat_id = full_info->personal_chat_id_;
       user_info->has_private_forwards = full_info->has_private_forwards_;
       user_info->has_restricted_voice_and_video_messages = full_info->has_restricted_voice_and_video_note_messages_;
@@ -9762,6 +10241,7 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       supergroup_info->guard_bot_user_id = full_info->guard_bot_user_id_;
       supergroup_info->community_id = full_info->community_id_;
       supergroup_info->location = std::move(full_info->location_);
+      supergroup_info->share_theme = std::move(full_info->share_theme_);
       supergroup_info->has_hidden_members = full_info->has_hidden_members_;
       supergroup_info->has_aggressive_anti_spam_enabled = full_info->has_aggressive_anti_spam_enabled_;
       supergroup_info->has_paid_media_allowed = full_info->has_paid_media_allowed_;
@@ -9777,7 +10257,6 @@ void Client::on_update(object_ptr<td_api::Object> result) {
         } else {
           CHECK(update->value_->get_id() == td_api::optionValueInteger::ID);
           my_id_ = move_object_as<td_api::optionValueInteger>(update->value_)->value_;
-          bot_user_ids_.default_bot_user_id_ = my_id_;
         }
       }
       if (name == "group_anonymous_bot_user_id" && update->value_->get_id() == td_api::optionValueInteger::ID) {
@@ -9844,6 +10323,11 @@ void Client::on_update(object_ptr<td_api::Object> result) {
     case td_api::updateNewInlineCallbackQuery::ID:
       add_new_inline_callback_query(move_object_as<td_api::updateNewInlineCallbackQuery>(result));
       break;
+    case td_api::updateNewWidgetQuery::ID:
+    case td_api::updateNewInlineWidgetQuery::ID:
+    case td_api::updateNewWidgetCopyQuery::ID:
+      add_new_widget_query(std::move(result));
+      break;
     case td_api::updateNewShippingQuery::ID:
       add_new_shipping_query(move_object_as<td_api::updateNewShippingQuery>(result));
       break;
@@ -9858,6 +10342,9 @@ void Client::on_update(object_ptr<td_api::Object> result) {
       break;
     case td_api::updateUserSubscription::ID:
       add_update_subscription(move_object_as<td_api::updateUserSubscription>(result));
+      break;
+    case td_api::updateStopMessageDraft::ID:
+      add_update_stopped_message_generation(move_object_as<td_api::updateStopMessageDraft>(result));
       break;
     case td_api::updateNewCustomEvent::ID:
       add_new_custom_event(move_object_as<td_api::updateNewCustomEvent>(result));
@@ -9989,13 +10476,15 @@ void Client::on_closed() {
   if (logging_out_) {
     parameters_->shared_data_->webhook_db_->erase(bot_token_with_dc_);
 
-    td::Scheduler::instance()->run_on_scheduler(SharedData::get_file_gc_scheduler_id(),
-                                                [actor_id = actor_id(this), dir = dir_](td::Unit) {
-                                                  CHECK(dir.size() >= 24);
-                                                  CHECK(dir.back() == TD_DIR_SLASH);
-                                                  td::rmrf(dir).ignore();
-                                                  send_closure(actor_id, &Client::finish_closing);
-                                                });
+    td::Scheduler::instance()->run_on_scheduler(
+        SharedData::get_file_gc_scheduler_id(),
+        [actor_id = actor_id(this), dir = dir_, files_dir = files_dir_](td::Unit) {
+          CHECK(dir.size() >= 24);
+          CHECK(dir.back() == TD_DIR_SLASH);
+          td::rmrf(dir).ignore();
+          td::rmrf(files_dir).ignore();
+          send_closure(actor_id, &Client::finish_closing);
+        });
     return;
   }
 
@@ -10150,6 +10639,20 @@ td::Result<Client::InputReplyParameters> Client::get_reply_parameters(td::JsonVa
   TRY_RESULT(parse_mode, object.get_optional_string_field("quote_parse_mode"));
   TRY_RESULT(quote,
              get_formatted_text(std::move(input_quote), std::move(parse_mode), object.extract_field("quote_entities")));
+  td::vector<object_ptr<td_api::RichText>> quote_rich_texts;
+  auto input_quote_rich_texts = object.extract_field("quote_rich_texts");
+  if (input_quote_rich_texts.type() != td::JsonValue::Type::Null) {
+    if (input_quote_rich_texts.type() != td::JsonValue::Type::Array) {
+      return td::Status::Error(400, "Field \"quote_rich_texts\" must be an Array");
+    }
+    for (auto &input_rich_text : input_quote_rich_texts.get_array()) {
+      if (input_rich_text.type() == td::JsonValue::Type::Null) {
+        return td::Status::Error(400, "Field \"quote_rich_texts\" must not contain null");
+      }
+      TRY_RESULT(rich_text, get_rich_text(std::move(input_rich_text)));
+      quote_rich_texts.push_back(std::move(rich_text));
+    }
+  }
   TRY_RESULT(quote_position, object.get_optional_int_field("quote_position"));
   TRY_RESULT(checklist_task_id, object.get_optional_int_field("checklist_task_id"));
   TRY_RESULT(poll_option_id, object.get_optional_string_field("poll_option_id"));
@@ -10160,13 +10663,59 @@ td::Result<Client::InputReplyParameters> Client::get_reply_parameters(td::JsonVa
   result.reply_to_message_id = as_tdlib_message_id(td::max(message_id, 0));
   result.reply_to_ephemeral_message_id = td::max(ephemeral_message_id, 0);
   result.allow_sending_without_reply = allow_sending_without_reply;
-  result.quote = make_object<td_api::inputTextQuote>(std::move(quote), quote_position);
+  result.quote = make_object<td_api::inputTextQuote>(std::move(quote), std::move(quote_rich_texts), quote_position);
   result.checklist_task_id = checklist_task_id;
   result.poll_option_id = std::move(poll_option_id);
   return std::move(result);
 }
 
-td::Result<td_api::object_ptr<td_api::ButtonStyle>> Client::get_button_style(td::Result<td::string> r_style) {
+td::Result<Client::EphemeralMessageParameters> Client::get_ephemeral_message_parameters(const Query *query) {
+  if (!query->has_arg("ephemeral_message_parameters")) {
+    EphemeralMessageParameters result;
+    if (query->has_arg("receiver_user_id")) {
+      TRY_RESULT_ASSIGN(result.receiver_user_id, get_user_id(query, "receiver_user_id"));
+    }
+    result.callback_query_id = td::to_integer<int64>(query->arg("callback_query_id"));
+    result.replace_callback_query_message = to_bool(query->arg("replace_callback_query_message"));
+    return std::move(result);
+  }
+
+  auto ephemeral_message_parameters = query->arg("ephemeral_message_parameters");
+  if (ephemeral_message_parameters.empty()) {
+    return EphemeralMessageParameters();
+  }
+
+  LOG(INFO) << "Parsing JSON object: " << ephemeral_message_parameters;
+  auto r_value = json_decode(ephemeral_message_parameters);
+  if (r_value.is_error()) {
+    LOG(INFO) << "Can't parse JSON object: " << r_value.error();
+    return td::Status::Error(400, "Can't parse EphemeralMessageParameters JSON object");
+  }
+
+  return get_ephemeral_message_parameters(r_value.move_as_ok());
+}
+
+td::Result<Client::EphemeralMessageParameters> Client::get_ephemeral_message_parameters(td::JsonValue &&value) {
+  if (value.type() != td::JsonValue::Type::Object) {
+    return td::Status::Error(400, "Object expected as EphemeralMessageParameters");
+  }
+  auto &object = value.get_object();
+  if (object.field_count() == 0) {
+    return EphemeralMessageParameters();
+  }
+  EphemeralMessageParameters result;
+  TRY_RESULT_ASSIGN(result.receiver_user_id, object.get_optional_long_field("receiver_user_id"));
+  TRY_RESULT_ASSIGN(result.callback_query_id, object.get_optional_long_field("callback_query_id"));
+  TRY_RESULT_ASSIGN(result.replace_callback_query_message,
+                    object.get_optional_bool_field("replace_callback_query_message"));
+  if (result.receiver_user_id == 0 && result.callback_query_id == 0) {
+    return td::Status::Error(400, "Field \"receiver_user_id\" or \"callback_query_id\" must be specified");
+  }
+  return std::move(result);
+}
+
+td::Result<td_api::object_ptr<td_api::ButtonStyle>> Client::get_button_style(td::Result<td::string> r_style,
+                                                                             bool for_rich_message) {
   TRY_RESULT(style, std::move(r_style));
   td::to_lower_inplace(style);
   if (style.empty() || style == "default") {
@@ -10181,7 +10730,10 @@ td::Result<td_api::object_ptr<td_api::ButtonStyle>> Client::get_button_style(td:
   if (style == "success") {
     return make_object<td_api::buttonStyleSuccess>();
   }
-  return td::Status::Error("invalid button style specified");
+  if (for_rich_message && style == "link") {
+    return make_object<td_api::buttonStyleLink>();
+  }
+  return td::Status::Error("Invalid button style specified");
 }
 
 td::Result<td_api::object_ptr<td_api::KeyboardButtonType>> Client::get_keyboard_button_type(td::JsonObject &object) {
@@ -10289,7 +10841,7 @@ td::Result<td_api::object_ptr<td_api::keyboardButton>> Client::get_keyboard_butt
 
     TRY_RESULT(text, object.get_required_string_field("text"));
     TRY_RESULT(icon, object.get_optional_long_field("icon_custom_emoji_id"));
-    TRY_RESULT(style, get_button_style(object.get_optional_string_field("style")));
+    TRY_RESULT(style, get_button_style(object.get_optional_string_field("style"), false));
     TRY_RESULT(type, get_keyboard_button_type(object));
     return make_object<td_api::keyboardButton>(text, std::move(icon), std::move(style), std::move(type));
   }
@@ -10309,13 +10861,25 @@ td::Result<td_api::object_ptr<td_api::inlineKeyboardButton>> Client::get_inline_
   auto &object = button.get_object();
   TRY_RESULT(text, object.get_required_string_field("text"));
   TRY_RESULT(icon, object.get_optional_long_field("icon_custom_emoji_id"));
-  TRY_RESULT(style, get_button_style(object.get_optional_string_field("style")));
-  TRY_RESULT(type, get_inline_keyboard_button_type(object, bot_user_ids));
+  TRY_RESULT(style, get_button_style(object.get_optional_string_field("style"), false));
+  TRY_RESULT(type, get_inline_keyboard_button_type(object, &bot_user_ids));
   return make_object<td_api::inlineKeyboardButton>(text, std::move(icon), std::move(style), std::move(type));
 }
 
+td::Result<td_api::object_ptr<td_api::inlineButton>> Client::get_inline_button(td::JsonValue &&button) {
+  if (button.type() != td::JsonValue::Type::Object) {
+    return td::Status::Error(400, "InlineButton must be an Object");
+  }
+
+  auto &object = button.get_object();
+  TRY_RESULT(text, get_rich_text(object.extract_field("text")));
+  TRY_RESULT(style, get_button_style(object.get_optional_string_field("style"), true));
+  TRY_RESULT(type, get_inline_keyboard_button_type(object, nullptr));
+  return make_object<td_api::inlineButton>(std::move(text), std::move(style), std::move(type));
+}
+
 td::Result<td_api::object_ptr<td_api::InlineKeyboardButtonType>> Client::get_inline_keyboard_button_type(
-    td::JsonObject &object, BotUserIds &bot_user_ids) {
+    td::JsonObject &object, BotUserIds *bot_user_ids) {
   {
     TRY_RESULT(url, object.get_optional_string_field("url"));
     if (!url.empty()) {
@@ -10376,9 +10940,10 @@ td::Result<td_api::object_ptr<td_api::InlineKeyboardButtonType>> Client::get_inl
     TRY_RESULT(forward_text, login_url_object.get_optional_string_field("forward_text"));
 
     int64 bot_user_id = 0;
-    if (bot_username.empty()) {
-      bot_user_id = bot_user_ids.default_bot_user_id_;
-    } else {
+    if (!bot_username.empty()) {
+      if (bot_user_ids == nullptr) {
+        return td::Status::Error(400, "Bot username must be empty for login_url buttons in rich messages");
+      }
       if (bot_username[0] == '@') {
         bot_username = bot_username.substr(1);
       }
@@ -10390,18 +10955,18 @@ td::Result<td_api::object_ptr<td_api::InlineKeyboardButtonType>> Client::get_inl
           return td::Status::Error(400, "LoginUrl bot username is invalid");
         }
       }
-      auto &user_id = bot_user_ids.bot_user_ids_[bot_username];
+      auto &user_id = bot_user_ids->bot_user_ids_[bot_username];
       if (user_id == 0) {
-        user_id = bot_user_ids.cur_temp_bot_user_id_++;
+        user_id = bot_user_ids->cur_temp_bot_user_id_++;
         user_id *= 1000;
       }
       if (user_id % 1000 == 0) {
-        bot_user_ids.unresolved_bot_usernames_.insert(bot_username);
+        bot_user_ids->unresolved_bot_usernames_.insert(bot_username);
       }
       bot_user_id = user_id;
     }
     if (!request_write_access) {
-      bot_user_id *= -1;
+      bot_user_id = -bot_user_id - 1;
     }
     return make_object<td_api::inlineKeyboardButtonTypeLoginUrl>(url, bot_user_id, forward_text);
   }
@@ -10420,7 +10985,11 @@ td::Result<td_api::object_ptr<td_api::InlineKeyboardButtonType>> Client::get_inl
     return make_object<td_api::inlineKeyboardButtonTypeCopyText>(copied_text);
   }
 
-  return td::Status::Error(400, "Text buttons are unallowed in the inline keyboard");
+  if (object.has_field("disabled")) {
+    return make_object<td_api::inlineKeyboardButtonTypeDisabled>();
+  }
+
+  return td::Status::Error(400, "Text buttons are not allowed in the inline keyboard");
 }
 
 td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(const Query *query,
@@ -10482,10 +11051,11 @@ td::Result<td_api::object_ptr<td_api::ReplyMarkup>> Client::get_reply_markup(td:
     TRY_RESULT(resize_keyboard, object.get_optional_bool_field("resize_keyboard"));
     TRY_RESULT(one_time_keyboard, object.get_optional_bool_field("one_time_keyboard"));
     TRY_RESULT(is_persistent, object.get_optional_bool_field("is_persistent"));
-    result = make_object<td_api::replyMarkupShowKeyboard>(std::move(rows), is_persistent, resize_keyboard,
-                                                          one_time_keyboard, is_personal, input_field_placeholder);
+    result =
+        make_object<td_api::replyMarkupShowKeyboard>(std::move(rows), is_persistent, resize_keyboard, one_time_keyboard,
+                                                     is_personal, force_reply, input_field_placeholder);
   } else if (!inline_rows.empty()) {
-    result = make_object<td_api::replyMarkupInlineKeyboard>(std::move(inline_rows));
+    result = make_object<td_api::replyMarkupInlineKeyboard>(std::move(inline_rows), force_reply);
   } else if (hide_keyboard || remove_keyboard) {
     result = make_object<td_api::replyMarkupRemoveKeyboard>(is_personal);
   } else if (force_reply || force_reply_keyboard) {
@@ -10766,6 +11336,38 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
     TRY_RESULT(rich_message, object.extract_required_field("rich_message", td::JsonValue::Type::Object));
     TRY_RESULT(input_rich_message, get_input_rich_message(query, std::move(rich_message)));
     return make_object<td_api::inputMessageRichMessage>(std::move(input_rich_message), false);
+  }
+
+  if (object.has_field("html")) {
+    TRY_RESULT(html, object.get_required_string_field("html"));
+    TRY_RESULT(width, object.get_optional_int_field("width"));
+    TRY_RESULT(height, object.get_optional_int_field("height"));
+    TRY_RESULT(public_data, object.get_optional_string_field("public_data"));
+    TRY_RESULT(chat_data, object.get_optional_string_field("chat_data"));
+    TRY_RESULT(input_caption, object.get_optional_string_field("caption"));
+    TRY_RESULT(parse_mode, object.get_optional_string_field("parse_mode"));
+    auto entities = object.extract_field("caption_entities");
+    TRY_RESULT(caption, get_formatted_text(std::move(input_caption), std::move(parse_mode), std::move(entities)));
+    TRY_RESULT(show_caption_above_media, object.get_optional_bool_field("show_caption_above_media"));
+    TRY_RESULT(allow_queries, object.get_optional_bool_field("allow_queries"));
+    TRY_RESULT(is_shared, object.get_optional_bool_field("is_shared"));
+    width = td::clamp(width, 0, MAX_LENGTH);
+    height = td::clamp(height, 0, MAX_LENGTH);
+    return make_object<td_api::inputMessageWidget>(width, height, std::move(html), std::move(public_data),
+                                                   std::move(chat_data), std::move(caption), show_caption_above_media,
+                                                   allow_queries, is_shared);
+  }
+
+  if (object.has_field("widget_id")) {
+    TRY_RESULT(widget_id, object.get_required_long_field("widget_id"));
+    TRY_RESULT(chat_data, object.get_optional_string_field("chat_data"));
+    TRY_RESULT(input_caption, object.get_optional_string_field("caption"));
+    TRY_RESULT(parse_mode, object.get_optional_string_field("parse_mode"));
+    auto entities = object.extract_field("caption_entities");
+    TRY_RESULT(caption, get_formatted_text(std::move(input_caption), std::move(parse_mode), std::move(entities)));
+    TRY_RESULT(show_caption_above_media, object.get_optional_bool_field("show_caption_above_media"));
+    return make_object<td_api::inputMessageSharedWidget>(widget_id, std::move(chat_data), std::move(caption),
+                                                         show_caption_above_media);
   }
 
   TRY_RESULT(message_text, object.get_optional_string_field("message_text"));
@@ -11379,12 +11981,13 @@ td::Result<td_api::object_ptr<td_api::chatAdministratorRights>> Client::get_chat
   TRY_RESULT(can_delete_stories, object.get_optional_bool_field("can_delete_stories"));
   TRY_RESULT(can_manage_direct_messages, object.get_optional_bool_field("can_manage_direct_messages"));
   TRY_RESULT(can_manage_tags, object.get_optional_bool_field("can_manage_tags"));
+  TRY_RESULT(can_send_welcome_messages, object.get_optional_bool_field("can_send_welcome_messages"));
   TRY_RESULT(is_anonymous, object.get_optional_bool_field("is_anonymous"));
   return make_object<td_api::chatAdministratorRights>(
       can_manage_chat, can_change_info, can_post_messages, can_edit_messages, can_delete_messages, can_invite_users,
       can_restrict_members, can_pin_messages, can_manage_topics, can_promote_members, can_manage_video_chats,
       can_post_stories, can_edit_stories, can_delete_stories, can_manage_direct_messages, can_manage_tags,
-      is_anonymous);
+      can_send_welcome_messages, is_anonymous);
 }
 
 td::Result<td_api::object_ptr<td_api::chatAdministratorRights>> Client::get_chat_administrator_rights(
@@ -11848,7 +12451,7 @@ td::Result<td_api::object_ptr<td_api::TextEntityType>> Client::get_text_entity_t
     return make_object<td_api::textEntityTypeDateTime>(unix_time, std::move(formatting_type));
   }
   if (type == "mention" || type == "hashtag" || type == "cashtag" || type == "bot_command" || type == "url" ||
-      type == "email" || type == "phone_number" || type == "bank_card_number") {
+      type == "email" || type == "phone_number" || type == "bank_card_number" || type == "ton_address") {
     return nullptr;
   }
 
@@ -12084,6 +12687,10 @@ td::Result<td_api::object_ptr<td_api::RichText>> Client::get_rich_text(td::JsonV
         TRY_RESULT(text, get_rich_text(object.extract_field("text")));
         return make_object<td_api::richTextCashtag>(std::move(text), td::string());
       }
+      if (type == "ton_address") {
+        TRY_RESULT(text, get_rich_text(object.extract_field("text")));
+        return make_object<td_api::richTextTonAddress>(std::move(text), td::string());
+      }
       if (type == "bot_command") {
         TRY_RESULT(text, get_rich_text(object.extract_field("text")));
         return make_object<td_api::richTextBotCommand>(std::move(text), td::string());
@@ -12159,6 +12766,10 @@ td::Result<td_api::object_ptr<td_api::RichText>> Client::get_rich_text(td::JsonV
         TRY_RESULT(anchor_name, object.get_required_string_field("anchor_name"));
         return make_object<td_api::richTextAnchorLink>(std::move(text), anchor_name, td::string());
       }
+      if (type == "button") {
+        TRY_RESULT(button, get_inline_button(object.extract_field("button")));
+        return make_object<td_api::richTextButton>(std::move(button));
+      }
       return td::Status::Error(400, "Unsupported rich text type");
     }
     default:
@@ -12232,6 +12843,11 @@ td::Result<td_api::object_ptr<td_api::InputPageBlock>> Client::get_input_page_bl
     TRY_RESULT(credit, get_rich_text(object.extract_field("credit")));
     return make_object<td_api::inputPageBlockBlockQuote>(std::move(blocks), std::move(credit));
   }
+  if (type == "expandable_blockquote") {
+    TRY_RESULT(text, get_rich_text(object.extract_field("text")));
+    TRY_RESULT(credit, get_rich_text(object.extract_field("credit")));
+    return make_object<td_api::inputPageBlockExpandableBlockQuote>(std::move(text), std::move(credit));
+  }
   if (type == "pullquote") {
     TRY_RESULT(text, get_rich_text(object.extract_field("text")));
     TRY_RESULT(credit, get_rich_text(object.extract_field("credit")));
@@ -12257,7 +12873,9 @@ td::Result<td_api::object_ptr<td_api::InputPageBlock>> Client::get_input_page_bl
     TRY_RESULT(caption, get_rich_text(object.extract_field("caption")));
     TRY_RESULT(is_bordered, object.get_optional_bool_field("is_bordered"));
     TRY_RESULT(is_striped, object.get_optional_bool_field("is_striped"));
-    return make_object<td_api::inputPageBlockTable>(std::move(caption), std::move(cells), is_bordered, is_striped);
+    TRY_RESULT(is_compact, object.get_optional_bool_field("is_compact"));
+    return make_object<td_api::inputPageBlockTable>(std::move(caption), std::move(cells), is_bordered, is_striped,
+                                                    is_compact);
   }
   if (type == "details") {
     TRY_RESULT(summary, get_rich_text(object.extract_field("summary")));
@@ -12275,7 +12893,26 @@ td::Result<td_api::object_ptr<td_api::InputPageBlock>> Client::get_input_page_bl
     TRY_RESULT(caption, get_page_block_caption(object.extract_field("caption")));
     return make_object<td_api::inputPageBlockMap>(std::move(location), zoom, width, height, std::move(caption));
   }
-  if (type != "animation" && type != "audio" && type != "photo" && type != "video" && type != "voice_note") {
+  if (type == "buttons") {
+    TRY_RESULT(input_buttons, object.extract_required_field("buttons", td::JsonValue::Type::Array));
+    TRY_RESULT(buttons, get_array(std::move(input_buttons), "RichMessageButton", get_inline_button));
+    object_ptr<td_api::PageBlockHorizontalAlignment> align;
+    TRY_RESULT(align_str, object.get_optional_string_field("align"));
+    if (align_str.empty()) {
+      // ok
+    } else if (align_str == "left") {
+      align = make_object<td_api::pageBlockHorizontalAlignmentLeft>();
+    } else if (align_str == "center") {
+      align = make_object<td_api::pageBlockHorizontalAlignmentCenter>();
+    } else if (align_str == "right") {
+      align = make_object<td_api::pageBlockHorizontalAlignmentRight>();
+    } else {
+      return td::Status::Error(400, "Invalid horizontal alignment specified");
+    }
+    return make_object<td_api::inputPageBlockButtonRow>(std::move(buttons), std::move(align));
+  }
+  if (type != "animation" && type != "audio" && type != "document" && type != "photo" && type != "video" &&
+      type != "voice_note") {
     return td::Status::Error(400, PSLICE() << "type \"" << type << "\" is unsupported");
   }
   TRY_RESULT(media_field, object.extract_required_field(type, td::JsonValue::Type::Object));
@@ -12298,6 +12935,12 @@ td::Result<td_api::object_ptr<td_api::InputPageBlock>> Client::get_input_page_bl
     CHECK(input_message_content->get_id() == td_api::inputMessageAudio::ID);
     return make_object<td_api::inputPageBlockAudio>(
         std::move(static_cast<td_api::inputMessageAudio *>(input_message_content.get())->audio_), std::move(caption));
+  }
+  if (type == "document") {
+    CHECK(input_message_content->get_id() == td_api::inputMessageDocument::ID);
+    return make_object<td_api::inputPageBlockDocument>(
+        std::move(static_cast<td_api::inputMessageDocument *>(input_message_content.get())->document_),
+        std::move(caption));
   }
   if (type == "photo") {
     CHECK(input_message_content->get_id() == td_api::inputMessagePhoto::ID);
@@ -12587,7 +13230,7 @@ td::Result<td_api::object_ptr<td_api::inputPhoto>> Client::get_input_photo(const
     TRY_RESULT(photo, object.get_optional_string_field("photo"));
     auto input_photo = get_input_file(query, td::Slice(), photo, false);
     if (input_photo == nullptr) {
-      return td::Status::Error("photo not found");
+      return td::Status::Error("Photo not found");
     }
     return make_object<td_api::inputPhoto>(std::move(input_photo), nullptr, std::move(input_file), td::vector<int32>(),
                                            0, 0);
@@ -12731,9 +13374,6 @@ td::Result<td_api::object_ptr<td_api::InputMessageContent>> Client::get_input_me
     return make_object<td_api::inputMessageAudio>(std::move(input_audio), std::move(caption));
   }
   if (type == "document") {
-    if (for_rich_message) {
-      return td::Status::Error(PSLICE() << "type \"" << type << "\" is not allowed");
-    }
     TRY_RESULT(disable_content_type_detection, object.get_optional_bool_field("disable_content_type_detection"));
     return make_object<td_api::inputMessageDocument>(
         make_object<td_api::inputDocument>(std::move(input_file), std::move(input_thumbnail),
@@ -12848,7 +13488,7 @@ td::Result<td_api::object_ptr<td_api::InputPollMedia>> Client::get_input_poll_me
   auto r_value = json_decode(media);
   if (r_value.is_error()) {
     LOG(INFO) << "Can't parse JSON object: " << r_value.error();
-    return td::Status::Error(400, PSLICE() << "Can't parse InputPollMedia JSON object");
+    return td::Status::Error(400, "Can't parse InputPollMedia JSON object");
   }
 
   auto r_input_message_content = get_input_poll_media(query, r_value.move_as_ok(), false);
@@ -12926,7 +13566,7 @@ td::Result<td_api::object_ptr<td_api::inputPaidMedia>> Client::get_input_paid_me
     media_type = make_object<td_api::inputPaidMediaTypePhoto>(std::move(input_file));
     input_file = get_input_file(query, "photo", photo, false);
     if (input_file == nullptr) {
-      return td::Status::Error("photo not found");
+      return td::Status::Error("Photo not found");
     }
   } else if (type == "video") {
     TRY_RESULT(duration, object.get_optional_int_field("duration"));
@@ -13195,8 +13835,8 @@ td::Result<td_api::object_ptr<td_api::inputStoryArea>> Client::get_input_story_a
   TRY_RESULT(input_type, get_input_story_area_type(std::move(type)));
 
   return make_object<td_api::inputStoryArea>(
-      make_object<td_api::storyAreaPosition>(x_percentage, y_percentage, width_percentage, height_percentage,
-                                             rotation_angle, corner_radius_percentage),
+      make_object<td_api::areaPosition>(x_percentage, y_percentage, width_percentage, height_percentage, rotation_angle,
+                                        corner_radius_percentage),
       std::move(input_type));
 }
 
@@ -14243,6 +14883,34 @@ td::Status Client::process_stop_poll_query(PromisedQueryPtr &query) {
   return td::Status::OK();
 }
 
+td::Status Client::process_send_widget_query(PromisedQueryPtr &query) {
+  TRY_RESULT(html, get_required_string_arg(query.get(), "html"));
+  int32 width = get_integer_arg(query.get(), "width", 0, 0, MAX_LENGTH);
+  int32 height = get_integer_arg(query.get(), "height", 0, 0, MAX_LENGTH);
+  auto public_data = query->arg("public_data").str();
+  auto chat_data = query->arg("chat_data").str();
+  TRY_RESULT(caption, get_caption(query.get()));
+  auto show_caption_above_media = to_bool(query->arg("show_caption_above_media"));
+  auto allow_queries = to_bool(query->arg("allow_queries"));
+  auto is_shared = to_bool(query->arg("is_shared"));
+  do_send_message(make_object<td_api::inputMessageWidget>(width, height, html.str(), std::move(public_data),
+                                                          std::move(chat_data), std::move(caption),
+                                                          show_caption_above_media, allow_queries, is_shared),
+                  std::move(query));
+  return td::Status::OK();
+}
+
+td::Status Client::process_send_shared_widget_query(PromisedQueryPtr &query) {
+  auto widget_id = td::to_integer<int64>(query->arg("widget_id"));
+  auto chat_data = query->arg("chat_data").str();
+  TRY_RESULT(caption, get_caption(query.get()));
+  auto show_caption_above_media = to_bool(query->arg("show_caption_above_media"));
+  do_send_message(make_object<td_api::inputMessageSharedWidget>(widget_id, std::move(chat_data), std::move(caption),
+                                                                show_caption_above_media),
+                  std::move(query));
+  return td::Status::OK();
+}
+
 td::Status Client::process_send_checklist_query(PromisedQueryPtr &query) {
   TRY_RESULT(input_checklist, get_input_checklist(query.get(), "checklist"));
   do_send_message(make_object<td_api::inputMessageChecklist>(std::move(input_checklist)), std::move(query));
@@ -14486,14 +15154,17 @@ td::Status Client::process_send_message_draft_query(PromisedQueryPtr &query) {
   auto chat_id_str = query->arg("chat_id");
   auto forum_topic_id = get_forum_topic_id(query.get(), "message_thread_id");
   auto draft_id = td::to_integer<int64>(query->arg("draft_id"));
+  auto can_stop = to_bool(query->arg("can_stop"));
+  auto keep_on_stop = to_bool(query->arg("keep_on_stop"));
   TRY_RESULT(text, get_formatted_text(query->arg("text").str(), query->arg("parse_mode").str(),
                                       get_input_entities(query.get(), "entities")));
 
   check_chat(chat_id_str, AccessRights::Write, std::move(query),
-             [this, forum_topic_id, draft_id, text = std::move(text)](int64 chat_id, PromisedQueryPtr query) mutable {
-               send_request(
-                   make_object<td_api::sendTextMessageDraft>(chat_id, forum_topic_id, draft_id, std::move(text)),
-                   td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+             [this, forum_topic_id, draft_id, can_stop, keep_on_stop, text = std::move(text)](
+                 int64 chat_id, PromisedQueryPtr query) mutable {
+               send_request(make_object<td_api::sendTextMessageDraft>(chat_id, forum_topic_id, draft_id, can_stop,
+                                                                      keep_on_stop, std::move(text)),
+                            td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
   return td::Status::OK();
 }
@@ -14502,13 +15173,15 @@ td::Status Client::process_send_rich_message_draft_query(PromisedQueryPtr &query
   auto chat_id_str = query->arg("chat_id");
   auto forum_topic_id = get_forum_topic_id(query.get(), "message_thread_id");
   auto draft_id = td::to_integer<int64>(query->arg("draft_id"));
+  auto can_stop = to_bool(query->arg("can_stop"));
+  auto keep_on_stop = to_bool(query->arg("keep_on_stop"));
   TRY_RESULT(rich_message, get_input_rich_message(query.get()));
 
   check_chat(chat_id_str, AccessRights::Write, std::move(query),
-             [this, forum_topic_id, draft_id, rich_message = std::move(rich_message)](int64 chat_id,
-                                                                                      PromisedQueryPtr query) mutable {
-               send_request(make_object<td_api::sendRichMessageDraft>(chat_id, forum_topic_id, draft_id,
-                                                                      std::move(rich_message)),
+             [this, forum_topic_id, draft_id, can_stop, keep_on_stop, rich_message = std::move(rich_message)](
+                 int64 chat_id, PromisedQueryPtr query) mutable {
+               send_request(make_object<td_api::sendRichMessageDraft>(chat_id, forum_topic_id, draft_id, can_stop,
+                                                                      keep_on_stop, std::move(rich_message)),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
   return td::Status::OK();
@@ -14779,6 +15452,42 @@ td::Status Client::process_edit_message_checklist_query(PromisedQueryPtr &query)
   return td::Status::OK();
 }
 
+td::Status Client::process_edit_message_widget_data_query(PromisedQueryPtr &query) {
+  auto chat_id = query->arg("chat_id");
+  auto message_id = get_message_id(query.get());
+  auto edit_public_data = query->has_arg("public_data");
+  auto public_data = query->arg("public_data").str();
+  auto edit_chat_data = query->has_arg("chat_data");
+  auto chat_data = query->arg("chat_data").str();
+
+  if (chat_id.empty() && message_id == 0) {
+    TRY_RESULT(inline_message_id, get_inline_message_id(query.get()));
+    auto request = make_object<td_api::editInlineMessageWidgetData>(
+        inline_message_id.str(), edit_public_data, std::move(public_data), edit_chat_data, std::move(chat_data));
+    send_request(std::move(request), td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+    return td::Status::OK();
+  }
+
+  check_message(chat_id, message_id, false, AccessRights::Read, "message with widget to edit", std::move(query),
+                [this, edit_public_data, public_data = std::move(public_data), edit_chat_data,
+                 chat_data = std::move(chat_data)](int64 chat_id, int64 message_id, PromisedQueryPtr query) {
+                  send_request(make_object<td_api::editMessageWidgetData>(chat_id, message_id, edit_public_data,
+                                                                          public_data, edit_chat_data, chat_data),
+                               td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+                });
+  return td::Status::OK();
+}
+
+td::Status Client::process_edit_shared_widget_data_query(PromisedQueryPtr &query) {
+  auto widget_id = td::to_integer<int64>(query->arg("widget_id"));
+  auto public_data = query->arg("public_data").str();
+  int32 cache_time = get_integer_arg(query.get(), "cache_time", 0, -1, 3601);
+
+  send_request(make_object<td_api::editWidgetData>(widget_id, public_data, cache_time),
+               td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+  return td::Status::OK();
+}
+
 td::Status Client::process_edit_message_reply_markup_query(PromisedQueryPtr &query) {
   auto business_connection_id = query->arg("business_connection_id");
   auto chat_id = query->arg("chat_id");
@@ -14824,7 +15533,13 @@ td::Status Client::process_edit_message_reply_markup_query(PromisedQueryPtr &que
 }
 
 td::Status Client::process_edit_ephemeral_message_text_query(PromisedQueryPtr &query) {
-  TRY_RESULT(input_message_text, get_input_message_text(query.get()));
+  object_ptr<td_api::InputMessageContent> input_message_text;
+  if (query->has_arg("rich_message")) {
+    TRY_RESULT(input_rich_message, get_input_rich_message(query.get()));
+    input_message_text = make_object<td_api::inputMessageRichMessage>(std::move(input_rich_message), false);
+  } else {
+    TRY_RESULT_ASSIGN(input_message_text, get_input_message_text(query.get()));
+  }
   return do_edit_ephemeral_message(std::move(input_message_text), query);
 }
 
@@ -14835,7 +15550,27 @@ td::Status Client::process_edit_ephemeral_message_media_query(PromisedQueryPtr &
 
 td::Status Client::process_edit_ephemeral_message_caption_query(PromisedQueryPtr &query) {
   TRY_RESULT(caption, get_caption(query.get()));
-  return do_edit_ephemeral_message(make_object<td_api::inputMessageText>(std::move(caption), nullptr, false), query);
+  auto show_caption_above_media = to_bool(query->arg("show_caption_above_media"));
+  auto chat_id = query->arg("chat_id");
+  TRY_RESULT(receiver_user_id, get_user_id(query.get(), "receiver_user_id"));
+  auto ephemeral_message_id = get_integer_arg(query.get(), "ephemeral_message_id", 0);
+  TRY_RESULT(reply_markup, get_reply_markup(query.get(), bot_user_ids_));
+
+  resolve_reply_markup_bot_usernames(
+      std::move(reply_markup), std::move(query),
+      [this, chat_id_str = chat_id.str(), receiver_user_id, ephemeral_message_id, caption = std::move(caption),
+       show_caption_above_media](object_ptr<td_api::ReplyMarkup> reply_markup, PromisedQueryPtr query) mutable {
+        check_chat(
+            chat_id_str, AccessRights::EditEphemeral, std::move(query),
+            [this, receiver_user_id, ephemeral_message_id, caption = std::move(caption), show_caption_above_media,
+             reply_markup = std::move(reply_markup)](int64 chat_id, PromisedQueryPtr query) mutable {
+              send_request(make_object<td_api::editEphemeralMessageCaption>(
+                               chat_id, receiver_user_id, ephemeral_message_id, std::move(reply_markup),
+                               std::move(caption), show_caption_above_media),
+                           td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+            });
+      });
+  return td::Status::OK();
 }
 
 td::Status Client::process_edit_ephemeral_message_reply_markup_query(PromisedQueryPtr &query) {
@@ -14868,7 +15603,7 @@ td::Status Client::process_delete_ephemeral_message_query(PromisedQueryPtr &quer
   auto chat_id = query->arg("chat_id");
   TRY_RESULT(receiver_user_id, get_user_id(query.get(), "receiver_user_id"));
   auto ephemeral_message_id = get_integer_arg(query.get(), "ephemeral_message_id", 0);
-  check_chat(chat_id, AccessRights::Read, std::move(query),
+  check_chat(chat_id, AccessRights::ReadEphemeral, std::move(query),
              [this, receiver_user_id, ephemeral_message_id](int64 chat_id, PromisedQueryPtr query) {
                send_request(
                    make_object<td_api::deleteEphemeralMessage>(chat_id, receiver_user_id, ephemeral_message_id),
@@ -14952,8 +15687,8 @@ td::Status Client::process_post_story_query(PromisedQueryPtr &query) {
         auto protect_content = to_bool(query->arg("protect_content"));
         send_request(make_object<td_api::postStory>(
                          business_connection->user_chat_id_, std::move(content), std::move(areas), std::move(caption),
-                         make_object<td_api::storyPrivacySettingsEveryone>(), td::vector<int32>(), active_period,
-                         nullptr, is_posted_to_chat_page, protect_content),
+                         nullptr, make_object<td_api::storyPrivacySettingsEveryone>(), td::vector<int32>(),
+                         active_period, nullptr, is_posted_to_chat_page, protect_content),
                      td::make_unique<TdOnPostStoryCallback>(this, std::move(query)));
       });
   return td::Status::OK();
@@ -14974,7 +15709,7 @@ td::Status Client::process_repost_story_query(PromisedQueryPtr &query) {
                      auto is_posted_to_chat_page = to_bool(query->arg("post_to_chat_page"));
                      auto protect_content = to_bool(query->arg("protect_content"));
                      send_request(make_object<td_api::postStory>(
-                                      chat_id, nullptr, nullptr, nullptr,
+                                      chat_id, nullptr, nullptr, nullptr, nullptr,
                                       make_object<td_api::storyPrivacySettingsEveryone>(), td::vector<int32>(),
                                       active_period, make_object<td_api::storyFullId>(from_chat_id, from_story_id),
                                       is_posted_to_chat_page, protect_content),
@@ -15078,6 +15813,19 @@ td::Status Client::process_get_available_gifts_query(PromisedQueryPtr &query) {
   return td::Status::OK();
 }
 
+td::Status Client::process_get_unique_gift_query(PromisedQueryPtr &query) {
+  auto name = query->arg("name").str();
+  send_request(make_object<td_api::getUpgradedGift>(name),
+               td::make_unique<TdOnGetUniqueGiftCallback>(this, std::move(query)));
+  return td::Status::OK();
+}
+
+td::Status Client::process_get_chat_share_theme_backdrops_query(PromisedQueryPtr &query) {
+  send_request(make_object<td_api::getProfileShareThemeBackdrops>(),
+               td::make_unique<TdOnGetChatShareThemeBackdropsCallback>(std::move(query)));
+  return td::Status::OK();
+}
+
 td::Status Client::process_send_gift_query(PromisedQueryPtr &query) {
   auto gift_id = td::to_integer<int64>(query->arg("gift_id"));
   auto pay_for_upgrade = to_bool(query->arg("pay_for_upgrade"));
@@ -15164,11 +15912,13 @@ td::Status Client::process_set_managed_bot_access_settings_query(PromisedQueryPt
 
 td::Status Client::process_verify_user_query(PromisedQueryPtr &query) {
   TRY_RESULT(user_id, get_user_id(query.get()));
-  auto custom_description = query->arg("custom_description");
+  TRY_RESULT(custom_description, get_formatted_text(query->arg("custom_description").str(),
+                                                    query->arg("custom_description_parse_mode").str(),
+                                                    get_input_entities(query.get(), "custom_description_entities")));
   check_user(user_id, std::move(query),
-             [this, user_id, custom_description = custom_description.str()](PromisedQueryPtr query) {
+             [this, user_id, custom_description = std::move(custom_description)](PromisedQueryPtr query) mutable {
                send_request(make_object<td_api::setMessageSenderBotVerification>(
-                                0, make_object<td_api::messageSenderUser>(user_id), custom_description),
+                                0, make_object<td_api::messageSenderUser>(user_id), std::move(custom_description)),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
   return td::Status::OK();
@@ -15176,11 +15926,13 @@ td::Status Client::process_verify_user_query(PromisedQueryPtr &query) {
 
 td::Status Client::process_verify_chat_query(PromisedQueryPtr &query) {
   auto chat_id = query->arg("chat_id");
-  auto custom_description = query->arg("custom_description");
+  TRY_RESULT(custom_description, get_formatted_text(query->arg("custom_description").str(),
+                                                    query->arg("custom_description_parse_mode").str(),
+                                                    get_input_entities(query.get(), "custom_description_entities")));
   check_chat(chat_id, AccessRights::Read, std::move(query),
-             [this, custom_description = custom_description.str()](int64 chat_id, PromisedQueryPtr query) {
+             [this, custom_description = std::move(custom_description)](int64 chat_id, PromisedQueryPtr query) mutable {
                send_request(make_object<td_api::setMessageSenderBotVerification>(
-                                0, make_object<td_api::messageSenderChat>(chat_id), custom_description),
+                                0, make_object<td_api::messageSenderChat>(chat_id), std::move(custom_description)),
                             td::make_unique<TdOnOkQueryCallback>(std::move(query)));
              });
   return td::Status::OK();
@@ -15405,6 +16157,15 @@ td::Status Client::process_answer_callback_query_query(PromisedQueryPtr &query) 
   int32 cache_time = get_integer_arg(query.get(), "cache_time", 0, 0, 24 * 30 * 60 * 60);
 
   send_request(make_object<td_api::answerCallbackQuery>(callback_query_id, text, show_alert, url, cache_time),
+               td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+  return td::Status::OK();
+}
+
+td::Status Client::process_answer_widget_query_query(PromisedQueryPtr &query) {
+  auto widget_query_id = td::to_integer<int64>(query->arg("widget_query_id"));
+  auto data = query->arg("data").str();
+
+  send_request(make_object<td_api::answerWidgetQuery>(widget_query_id, data),
                td::make_unique<TdOnOkQueryCallback>(std::move(query)));
   return td::Status::OK();
 }
@@ -15743,6 +16504,18 @@ td::Status Client::process_convert_gift_to_stars_query(PromisedQueryPtr &query) 
   return td::Status::OK();
 }
 
+td::Status Client::process_delete_business_account_gift_query(PromisedQueryPtr &query) {
+  auto business_connection_id = query->arg("business_connection_id").str();
+  auto owned_gift_id = query->arg("owned_gift_id");
+  check_business_connection(
+      business_connection_id, std::move(query),
+      [this, owned_gift_id](const BusinessConnection *business_connection, PromisedQueryPtr query) {
+        send_request(make_object<td_api::deleteGift>(business_connection->id_, owned_gift_id.str()),
+                     td::make_unique<TdOnOkQueryCallback>(std::move(query)));
+      });
+  return td::Status::OK();
+}
+
 td::Status Client::process_upgrade_gift_query(PromisedQueryPtr &query) {
   auto business_connection_id = query->arg("business_connection_id").str();
   auto owned_gift_id = query->arg("owned_gift_id");
@@ -15994,7 +16767,7 @@ td::Status Client::process_set_chat_sticker_set_query(PromisedQueryPtr &query) {
   check_chat(chat_id, AccessRights::Write, std::move(query),
              [this, sticker_set_name = sticker_set_name.str()](int64 chat_id, PromisedQueryPtr query) {
                if (get_chat_type(chat_id) != ChatType::Supergroup) {
-                 return fail_query(400, "Bad Request: method is available only for supergroups", std::move(query));
+                 return fail_query(400, "Bad Request: method is available only in supergroups", std::move(query));
                }
 
                resolve_sticker_set(
@@ -16015,7 +16788,7 @@ td::Status Client::process_delete_chat_sticker_set_query(PromisedQueryPtr &query
 
   check_chat(chat_id, AccessRights::Write, std::move(query), [this](int64 chat_id, PromisedQueryPtr query) {
     if (get_chat_type(chat_id) != ChatType::Supergroup) {
-      return fail_query(400, "Bad Request: method is available only for supergroups", std::move(query));
+      return fail_query(400, "Bad Request: method is available only in supergroups", std::move(query));
     }
 
     auto chat_info = get_chat(chat_id);
@@ -16270,24 +17043,25 @@ td::Status Client::process_promote_chat_member_query(PromisedQueryPtr &query) {
   auto can_delete_stories = to_bool(query->arg("can_delete_stories"));
   auto can_manage_direct_messages = to_bool(query->arg("can_manage_direct_messages"));
   auto can_manage_tags = to_bool(query->arg("can_manage_tags"));
+  auto can_send_welcome_messages = to_bool(query->arg("can_send_welcome_messages"));
   auto is_anonymous = to_bool(query->arg("is_anonymous"));
   auto is_promotion = can_manage_chat || can_change_info || can_post_messages || can_edit_messages ||
                       can_delete_messages || can_invite_users || can_restrict_members || can_pin_messages ||
                       can_manage_topics || can_promote_members || can_manage_video_chats || can_post_stories ||
                       can_edit_stories || can_delete_stories || can_manage_direct_messages || can_manage_tags ||
-                      is_anonymous;
+                      can_send_welcome_messages || is_anonymous;
   auto status = make_object<td_api::chatMemberStatusAdministrator>(
       true, make_object<td_api::chatAdministratorRights>(
                 can_manage_chat, can_change_info, can_post_messages, can_edit_messages, can_delete_messages,
                 can_invite_users, can_restrict_members, can_pin_messages, can_manage_topics, can_promote_members,
                 can_manage_video_chats, can_post_stories, can_edit_stories, can_delete_stories,
-                can_manage_direct_messages, can_manage_tags, is_anonymous));
+                can_manage_direct_messages, can_manage_tags, can_send_welcome_messages, is_anonymous));
   check_chat(chat_id, AccessRights::Write, std::move(query),
              [this, user_id, status = std::move(status), is_promotion](int64 chat_id, PromisedQueryPtr query) mutable {
                auto chat_info = get_chat(chat_id);
                CHECK(chat_info != nullptr);
                if (chat_info->type != ChatInfo::Type::Supergroup) {
-                 return fail_query(400, "Bad Request: method is available for supergroup and channel chats only",
+                 return fail_query(400, "Bad Request: method is available only in supergroup and channel chats",
                                    std::move(query));
                }
                auto supergroup_info = get_supergroup_info(chat_info->supergroup_id);
@@ -16310,7 +17084,7 @@ td::Status Client::process_set_chat_administrator_custom_title_query(PromisedQue
   check_chat(chat_id, AccessRights::Write, std::move(query), [this, user_id](int64 chat_id, PromisedQueryPtr query) {
     auto chat_type = get_chat_type(chat_id);
     if (chat_type != ChatType::Group && chat_type != ChatType::Supergroup) {
-      return fail_query(400, "Bad Request: method is available only for groups and supergroups", std::move(query));
+      return fail_query(400, "Bad Request: method is available only in groups and supergroups", std::move(query));
     }
 
     get_chat_member(chat_id, user_id, std::move(query),
@@ -16343,7 +17117,7 @@ td::Status Client::process_set_chat_member_tag_query(PromisedQueryPtr &query) {
   check_chat(chat_id, AccessRights::Write, std::move(query), [this, user_id](int64 chat_id, PromisedQueryPtr query) {
     auto chat_type = get_chat_type(chat_id);
     if (chat_type != ChatType::Group && chat_type != ChatType::Supergroup) {
-      return fail_query(400, "Bad Request: method is available only for groups and supergroups", std::move(query));
+      return fail_query(400, "Bad Request: method is available only in groups and supergroups", std::move(query));
     }
 
     check_user_no_fail(user_id, std::move(query), [this, chat_id, user_id](PromisedQueryPtr query) {
@@ -16386,7 +17160,7 @@ td::Status Client::process_restrict_chat_member_query(PromisedQueryPtr &query) {
              [this, user_id, until_date, is_legacy = allow_legacy, permissions = std::move(permissions)](
                  int64 chat_id, PromisedQueryPtr query) mutable {
                if (get_chat_type(chat_id) != ChatType::Supergroup) {
-                 return fail_query(400, "Bad Request: method is available only for supergroups", std::move(query));
+                 return fail_query(400, "Bad Request: method is available only in supergroups", std::move(query));
                }
 
                get_chat_member(
@@ -16424,7 +17198,7 @@ td::Status Client::process_unban_chat_member_query(PromisedQueryPtr &query) {
                auto chat_info = get_chat(chat_id);
                CHECK(chat_info != nullptr);
                if (chat_info->type != ChatInfo::Type::Supergroup) {
-                 return fail_query(400, "Bad Request: method is available for supergroup and channel chats only",
+                 return fail_query(400, "Bad Request: method is available only in supergroup and channel chats",
                                    std::move(query));
                }
 
@@ -16934,6 +17708,10 @@ void Client::return_gifts(td::vector<object_ptr<td_api::gift>> gifts, PromisedQu
   answer_query(JsonGifts(gifts, this), std::move(query));
 }
 
+void Client::return_unique_gift(object_ptr<td_api::upgradedGift> gift, PromisedQueryPtr query) {
+  answer_query(JsonUniqueGift(gift.get(), this), std::move(query));
+}
+
 void Client::return_received_gifts(object_ptr<td_api::receivedGifts> gifts, bool can_be_managed,
                                    PromisedQueryPtr query) {
   answer_query(JsonReceivedGifts(gifts.get(), can_be_managed, this), std::move(query));
@@ -17101,7 +17879,7 @@ void Client::do_set_webhook(PromisedQueryPtr query, bool was_deleted) {
       return fail_query(400, "Bad Request: secret token is too long", std::move(query));
     }
     if (!td::is_base64url_characters(secret_token)) {
-      return fail_query(400, "Bad Request: secret token contains unallowed characters", std::move(query));
+      return fail_query(400, "Bad Request: secret token contains illegal characters", std::move(query));
     }
 
     if (active_webhook_set_query_) {
@@ -17200,22 +17978,28 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
   auto chat_id = query->arg("chat_id");
   auto forum_topic_id = get_forum_topic_id(query.get(), "message_thread_id");
   auto business_connection_id = query->arg("business_connection_id");
-  int64 receiver_user_id = 0;
-  if (query->has_arg("receiver_user_id")) {
-    auto r_receiver_user_id = get_user_id(query.get(), "receiver_user_id");
-    if (r_receiver_user_id.is_error()) {
-      return fail_query_with_error(std::move(query), 400, r_receiver_user_id.error().message());
-    }
-    receiver_user_id = r_receiver_user_id.move_as_ok();
+  auto r_ephemeral_message_parameters = get_ephemeral_message_parameters(query.get());
+  if (r_ephemeral_message_parameters.is_error()) {
+    return fail_query_with_error(std::move(query), 400, r_ephemeral_message_parameters.error().message());
   }
-  auto callback_query_id = td::to_integer<int64>(query->arg("callback_query_id"));
+  auto ephemeral_message_parameters = r_ephemeral_message_parameters.move_as_ok();
+  auto protect_content = to_bool(query->arg("protect_content"));
+  auto r_reply_markup = get_reply_markup(query.get(), bot_user_ids_);
+  if (r_reply_markup.is_error()) {
+    return fail_query_with_error(std::move(query), 400, r_reply_markup.error().message());
+  }
+  auto reply_markup = r_reply_markup.move_as_ok();
+  if (ephemeral_message_parameters.receiver_user_id == 0 && ephemeral_message_parameters.callback_query_id != 0) {
+    return do_reply_to_callback_query_with_ephemeral_message(ephemeral_message_parameters, protect_content,
+                                                             std::move(reply_markup), std::move(input_message_content),
+                                                             std::move(query));
+  }
   auto r_reply_parameters = get_reply_parameters(query.get());
   if (r_reply_parameters.is_error()) {
     return fail_query_with_error(std::move(query), 400, r_reply_parameters.error().message());
   }
   auto reply_parameters = r_reply_parameters.move_as_ok();
   auto disable_notification = to_bool(query->arg("disable_notification"));
-  auto protect_content = to_bool(query->arg("protect_content"));
   auto allow_paid_broadcast = to_bool(query->arg("allow_paid_broadcast"));
   auto effect_id = td::to_integer<int64>(query->arg("message_effect_id"));
   auto direct_messages_topic_id = td::to_integer<int64>(query->arg("direct_messages_topic_id"));
@@ -17223,18 +18007,13 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
   if (r_input_suggested_post_info.is_error()) {
     return fail_query_with_error(std::move(query), 400, r_input_suggested_post_info.error().message());
   }
-  auto r_reply_markup = get_reply_markup(query.get(), bot_user_ids_);
-  if (r_reply_markup.is_error()) {
-    return fail_query_with_error(std::move(query), 400, r_reply_markup.error().message());
-  }
-  auto reply_markup = r_reply_markup.move_as_ok();
 
   auto send_options = get_message_send_options(disable_notification, protect_content, allow_paid_broadcast, effect_id,
                                                r_input_suggested_post_info.move_as_ok());
   resolve_reply_markup_bot_usernames(
       std::move(reply_markup), std::move(query),
       [this, chat_id_str = chat_id.str(), forum_topic_id, direct_messages_topic_id,
-       business_connection_id = business_connection_id.str(), receiver_user_id, callback_query_id,
+       business_connection_id = business_connection_id.str(), ephemeral_message_parameters,
        reply_parameters = std::move(reply_parameters), disable_notification, protect_content, allow_paid_broadcast,
        effect_id, send_options = std::move(send_options), input_message_content = std::move(input_message_content)](
           object_ptr<td_api::ReplyMarkup> reply_markup, PromisedQueryPtr query) mutable {
@@ -17254,7 +18033,7 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
               });
         }
 
-        auto on_success = [this, receiver_user_id, callback_query_id, send_options = std::move(send_options),
+        auto on_success = [this, ephemeral_message_parameters, send_options = std::move(send_options),
                            input_message_content = std::move(input_message_content),
                            reply_markup = std::move(reply_markup)](
                               int64 chat_id, object_ptr<td_api::MessageTopic> topic_id,
@@ -17265,12 +18044,15 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
           }
           count++;
 
-          if (receiver_user_id != 0) {
-            return send_request(make_object<td_api::sendEphemeralMessage>(
-                                    chat_id, std::move(topic_id), receiver_user_id, callback_query_id,
-                                    get_input_message_reply_to(std::move(reply_parameters)), 0, false,
-                                    std::move(reply_markup), std::move(input_message_content)),
-                                td::make_unique<TdOnSendMessageCallback>(this, chat_id, std::move(query)));
+          if (ephemeral_message_parameters.receiver_user_id != 0) {
+            return send_request(
+                make_object<td_api::sendEphemeralMessage>(
+                    chat_id, std::move(topic_id), ephemeral_message_parameters.receiver_user_id,
+                    ephemeral_message_parameters.callback_query_id,
+                    ephemeral_message_parameters.replace_callback_query_message,
+                    get_input_message_reply_to(std::move(reply_parameters)), send_options->protect_content_, 0, false,
+                    std::move(reply_markup), std::move(input_message_content)),
+                td::make_unique<TdOnSendMessageCallback>(this, chat_id, std::move(query)));
           }
 
           send_request(make_object<td_api::sendMessage>(
@@ -17281,6 +18063,27 @@ void Client::do_send_message(object_ptr<td_api::InputMessageContent> input_messa
         check_reply_parameters(chat_id_str, std::move(reply_parameters), forum_topic_id, direct_messages_topic_id,
                                std::move(query), std::move(on_success), allow_paid_broadcast);
       });
+}
+
+void Client::do_reply_to_callback_query_with_ephemeral_message(
+    const EphemeralMessageParameters &parameters, bool protect_content, object_ptr<td_api::ReplyMarkup> reply_markup,
+    object_ptr<td_api::InputMessageContent> input_message_content, PromisedQueryPtr query) {
+  if (!query->arg("business_connection_id").empty()) {
+    return fail_query_with_error(std::move(query), 400,
+                                 "Business messages can't be sent as ephemeral replies to callback queries");
+  }
+
+  resolve_reply_markup_bot_usernames(std::move(reply_markup), std::move(query),
+                                     [this, callback_query_id = parameters.callback_query_id,
+                                      replace_callback_query_message = parameters.replace_callback_query_message,
+                                      protect_content, input_message_content = std::move(input_message_content)](
+                                         object_ptr<td_api::ReplyMarkup> reply_markup, PromisedQueryPtr query) mutable {
+                                       send_request(
+                                           make_object<td_api::replyToCallbackQueryWithEphemeralMessage>(
+                                               callback_query_id, replace_callback_query_message, protect_content,
+                                               std::move(reply_markup), std::move(input_message_content)),
+                                           td::make_unique<TdOnReplyToCallbackQueryCallback>(this, std::move(query)));
+                                     });
 }
 
 td::int64 Client::get_send_message_query_id(PromisedQueryPtr query, bool is_multisend) {
@@ -17298,10 +18101,10 @@ void Client::on_sent_message(object_ptr<td_api::message> &&message, int64 query_
   int64 chat_id = message->chat_id_;
   int64 message_id = message->id_;
 
-  MessageFullId yet_unsent_message_id{chat_id, message_id};
+  MessageFullId yet_unsent_message_full_id{chat_id, message_id};
   YetUnsentMessage yet_unsent_message;
   yet_unsent_message.send_message_query_id = query_id;
-  auto emplace_result = yet_unsent_messages_.emplace(yet_unsent_message_id, yet_unsent_message);
+  auto emplace_result = yet_unsent_messages_.emplace(yet_unsent_message_full_id, yet_unsent_message);
   CHECK(emplace_result.second);
 
   auto &query = *pending_send_message_queries_[query_id];
@@ -17334,7 +18137,7 @@ td::Status Client::do_edit_ephemeral_message(object_ptr<td_api::InputMessageCont
        input_message_content = std::move(input_message_content)](object_ptr<td_api::ReplyMarkup> reply_markup,
                                                                  PromisedQueryPtr query) mutable {
         check_chat(
-            chat_id_str, AccessRights::Edit, std::move(query),
+            chat_id_str, AccessRights::EditEphemeral, std::move(query),
             [this, receiver_user_id, ephemeral_message_id, input_message_content = std::move(input_message_content),
              reply_markup = std::move(reply_markup)](int64 chat_id, PromisedQueryPtr query) mutable {
               send_request(
@@ -17348,18 +18151,17 @@ td::Status Client::do_edit_ephemeral_message(object_ptr<td_api::InputMessageCont
 
 void Client::abort_long_poll(bool from_set_webhook) {
   if (long_poll_query_) {
-    td::Slice message;
+    td::CSlice message;
     if (from_set_webhook) {
-      message = td::Slice("Conflict: terminated by setWebhook request");
+      message = "Conflict: terminated by setWebhook request";
     } else {
-      message = td::Slice(
-          "Conflict: terminated by other getUpdates request; make sure that only one bot instance is running");
+      message = "Conflict: terminated by other getUpdates request; make sure that only one bot instance is running";
     }
     fail_query_conflict(message, std::move(long_poll_query_));
   }
 }
 
-void Client::fail_query_conflict(td::Slice message, PromisedQueryPtr &&query) {
+void Client::fail_query_conflict(td::CSlice message, PromisedQueryPtr &&query) {
   auto now = td::Time::now_cached();
   if (now >= next_get_updates_conflict_time_) {
     fail_query(409, message, std::move(query));
@@ -17398,7 +18200,7 @@ Client::ClosingError Client::get_closing_error() {
   if (logging_out_) {
     if (is_api_id_invalid_) {
       result.code = 401;
-      result.message = td::Slice("Unauthorized: invalid api-id/api-hash");
+      result.message = "Unauthorized: invalid api-id/api-hash";
     } else if (next_authorization_time_ > 0.0) {
       result.code = 429;
       result.retry_after = td::max(static_cast<int>(next_authorization_time_ - td::Time::now()), 0) + 1;
@@ -17409,15 +18211,15 @@ Client::ClosingError Client::get_closing_error() {
       result.message = retry_after_error_message;
     } else if (clear_tqueue_) {
       result.code = 400;
-      result.message = td::Slice("Logged out");
+      result.message = "Logged out";
     } else {
       result.code = 401;
-      result.message = td::Slice("Unauthorized");
+      result.message = "Unauthorized";
     }
   } else {
     CHECK(closing_);
     result.code = 500;
-    result.message = td::Slice("Internal Server Error: restart");
+    result.message = "Internal Server Error: restart";
   }
   return result;
 }
@@ -17815,13 +18617,9 @@ void Client::json_store_file(td::JsonObjectScope &object, const td_api::file *fi
   }
   if (with_path && file->local_->is_downloading_completed_) {
     if (parameters_->local_mode_) {
-      if (td::check_utf8(file->local_->path_)) {
-        object("file_path", file->local_->path_);
-      } else {
-        object("file_path", td::JsonRawString(file->local_->path_));
-      }
+      json_store_bytes(object, "file_path", file->local_->path_, td::Slice());
     } else {
-      td::Slice relative_path = td::PathView::relative(file->local_->path_, dir_, true);
+      td::Slice relative_path = td::PathView::relative(file->local_->path_, files_dir_, true);
       if (!relative_path.empty() && file->local_->downloaded_size_ <= MAX_DOWNLOAD_FILE_SIZE) {
         object("file_path", relative_path);
       }
@@ -17845,12 +18643,7 @@ void Client::json_store_callback_query_payload(td::JsonObjectScope &object,
   switch (payload->get_id()) {
     case td_api::callbackQueryPayloadData::ID: {
       auto data = static_cast<const td_api::callbackQueryPayloadData *>(payload);
-      if (!td::check_utf8(data->data_)) {
-        LOG(WARNING) << "Receive non-UTF-8 callback query data";
-        object("data", td::JsonRawString(data->data_));
-      } else {
-        object("data", data->data_);
-      }
+      json_store_bytes(object, "data", data->data_, "callback query data");
       break;
     }
     case td_api::callbackQueryPayloadGame::ID:
@@ -17861,6 +18654,17 @@ void Client::json_store_callback_query_payload(td::JsonObjectScope &object,
       break;
     default:
       UNREACHABLE();
+  }
+}
+
+void Client::json_store_bytes(td::JsonObjectScope &object, td::Slice field_name, td::CSlice bytes, td::Slice source) {
+  if (!td::check_utf8(bytes)) {
+    if (!source.empty()) {
+      LOG(WARNING) << "Receive non-UTF-8 " << source;
+    }
+    object(field_name, td::JsonRawString(bytes));
+  } else {
+    object(field_name, bytes);
   }
 }
 
@@ -17892,6 +18696,7 @@ void Client::json_store_administrator_rights(td::JsonObjectScope &object, const 
   if (chat_type == ChatType::Group || chat_type == ChatType::Supergroup) {
     object("can_manage_tags", td::JsonBool(rights->can_manage_tags_));
   }
+  object("can_send_welcome_messages", td::JsonBool(rights->can_send_welcome_messages_));
   object("is_anonymous", td::JsonBool(rights->is_anonymous_));
 }
 
@@ -17940,6 +18745,138 @@ void Client::json_store_rarity(td::JsonObjectScope &object, const td_api::Upgrad
       UNREACHABLE();
   }
   object("rarity_per_mille", rarity_per_mille);
+}
+
+void Client::json_store_style(td::JsonObjectScope &object, const td_api::ButtonStyle *style, bool for_rich_message) {
+  CHECK(style != nullptr);
+  switch (style->get_id()) {
+    case td_api::buttonStyleDefault::ID:
+      break;
+    case td_api::buttonStylePrimary::ID:
+      object("style", "primary");
+      break;
+    case td_api::buttonStyleDanger::ID:
+      object("style", "danger");
+      break;
+    case td_api::buttonStyleSuccess::ID:
+      object("style", "success");
+      break;
+    case td_api::buttonStyleLink::ID:
+      if (for_rich_message) {
+        object("style", "link");
+      } else {
+        LOG(ERROR) << "Receive buttonStyleLink";
+      }
+      break;
+    default:
+      UNREACHABLE();
+  }
+}
+
+void Client::json_store_inline_keyboard_button_type(td::JsonObjectScope &object,
+                                                    const td_api::InlineKeyboardButtonType *button_type,
+                                                    bool for_rich_message) {
+  CHECK(button_type != nullptr);
+  switch (button_type->get_id()) {
+    case td_api::inlineKeyboardButtonTypeUrl::ID: {
+      auto type = static_cast<const td_api::inlineKeyboardButtonTypeUrl *>(button_type);
+      object("url", type->url_);
+      break;
+    }
+    case td_api::inlineKeyboardButtonTypeLoginUrl::ID: {
+      auto type = static_cast<const td_api::inlineKeyboardButtonTypeLoginUrl *>(button_type);
+      object("url", type->url_);
+      break;
+    }
+    case td_api::inlineKeyboardButtonTypeCallback::ID:
+    case td_api::inlineKeyboardButtonTypeCallbackWithPassword::ID: {
+      auto data = get_callback_data(button_type);
+      if (!td::check_utf8(data)) {
+        object("callback_data", "INVALID");
+      } else {
+        object("callback_data", data);
+      }
+      break;
+    }
+    case td_api::inlineKeyboardButtonTypeCallbackGame::ID:
+      if (for_rich_message) {
+        LOG(ERROR) << "Receive inlineKeyboardButtonTypeCallbackGame";
+      }
+      object("callback_game", JsonEmptyObject());
+      break;
+    case td_api::inlineKeyboardButtonTypeSwitchInline::ID: {
+      auto type = static_cast<const td_api::inlineKeyboardButtonTypeSwitchInline *>(button_type);
+      switch (type->target_chat_->get_id()) {
+        case td_api::targetChatCurrent::ID:
+          object("switch_inline_query_current_chat", type->query_);
+          break;
+        case td_api::targetChatChosen::ID: {
+          auto types = static_cast<const td_api::targetChatChosen *>(type->target_chat_.get())->types_.get();
+          if (types->allow_user_chats_ && types->allow_bot_chats_ && types->allow_group_chats_ &&
+              types->allow_channel_chats_) {
+            object("switch_inline_query", type->query_);
+          } else {
+            object("switch_inline_query_chosen_chat", td::json_object([&](auto &o) {
+                     o("query", type->query_);
+                     o("allow_user_chats", td::JsonBool(types->allow_user_chats_));
+                     o("allow_bot_chats", td::JsonBool(types->allow_bot_chats_));
+                     o("allow_group_chats", td::JsonBool(types->allow_group_chats_));
+                     o("allow_channel_chats", td::JsonBool(types->allow_channel_chats_));
+                   }));
+          }
+          break;
+        }
+        default:
+          UNREACHABLE();
+      }
+      break;
+    }
+    case td_api::inlineKeyboardButtonTypeBuy::ID:
+      if (for_rich_message) {
+        LOG(ERROR) << "Receive inlineKeyboardButtonTypeBuy";
+      }
+      object("pay", td::JsonTrue());
+      break;
+    case td_api::inlineKeyboardButtonTypeUser::ID: {
+      auto type = static_cast<const td_api::inlineKeyboardButtonTypeUser *>(button_type);
+      object("url", PSLICE() << "tg://user?id=" << type->user_id_);
+      break;
+    }
+    case td_api::inlineKeyboardButtonTypeWebApp::ID: {
+      auto type = static_cast<const td_api::inlineKeyboardButtonTypeWebApp *>(button_type);
+      object("web_app", JsonWebAppInfo(type->url_));
+      break;
+    }
+    case td_api::inlineKeyboardButtonTypeCopyText::ID: {
+      auto type = static_cast<const td_api::inlineKeyboardButtonTypeCopyText *>(button_type);
+      object("copy_text", JsonCopyTextButton(type->text_));
+      break;
+    }
+    case td_api::inlineKeyboardButtonTypeDisabled::ID:
+      object("disabled", JsonEmptyObject());
+      break;
+    default:
+      UNREACHABLE();
+      break;
+  }
+}
+
+void Client::json_store_horizontal_alignment(td::JsonObjectScope &object,
+                                             const td_api::PageBlockHorizontalAlignment *alignment) {
+  CHECK(alignment != nullptr);
+  switch (alignment->get_id()) {
+    case td_api::pageBlockHorizontalAlignmentLeft::ID:
+      object("align", "left");
+      break;
+    case td_api::pageBlockHorizontalAlignmentCenter::ID:
+      object("align", "center");
+      break;
+    case td_api::pageBlockHorizontalAlignmentRight::ID:
+      object("align", "right");
+      break;
+    default:
+      UNREACHABLE();
+  }
 }
 
 void Client::json_store_message_sender(td::JsonObjectScope &object, const object_ptr<td_api::MessageSender> &sender,
@@ -18023,6 +18960,12 @@ td::Slice Client::get_update_type_name(UpdateType update_type) {
       return td::Slice("guest_message");
     case UpdateType::Subscription:
       return td::Slice("subscription");
+    case UpdateType::StopMessageDraft:
+      return td::Slice("stopped_message_generation");
+    case UpdateType::WidgetQuery:
+      return td::Slice("widget_query");
+    case UpdateType::SharedWidgetQuery:
+      return td::Slice("shared_widget_query");
     default:
       UNREACHABLE();
       return td::Slice();
@@ -18112,8 +19055,8 @@ void Client::add_update_impl(UpdateType update_type, const td::VirtuallyJsonable
   last_update_creation_time_ = td::Time::now();
 
   if (((allowed_update_types_ >> static_cast<int32>(update_type)) & 1) == 0) {
-    LOG(DEBUG) << "Skip unallowed update of the type " << static_cast<int32>(update_type) << ", allowed update mask is "
-               << allowed_update_types_;
+    LOG(DEBUG) << "Skip disallowed update of the type " << static_cast<int32>(update_type)
+               << ", allowed update mask is " << allowed_update_types_;
     return;
   }
 
@@ -18374,6 +19317,61 @@ void Client::add_new_inline_callback_query(object_ptr<td_api::updateNewInlineCal
              150, query->sender_user_id_ + (static_cast<int64>(3) << 33));
 }
 
+void Client::add_new_widget_query(object_ptr<td_api::Object> &&update) {
+  CHECK(update != nullptr);
+  td::vector<int64> sticker_set_ids;
+  switch (update->get_id()) {
+    case td_api::updateNewWidgetQuery::ID: {
+      auto query = static_cast<const td_api::updateNewWidgetQuery *>(update.get());
+      sticker_set_ids = get_widget_query_sticker_set_ids(query->query_type_, query->wallet_card_);
+      break;
+    }
+    case td_api::updateNewInlineWidgetQuery::ID: {
+      auto query = static_cast<const td_api::updateNewInlineWidgetQuery *>(update.get());
+      sticker_set_ids = get_widget_query_sticker_set_ids(query->query_type_, query->wallet_card_);
+      break;
+    }
+    case td_api::updateNewWidgetCopyQuery::ID: {
+      auto query = static_cast<const td_api::updateNewWidgetCopyQuery *>(update.get());
+      sticker_set_ids = get_widget_query_sticker_set_ids(query->query_type_, query->wallet_card_);
+      break;
+    }
+    default:
+      UNREACHABLE();
+  }
+  get_sticker_set_names(
+      std::move(sticker_set_ids),
+      td::PromiseCreator::lambda([actor_id = actor_id(this), update = std::move(update)](td::Unit) mutable {
+        send_closure(actor_id, &Client::do_add_new_widget_query, std::move(update));
+      }));
+}
+
+void Client::do_add_new_widget_query(object_ptr<td_api::Object> &&update) {
+  CHECK(update != nullptr);
+  switch (update->get_id()) {
+    case td_api::updateNewWidgetQuery::ID: {
+      auto query = static_cast<const td_api::updateNewWidgetQuery *>(update.get());
+      add_update(UpdateType::WidgetQuery, JsonWidgetQuery(query, this), 150,
+                 query->sender_user_id_ + (static_cast<int64>(16) << 33));
+      break;
+    }
+    case td_api::updateNewInlineWidgetQuery::ID: {
+      auto query = static_cast<const td_api::updateNewInlineWidgetQuery *>(update.get());
+      add_update(UpdateType::WidgetQuery, JsonInlineWidgetQuery(query, this), 150,
+                 query->sender_user_id_ + (static_cast<int64>(16) << 33));
+      break;
+    }
+    case td_api::updateNewWidgetCopyQuery::ID: {
+      auto query = static_cast<const td_api::updateNewWidgetCopyQuery *>(update.get());
+      add_update(UpdateType::SharedWidgetQuery, JsonSharedWidgetQuery(query, this), 150,
+                 query->sender_user_id_ + (static_cast<int64>(16) << 33));
+      break;
+    }
+    default:
+      UNREACHABLE();
+  }
+}
+
 void Client::add_new_shipping_query(object_ptr<td_api::updateNewShippingQuery> &&query) {
   CHECK(query != nullptr);
   add_update(UpdateType::ShippingQuery, JsonShippingQuery(query.get(), this), 150,
@@ -18402,6 +19400,12 @@ void Client::add_update_subscription(object_ptr<td_api::updateUserSubscription> 
   CHECK(query != nullptr);
   add_update(UpdateType::Subscription, JsonBotSubscriptionUpdated(query.get(), this), 86400,
              query->user_id_ + (static_cast<int64>(14) << 33));
+}
+
+void Client::add_update_stopped_message_generation(object_ptr<td_api::updateStopMessageDraft> &&update) {
+  CHECK(update != nullptr);
+  add_update(UpdateType::StopMessageDraft, JsonMessageGenerationStopped(update.get(), this), 150,
+             update->chat_id_ + (static_cast<int64>(15) << 33));
 }
 
 void Client::add_new_custom_event(object_ptr<td_api::updateNewCustomEvent> &&event) {
@@ -18605,9 +19609,11 @@ bool Client::need_skip_update_message(int64 chat_id, const MessageInfo *message_
   if (chat_type == ChatInfo::Type::Supergroup) {
     CHECK(chat != nullptr);
     auto supergroup_info = get_supergroup_info(chat->supergroup_id);
-    if (supergroup_info->status->get_id() == td_api::chatMemberStatusLeft::ID ||
-        supergroup_info->status->get_id() == td_api::chatMemberStatusBanned::ID) {
+    if ((supergroup_info->status->get_id() == td_api::chatMemberStatusLeft::ID ||
+         supergroup_info->status->get_id() == td_api::chatMemberStatusBanned::ID) &&
+        message_info->ephemeral_message_id == 0) {
       // if we have left the chat, send only update about leaving the supergroup
+      // ephemeral messages are received without chat membership, for example, in placeholder chats
       if (message_content_id == td_api::messageChatDeleteMember::ID) {
         auto user_id = static_cast<const td_api::messageChatDeleteMember *>(message_info->content.get())->user_id_;
         return user_id != my_id_;
@@ -18683,12 +19689,13 @@ bool Client::need_skip_update_message(int64 chat_id, const MessageInfo *message_
     case td_api::messageGiveawayPrizeStars::ID:
     case td_api::messagePaidMessagesRefunded::ID:
     case td_api::messageGroupCall::ID:
-    case td_api::messageGiftedTon::ID:
+    case td_api::messageGiftedGrams::ID:
     case td_api::messageSuggestBirthdate::ID:
     case td_api::messageUpgradedGiftPurchaseOffer::ID:
     case td_api::messageUpgradedGiftPurchaseOfferRejected::ID:
     case td_api::messageChatHasProtectedContentToggled::ID:
     case td_api::messageChatHasProtectedContentDisableRequested::ID:
+    case td_api::messageTonConnectRequest::ID:
       return true;
     default:
       break;
@@ -18800,13 +19807,13 @@ td::Result<td_api::object_ptr<td_api::StickerType>> Client::get_sticker_type(td:
   return td::Status::Error(400, "Unsupported sticker type specified");
 }
 
-td::CSlice Client::get_callback_data(const object_ptr<td_api::InlineKeyboardButtonType> &type) {
+td::CSlice Client::get_callback_data(const td_api::InlineKeyboardButtonType *type) {
   CHECK(type != nullptr);
   switch (type->get_id()) {
     case td_api::inlineKeyboardButtonTypeCallback::ID:
-      return static_cast<const td_api::inlineKeyboardButtonTypeCallback *>(type.get())->data_;
+      return static_cast<const td_api::inlineKeyboardButtonTypeCallback *>(type)->data_;
     case td_api::inlineKeyboardButtonTypeCallbackWithPassword::ID:
-      return static_cast<const td_api::inlineKeyboardButtonTypeCallbackWithPassword *>(type.get())->data_;
+      return static_cast<const td_api::inlineKeyboardButtonTypeCallbackWithPassword *>(type)->data_;
     default:
       UNREACHABLE();
       return td::CSlice();
@@ -18882,7 +19889,7 @@ bool Client::are_equal_inline_keyboard_buttons(const td_api::inlineKeyboardButto
     }
     case td_api::inlineKeyboardButtonTypeCallback::ID:
     case td_api::inlineKeyboardButtonTypeCallbackWithPassword::ID:
-      return get_callback_data(lhs->type_) == get_callback_data(rhs->type_);
+      return get_callback_data(lhs->type_.get()) == get_callback_data(rhs->type_.get());
     case td_api::inlineKeyboardButtonTypeCallbackGame::ID:
       return true;
     case td_api::inlineKeyboardButtonTypeSwitchInline::ID: {
@@ -18908,6 +19915,8 @@ bool Client::are_equal_inline_keyboard_buttons(const td_api::inlineKeyboardButto
       auto rhs_type = static_cast<const td_api::inlineKeyboardButtonTypeCopyText *>(rhs->type_.get());
       return lhs_type->text_ == rhs_type->text_;
     }
+    case td_api::inlineKeyboardButtonTypeDisabled::ID:
+      return true;
     default:
       UNREACHABLE();
       return false;
@@ -18983,6 +19992,39 @@ td::vector<td::int64> Client::get_sent_gift_sticker_set_ids(const object_ptr<td_
       UNREACHABLE();
       return {};
   }
+}
+
+td::vector<td::int64> Client::get_widget_query_sticker_set_ids(const object_ptr<td_api::WidgetQueryType> &query_type,
+                                                               const object_ptr<td_api::tonWalletCard> &wallet_card) {
+  CHECK(query_type != nullptr);
+  if (query_type->get_id() != td_api::widgetQueryTypeData::ID ||
+      !static_cast<const td_api::widgetQueryTypeData *>(query_type.get())->with_wallet_) {
+    return {};
+  }
+  return get_ton_wallet_card_sticker_set_ids(wallet_card);
+}
+
+td::vector<td::int64> Client::get_ton_wallet_card_sticker_set_ids(const object_ptr<td_api::tonWalletCard> &card) {
+  td::vector<int64> sticker_set_ids;
+  if (card == nullptr) {
+    return sticker_set_ids;
+  }
+  for (const auto &sticker : card->stickers_) {
+    const auto &nft = sticker->nft_;
+    if (nft->gift_ != nullptr) {
+      td::append(sticker_set_ids, get_upgraded_gift_sticker_set_ids(nft->gift_));
+    }
+  }
+  return sticker_set_ids;
+}
+
+td::vector<td::int64> Client::get_profile_share_theme_sticker_set_ids(
+    const object_ptr<td_api::ProfileShareTheme> &share_theme) {
+  if (share_theme == nullptr || share_theme->get_id() != td_api::profileShareThemeUpgradedGift::ID) {
+    return {};
+  }
+  return get_upgraded_gift_sticker_set_ids(
+      static_cast<const td_api::profileShareThemeUpgradedGift *>(share_theme.get())->gift_);
 }
 
 td::vector<td::int64> Client::get_message_content_sticker_set_ids(const object_ptr<td_api::MessageContent> &content) {
@@ -19116,7 +20158,9 @@ void Client::process_new_message_queue(int64 chat_id, int state) {
     UpdateType update_type;
     auto chat = get_chat(chat_id);
     CHECK(chat != nullptr);
-    if (chat->type == ChatInfo::Type::Supergroup && !get_supergroup_info(chat->supergroup_id)->is_supergroup) {
+    // ephemeral messages are sent by users even in channels
+    if (chat->type == ChatInfo::Type::Supergroup && !get_supergroup_info(chat->supergroup_id)->is_supergroup &&
+        message_info->ephemeral_message_id == 0) {
       update_type = is_edited ? UpdateType::EditedChannelPost : UpdateType::ChannelPost;
     } else {
       update_type = is_edited ? UpdateType::EditedMessage : UpdateType::Message;

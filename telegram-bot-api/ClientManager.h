@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2025
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2026
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -16,6 +16,7 @@
 #include "td/utils/buffer.h"
 #include "td/utils/common.h"
 #include "td/utils/Container.h"
+#include "td/utils/ExpiringFlatHashMap.h"
 #include "td/utils/FlatHashMap.h"
 #include "td/utils/FloodControlFast.h"
 #include "td/utils/Promise.h"
@@ -65,7 +66,7 @@ class ClientManager final : public td::Actor {
   TokenRange token_range_;
 
   td::FlatHashMap<td::string, td::uint64> token_to_id_;
-  td::FlatHashMap<td::string, td::FloodControlFast> flood_controls_;
+  td::ExpiringFlatHashMap<td::string, td::FloodControlFast> flood_controls_{60 * 60};
   td::FloodControlFast global_flood_control_;
   bool is_global_flood_control_enabled_ = false;
   td::FlatHashMap<td::int64, td::uint64> active_client_count_;

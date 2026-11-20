@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2025
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2026
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -16,12 +16,27 @@
 #include "td/utils/port/IPAddress.h"
 #include "td/utils/SliceBuilder.h"
 #include "td/utils/Time.h"
+#include "td/utils/utf8.h"
 
 #include <numeric>
 
 namespace telegram_bot_api {
 
 td::FlatHashMap<td::string, td::unique_ptr<td::VirtuallyJsonable>> empty_parameters;
+
+void JsonQueryError::store(td::JsonValueScope *scope) const {
+  auto object = scope->enter_object();
+  object("ok", td::JsonFalse());
+  object("error_code", error_code_);
+  if (td::check_utf8(description_)) {
+    object("description", description_);
+  } else {
+    object("description", td::JsonRawString(description_));
+  }
+  if (!parameters_.empty()) {
+    object("parameters", JsonParameters(parameters_));
+  }
+}
 
 Query::Query(td::vector<td::BufferSlice> &&container, td::Slice token, bool is_test_dc, td::MutableSlice method,
              td::vector<std::pair<td::MutableSlice, td::MutableSlice>> &&args,

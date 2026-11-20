@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2025
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2026
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -214,23 +214,15 @@ class JsonQueryOk final : public td::Jsonable {
 class JsonQueryError final : public td::Jsonable {
  public:
   JsonQueryError(
-      int error_code, td::Slice description,
+      int error_code, td::CSlice description,
       const td::FlatHashMap<td::string, td::unique_ptr<td::VirtuallyJsonable>> &parameters = empty_parameters)
       : error_code_(error_code), description_(description), parameters_(parameters) {
   }
-  void store(td::JsonValueScope *scope) const {
-    auto object = scope->enter_object();
-    object("ok", td::JsonFalse());
-    object("error_code", error_code_);
-    object("description", description_);
-    if (!parameters_.empty()) {
-      object("parameters", JsonParameters(parameters_));
-    }
-  }
+  void store(td::JsonValueScope *scope) const;
 
  private:
   int error_code_;
-  td::Slice description_;
+  td::CSlice description_;
   const td::FlatHashMap<td::string, td::unique_ptr<td::VirtuallyJsonable>> &parameters_;
 };
 
@@ -269,7 +261,7 @@ void answer_query(const Jsonable &result, PromisedQueryPtr query, td::Slice desc
 }
 
 inline void fail_query(
-    int http_status_code, td::Slice description, PromisedQueryPtr query,
+    int http_status_code, td::CSlice description, PromisedQueryPtr query,
     const td::FlatHashMap<td::string, td::unique_ptr<td::VirtuallyJsonable>> &parameters = empty_parameters) {
   query->set_error(http_status_code,
                    td::json_encode<td::BufferSlice>(JsonQueryError(http_status_code, description, parameters)));

@@ -1,5 +1,5 @@
 //
-// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2025
+// Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2026
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -87,7 +87,7 @@ void HttpConnection::send_response(int http_status_code, td::BufferSlice &&conte
   send_closure(std::move(connection_), &td::HttpInboundConnection::write_ok);
 }
 
-void HttpConnection::send_http_error(int http_status_code, td::Slice description) {
+void HttpConnection::send_http_error(int http_status_code, td::CSlice description) {
   send_response(http_status_code, td::json_encode<td::BufferSlice>(JsonQueryError(http_status_code, description)), 0);
 }
 
