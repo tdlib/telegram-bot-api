@@ -4287,6 +4287,21 @@ class Client::JsonWidget final : public td::Jsonable {
   const td_api::messageWidget *widget_;
 };
 
+class Client::JsonBotInvite final : public td::Jsonable {
+ public:
+  JsonBotInvite(const td_api::messageBotInvite *bot_invite, const Client *client)
+      : bot_invite_(bot_invite), client_(client) {
+  }
+  void store(td::JsonValueScope *scope) const {
+    auto object = scope->enter_object();
+    object("inviter", JsonUser(bot_invite_->inviter_user_id_, client_));
+  }
+
+ private:
+  const td_api::messageBotInvite *bot_invite_;
+  const Client *client_;
+};
+
 class Client::JsonGiveawayCreated final : public td::Jsonable {
  public:
   explicit JsonGiveawayCreated(const td_api::messageGiveawayCreated *giveaway_created)
@@ -5665,8 +5680,11 @@ void Client::JsonMessage::store(td::JsonValueScope *scope) const {
     case td_api::messageUnpaidMessagesAllowedByLink::ID:
       object("paid_messages_waived", JsonEmptyObject());
       break;
-    case td_api::messageBotInvite::ID:
+    case td_api::messageBotInvite::ID: {
+      auto content = static_cast<const td_api::messageBotInvite *>(message_->content.get());
+      object("write_access_allowed", JsonBotInvite(content, client_));
       break;
+    }
     case td_api::messageUpgradedGiftOnChainPurchaseOffer::ID:
       break;
     default:
@@ -19726,7 +19744,6 @@ bool Client::need_skip_update_message(int64 chat_id, const MessageInfo *message_
     case td_api::messageChatHasProtectedContentToggled::ID:
     case td_api::messageChatHasProtectedContentDisableRequested::ID:
     case td_api::messageTonConnectRequest::ID:
-    case td_api::messageBotInvite::ID:
     case td_api::messageUpgradedGiftOnChainPurchaseOffer::ID:
       return true;
     default:
