@@ -4844,13 +4844,13 @@ void Client::JsonRichBlock::store(td::JsonValueScope *scope) const {
     }
     case td_api::pageBlockExpandableBlockQuote::ID: {
       const auto *block = static_cast<const td_api::pageBlockExpandableBlockQuote *>(block_);
+      object("type", "expandable_blockquote");
+      object("blocks", JsonRichBlocks(block->blocks_, client_));
       if (block->blocks_.size() == 1 && block->blocks_[0]->get_id() == td_api::pageBlockParagraph::ID) {
         const auto *paragraph = static_cast<const td_api::pageBlockParagraph *>(block->blocks_[0].get());
-        object("type", "expandable_blockquote");
         object("text", JsonRichText(paragraph->text_.get(), client_));
       } else {
-        object("type", "blockquote");
-        object("blocks", JsonRichBlocks(block->blocks_, client_));
+        object("text", "");
       }
       if (block->credit_ != nullptr) {
         object("credit", JsonRichText(block->credit_.get(), client_));
@@ -12895,10 +12895,12 @@ td::Result<td_api::object_ptr<td_api::InputPageBlock>> Client::get_input_page_bl
     return make_object<td_api::inputPageBlockBlockQuote>(std::move(blocks), std::move(credit));
   }
   if (type == "expandable_blockquote") {
-    TRY_RESULT(text, get_rich_text(object.extract_field("text")));
+    TRY_RESULT(blocks, get_input_page_blocks(query, object.extract_field("blocks")));
+    if (blocks.empty() && object.has_field("text")) {
+      TRY_RESULT(text, get_rich_text(object.extract_field("text")));
+      blocks.push_back(make_object<td_api::inputPageBlockParagraph>(std::move(text)));
+    }
     TRY_RESULT(credit, get_rich_text(object.extract_field("credit")));
-    td::vector<object_ptr<td_api::InputPageBlock>> blocks;
-    blocks.push_back(make_object<td_api::inputPageBlockParagraph>(std::move(text)));
     return make_object<td_api::inputPageBlockExpandableBlockQuote>(std::move(blocks), std::move(credit));
   }
   if (type == "pullquote") {
