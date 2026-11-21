@@ -525,6 +525,10 @@ class Client::JsonUser final : public td::Jsonable {
     }
     if (full_bot_info_) {
       CHECK(user_id_ == client_->my_id_);
+      if (user_info != nullptr && !user_info->active_usernames.empty()) {
+        object("active_usernames", td::json_array(user_info->active_usernames,
+                                                  [](td::Slice username) { return td::JsonString(username); }));
+      }
       const auto *bot = client_->my_bot_type_.get();
       CHECK(bot != nullptr);
       object("can_join_groups", td::JsonBool(bot->can_join_groups_));
