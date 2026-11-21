@@ -4216,7 +4216,7 @@ class Client::JsonMessageGenerationStopped final : public td::Jsonable {
     if (update_stop_message_draft_->forum_topic_id_ != 0) {
       object("message_thread_id", update_stop_message_draft_->forum_topic_id_);
     }
-    object("draft_id", td::to_string(update_stop_message_draft_->draft_id_));
+    object("draft_id", update_stop_message_draft_->draft_id_);
   }
 
  private:
